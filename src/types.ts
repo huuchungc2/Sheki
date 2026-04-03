@@ -18,6 +18,8 @@ export type Product = {
   price: number;
   costPrice: number;
   stock: number;
+  availableStock: number;
+  reservedStock: number;
   status: "in_stock" | "out_of_stock" | "low_stock";
   image?: string;
 };
@@ -31,15 +33,39 @@ export type Customer = {
   totalSpent: number;
   lastVisit: string;
   status: "active" | "inactive";
+  assignedEmployeeId?: string;
+};
+
+export type OrderItem = {
+  productId: string;
+  productName: string;
+  sku: string;
+  price: number;
+  quantity: number;
+  discountRate: number;
+  discountAmount: number;
+  commissionRate: number;
+  commissionAmount: number;
+  image?: string;
 };
 
 export type Order = {
   id: string;
+  customerId: string;
   customerName: string;
+  customerPhone: string;
   date: string;
   total: number;
   status: "pending" | "completed" | "cancelled" | "shipping";
-  paymentMethod: string;
+  paymentMethod: "cash" | "transfer" | "card";
+  items: OrderItem[];
+  shippingAddress: string;
+  carrierService: "standard" | "express";
+  shippingFee: number;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  assignedEmployeeId?: string;
 };
 
 export type InventoryTransaction = {

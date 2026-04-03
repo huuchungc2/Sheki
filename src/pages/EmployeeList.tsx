@@ -13,7 +13,8 @@ import {
   Trash2,
   Edit2,
   Eye,
-  Users
+  Users,
+  Upload
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn, formatDate } from "../lib/utils";
@@ -170,9 +171,9 @@ export function EmployeeList() {
                       <button className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-400 transition-all" title="Xem chi tiết">
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all" title="Chỉnh sửa">
+                      <Link to={`/employees/edit/${employee.id}`} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all" title="Chỉnh sửa">
                         <Edit2 className="w-4 h-4" />
-                      </button>
+                      </Link>
                       <button className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all" title="Xóa">
                         <Trash2 className="w-4 h-4" />
                       </button>

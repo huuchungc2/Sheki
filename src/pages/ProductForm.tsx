@@ -12,11 +12,13 @@ import {
   Truck,
   Info
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "../lib/utils";
 
 export function ProductForm() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEdit = Boolean(id);
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -30,8 +32,12 @@ export function ProductForm() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Thêm sản phẩm mới</h1>
-            <p className="text-slate-500 text-sm mt-1">Tạo sản phẩm mới để bắt đầu kinh doanh.</p>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isEdit ? `Chỉnh sửa sản phẩm: ${id}` : "Thêm sản phẩm mới"}
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">
+              {isEdit ? "Cập nhật thông tin chi tiết của sản phẩm." : "Tạo sản phẩm mới để bắt đầu kinh doanh."}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -189,7 +195,23 @@ export function ProductForm() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700">Tồn kho ban đầu</label>
+                <label className="text-sm font-bold text-slate-700">Tổng tồn kho</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Tạm giữ (Đơn đang giao/đã lên)</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Có thể bán</label>
                 <input 
                   type="number" 
                   placeholder="0" 

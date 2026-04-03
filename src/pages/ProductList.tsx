@@ -13,18 +13,19 @@ import {
   Edit2,
   Trash2,
   Eye,
-  BarChart2
+  BarChart2,
+  Upload
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn, formatCurrency } from "../lib/utils";
 import type { Product } from "../types";
 
 const products: Product[] = [
-  { id: "PROD001", name: "Áo thun Cotton Basic", sku: "TS-001", category: "Áo nam", price: 250000, costPrice: 120000, stock: 150, status: "in_stock", image: "https://picsum.photos/seed/shirt1/200/200" },
-  { id: "PROD002", name: "Quần Jean Slimfit", sku: "JN-002", category: "Quần nam", price: 550000, costPrice: 350000, stock: 8, status: "low_stock", image: "https://picsum.photos/seed/jean1/200/200" },
-  { id: "PROD003", name: "Giày Sneaker White", sku: "SH-003", category: "Giày dép", price: 1200000, costPrice: 850000, stock: 0, status: "out_of_stock", image: "https://picsum.photos/seed/shoe1/200/200" },
-  { id: "PROD004", name: "Áo khoác Bomber", sku: "JK-004", category: "Áo nam", price: 850000, costPrice: 550000, stock: 45, status: "in_stock", image: "https://picsum.photos/seed/jacket1/200/200" },
-  { id: "PROD005", name: "Thắt lưng da bò", sku: "BL-005", category: "Phụ kiện", price: 450000, costPrice: 200000, stock: 22, status: "in_stock", image: "https://picsum.photos/seed/belt1/200/200" },
+  { id: "PROD001", name: "Áo thun Cotton Basic", sku: "TS-001", category: "Áo nam", price: 250000, costPrice: 120000, stock: 150, availableStock: 120, reservedStock: 30, status: "in_stock", image: "https://picsum.photos/seed/shirt1/200/200" },
+  { id: "PROD002", name: "Quần Jean Slimfit", sku: "JN-002", category: "Quần nam", price: 550000, costPrice: 350000, stock: 8, availableStock: 5, reservedStock: 3, status: "low_stock", image: "https://picsum.photos/seed/jean1/200/200" },
+  { id: "PROD003", name: "Giày Sneaker White", sku: "SH-003", category: "Giày dép", price: 1200000, costPrice: 850000, stock: 0, availableStock: 0, reservedStock: 0, status: "out_of_stock", image: "https://picsum.photos/seed/shoe1/200/200" },
+  { id: "PROD004", name: "Áo khoác Bomber", sku: "JK-004", category: "Áo nam", price: 850000, costPrice: 550000, stock: 45, availableStock: 40, reservedStock: 5, status: "in_stock", image: "https://picsum.photos/seed/jacket1/200/200" },
+  { id: "PROD005", name: "Thắt lưng da bò", sku: "BL-005", category: "Phụ kiện", price: 450000, costPrice: 200000, stock: 22, availableStock: 20, reservedStock: 2, status: "in_stock", image: "https://picsum.photos/seed/belt1/200/200" },
 ];
 
 export function ProductList() {
@@ -112,7 +113,7 @@ export function ProductList() {
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sản phẩm</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Danh mục</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Giá bán</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tồn kho</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kho hàng</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right"></th>
               </tr>
@@ -140,14 +141,29 @@ export function ProductList() {
                     <p className="text-xs text-slate-400 line-through">{formatCurrency(product.price * 1.2)}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <p className={cn(
-                      "text-sm font-bold",
-                      product.stock === 0 ? "text-red-600" : 
-                      product.stock < 10 ? "text-amber-600" : 
-                      "text-slate-900"
-                    )}>
-                      {product.stock} <span className="text-xs font-normal text-slate-500">cái</span>
-                    </p>
+                    <div className="space-y-1.5 min-w-[140px]">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">CÓ THỂ BÁN</span>
+                        </div>
+                        <span className="text-sm font-black text-emerald-600">{product.availableStock}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">TẠM GIỮ</span>
+                        </div>
+                        <span className="text-sm font-black text-amber-600">{product.reservedStock}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 pt-1.5 border-t border-slate-100">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">TỔNG TỒN</span>
+                        </div>
+                        <span className="text-sm font-black text-slate-900">{product.stock}</span>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={cn(
@@ -166,9 +182,9 @@ export function ProductList() {
                       <button className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-400 transition-all">
                         <BarChart2 className="w-4 h-4" />
                       </button>
-                      <button className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
+                      <Link to={`/products/edit/${product.id}`} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
                         <Edit2 className="w-4 h-4" />
-                      </button>
+                      </Link>
                       <button className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all">
                         <Trash2 className="w-4 h-4" />
                       </button>

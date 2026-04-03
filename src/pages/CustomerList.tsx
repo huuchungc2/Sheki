@@ -14,7 +14,8 @@ import {
   Edit2,
   Trash2,
   Eye,
-  History
+  History,
+  Upload
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
@@ -165,9 +166,9 @@ export function CustomerList() {
                       <button className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-400 transition-all">
                         <History className="w-4 h-4" />
                       </button>
-                      <button className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
+                      <Link to={`/customers/edit/${customer.id}`} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
                         <Edit2 className="w-4 h-4" />
-                      </button>
+                      </Link>
                       <button className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all">
                         <Trash2 className="w-4 h-4" />
                       </button>

@@ -12,11 +12,13 @@ import {
   CreditCard,
   History
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "../lib/utils";
 
 export function CustomerForm() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEdit = Boolean(id);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -30,8 +32,12 @@ export function CustomerForm() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Thêm khách hàng mới</h1>
-            <p className="text-slate-500 text-sm mt-1">Thu thập thông tin khách hàng để chăm sóc tốt hơn.</p>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isEdit ? `Chỉnh sửa khách hàng: ${id}` : "Thêm khách hàng mới"}
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">
+              {isEdit ? "Cập nhật thông tin chi tiết của khách hàng." : "Thu thập thông tin khách hàng để chăm sóc tốt hơn."}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -176,6 +182,14 @@ export function CustomerForm() {
                     <option>Hà Nội</option>
                     <option>TP. Hồ Chí Minh</option>
                     <option>Đà Nẵng</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Nhân viên phụ trách</label>
+                  <select className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none">
+                    <option value="">Không có</option>
+                    <option value="EMP001">Nguyễn Văn An</option>
+                    <option value="EMP002">Trần Thị Bình</option>
                   </select>
                 </div>
                 <div className="space-y-2">

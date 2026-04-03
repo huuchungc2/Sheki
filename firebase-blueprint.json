@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user-specific information including their assigned role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User's full name" },
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "role": { "type": "string", "enum": ["admin", "manager", "sales", "warehouse", "accounting"], "description": "The role ID assigned to the user" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Role": {
+      "title": "System Role",
+      "description": "Defines a group of permissions for a specific role.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Role ID (e.g., manager)" },
+        "name": { "type": "string", "description": "Display name of the role" },
+        "description": { "type": "string", "description": "Brief description of the role's purpose" },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of permission strings (e.g., products:view_catalog)"
+        }
+      },
+      "required": ["id", "name", "permissions"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and role assignments"
+    },
+    "/roles/{roleId}": {
+      "schema": "Role",
+      "description": "System-wide role and permission definitions"
+    }
+  }
+}
