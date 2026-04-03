@@ -54,6 +54,11 @@ export function Login() {
     } catch (err: any) {
       console.log("Initial sign-in failed, checking if we need to seed:", err.code);
       
+      if (err.code === "auth/operation-not-allowed") {
+        setError("Lỗi: Phương thức đăng nhập bằng Email/Mật khẩu chưa được bật trong Firebase Console. Vui lòng bật nó trong phần Authentication > Sign-in method.");
+        return;
+      }
+
       // If user doesn't exist (or invalid credential which could mean doesn't exist)
       if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
         try {

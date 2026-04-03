@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Search, Calendar, Filter, ArrowRight } from "lucide-react";
 import { cn, formatCurrency } from "../lib/utils";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 
 // Mock data for orders
 const mockOrders = [

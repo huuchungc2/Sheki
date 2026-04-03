@@ -42,73 +42,69 @@ export default function App() {
     );
   }
 
-  // Basic route protection
-  const isAuthPage = window.location.pathname === "/login" || window.location.pathname === "/register";
-  if (!isAuthenticated && !isAuthPage) {
-    return (
-      <Router>
-        <Routes>
-          <Route path="*" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-        </Routes>
-      </Router>
-    );
-  }
-
   return (
     <Router>
       <Routes>
+        {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
-        <Route path="*" element={
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              
-              {/* Employees */}
-              <Route path="/employees" element={<EmployeeList />} />
-              <Route path="/employees/new" element={<EmployeeForm />} />
-              <Route path="/employees/edit/:id" element={<EmployeeForm />} />
-              <Route path="/employees/import" element={<BulkImport />} />
-              
-              {/* Products */}
-              <Route path="/products" element={<ProductList />} />
-              <Route path="/products/new" element={<ProductForm />} />
-              <Route path="/products/edit/:id" element={<ProductForm />} />
-              <Route path="/products/import" element={<BulkImport />} />
-              
-              {/* Customers */}
-              <Route path="/customers" element={<CustomerList />} />
-              <Route path="/customers/new" element={<CustomerForm />} />
-              <Route path="/customers/edit/:id" element={<CustomerForm />} />
-              <Route path="/customers/import" element={<BulkImport />} />
-              
-              {/* Orders */}
-              <Route path="/orders" element={<OrderList />} />
-              <Route path="/orders/new" element={<OrderForm />} />
-              <Route path="/orders/edit/:id" element={<OrderForm />} />
-              <Route path="/orders/search/day" element={<OrderSearchDay />} />
-              <Route path="/orders/search/month" element={<OrderSearchMonth />} />
-              <Route path="/orders/search/year" element={<OrderSearchYear />} />
-              <Route path="/orders/search/range" element={<OrderSearchRange />} />
-              
-              {/* Inventory */}
-              <Route path="/inventory" element={<InventoryHistory />} />
-              <Route path="/inventory/import" element={<InventoryImport />} />
-              <Route path="/inventory/export" element={<InventoryExport />} />
-              
-              {/* Reports */}
-              <Route path="/reports" element={<SalaryReport />} />
-              
-              {/* Settings */}
-              <Route path="/settings" element={<Settings />} />
-              
-              {/* Fallback */}
-              <Route path="*" element={<Dashboard />} />
-            </Routes>
-          </Layout>
-        } />
+        {/* Protected Routes */}
+        <Route 
+          path="*" 
+          element={
+            isAuthenticated ? (
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  
+                  {/* Employees */}
+                  <Route path="/employees" element={<EmployeeList />} />
+                  <Route path="/employees/new" element={<EmployeeForm />} />
+                  <Route path="/employees/edit/:id" element={<EmployeeForm />} />
+                  <Route path="/employees/import" element={<BulkImport />} />
+                  
+                  {/* Products */}
+                  <Route path="/products" element={<ProductList />} />
+                  <Route path="/products/new" element={<ProductForm />} />
+                  <Route path="/products/edit/:id" element={<ProductForm />} />
+                  <Route path="/products/import" element={<BulkImport />} />
+                  
+                  {/* Customers */}
+                  <Route path="/customers" element={<CustomerList />} />
+                  <Route path="/customers/new" element={<CustomerForm />} />
+                  <Route path="/customers/edit/:id" element={<CustomerForm />} />
+                  <Route path="/customers/import" element={<BulkImport />} />
+                  
+                  {/* Orders */}
+                  <Route path="/orders" element={<OrderList />} />
+                  <Route path="/orders/new" element={<OrderForm />} />
+                  <Route path="/orders/edit/:id" element={<OrderForm />} />
+                  <Route path="/orders/search/day" element={<OrderSearchDay />} />
+                  <Route path="/orders/search/month" element={<OrderSearchMonth />} />
+                  <Route path="/orders/search/year" element={<OrderSearchYear />} />
+                  <Route path="/orders/search/range" element={<OrderSearchRange />} />
+                  
+                  {/* Inventory */}
+                  <Route path="/inventory" element={<InventoryHistory />} />
+                  <Route path="/inventory/import" element={<InventoryImport />} />
+                  <Route path="/inventory/export" element={<InventoryExport />} />
+                  
+                  {/* Reports */}
+                  <Route path="/reports" element={<SalaryReport />} />
+                  
+                  {/* Settings */}
+                  <Route path="/settings" element={<Settings />} />
+                  
+                  {/* Fallback */}
+                  <Route path="*" element={<Dashboard />} />
+                </Routes>
+              </Layout>
+            ) : (
+              <Login />
+            )
+          } 
+        />
       </Routes>
     </Router>
   );

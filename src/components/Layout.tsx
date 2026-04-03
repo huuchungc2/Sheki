@@ -17,7 +17,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const navigation = [
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },

@@ -23,7 +23,7 @@ import {
   Bar,
   Cell
 } from "recharts";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { cn, formatCurrency } from "../lib/utils";
 
 const data = [
