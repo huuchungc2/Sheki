@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface BulkImportProps {
   entity: "products" | "customers" | "employees";
@@ -111,176 +110,157 @@ export function BulkImport() {
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
-        {step === 1 && (
-          <motion.div 
-            key="step1"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-8"
+      {step === 1 && (
+        <div className="space-y-8">
+          <div 
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files[0]) { setFileName(e.dataTransfer.files[0].name); setStep(2); } }}
+            className={cn(
+              "border-2 border-dashed rounded-[2.5rem] p-16 flex flex-col items-center justify-center text-center transition-all cursor-pointer",
+              isDragging ? "border-blue-500 bg-blue-50/50" : "border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/50"
+            )}
+            onClick={() => document.getElementById("file-upload")?.click()}
           >
-            <div 
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files[0]) { setFileName(e.dataTransfer.files[0].name); setStep(2); } }}
-              className={cn(
-                "border-2 border-dashed rounded-[2.5rem] p-16 flex flex-col items-center justify-center text-center transition-all cursor-pointer",
-                isDragging ? "border-blue-500 bg-blue-50/50" : "border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/50"
-              )}
-              onClick={() => document.getElementById("file-upload")?.click()}
-            >
-              <input 
-                type="file" 
-                id="file-upload" 
-                className="hidden" 
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileSelect}
-              />
-              <div className={cn("w-20 h-20 rounded-3xl flex items-center justify-center text-white mb-6 shadow-xl", config.color)}>
-                <Upload className="w-10 h-10" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Chọn tệp hoặc kéo thả vào đây</h3>
-              <p className="text-slate-500 max-w-xs mx-auto">Hỗ trợ định dạng .csv, .xlsx, .xls. Dung lượng tối đa 10MB.</p>
+            <input 
+              type="file" 
+              id="file-upload" 
+              className="hidden" 
+              accept=".csv,.xlsx,.xls"
+              onChange={handleFileSelect}
+            />
+            <div className={cn("w-20 h-20 rounded-3xl flex items-center justify-center text-white mb-6 shadow-xl", config.color)}>
+              <Upload className="w-10 h-10" />
             </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Chọn tệp hoặc kéo thả vào đây</h3>
+            <p className="text-slate-500 max-w-xs mx-auto">Hỗ trợ định dạng .csv, .xlsx, .xls. Dung lượng tối đa 10MB.</p>
+          </div>
 
-            <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
-                  <FileText className="w-6 h-6" />
-                </div>
+          <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900">Tệp mẫu chuẩn</h4>
+                <p className="text-sm text-slate-500">Sử dụng tệp mẫu của chúng tôi để đảm bảo dữ liệu hợp lệ.</p>
+              </div>
+            </div>
+            <button className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20">
+              <Download className="w-4 h-4" />
+              Tải tệp mẫu
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-8">
+          <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-2xl border border-blue-100">
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6 text-blue-600" />
                 <div>
-                  <h4 className="font-bold text-slate-900">Tệp mẫu chuẩn</h4>
-                  <p className="text-sm text-slate-500">Sử dụng tệp mẫu của chúng tôi để đảm bảo dữ liệu hợp lệ.</p>
+                  <p className="text-sm font-bold text-slate-900">{fileName}</p>
+                  <p className="text-xs text-slate-500">Sẵn sàng để nhập dữ liệu</p>
                 </div>
               </div>
-              <button className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20">
-                <Download className="w-4 h-4" />
-                Tải tệp mẫu
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 2 && (
-          <motion.div 
-            key="step2"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-8"
-          >
-            <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{fileName}</p>
-                    <p className="text-xs text-slate-500">Sẵn sàng để nhập dữ liệu</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => { setFileName(null); setStep(1); }}
-                  className="text-xs font-bold text-red-600 hover:underline"
-                >
-                  Thay đổi tệp
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                  <Database className="w-4 h-4 text-blue-600" />
-                  Ánh xạ các trường dữ liệu
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {config.fields.map((field) => (
-                    <div key={field} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-sm font-medium text-slate-700">{field}</span>
-                      <div className="flex items-center gap-2 text-emerald-600">
-                        <span className="text-xs font-bold">Đã khớp</span>
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
-                <button 
-                  onClick={() => setStep(1)}
-                  className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
-                >
-                  Quay lại
-                </button>
-                <button 
-                  onClick={handleUpload}
-                  disabled={isUploading}
-                  className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
-                >
-                  {isUploading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Đang xử lý...
-                    </>
-                  ) : (
-                    <>
-                      Bắt đầu nhập dữ liệu
-                      <ChevronRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 3 && (
-          <motion.div 
-            key="step3"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white p-16 rounded-[3rem] border border-slate-200 shadow-sm text-center space-y-8"
-          >
-            <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-              <CheckCircle2 className="w-12 h-12" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold text-slate-900">Thành công!</h2>
-              <p className="text-slate-500">Dữ liệu của bạn đã được nhập vào hệ thống thành công.</p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-              <div className="bg-slate-50 p-4 rounded-2xl">
-                <p className="text-2xl font-bold text-slate-900">128</p>
-                <p className="text-xs text-slate-500 font-medium">Tổng số dòng</p>
-              </div>
-              <div className="bg-emerald-50 p-4 rounded-2xl">
-                <p className="text-2xl font-bold text-emerald-600">128</p>
-                <p className="text-xs text-emerald-600 font-medium">Thành công</p>
-              </div>
-              <div className="bg-red-50 p-4 rounded-2xl">
-                <p className="text-2xl font-bold text-red-600">0</p>
-                <p className="text-xs text-red-600 font-medium">Lỗi</p>
-              </div>
-            </div>
-
-            <div className="pt-8 flex items-center justify-center gap-4">
               <button 
-                onClick={() => navigate(`/${entityType}`)}
-                className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
+                onClick={() => { setFileName(null); setStep(1); }}
+                className="text-xs font-bold text-red-600 hover:underline"
               >
-                Xem danh sách
+                Thay đổi tệp
               </button>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                <Database className="w-4 h-4 text-blue-600" />
+                Ánh xạ các trường dữ liệu
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {config.fields.map((field) => (
+                  <div key={field} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-sm font-medium text-slate-700">{field}</span>
+                    <div className="flex items-center gap-2 text-emerald-600">
+                      <span className="text-xs font-bold">Đã khớp</span>
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
               <button 
                 onClick={() => setStep(1)}
-                className="px-8 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
               >
-                Tiếp tục nhập tệp khác
+                Quay lại
+              </button>
+              <button 
+                onClick={handleUpload}
+                disabled={isUploading}
+                className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+              >
+                {isUploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    Bắt đầu nhập dữ liệu
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="bg-white p-16 rounded-[3rem] border border-slate-200 shadow-sm text-center space-y-8">
+          <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+            <CheckCircle2 className="w-12 h-12" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold text-slate-900">Thành công!</h2>
+            <p className="text-slate-500">Dữ liệu của bạn đã được nhập vào hệ thống thành công.</p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
+            <div className="bg-slate-50 p-4 rounded-2xl">
+              <p className="text-2xl font-bold text-slate-900">128</p>
+              <p className="text-xs text-slate-500 font-medium">Tổng số dòng</p>
+            </div>
+            <div className="bg-emerald-50 p-4 rounded-2xl">
+              <p className="text-2xl font-bold text-emerald-600">128</p>
+              <p className="text-xs text-emerald-600 font-medium">Thành công</p>
+            </div>
+            <div className="bg-red-50 p-4 rounded-2xl">
+              <p className="text-2xl font-bold text-red-600">0</p>
+              <p className="text-xs text-red-600 font-medium">Lỗi</p>
+            </div>
+          </div>
+
+          <div className="pt-8 flex items-center justify-center gap-4">
+            <button 
+              onClick={() => navigate(`/${entityType}`)}
+              className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
+            >
+              Xem danh sách
+            </button>
+            <button 
+              onClick={() => setStep(1)}
+              className="px-8 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+            >
+              Tiếp tục nhập tệp khác
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Help Section */}
       {step < 3 && (

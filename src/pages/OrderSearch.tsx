@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Search, Calendar, Filter, ArrowRight } from "lucide-react";
 import { cn, formatCurrency } from "../lib/utils";
-import { motion } from "framer-motion";
 
 // Mock data for orders
 const mockOrders = [
@@ -131,11 +130,8 @@ function OrderSearchBase({ title, description, type }: OrderSearchProps) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {results.map((order, index) => (
-                <motion.tr 
+                <tr 
                   key={order.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
                   className="hover:bg-slate-50/50 transition-all group"
                 >
                   <td className="px-8 py-5">
@@ -171,7 +167,7 @@ function OrderSearchBase({ title, description, type }: OrderSearchProps) {
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </td>
-                </motion.tr>
+                </tr>
               ))}
             </tbody>
           </table>

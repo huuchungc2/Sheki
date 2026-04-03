@@ -136,10 +136,53 @@ export function Login() {
         </div>
 
         {/* Right Side: Login Form */}
-        <div className="md:w-1/2 p-12 md:p-16">
+        <div className="md:w-1/2 p-12 md:p-16 overflow-y-auto">
           <div className="mb-10">
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Chào mừng trở lại</h2>
             <p className="text-slate-400 font-bold mt-2">Đăng nhập để tiếp tục quản lý hệ thống.</p>
+          </div>
+
+          {/* Quick Login Section moved up */}
+          <div className="mb-10">
+            <div className="relative flex items-center justify-center mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-100"></div>
+              </div>
+              <span className="relative px-4 bg-white text-[10px] font-black text-blue-600 uppercase tracking-widest">Đăng nhập nhanh (Dữ liệu mẫu)</span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {DEMO_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => seedAndLogin(acc)}
+                  disabled={isLoading}
+                  className="flex items-center justify-between px-6 py-3 bg-blue-50/50 border border-blue-100/50 rounded-2xl hover:bg-blue-600 hover:text-white transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black transition-colors",
+                      acc.role === "admin" ? "bg-red-100 text-red-600 group-hover:bg-white/20 group-hover:text-white" : "bg-emerald-100 text-emerald-600 group-hover:bg-white/20 group-hover:text-white"
+                    )}>
+                      {acc.role === "admin" ? "AD" : "SA"}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-black group-hover:text-white transition-colors">{acc.name}</p>
+                      <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest">{acc.email}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 opacity-40 group-hover:opacity-100 transition-all" />
+                </button>
+              ))}
+            </div>
+
+            <div className="relative flex items-center justify-center mt-8">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-100"></div>
+              </div>
+              <span className="relative px-4 bg-white text-[10px] font-black text-slate-300 uppercase tracking-widest">Hoặc nhập thủ công</span>
+            </div>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
@@ -197,41 +240,6 @@ export function Login() {
               )}
             </button>
           </form>
-
-          <div className="mt-10">
-            <div className="relative flex items-center justify-center mb-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-100"></div>
-              </div>
-              <span className="relative px-4 bg-white text-[10px] font-black text-slate-300 uppercase tracking-widest">Đăng nhập nhanh (Dữ liệu mẫu)</span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => seedAndLogin(acc)}
-                  disabled={isLoading}
-                  className="flex items-center justify-between px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-blue-50 hover:border-blue-100 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black",
-                      acc.role === "admin" ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"
-                    )}>
-                      {acc.role === "admin" ? "AD" : "SA"}
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-black text-slate-900">{acc.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{acc.email}</p>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
-                </button>
-              ))}
-            </div>
-          </div>
 
           <p className="mt-10 text-center text-sm font-bold text-slate-400">
             Chưa có tài khoản?{" "}

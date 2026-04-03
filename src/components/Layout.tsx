@@ -17,7 +17,9 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+
+import { auth } from "../firebase";
+import { signOut } from "firebase/auth";
 
 const navigation = [
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
@@ -49,9 +51,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
   };
 
   if (isAuthPage) {
@@ -93,10 +99,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
                 {isSidebarOpen && <span>{item.name}</span>}
                 {isActive && isSidebarOpen && (
-                  <motion.div 
-                    layoutId="active-dot"
-                    className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" 
-                  />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
                 )}
               </Link>
             );
@@ -124,10 +127,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
                 {isSidebarOpen && <span>{item.name}</span>}
                 {isActive && isSidebarOpen && (
-                  <motion.div 
-                    layoutId="active-dot"
-                    className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" 
-                  />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
                 )}
               </Link>
             );
@@ -155,10 +155,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
                 {isSidebarOpen && <span>{item.name}</span>}
                 {isActive && isSidebarOpen && (
-                  <motion.div 
-                    layoutId="active-dot"
-                    className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" 
-                  />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
                 )}
               </Link>
             );
@@ -220,11 +217,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="h-8 w-px bg-slate-200 mx-2"></div>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-slate-900 leading-none">Admin Velocity</p>
-                <p className="text-xs text-slate-500 mt-1">Quản trị viên</p>
+                <p className="text-sm font-semibold text-slate-900 leading-none">
+                  {auth.currentUser?.displayName || "Người dùng"}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {auth.currentUser?.email || "Chưa đăng nhập"}
+                </p>
               </div>
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
-                AV
+                {auth.currentUser?.displayName?.split(' ').map(n => n[0]).join('').toUpperCase() || "U"}
               </div>
             </div>
           </div>
@@ -232,17 +233,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Page Content */}
         <div className="p-8 max-w-7xl mx-auto w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          <div key={location.pathname}>
+            {children}
+          </div>
         </div>
       </main>
     </div>

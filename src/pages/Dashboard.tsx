@@ -23,7 +23,6 @@ import {
   Bar,
   Cell
 } from "recharts";
-import { motion } from "framer-motion";
 import { cn, formatCurrency } from "../lib/utils";
 
 const data = [
@@ -101,13 +100,10 @@ export function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
-          <motion.div 
-            key={stat.name}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
-          >
+            <div 
+              key={stat.name}
+              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
+            >
             <div className="flex items-center justify-between mb-4">
               <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg", stat.color)}>
                 <stat.icon className="w-6 h-6" />
@@ -122,7 +118,7 @@ export function Dashboard() {
             </div>
             <p className="text-sm font-medium text-slate-500">{stat.name}</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
-          </motion.div>
+          </div>
         ))}
       </div>
 
@@ -182,11 +178,8 @@ export function Dashboard() {
           <h2 className="text-lg font-bold text-slate-900 mb-6">Đơn hàng gần đây</h2>
           <div className="space-y-6">
             {recentOrders.map((order, index) => (
-              <motion.div 
+              <div 
                 key={order.id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 + 0.5 }}
                 className="flex items-center justify-between group cursor-pointer"
               >
                 <div className="flex items-center gap-4">
@@ -210,7 +203,7 @@ export function Dashboard() {
                     {order.status}
                   </p>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
           <button className="w-full mt-8 py-3 bg-slate-50 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
