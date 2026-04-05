@@ -4,6 +4,9 @@
 1. `TODO.md` → biết đang làm gì, task nào tiếp theo
 2. `CHANGELOG.md` → biết đã làm gì rồi, tránh làm lại
 3. `RULES.md` → quy tắc code bắt buộc
+4. `LOGIC_BUSINESS.md` → nghiệp vụ hoa hồng, lương, CTV
+5. `UI_SPEC.md` → chuẩn giao diện Sheki
+6. `plan.md` → business rules chi tiết, DB schema, cấu trúc thư mục
 
 ---
 
