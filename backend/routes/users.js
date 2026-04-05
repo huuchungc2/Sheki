@@ -181,6 +181,7 @@ router.get('/:id/overview', auth, async (req, res, next) => {
 
     const pool = await getPool();
     const targetUserId = parseInt(req.params.id);
+    const { date_from, date_to } = req.query;
 
     const [userRows] = await pool.query(
       'SELECT id, full_name, email, phone, role, department, position, commission_rate, salary, join_date, avatar_url, city, district, is_active, created_at FROM users WHERE id = ?',
@@ -198,16 +199,40 @@ router.get('/:id/overview', auth, async (req, res, next) => {
       [targetUserId]
     );
 
-    const [commissionRows] = await pool.query(
+    // Build date filter condition
+    let dateWhere = '';
+    const dateParams = [];
+    if (date_from) { dateWhere += ' AND DATE(o.created_at) >= ?'; dateParams.push(date_from); }
+    if (date_to)   { dateWhere += ' AND DATE(o.created_at) <= ?'; dateParams.push(date_to); }
+
+    // Hoa hồng trực tiếp (direct) — từ đơn nhân viên tự bán
+    const [directRows] = await pool.query(
       `SELECT
         COUNT(DISTINCT c.order_id) as total_orders,
-        COALESCE(SUM(DISTINCT c.commission_amount), 0) as total_commission,
-        COALESCE(SUM(DISTINCT o.total_amount), 0) as total_revenue
+        COALESCE(SUM(c.commission_amount), 0) as direct_commission,
+        COALESCE(SUM(o.total_amount), 0) as total_revenue
        FROM commissions c
        JOIN orders o ON c.order_id = o.id
-       WHERE c.user_id = ?`,
-      [targetUserId]
+       WHERE c.user_id = ? AND c.type = 'direct' ${dateWhere}`,
+      [targetUserId, ...dateParams]
     );
+
+    // Hoa hồng override (từ CTV) — nhân viên Sales nhận khi CTV dưới quyền bán
+    const [overrideRows] = await pool.query(
+      `SELECT COALESCE(SUM(c.commission_amount), 0) as override_commission
+       FROM commissions c
+       JOIN orders o ON c.order_id = o.id
+       WHERE c.user_id = ? AND c.type = 'override' ${dateWhere}`,
+      [targetUserId, ...dateParams]
+    );
+
+    const commission = {
+      total_orders:        parseInt(directRows[0].total_orders) || 0,
+      direct_commission:   parseFloat(directRows[0].direct_commission) || 0,
+      override_commission: parseFloat(overrideRows[0].override_commission) || 0,
+      total_commission:    (parseFloat(directRows[0].direct_commission) || 0) + (parseFloat(overrideRows[0].override_commission) || 0),
+      total_revenue:       parseFloat(directRows[0].total_revenue) || 0,
+    };
 
     const [topProductsRows] = await pool.query(
       `SELECT
@@ -217,19 +242,19 @@ router.get('/:id/overview', auth, async (req, res, next) => {
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.id
        JOIN products p ON oi.product_id = p.id
-       WHERE o.salesperson_id = ? AND o.status != 'cancelled'
+       WHERE o.salesperson_id = ? AND o.status != 'cancelled' ${dateWhere}
        GROUP BY p.id, p.name, p.sku, p.unit
        ORDER BY total_qty DESC
        LIMIT 10`,
-      [targetUserId]
+      [targetUserId, ...dateParams]
     );
 
     const [orderStatsRows] = await pool.query(
       `SELECT status, COUNT(*) as count
        FROM orders
-       WHERE salesperson_id = ?
+       WHERE salesperson_id = ? ${dateWhere.replace(/o\./g, '')}
        GROUP BY status`,
-      [targetUserId]
+      [targetUserId, ...dateParams]
     );
     const orderStats = {};
     orderStatsRows.forEach(r => { orderStats[r.status] = r.count; });
@@ -238,7 +263,7 @@ router.get('/:id/overview', auth, async (req, res, next) => {
       data: {
         user,
         groups: groupRows,
-        commission: commissionRows[0],
+        commission,
         topProducts: topProductsRows.map(r => ({
           ...r,
           total_qty: parseFloat(r.total_qty) || 0,
@@ -260,7 +285,7 @@ router.get('/:id/orders', auth, async (req, res, next) => {
 
     const pool = await getPool();
     const targetUserId = parseInt(req.params.id);
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, date_from, date_to, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
     let query = `
@@ -273,11 +298,9 @@ router.get('/:id/orders', auth, async (req, res, next) => {
     let countQuery = 'SELECT COUNT(*) as total FROM orders WHERE salesperson_id = ?';
     const params = [targetUserId];
 
-    if (status) {
-      query += ' AND o.status = ?';
-      countQuery += ' AND status = ?';
-      params.push(status);
-    }
+    if (status)    { query += ' AND o.status = ?';              countQuery += ' AND status = ?';              params.push(status); }
+    if (date_from) { query += ' AND DATE(o.created_at) >= ?';   countQuery += ' AND DATE(created_at) >= ?';   params.push(date_from); }
+    if (date_to)   { query += ' AND DATE(o.created_at) <= ?';   countQuery += ' AND DATE(created_at) <= ?';   params.push(date_to); }
 
     query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
@@ -327,30 +350,90 @@ router.get('/:id/collaborators', auth, async (req, res, next) => {
 // Report: tổng hoa hồng từ CTV cho một nhân viên
 router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
   try {
-    // Admin có quyền xem cho mọi NV; Sales chỉ được xem CTV của chính mình
-    if (req.user.role === 'sales') {
-      // if there is no mapping, still return 403 to avoid leaking data
-      const pool = await getPool();
-      const [exist] = await pool.query('SELECT 1 FROM user_collaborators WHERE user_id = ? LIMIT 1', [req.params.id]);
-      if ((exist || []).length === 0) {
-        return res.status(403).json({ error: 'Không có quyền xem báo cáo CTV' });
-      }
+    if (req.user.role === 'sales' && parseInt(req.params.id) !== req.user.id) {
+      return res.status(403).json({ error: 'Không có quyền xem báo cáo CTV' });
     }
 
     const pool = await getPool();
-    const [rows] = await pool.query(`
-      SELECT uc.collaborator_id, u.full_name as collaborator_name,
-             COALESCE(SUM(c.commission_amount), 0) as total_commission,
-             COALESCE(COUNT(DISTINCT c.order_id), 0) as total_orders
-      FROM user_collaborators uc
-      LEFT JOIN commissions c ON c.user_id = uc.collaborator_id
-      LEFT JOIN users u ON uc.collaborator_id = u.id
-      WHERE uc.user_id = ?
-      GROUP BY uc.collaborator_id, u.full_name
-      ORDER BY total_commission DESC
-    `, [req.params.id]);
+    const targetUserId = parseInt(req.params.id);
+    const { month, year, group_id } = req.query;
 
-    res.json({ data: rows });
+    // Params cho filter ngày/nhóm (KHÔNG bao gồm targetUserId)
+    const filterConds = [];
+    const filterParams = [];
+    if (month)    { filterConds.push('MONTH(o.created_at) = ?'); filterParams.push(parseInt(month)); }
+    if (year)     { filterConds.push('YEAR(o.created_at) = ?');  filterParams.push(parseInt(year)); }
+    if (group_id) { filterConds.push('o.group_id = ?');          filterParams.push(parseInt(group_id)); }
+    const extra = filterConds.length ? ' AND ' + filterConds.join(' AND ') : '';
+
+    // Tổng hợp theo từng CTV
+    // Params: [filterParams...(cho JOIN ON), targetUserId(cho c.user_id), targetUserId(cho cr.sales_id)]
+    const [summary] = await pool.query(`
+      SELECT
+        col.id as collaborator_id,
+        col.full_name as collaborator_name,
+        col.commission_rate as collaborator_rate,
+        COALESCE(SUM(c.commission_amount), 0) as total_override_commission,
+        COALESCE(COUNT(DISTINCT o.id), 0) as total_orders,
+        COALESCE(SUM(o.total_amount), 0) as total_revenue
+      FROM collaborators cr
+      JOIN users col ON cr.ctv_id = col.id
+      LEFT JOIN orders o ON o.salesperson_id = col.id ${extra}
+      LEFT JOIN commissions c ON c.order_id = o.id
+        AND c.user_id = ? AND c.type = 'override' AND c.ctv_user_id = col.id
+      WHERE cr.sales_id = ?
+      GROUP BY col.id, col.full_name, col.commission_rate
+      ORDER BY total_override_commission DESC
+    `, [...filterParams, targetUserId, targetUserId]);
+
+    // Chi tiết từng đơn
+    // Params: [targetUserId(c.user_id), targetUserId(cr.sales_id), filterParams...(WHERE extra)]
+    const [orders] = await pool.query(`
+      SELECT
+        col.id as collaborator_id,
+        col.full_name as collaborator_name,
+        o.id as order_id, o.code as order_code,
+        o.created_at as order_date,
+        o.total_amount, o.status,
+        g.name as group_name,
+        cu.name as customer_name,
+        c.commission_amount as override_commission,
+        ct.sales_override_rate as override_rate
+      FROM collaborators cr
+      JOIN users col ON cr.ctv_id = col.id
+      JOIN orders o ON o.salesperson_id = col.id
+      JOIN commissions c ON c.order_id = o.id
+        AND c.user_id = ? AND c.type = 'override' AND c.ctv_user_id = col.id
+      LEFT JOIN groups g ON o.group_id = g.id
+      LEFT JOIN customers cu ON o.customer_id = cu.id
+      LEFT JOIN commission_tiers ct ON ct.ctv_rate_min <= col.commission_rate
+        AND (ct.ctv_rate_max IS NULL OR ct.ctv_rate_max >= col.commission_rate)
+      WHERE cr.sales_id = ? ${extra}
+      ORDER BY col.full_name, o.created_at DESC
+    `, [targetUserId, targetUserId, ...filterParams]);
+
+    // Summary tổng
+    const totalOverride = summary.reduce((s, r) => s + parseFloat(r.total_override_commission), 0);
+    const totalOrders   = summary.reduce((s, r) => s + parseInt(r.total_orders), 0);
+    const totalRevenue  = summary.reduce((s, r) => s + parseFloat(r.total_revenue), 0);
+
+    res.json({
+      data: {
+        summary: summary.map(r => ({
+          ...r,
+          total_override_commission: parseFloat(r.total_override_commission) || 0,
+          total_orders:  parseInt(r.total_orders) || 0,
+          total_revenue: parseFloat(r.total_revenue) || 0,
+        })),
+        orders: orders.map(r => ({
+          ...r,
+          total_amount:        parseFloat(r.total_amount) || 0,
+          override_commission: parseFloat(r.override_commission) || 0,
+          override_rate:       parseFloat(r.override_rate) || 0,
+        })),
+        totals: { total_override_commission: totalOverride, total_orders: totalOrders, total_revenue: totalRevenue },
+      }
+    });
   } catch (err) {
     next(err);
   }

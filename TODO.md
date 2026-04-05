@@ -7,39 +7,13 @@
 
 ## 🔴 ĐANG LÀM
 
-- [x] **Test toàn bộ flow với data thực**
-  - Login admin + sales, kiểm tra phân quyền menu
-  - Tạo đơn hàng end-to-end (tạo KH → tạo đơn → xem hoa hồng)
-  - Kiểm tra tồn kho realtime khi lên đơn
-  - Files liên quan: Toàn bộ pages/, backend/routes/
-- [x] **Fix edge cases parse địa chỉ**
-  - Tên không chuẩn trong DB (viết tắt, thiếu dấu...)
-  - Files: `src/pages/CustomerForm.tsx`, `src/pages/OrderForm.tsx`, `src/lib/utils.ts`
+- [ ] **Implement real-time stock update**
+  - Tồn kho cập nhật ngay khi đơn hàng thay đổi status
+  - Files: `backend/routes/orders.js`, `backend/services/orderService.js`
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
-
-- [ ] **Thêm validation đầy đủ cho tất cả form**
-  - Required fields, min/max, format check
-  - Hiển thị lỗi rõ ràng dưới mỗi field
-  - Files: tất cả `src/pages/*Form.tsx`
-- [ ] **Implement real-time stock update**
-  - Tồn kho cập nhật ngay khi đơn hàng thay đổi status
-  - Files: `backend/routes/orders.js`, `backend/services/orderService.js`
-- [ ] **Deploy production**
-  - Setup VPS CentOS/Ubuntu
-  - Config Nginx, PM2, SSL
-  - Files: tạo mới `deploy.sh`, `nginx.conf`
-
-- [ ] **Thêm validation đầy đủ cho tất cả form**
-  - Required fields, min/max, format check
-  - Hiển thị lỗi rõ ràng dưới mỗi field
-  - Files: tất cả `src/pages/*Form.tsx`
-
-- [ ] **Implement real-time stock update**
-  - Tồn kho cập nhật ngay khi đơn hàng thay đổi status
-  - Files: `backend/routes/orders.js`, `backend/services/orderService.js`
 
 - [ ] **Deploy production**
   - Setup VPS CentOS/Ubuntu
@@ -95,6 +69,10 @@
 - [x] Groups: bảng groups + user_groups, CRUD, gán NV
 - [x] OrderForm: Group selector + validate tồn kho realtime
 - [x] SalaryReport: filter theo nhóm
+
+### Phase 4: Validation & Bug Fixes
+- [x] **Thêm validation đầy đủ cho tất cả form** - Required fields, inline errors, format check cho CustomerForm, ProductForm, EmployeeForm, OrderForm
+- [x] **Fix OrderForm bugs** - Shipping fee/discount controlled inputs, payment method toggle, order status select, note textarea hiển thị đúng, group selector bắt buộc
 
 ### Phase 3: Bug Fixes
 - [x] CustomerList: sales filter đúng

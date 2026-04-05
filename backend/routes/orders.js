@@ -5,6 +5,9 @@ const { getPool } = require('../config/db');
 const {
   generateOrderCode,
   recalculateStock,
+  recalculateAllStock,
+  deductStockOnComplete,
+  restoreStockOnCancel,
   recalculateCommission,
   calculateItemCommission,
   updateLoyaltyPoints
@@ -13,7 +16,7 @@ const {
 router.get('/', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, status, employee, warehouse, page = 1, limit = 20 } = req.query;
+    const { search, status, employee, warehouse, date_from, date_to, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
     let query = `
@@ -58,6 +61,18 @@ router.get('/', auth, async (req, res, next) => {
       query += ' AND o.warehouse_id = ?';
       countQuery += ' AND warehouse_id = ?';
       params.push(warehouse);
+    }
+
+    if (date_from) {
+      query += ' AND DATE(o.created_at) >= ?';
+      countQuery += ' AND DATE(created_at) >= ?';
+      params.push(date_from);
+    }
+
+    if (date_to) {
+      query += ' AND DATE(o.created_at) <= ?';
+      countQuery += ' AND DATE(created_at) <= ?';
+      params.push(date_to);
     }
 
     query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
@@ -174,10 +189,13 @@ router.post('/', auth, async (req, res, next) => {
 
     const totalAmount = subtotal + (shipping_fee || 0) - (discount || 0);
 
+    // Dùng status từ request, mặc định 'pending' (KHÔNG dùng 'draft')
+    const orderStatus = req.body.status || 'pending';
+
     const [orderResult] = await pool.query(
       `INSERT INTO orders (code, customer_id, salesperson_id, warehouse_id, group_id, status, shipping_address, carrier_service, shipping_fee, payment_method, subtotal, discount, total_amount, note)
-       VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [code, customer_id, req.user.id, warehouse_id, group_id || null, shipping_address, carrier_service, shipping_fee || 0, payment_method || 'cash', subtotal, discount || 0, totalAmount, note]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [code, customer_id, req.user.id, warehouse_id, group_id || null, orderStatus, shipping_address, carrier_service, shipping_fee || 0, payment_method || 'cash', subtotal, discount || 0, totalAmount, note]
     );
 
     const orderId = orderResult.insertId;
@@ -211,13 +229,8 @@ router.put('/:id', auth, async (req, res, next) => {
 
     const order = existing[0];
 
-    if (req.user.role === 'sales') {
-      if (order.salesperson_id !== req.user.id) {
-        return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
-      }
-      if (order.status !== 'draft') {
-        return res.status(400).json({ error: 'Chỉ có thể sửa đơn nháp' });
-      }
+    if (req.user.role === 'sales' && order.salesperson_id !== req.user.id) {
+      return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
     }
 
     const { customer_id, warehouse_id, group_id, status, shipping_address, carrier_service, shipping_fee, payment_method, discount, note, items } = req.body;
@@ -264,16 +277,36 @@ router.put('/:id', auth, async (req, res, next) => {
       [customer_id || order.customer_id, warehouse_id || order.warehouse_id, group_id !== undefined ? group_id : order.group_id, status || order.status, shipping_address || order.shipping_address, carrier_service || order.carrier_service, shipping_fee !== undefined ? shipping_fee : order.shipping_fee, payment_method || order.payment_method, subtotal, discount !== undefined ? discount : order.discount, totalAmount, note || order.note, req.params.id]
     );
 
-    const [allItems] = await pool.query('SELECT product_id FROM order_items WHERE order_id = ?', [req.params.id]);
-    const productIds = [...new Set(allItems.map(i => i.product_id))];
+    const newStatus = status || order.status;
 
-    for (const productId of productIds) {
-      await recalculateStock(productId);
+    // Xử lý kho theo status transition
+    if (newStatus !== oldStatus) {
+      if (newStatus === 'completed' && oldStatus !== 'completed') {
+        // Giao hàng thành công → trừ hẳn stock_qty vật lý
+        await deductStockOnComplete(req.params.id);
+      } else if (newStatus === 'cancelled') {
+        // Hủy đơn → hoàn lại kho
+        await restoreStockOnCancel(req.params.id, oldStatus);
+      } else {
+        // Các transition khác (pending↔shipping...) → chỉ recalc reserved
+        const [allItems] = await pool.query('SELECT product_id FROM order_items WHERE order_id = ?', [req.params.id]);
+        const productIds = [...new Set(allItems.map(i => i.product_id))];
+        for (const productId of productIds) {
+          await recalculateStock(productId);
+        }
+      }
+    } else {
+      // Status không đổi nhưng items có thể đổi → recalc
+      const [allItems] = await pool.query('SELECT product_id FROM order_items WHERE order_id = ?', [req.params.id]);
+      const productIds = [...new Set(allItems.map(i => i.product_id))];
+      for (const productId of productIds) {
+        await recalculateStock(productId);
+      }
     }
 
     await recalculateCommission(req.params.id);
 
-    if (status === 'done' && oldStatus !== 'done') {
+    if (newStatus === 'completed' && oldStatus !== 'completed') {
       await updateLoyaltyPoints(customer_id || order.customer_id, req.params.id, totalAmount);
     }
 
@@ -298,16 +331,25 @@ router.delete('/:id', auth, async (req, res, next) => {
       return res.status(403).json({ error: 'Không có quyền xóa đơn hàng này' });
     }
 
-    const [items] = await pool.query('SELECT product_id FROM order_items WHERE order_id = ?', [req.params.id]);
+    const deletedStatus = order.status;
 
-    await pool.query('DELETE FROM orders WHERE id = ?', [req.params.id]);
+    // Lấy danh sách product_id trước khi xóa
+    const [itemsBefore] = await pool.query('SELECT DISTINCT product_id FROM order_items WHERE order_id = ?', [req.params.id]);
+    const productIds = [...new Set(itemsBefore.map(i => i.product_id))];
 
-    const productIds = [...new Set(items.map(i => i.product_id))];
-    for (const productId of productIds) {
-      await recalculateStock(productId);
+    // Nếu đơn đã completed → cộng lại stock_qty trước khi xóa
+    if (deletedStatus === 'completed') {
+      await restoreStockOnCancel(req.params.id, 'completed');
     }
 
     await pool.query('DELETE FROM commissions WHERE order_id = ?', [req.params.id]);
+    await pool.query('DELETE FROM order_items WHERE order_id = ?', [req.params.id]);
+    await pool.query('DELETE FROM orders WHERE id = ?', [req.params.id]);
+
+    // Recalc reserved sau khi xóa
+    for (const productId of productIds) {
+      await recalculateStock(productId);
+    }
 
     res.json({ message: 'Xóa đơn hàng thành công' });
   } catch (err) {

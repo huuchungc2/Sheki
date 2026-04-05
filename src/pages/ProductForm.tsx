@@ -30,6 +30,7 @@ export function ProductForm() {
   const [fetchLoading, setFetchLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
+  const [errors, setErrors] = React.useState<{ name?: string; sku?: string; price?: string }>({});
 
   React.useEffect(() => {
     const fetchCategories = async () => {
@@ -93,6 +94,27 @@ export function ProductForm() {
 
   const handleChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error khi user bắt đầu sửa field
+    if (errors[field as keyof typeof errors]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: { name?: string; sku?: string; price?: string } = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Vui lòng nhập tên sản phẩm";
+    }
+    if (!formData.sku.trim()) {
+      newErrors.sku = "Vui lòng nhập mã SKU";
+    }
+    if (!formData.price || formData.price <= 0) {
+      newErrors.price = "Giá bán phải lớn hơn 0";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const getImageUrl = (img: string) => {
@@ -156,6 +178,7 @@ export function ProductForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -331,12 +354,14 @@ export function ProductForm() {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Tên sản phẩm <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="VD: Áo thun Cotton Basic" required className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                  <input type="text" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="VD: Áo thun Cotton Basic" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.name ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                  {errors.name && <p className="text-xs text-red-500 font-medium">{errors.name}</p>}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">Mã SKU <span className="text-red-500">*</span></label>
-                    <input type="text" value={formData.sku} onChange={(e) => handleChange("sku", e.target.value)} placeholder="VD: TS-001" required className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm font-mono transition-all outline-none" />
+                    <input type="text" value={formData.sku} onChange={(e) => handleChange("sku", e.target.value)} placeholder="VD: TS-001" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm font-mono transition-all outline-none", errors.sku ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                    {errors.sku && <p className="text-xs text-red-500 font-medium">{errors.sku}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">Danh mục</label>
@@ -363,11 +388,12 @@ export function ProductForm() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Giá bán lẻ</label>
+                  <label className="text-sm font-bold text-slate-700">Giá bán lẻ <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">VNĐ</span>
-                    <input type="number" value={formData.price || ""} onChange={(e) => handleChange("price", Number(e.target.value))} placeholder="0" className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <input type="number" value={formData.price || ""} onChange={(e) => handleChange("price", Number(e.target.value))} placeholder="0" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.price ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
                   </div>
+                  {errors.price && <p className="text-xs text-red-500 font-medium">{errors.price}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Giá vốn</label>

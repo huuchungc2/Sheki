@@ -35,7 +35,6 @@ const navigationAdmin = [
   ]},
   { name: "Quy tắc hoa hồng", href: "/commission-rules", icon: DollarSign },
   { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv", icon: DollarSign },
-  { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv", icon: DollarSign },
   { name: "Nhật ký", href: "/logs", icon: FileText },
   { name: "Cài đặt", href: "/settings", icon: Settings },
 ];

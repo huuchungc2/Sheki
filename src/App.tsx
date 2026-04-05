@@ -31,6 +31,13 @@ import CommissionRules from "./pages/CommissionRules";
 import CollaboratorsCommissionsReportPage from "./pages/CollaboratorsCommissionsReport";
 import { ChangePassword } from "./pages/ChangePassword";
 
+// Route /reports/commissions/ctv — Admin thấy toàn hệ thống, Sales thấy CTV của mình
+function CtvCommissionRoute() {
+  const role = getUserRole();
+  if (role === 'admin') return <CollaboratorsCommissionsReportPage />;
+  return <CollaboratorsCommissionReport />;
+}
+
 function checkAuth() {
   const token = localStorage.getItem("token");
   const user = localStorage.getItem("user");
@@ -125,11 +132,10 @@ export default function App() {
                   <Route path="/change-password" element={<ChangePassword />} />
                   <Route path="/reports/revenue" element={<AdminRoute><RevenueReport /></AdminRoute>} />
                   <Route path="/reports/commissions" element={<CommissionReport />} />
-                  <Route path="/reports/commissions/ctv" element={<CollaboratorsCommissionsReportPage />} />
+                  <Route path="/reports/commissions/ctv" element={<CtvCommissionRoute />} />
                   <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionDetail /></AdminRoute>} />
                   <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
-                  <Route path="/reports/commissions/ctv" element={<AdminRoute><CollaboratorsCommissionsReport /></AdminRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

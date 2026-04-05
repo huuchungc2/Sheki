@@ -23,7 +23,8 @@ import {
   X,
   Wallet,
   ArrowRight,
-  Eye
+  Eye,
+  AlertTriangle
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn, formatCurrency } from "../lib/utils";
@@ -70,13 +71,14 @@ export function OrderForm() {
   const addProduct = (product: any) => {
     const existing = items.find(i => i.productId === product.id);
     if (existing) {
-      setItems(items.map(i => i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i));
+      setItems(items.map(i => i.productId === product.id ? { ...i, quantity: parseFloat((i.quantity + 1).toFixed(1)) } : i));
     } else {
       setItems([...items, {
         productId: product.id,
         productName: product.name,
         sku: product.sku,
         price: product.price,
+        availableStock: product.available_stock ?? 0,
         quantity: 1,
         discountRate: 0,
         discountAmount: 0,
@@ -86,13 +88,31 @@ export function OrderForm() {
     }
     setSearchQuery("");
     setShowResults(false);
+    setProductQuery("");
   };
 
   const [items, setItems] = React.useState<OrderItem[]>([]);
   const [shipmentAddress, setShipmentAddress] = React.useState<string>("");
   const [shippingFee, setShippingFee] = React.useState<number>(0);
+  const [orderDiscount, setOrderDiscount] = React.useState<number>(0);
   const [paymentMethod, setPaymentMethod] = React.useState<string>("cash");
+  const [orderStatus, setOrderStatus] = React.useState<string>("pending");
   const [note, setNote] = React.useState<string>("");
+  const [formError, setFormError] = React.useState<string>("");
+  const [selectedGroupId, setSelectedGroupId] = React.useState<number | null>(null);
+  const [groups, setGroups] = React.useState<any[]>([]);
+
+  // Fetch groups — chỉ lấy nhóm của nhân viên đang login
+  React.useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    if (!user?.id) return;
+    // Admin xem tất cả nhóm, sales chỉ xem nhóm của mình
+    const endpoint = user.role === 'admin' ? '/groups' : `/groups/user/${user.id}`;
+    api.get(endpoint).then((res: any) => {
+      setGroups(res?.data ?? []);
+    }).catch(() => setGroups([]));
+  }, []);
 
   // Product suggestions (DB-backed)
   const [productQuery, setProductQuery] = React.useState("");
@@ -102,7 +122,7 @@ export function OrderForm() {
     try {
       const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50`);
       const data = res?.data ?? [];
-      setProductSuggestions(data.map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, price: Number(p.price) || 0 })));
+      setProductSuggestions(data.map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, price: Number(p.price) || 0, available_stock: Number(p.available_stock) || 0 })));
     } catch {
       setProductSuggestions([]);
     }
@@ -131,6 +151,7 @@ export function OrderForm() {
           productName: it.product_name ?? it.productName ?? '',
           sku: it.sku ?? '',
           price: Number(it.unit_price ?? it.price ?? 0),
+          availableStock: Number(it.available_stock ?? 999),
           quantity: Number(it.qty ?? it.quantity ?? 1),
           discountRate: Number(it.discount_rate ?? 0),
           discountAmount: Number(it.discount_amount ?? 0),
@@ -140,8 +161,11 @@ export function OrderForm() {
         if (itemsData.length) setItems(itemsData as any);
 
         setShipmentAddress(order?.shipping_address ?? '');
-        setShippingFee(order?.shipping_fee ?? 0);
+        setShippingFee(Number(order?.shipping_fee ?? 0));
+        setOrderDiscount(Number(order?.discount ?? 0));
         setPaymentMethod(order?.payment_method ?? 'cash');
+        setOrderStatus(order?.status ?? 'pending');
+        setSelectedGroupId(order?.group_id ?? null);
         setNote(order?.note ?? '');
       } catch (e) {
         console.error('Load order error', e);
@@ -151,14 +175,42 @@ export function OrderForm() {
 
   // Submit order to backend
   const submitOrder = async () => {
+    setFormError("");
+
+    // Validation
     if (!selectedCustomer?.id) {
-      alert('Vui lòng chọn khách hàng');
+      setFormError('Vui lòng chọn khách hàng');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!selectedGroupId) {
+      setFormError('Vui lòng chọn nhóm bán hàng');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (items.length === 0) {
-      alert('Vui lòng thêm ít nhất 1 sản phẩm');
+      setFormError('Vui lòng thêm ít nhất 1 sản phẩm');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    const zeroQtyItem = items.find(i => !i.quantity || i.quantity <= 0);
+    if (zeroQtyItem) {
+      setFormError(`Sản phẩm "${zeroQtyItem.productName}" phải có số lượng lớn hơn 0`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const shippingAddr = selectedCustomer?.address?.trim() || '';
+    if (!shippingAddr) {
+      setFormError('Vui lòng nhập địa chỉ giao hàng');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!paymentMethod) {
+      setFormError('Vui lòng chọn phương thức thanh toán');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     const itemsPayload = items.map(i => ({
       product_id: i.productId,
       qty: i.quantity,
@@ -172,31 +224,31 @@ export function OrderForm() {
     const payload: any = {
       customer_id: selectedCustomer.id,
       warehouse_id: 1,
-      group_id: null,
-      shipping_address: selectedCustomer.address || '',
+      group_id: selectedGroupId,
+      shipping_address: shippingAddr,
       carrier_service: 'standard',
-      shipping_fee: 0,
-      payment_method: 'cash',
-      discount: 0,
-      note: '',
+      shipping_fee: shippingFee,
+      payment_method: paymentMethod,
+      status: orderStatus,
+      discount: orderDiscount,
+      note: note,
       items: itemsPayload
     };
     try {
       let res: any;
       if (id) {
-        // Editing existing order
         res = await api.put(`/orders/${id}`, payload);
       } else {
-        // Creating new order
         res = await api.post('/orders', payload);
       }
       if (res?.id) {
-        navigate(id ? `/orders/edit/${res.id}` : `/orders/edit/${res.id}`);
+        navigate(`/orders/edit/${res.id}`);
       } else {
         navigate('/orders');
       }
-    } catch (e) {
-      alert('Lỗi khi tạo đơn hàng');
+    } catch (e: any) {
+      setFormError(e?.message || 'Lỗi khi lưu đơn hàng. Vui lòng thử lại.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -257,9 +309,8 @@ export function OrderForm() {
   };
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.price - item.discountAmount), 0);
-  const discount = 0;
   const tax = subtotal * 0.1;
-  const total = subtotal + shippingFee + tax - discount;
+  const total = Math.max(0, subtotal + shippingFee + tax - orderDiscount);
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
@@ -282,15 +333,23 @@ export function OrderForm() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
-            Lưu bản nháp
+          <button type="button" onClick={() => navigate(-1)} className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
+            Hủy bỏ
           </button>
-          <button onClick={submitOrder} className="flex items-center gap-2 px-8 py-3 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/20">
+          <button type="button" onClick={submitOrder} className="flex items-center gap-2 px-8 py-3 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/20">
             <Save className="w-5 h-5" />
             {isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}
           </button>
         </div>
       </div>
+
+      {/* Form error banner */}
+      {formError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span className="font-bold">{formError}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Customer & Products */}
@@ -305,7 +364,26 @@ export function OrderForm() {
                 </div>
                 Thông tin khách hàng
               </h2>
-              <button className="text-red-600 text-xs font-black uppercase tracking-widest hover:underline">Chọn khách hàng khác</button>
+            </div>
+
+            {/* Group selector */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                NHÓM BÁN HÀNG <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={selectedGroupId ?? ""}
+                onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
+                className={cn(
+                  "w-full px-5 py-3 bg-slate-50 border rounded-[24px] text-sm font-bold transition-all outline-none",
+                  !selectedGroupId ? "border-amber-300 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10" : "border-transparent focus:border-red-200 focus:ring-4 focus:ring-red-500/5"
+                )}
+              >
+                <option value="">-- Chọn nhóm bán hàng --</option>
+                {groups.map((g: any) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -434,90 +512,158 @@ export function OrderForm() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50">
-                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">SẢN PHẨM</th>
-                    <th className="px-4 py-4 w-28 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">SỐ LƯỢNG</th>
-                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">ĐƠN GIÁ</th>
-                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">CHIẾT KHẤU (%)</th>
-                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">THÀNH TIỀN</th>
-                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">HOA HỒNG (%)</th>
-                    <th className="px-8 py-4 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {items.map((item, index) => (
-                    <tr key={item.productId} className="group">
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300">
-                            <Package className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-black text-slate-900">{item.productName}</p>
-                            <p className="text-[10px] font-bold text-slate-400 tracking-tighter uppercase">{item.sku}</p>
-                          </div>
-                        </div>
-                      </td>
-        <td className="px-4 py-6 w-28">
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={item.quantity}
-            onChange={(e) => {
-              const raw = Number(e.target.value);
-              const v = Number.isFinite(raw) ? Math.floor(raw) : 0;
-              if (v >= 0) {
-                setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, subtotal: v * it.price, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
-              }
-            }}
-            className="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-md text-center text-2xl font-black outline-none"
-          />
-        </td>
-                      <td className="px-4 py-6">
-                        <p className="text-sm font-black text-slate-900">{formatCurrency(item.price)}</p>
-                      </td>
-                      <td className="px-4 py-6">
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{item.commissionRate}%</span>
-                          <span className="text-sm font-black text-slate-900">{formatCurrency(item.commissionAmount)}</span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <button 
-                          onClick={() => removeItem(item.productId)}
-                          className="p-2 text-slate-300 hover:text-red-600 transition-colors"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </td>
+            {items.length === 0 ? (
+              <div className="py-12 text-center text-slate-400">
+                <Package className="w-8 h-8 mx-auto mb-2 text-slate-200" />
+                <p className="text-sm">Chưa có sản phẩm. Tìm và thêm bên trên.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-y border-slate-100 text-slate-400 font-semibold uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left">Sản phẩm</th>
+                      <th className="px-3 py-2 text-center w-32">Số lượng</th>
+                      <th className="px-3 py-2 text-right w-28">Đơn giá</th>
+                      <th className="px-3 py-2 text-center w-20">CK%</th>
+                      <th className="px-3 py-2 text-right w-28">Thành tiền</th>
+                      <th className="px-3 py-2 text-center w-24">Hoa hồng%</th>
+                      <th className="px-2 py-2 w-7"></th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-slate-900 text-white font-black">
-                  <tr>
-                    <td className="px-8 py-4 text-xs uppercase tracking-widest">TỔNG CỘNG</td>
-                    <td className="px-4 py-4 text-center text-sm">
-                      {items.reduce((sum, item) => sum + item.quantity, 0)}
-                    </td>
-                    <td className="px-4 py-4"></td>
-                    <td className="px-4 py-4 text-center text-sm">
-                      {formatCurrency(items.reduce((sum, item) => sum + item.discountAmount, 0))}
-                    </td>
-                    <td className="px-4 py-4 text-right text-sm">
-                      {formatCurrency(items.reduce((sum, item) => sum + (item.quantity * item.price - item.discountAmount), 0))}
-                    </td>
-                    <td className="px-4 py-4 text-center text-sm text-emerald-400">
-                      {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
-                    </td>
-                    <td className="px-8 py-4"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => {
+                      const lineTotal = item.quantity * item.price - item.discountAmount;
+                      const overStock = item.quantity > (item as any).availableStock;
+                      return (
+                        <tr key={item.productId} className={cn("group border-b border-slate-50 last:border-0 transition-colors", overStock ? "bg-red-50/60" : "hover:bg-slate-50/60")}>
+                          {/* Sản phẩm + có thể bán */}
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300 flex-shrink-0">
+                                <Package className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-800 truncate text-xs leading-tight">{item.productName}</p>
+                                <p className="text-slate-400 font-mono leading-tight">{item.sku}</p>
+                                <p className={cn("leading-tight font-medium", overStock ? "text-red-500" : "text-slate-400")}>
+                                  Có thể bán: <span className="font-bold">{(item as any).availableStock ?? 0}</span>
+                                  {overStock && <span className="ml-1 text-red-500">⚠ Vượt tồn!</span>}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          {/* Số lượng */}
+                          <td className="px-3 py-2">
+                            <div className="flex items-center justify-center gap-1">
+                              <button type="button"
+                                onClick={() => {
+                                  const v = Math.max(0.1, parseFloat((item.quantity - 1).toFixed(1)));
+                                  setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
+                                }}
+                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0">
+                                <Minus className="w-2.5 h-2.5" />
+                              </button>
+                              <input type="number" min={0.1} step={0.1}
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const raw = parseFloat(parseFloat(e.target.value).toFixed(1));
+                                  const v = Number.isFinite(raw) && raw > 0 ? raw : 0.1;
+                                  setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
+                                }}
+                                className={cn("w-12 h-6 px-1 border rounded text-center text-xs font-semibold outline-none focus:ring-1", overStock ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-200" : "border-slate-200 bg-white focus:border-blue-300 focus:ring-blue-100")}
+                              />
+                              <button type="button"
+                                onClick={() => {
+                                  const v = parseFloat((item.quantity + 1).toFixed(1));
+                                  setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
+                                }}
+                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0">
+                                <Plus className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          </td>
+                          {/* Đơn giá */}
+                          <td className="px-3 py-2">
+                            <input type="number" min={0}
+                              value={item.price}
+                              onChange={(e) => {
+                                const p = Math.max(0, Number(e.target.value) || 0);
+                                const da = p * item.quantity * (item.discountRate / 100);
+                                setItems(items.map(it => it.productId === item.productId ? { ...it, price: p, discountAmount: da, commissionAmount: (p * it.quantity - da) * (it.commissionRate / 100) } : it));
+                              }}
+                              className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-right text-xs font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
+                            />
+                          </td>
+                          {/* Chiết khấu % */}
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-0.5 justify-center">
+                              <input type="number" min={0} max={100}
+                                value={item.discountRate}
+                                onChange={(e) => {
+                                  const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                  const da = item.price * item.quantity * (r / 100);
+                                  setItems(items.map(it => it.productId === item.productId ? { ...it, discountRate: r, discountAmount: da, commissionAmount: (it.price * it.quantity - da) * (it.commissionRate / 100) } : it));
+                                }}
+                                className="w-10 h-6 px-1 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-center text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
+                              />
+                              <span className="text-slate-400">%</span>
+                            </div>
+                          </td>
+                          {/* Thành tiền */}
+                          <td className="px-3 py-2 text-right">
+                            <span className="font-semibold text-slate-900 text-xs">{formatCurrency(lineTotal)}</span>
+                          </td>
+                          {/* Hoa hồng % — chỉnh được */}
+                          <td className="px-3 py-2">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <div className="flex items-center gap-0.5 justify-center">
+                                <input type="number" min={0} max={100}
+                                  value={item.commissionRate}
+                                  onChange={(e) => {
+                                    const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                    setItems(items.map(it => it.productId === item.productId ? { ...it, commissionRate: r, commissionAmount: (it.price * it.quantity - it.discountAmount) * (r / 100) } : it));
+                                  }}
+                                  className="w-10 h-5 px-1 bg-emerald-50 border border-transparent hover:border-emerald-200 focus:bg-white focus:border-emerald-400 rounded text-center text-xs font-bold text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-100 transition-colors"
+                                />
+                                <span className="text-emerald-600 text-xs font-bold">%</span>
+                              </div>
+                              <span className="text-emerald-600 font-semibold">{formatCurrency(item.commissionAmount)}</span>
+                            </div>
+                          </td>
+                          {/* Xoá */}
+                          <td className="px-2 py-2 text-center">
+                            <button type="button" onClick={() => removeItem(item.productId)}
+                              className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-800 text-white text-xs font-bold">
+                      <td className="px-4 py-2.5 uppercase tracking-wide">Tổng cộng ({items.length} SP)</td>
+                      <td className="px-3 py-2.5 text-center">
+                        {items.reduce((s, i) => s + i.quantity, 0).toFixed(1).replace(/\.0$/, '')}
+                      </td>
+                      <td className="px-3 py-2.5"></td>
+                      <td className="px-3 py-2.5 text-center text-red-300">
+                        {items.some(i => i.discountAmount > 0) ? `-${formatCurrency(items.reduce((s, i) => s + i.discountAmount, 0))}` : '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {formatCurrency(items.reduce((s, i) => s + (i.quantity * i.price - i.discountAmount), 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-emerald-400">
+                        {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
+                      </td>
+                      <td className="px-2 py-2.5"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
@@ -541,8 +687,10 @@ export function OrderForm() {
                   <span>Phí vận chuyển</span>
                   <div className="flex items-center gap-2">
                     <input 
-                      type="text" 
-                      defaultValue={shippingFee}
+                      type="number"
+                      min="0"
+                      value={shippingFee}
+                      onChange={(e) => setShippingFee(Number(e.target.value) || 0)}
                       className="w-24 px-3 py-1 bg-white/5 border-transparent focus:bg-white/10 rounded-lg text-right text-white outline-none transition-all"
                     />
                   </div>
@@ -551,8 +699,10 @@ export function OrderForm() {
                   <span>Giảm giá</span>
                   <div className="flex items-center gap-2">
                     <input 
-                      type="text" 
-                      defaultValue={discount}
+                      type="number"
+                      min="0"
+                      value={orderDiscount}
+                      onChange={(e) => setOrderDiscount(Number(e.target.value) || 0)}
                       className="w-24 px-3 py-1 bg-white/5 border-transparent focus:bg-white/10 rounded-lg text-right text-red-400 outline-none transition-all"
                     />
                   </div>
@@ -592,9 +742,11 @@ export function OrderForm() {
                 ].map((method) => (
                   <button 
                     key={method.id}
+                    type="button"
+                    onClick={() => setPaymentMethod(method.id)}
                     className={cn(
                       "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
-                      method.id === 'cash' 
+                      paymentMethod === method.id
                         ? "border-red-600 bg-red-50 text-red-600" 
                         : "border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200"
                     )}
@@ -608,7 +760,7 @@ export function OrderForm() {
 
             <div className="space-y-4">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">TRẠNG THÁI ĐƠN HÀNG</label>
-              <select className="w-full px-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-[24px] text-sm font-bold transition-all outline-none appearance-none cursor-pointer">
+              <select value={orderStatus} onChange={(e) => setOrderStatus(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-[24px] text-sm font-bold transition-all outline-none appearance-none cursor-pointer">
                 <option value="pending">CHỜ DUYỆT</option>
                 <option value="shipping">ĐANG GIAO</option>
                 <option value="completed">ĐÃ GIAO</option>
@@ -628,6 +780,17 @@ export function OrderForm() {
                 </div>
                 <button className="text-red-600 text-[10px] font-black uppercase tracking-widest hover:underline">Thay đổi</button>
               </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GHI CHÚ ĐƠN HÀNG</label>
+              <textarea
+                rows={3}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Ghi chú thêm về đơn hàng, yêu cầu đặc biệt..."
+                className="w-full px-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-2xl text-sm font-medium transition-all outline-none resize-none"
+              />
             </div>
 
             <div className="p-4 bg-blue-50 rounded-2xl flex gap-3">

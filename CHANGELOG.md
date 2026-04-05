@@ -1,5 +1,57 @@
 # CHANGELOG
 
+## [05/04/2026] - Fix logic hoa hồng override từ CTV + Tổng quan nhân viên
+### Fixed
+- **calculateOverrideCommissions** - Sửa đúng theo LOGIC_BUSINESS.md: override tính % trên TỔNG TIỀN ĐƠN (không phải trên hoa hồng CTV). Tra tier theo commission_rate của SALES (người quản lý), không phải CTV - Files: `backend/services/orderService.js`
+- **Recalculate** - Chạy lại commission cho tất cả đơn hiện có theo logic mới
+### Added  
+- **EmployeeDetail** - Date filter preset (Tất cả/Hôm nay/Tuần/Tháng/Tháng trước/Năm trước/Tuỳ chọn), 5 stat cards (Tổng HH / HH bán hàng / HH từ CTV / Số đơn / Doanh thu), fix statusConfig đúng 4 trạng thái - Files: `src/pages/EmployeeDetail.tsx`
+- **Backend overview API** - Thêm date_from/date_to filter, tách direct_commission và override_commission riêng - Files: `backend/routes/users.js`
+
+## [05/04/2026] - Fix toàn bộ logic kho theo trạng thái đơn hàng
+### Fixed
+- **DB ENUM migration** - ALTER TABLE orders: bỏ draft/confirmed/done, chỉ còn 4 trạng thái: `pending/shipping/completed/cancelled` - DB
+- **Data migration** - 1 đơn draft → pending, stock recalculate lại đúng
+- **recalculateStock** - Chỉ pending+shipping giữ reserved_stock (bỏ draft)
+- **deductStockOnComplete** - Khi đơn completed → trừ hẳn stock_qty vật lý
+- **restoreStockOnCancel** - Khi đơn cancelled → hoàn lại kho (nếu đã completed thì cộng lại stock_qty)
+- **DELETE order** - Lấy items trước khi xóa, hoàn kho nếu đơn đã completed
+- **PUT order** - Xử lý đúng transition: pending→completed trừ kho, bất kỳ→cancelled hoàn kho
+- Files: `backend/services/orderService.js`, `backend/routes/orders.js`
+
+## [05/04/2026] - Fix draft/stock bug + Checkbox bulk action + Date preset filter
+### Fixed
+- **orderService.js** - `recalculateStock` bỏ `draft` khỏi reserved list, chỉ còn `pending/shipping` giữ kho - Files: `backend/services/orderService.js`
+- **orders.js POST** - Bỏ hardcode `status='draft'`, dùng `status` từ request (default `pending`) - Files: `backend/routes/orders.js`
+- **orders.js PUT** - Bỏ rule chặn sales sửa đơn nếu không phải draft - Files: `backend/routes/orders.js`
+### Added
+- **OrderList checkbox** - Check all / check từng dòng, bulk đổi trạng thái nhiều đơn cùng lúc - Files: `src/pages/OrderList.tsx`
+- **OrderList date preset** - Dropdown: Hôm nay, Tuần này, Tháng này, Tháng trước, Năm trước, Tuỳ chọn (date range) — mặc định Hôm nay - Files: `src/pages/OrderList.tsx`
+### Changed
+- **OrderList** - Redesign gọn lại, bỏ stat cards thừa, filter 1 hàng, action buttons ẩn/hiện khi hover
+
+## [05/04/2026] - Redesign bảng sản phẩm OrderForm + Fix group selector
+### Fixed
+- **Bảng sản phẩm OrderForm** - Redesign gọn lại: font vừa phải (text-sm thay text-2xl), padding nhỏ hơn (py-3 thay py-6), cột đúng căn lề, qty input nhỏ gọn (w-16 h-8), hoa hồng badge emerald, nút xoá ẩn/hiện khi hover, empty state khi chưa có sản phẩm - Files: `src/pages/OrderForm.tsx`
+- **Group selector chỉ load nhóm của nhân viên** - Sales: `GET /groups/user/:userId`, Admin: `GET /groups` (tất cả) - Files: `src/pages/OrderForm.tsx`
+
+## [05/04/2026] - Thêm validation đầy đủ cho tất cả form + Fix OrderForm bugs
+### Added
+- **CustomerForm validation** - `errors` state object, validate name required, phone bắt buộc 10 chữ số (không còn optional), email format check (regex), inline red border + error text dưới mỗi field - Files: `src/pages/CustomerForm.tsx`
+- **ProductForm validation** - `errors` state, validate name/SKU required, price > 0, inline error display - Files: `src/pages/ProductForm.tsx`
+- **EmployeeForm validation** - `errors` state, validate full_name/email required, email format, password min 6 ký tự khi tạo mới, phone 10 chữ số nếu nhập, commission_rate 0-100, salary >= 0, inline error per field - Files: `src/pages/EmployeeForm.tsx`
+- **OrderForm formError banner** - Styled error banner thay thế alert(), hiển thị trên đầu form - Files: `src/pages/OrderForm.tsx`
+- **OrderForm group selector** - Dropdown chọn nhóm bắt buộc, fetch từ API, validate trước khi submit - Files: `src/pages/OrderForm.tsx`
+- **OrderForm note textarea** - Textarea ghi chú đơn hàng xuất hiện trong settings panel, bind `value={note}` - Files: `src/pages/OrderForm.tsx`
+### Fixed
+- **OrderForm shipping fee uncontrolled** - Chuyển sang `value={shippingFee}` + `onChange` → giá trị được gửi lên server - Files: `src/pages/OrderForm.tsx`
+- **OrderForm discount uncontrolled** - Chuyển sang `value={orderDiscount}` + `onChange` → giá trị được gửi lên server - Files: `src/pages/OrderForm.tsx`
+- **OrderForm payment method không cập nhật state** - Thêm `onClick={() => setPaymentMethod(method.id)}` vào mỗi button - Files: `src/pages/OrderForm.tsx`
+- **OrderForm status select không bind** - Thêm `value={orderStatus}` + `onChange` - Files: `src/pages/OrderForm.tsx`
+- **OrderForm payload hardcoded** - shipping_fee, discount, payment_method, status, note, group_id giờ lấy từ state thực - Files: `src/pages/OrderForm.tsx`
+### Changed
+- **CustomerForm** - Xóa `phoneError` state riêng, gộp vào `errors` object, phone trở thành bắt buộc - Files: `src/pages/CustomerForm.tsx`
+
 ## 2026-04-05 - Test flow with real data
 ### Added
 - Test flow with real data executed; moved to next task (edge-case address parsing). - Files: TODO.md

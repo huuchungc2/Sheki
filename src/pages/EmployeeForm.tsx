@@ -34,6 +34,14 @@ export function EmployeeForm() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
+  const [errors, setErrors] = React.useState<{
+    full_name?: string;
+    email?: string;
+    password?: string;
+    phone?: string;
+    commission_rate?: string;
+    salary?: string;
+  }>({});
 
   React.useEffect(() => {
     const fetchGroups = async () => {
@@ -101,6 +109,55 @@ export function EmployeeForm() {
 
   const handleChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error khi user sửa field
+    if (errors[field as keyof typeof errors]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: typeof errors = {};
+
+    if (!formData.full_name.trim()) {
+      newErrors.full_name = "Vui lòng nhập họ và tên";
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "Vui lòng nhập email";
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        newErrors.email = "Địa chỉ email không hợp lệ";
+      }
+    }
+
+    if (!isEdit) {
+      if (!formData.password) {
+        newErrors.password = "Vui lòng nhập mật khẩu";
+      } else if (formData.password.length < 6) {
+        newErrors.password = "Mật khẩu tối thiểu 6 ký tự";
+      }
+    } else if (formData.password && formData.password.length < 6) {
+      newErrors.password = "Mật khẩu tối thiểu 6 ký tự";
+    }
+
+    if (formData.phone) {
+      const cleanedPhone = String(formData.phone).replace(/\D/g, '');
+      if (cleanedPhone.length > 0 && cleanedPhone.length !== 10) {
+        newErrors.phone = "Số điện thoại phải có đúng 10 chữ số";
+      }
+    }
+
+    if (formData.commission_rate < 0 || formData.commission_rate > 100) {
+      newErrors.commission_rate = "Tỷ lệ hoa hồng phải từ 0 đến 100";
+    }
+
+    if (formData.salary < 0) {
+      newErrors.salary = "Lương không được âm";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const toggleGroup = (groupId: number) => {
@@ -111,15 +168,13 @@ export function EmployeeForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
     setIsSaving(true);
     setError(null);
     try {
       const token = localStorage.getItem("token");
       const method = isEdit ? "PUT" : "POST";
       const url = isEdit ? `${API_URL}/users/${id}` : `${API_URL}/users`;
-      if (!isEdit && !formData.password) {
-        throw new Error("Vui lòng nhập mật khẩu");
-      }
       const body: any = { ...formData };
       if (isEdit && !formData.password) {
         delete body.password;
@@ -235,8 +290,9 @@ export function EmployeeForm() {
                   <div className="space-y-2 text-left">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đặt lại mật khẩu</label>
                     <div className="relative">
-                      <input type="password" value={formData.password} onChange={(e) => handleChange("password", e.target.value)} placeholder="Để trống nếu không đổi" className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none" />
+                      <input type="password" value={formData.password} onChange={(e) => handleChange("password", e.target.value)} placeholder="Để trống nếu không đổi" className={cn("w-full px-4 py-3 bg-slate-50 border focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none", errors.password ? "border-red-300 bg-red-50" : "border-transparent")} />
                     </div>
+                    {errors.password && <p className="text-xs text-red-500 font-medium">{errors.password}</p>}
                   </div>
                 )}
 
@@ -297,30 +353,34 @@ export function EmployeeForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Họ và tên <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.full_name} onChange={(e) => handleChange("full_name", e.target.value)} placeholder="VD: Nguyễn Văn An" required className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                  <input type="text" value={formData.full_name} onChange={(e) => handleChange("full_name", e.target.value)} placeholder="VD: Nguyễn Văn An" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.full_name ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                  {errors.full_name && <p className="text-xs text-red-500 font-medium">{errors.full_name}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Email công việc <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="email" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="email@company.com" required className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <input type="text" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="email@company.com" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.email ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
                   </div>
+                  {errors.email && <p className="text-xs text-red-500 font-medium">{errors.email}</p>}
                 </div>
                 {!isEdit && (
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">Mật khẩu <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <Shield className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input type="password" value={formData.password} onChange={(e) => handleChange("password", e.target.value)} placeholder="Tối thiểu 6 ký tự" required className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                      <input type="password" value={formData.password} onChange={(e) => handleChange("password", e.target.value)} placeholder="Tối thiểu 6 ký tự" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.password ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
                     </div>
+                    {errors.password && <p className="text-xs text-red-500 font-medium">{errors.password}</p>}
                   </div>
                 )}
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Số điện thoại</label>
                   <div className="relative">
                     <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="090 123 4567" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <input type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="090 123 4567" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.phone ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
                   </div>
+                  {errors.phone && <p className="text-xs text-red-500 font-medium">{errors.phone}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Phòng ban</label>
@@ -362,11 +422,13 @@ export function EmployeeForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Lương cơ bản (VNĐ)</label>
-                  <input type="number" value={formData.salary || ""} onChange={(e) => handleChange("salary", Number(e.target.value))} placeholder="0" className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                  <input type="number" min="0" value={formData.salary || ""} onChange={(e) => handleChange("salary", Number(e.target.value))} placeholder="0" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.salary ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                  {errors.salary && <p className="text-xs text-red-500 font-medium">{errors.salary}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Tỷ lệ hoa hồng (%)</label>
-                  <input type="number" value={formData.commission_rate || ""} onChange={(e) => handleChange("commission_rate", Number(e.target.value))} placeholder="5" className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                  <input type="number" min="0" max="100" value={formData.commission_rate || ""} onChange={(e) => handleChange("commission_rate", Number(e.target.value))} placeholder="5" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.commission_rate ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                  {errors.commission_rate && <p className="text-xs text-red-500 font-medium">{errors.commission_rate}</p>}
                 </div>
               </div>
             </div>

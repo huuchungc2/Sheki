@@ -113,17 +113,81 @@ router.get('/available-ctvs', auth, authorize('admin'), async (req, res, next) =
 router.get('/commissions/all', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const [rows] = await pool.query(`
-      SELECT uc.collaborator_id, u.full_name as collaborator_name, COALESCE(SUM(c.commission_amount), 0) as total_commission,
-             COALESCE(COUNT(DISTINCT c.order_id), 0) as total_orders, COALESCE(SUM(o.total_amount), 0) as total_revenue
-      FROM user_collaborators uc
-      LEFT JOIN commissions c ON c.user_id = uc.collaborator_id
-      LEFT JOIN users u ON uc.collaborator_id = u.id
-      LEFT JOIN orders o ON o.id = c.order_id
-      GROUP BY uc.collaborator_id, u.full_name
-      ORDER BY total_commission DESC
-    `);
-    res.json({ data: rows });
+    const { month, year, group_id, sales_id } = req.query;
+
+    // filterParams: chỉ cho date/group (dùng trong JOIN ON và WHERE)
+    const filterConds = [];
+    const filterParams = [];
+    if (month)    { filterConds.push('MONTH(o.created_at) = ?'); filterParams.push(parseInt(month)); }
+    if (year)     { filterConds.push('YEAR(o.created_at) = ?');  filterParams.push(parseInt(year)); }
+    if (group_id) { filterConds.push('o.group_id = ?');          filterParams.push(parseInt(group_id)); }
+    const joinExtra  = filterConds.length ? ' AND ' + filterConds.join(' AND ') : '';
+    const whereExtra = filterConds.length ? ' AND ' + filterConds.join(' AND ') : '';
+    const salesFilter = sales_id ? ' AND cr.sales_id = ?' : '';
+    const salesParam  = sales_id ? [parseInt(sales_id)] : [];
+
+    // Tổng hợp: mỗi cặp Sales-CTV
+    // Params: [...filterParams(JOIN ON), ...salesParam(WHERE)]
+    const [pairs] = await pool.query(`
+      SELECT
+        sal.id as sales_id, sal.full_name as sales_name,
+        ctv.id as ctv_id, ctv.full_name as ctv_name,
+        ctv.commission_rate as ctv_rate,
+        COALESCE(SUM(c.commission_amount), 0) as override_commission,
+        COALESCE(COUNT(DISTINCT o.id), 0) as total_orders,
+        COALESCE(SUM(o.total_amount), 0) as total_revenue
+      FROM collaborators cr
+      JOIN users sal ON cr.sales_id = sal.id
+      JOIN users ctv ON cr.ctv_id = ctv.id
+      LEFT JOIN orders o ON o.salesperson_id = ctv.id ${joinExtra}
+      LEFT JOIN commissions c ON c.order_id = o.id
+        AND c.user_id = sal.id AND c.type = 'override' AND c.ctv_user_id = ctv.id
+      WHERE 1=1 ${salesFilter}
+      GROUP BY sal.id, sal.full_name, ctv.id, ctv.full_name, ctv.commission_rate
+      ORDER BY sal.full_name, override_commission DESC
+    `, [...filterParams, ...salesParam]);
+
+    // Chi tiết đơn
+    // Params: [...filterParams(WHERE), ...salesParam(WHERE)]
+    const [orders] = await pool.query(`
+      SELECT
+        sal.id as sales_id, sal.full_name as sales_name,
+        ctv.id as ctv_id, ctv.full_name as ctv_name,
+        o.id as order_id, o.code as order_code,
+        o.created_at as order_date, o.total_amount, o.status,
+        g.name as group_name, cu.name as customer_name,
+        c.commission_amount as override_commission
+      FROM collaborators cr
+      JOIN users sal ON cr.sales_id = sal.id
+      JOIN users ctv ON cr.ctv_id = ctv.id
+      JOIN orders o ON o.salesperson_id = ctv.id
+      JOIN commissions c ON c.order_id = o.id
+        AND c.user_id = sal.id AND c.type = 'override' AND c.ctv_user_id = ctv.id
+      LEFT JOIN groups g ON o.group_id = g.id
+      LEFT JOIN customers cu ON o.customer_id = cu.id
+      WHERE 1=1 ${whereExtra} ${salesFilter}
+      ORDER BY sal.full_name, ctv.full_name, o.created_at DESC
+    `, [...filterParams, ...salesParam]);
+
+    res.json({
+      data: {
+        pairs: pairs.map(r => ({
+          ...r,
+          override_commission: parseFloat(r.override_commission) || 0,
+          total_orders:  parseInt(r.total_orders) || 0,
+          total_revenue: parseFloat(r.total_revenue) || 0,
+        })),
+        orders: orders.map(r => ({
+          ...r,
+          total_amount:        parseFloat(r.total_amount) || 0,
+          override_commission: parseFloat(r.override_commission) || 0,
+        })),
+        totals: {
+          total_override: pairs.reduce((s, r) => s + parseFloat(r.override_commission), 0),
+          total_orders:   pairs.reduce((s, r) => s + parseInt(r.total_orders), 0),
+        }
+      }
+    });
   } catch (err) {
     next(err);
   }

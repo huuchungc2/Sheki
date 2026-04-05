@@ -7,91 +7,165 @@ router.get('/dashboard', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const y = now.getFullYear(), m = now.getMonth();
+    const firstDayThisMonth = new Date(y, m, 1);
+    const firstDayLastMonth = new Date(y, m - 1, 1);
+    const lastDayLastMonth  = new Date(y, m, 0);
+    const todayStart = new Date(y, m, now.getDate());
+    const isSales = req.user.role === 'sales';
+    const uid = req.user.id;
 
-    let orderWhere = 'WHERE created_at >= ?';
-    let customerWhere = 'WHERE created_at >= ?';
-    const orderParams = [firstDay];
-    const customerParams = [firstDay];
+    // Helper: build salesperson filter
+    const spFilter = isSales ? ' AND salesperson_id = ?' : '';
+    const spParam  = isSales ? [uid] : [];
 
-    if (req.user.role === 'sales') {
-      orderWhere += ' AND salesperson_id = ?';
-      customerWhere += ' AND created_by = ?';
-      orderParams.push(req.user.id);
-      customerParams.push(req.user.id);
-    }
-
-    const [orders] = await pool.query(
-      `SELECT COUNT(*) as total, COALESCE(SUM(total_amount), 0) as revenue FROM orders ${orderWhere}`,
-      orderParams
+    // ── Tháng này ──
+    const [thisMonth] = await pool.query(
+      `SELECT COUNT(*) as total_orders,
+              COALESCE(SUM(total_amount),0) as revenue,
+              COALESCE(SUM(CASE WHEN status='completed' THEN total_amount END),0) as completed_revenue
+       FROM orders WHERE created_at >= ? AND created_at < ?${spFilter}`,
+      [firstDayThisMonth, new Date(y, m+1, 1), ...spParam]
     );
 
-    const [customers] = await pool.query(
-      `SELECT COUNT(*) as total FROM customers ${customerWhere}`,
-      customerParams
+    // ── Tháng trước ──
+    const [lastMonth] = await pool.query(
+      `SELECT COALESCE(SUM(total_amount),0) as revenue
+       FROM orders WHERE created_at >= ? AND created_at <= ?${spFilter}`,
+      [firstDayLastMonth, lastDayLastMonth, ...spParam]
     );
 
-    const [products] = await pool.query('SELECT COUNT(*) as total FROM products WHERE is_active = 1');
+    // ── Hôm nay ──
+    const [today] = await pool.query(
+      `SELECT COUNT(*) as total_orders, COALESCE(SUM(total_amount),0) as revenue
+       FROM orders WHERE created_at >= ?${spFilter}`,
+      [todayStart, ...spParam]
+    );
 
-    let recentWhere = '1=1';
-    const recentParams = [];
-    if (req.user.role === 'sales') {
-      recentWhere = 'o.salesperson_id = ?';
-      recentParams.push(req.user.id);
-    }
+    // ── Đơn theo trạng thái (tháng này) ──
+    const [statusStats] = await pool.query(
+      `SELECT status, COUNT(*) as cnt FROM orders
+       WHERE created_at >= ?${spFilter} GROUP BY status`,
+      [firstDayThisMonth, ...spParam]
+    );
+    const byStatus = { pending:0, shipping:0, completed:0, cancelled:0 };
+    statusStats.forEach(r => { if (byStatus[r.status] !== undefined) byStatus[r.status] = r.cnt; });
 
+    // ── Hoa hồng tháng này ──
+    const commSpFilter = isSales ? ' AND c.user_id = ?' : '';
+    const [commThis] = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN c.type='direct'   THEN c.commission_amount END),0) as direct_commission,
+         COALESCE(SUM(CASE WHEN c.type='override' THEN c.commission_amount END),0) as override_commission
+       FROM commissions c
+       JOIN orders o ON c.order_id = o.id
+       WHERE MONTH(o.created_at)=? AND YEAR(o.created_at)=?${commSpFilter}`,
+      [m+1, y, ...(isSales ? [uid] : [])]
+    );
+
+    // ── Khách hàng ──
+    const custFilter = isSales ? ' AND created_by = ?' : '';
+    const [custTotal] = await pool.query(
+      `SELECT COUNT(*) as total FROM customers WHERE 1=1${custFilter}`,
+      isSales ? [uid] : []
+    );
+    const [custNew] = await pool.query(
+      `SELECT COUNT(*) as total FROM customers WHERE created_at >= ?${custFilter}`,
+      [firstDayThisMonth, ...(isSales ? [uid] : [])]
+    );
+
+    // ── Sản phẩm ──
+    const [products] = await pool.query(
+      'SELECT COUNT(*) as total FROM products WHERE is_active=1'
+    );
+
+    // ── Đơn gần đây ──
     const [recentOrders] = await pool.query(
-      `SELECT o.id, o.code, o.total_amount, o.status, c.name as customer_name, o.created_at
+      `SELECT o.id, o.code, o.total_amount, o.status, o.created_at,
+              c.name as customer_name, u.full_name as salesperson_name
        FROM orders o
        LEFT JOIN customers c ON o.customer_id = c.id
-       WHERE ${recentWhere}
-       ORDER BY o.created_at DESC LIMIT 10`,
-      recentParams
+       LEFT JOIN users u ON o.salesperson_id = u.id
+       WHERE 1=1${spFilter}
+       ORDER BY o.created_at DESC LIMIT 8`,
+      spParam
     );
 
-    let topWhere = 'WHERE o.created_at >= ?';
-    const topParams = [firstDay];
-    if (req.user.role === 'sales') {
-      topWhere += ' AND o.salesperson_id = ?';
-      topParams.push(req.user.id);
-    }
-
+    // ── Top sản phẩm tháng này ──
     const [topProducts] = await pool.query(
       `SELECT p.name, p.sku, SUM(oi.qty) as total_sold, SUM(oi.subtotal) as revenue
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
        JOIN orders o ON oi.order_id = o.id
-       ${topWhere}
-       GROUP BY p.id
-       ORDER BY total_sold DESC
-       LIMIT 5`,
-      topParams
+       WHERE o.created_at >= ?${spFilter} AND o.status != 'cancelled'
+       GROUP BY p.id, p.name, p.sku
+       ORDER BY revenue DESC LIMIT 5`,
+      [firstDayThisMonth, ...spParam]
     );
+
+    // ── Top nhân viên tháng này (admin only) ──
+    let topSales = [];
+    if (!isSales) {
+      const [rows] = await pool.query(
+        `SELECT u.id, u.full_name,
+                COUNT(DISTINCT o.id) as total_orders,
+                COALESCE(SUM(o.total_amount),0) as revenue,
+                COALESCE(SUM(CASE WHEN c.type='direct' THEN c.commission_amount END),0) as direct_comm,
+                COALESCE(SUM(CASE WHEN c.type='override' THEN c.commission_amount END),0) as override_comm
+         FROM users u
+         LEFT JOIN orders o ON o.salesperson_id = u.id AND MONTH(o.created_at)=? AND YEAR(o.created_at)=?
+         LEFT JOIN commissions c ON c.order_id = o.id AND c.user_id = u.id
+         WHERE u.role='sales' AND u.is_active=1
+         GROUP BY u.id, u.full_name
+         ORDER BY revenue DESC LIMIT 5`,
+        [m+1, y]
+      );
+      topSales = rows.map(r => ({
+        ...r,
+        total_orders:    parseInt(r.total_orders) || 0,
+        revenue:         parseFloat(r.revenue) || 0,
+        direct_comm:     parseFloat(r.direct_comm) || 0,
+        override_comm:   parseFloat(r.override_comm) || 0,
+      }));
+    }
+
+    const rev      = parseFloat(thisMonth[0].revenue) || 0;
+    const revLast  = parseFloat(lastMonth[0].revenue) || 0;
+    const revChange = revLast > 0 ? ((rev - revLast) / revLast * 100).toFixed(1) : null;
 
     res.json({
       data: {
-        orders: {
-          ...orders[0],
-          total: parseInt(orders[0].total) || 0,
-          revenue: parseFloat(orders[0].revenue) || 0,
+        thisMonth: {
+          revenue:           rev,
+          completed_revenue: parseFloat(thisMonth[0].completed_revenue) || 0,
+          total_orders:      parseInt(thisMonth[0].total_orders) || 0,
+          revenue_change:    revChange,
+        },
+        lastMonth: { revenue: revLast },
+        today: {
+          revenue:      parseFloat(today[0].revenue) || 0,
+          total_orders: parseInt(today[0].total_orders) || 0,
+        },
+        byStatus,
+        commission: {
+          direct:   parseFloat(commThis[0].direct_commission) || 0,
+          override: parseFloat(commThis[0].override_commission) || 0,
+          total:    (parseFloat(commThis[0].direct_commission) || 0) + (parseFloat(commThis[0].override_commission) || 0),
         },
         customers: {
-          ...customers[0],
-          total: parseInt(customers[0].total) || 0,
+          total: parseInt(custTotal[0].total) || 0,
+          new:   parseInt(custNew[0].total) || 0,
         },
-        products: {
-          ...products[0],
-          total: parseInt(products[0].total) || 0,
-        },
+        products: { total: parseInt(products[0].total) || 0 },
         recentOrders: recentOrders.map(o => ({
-          ...o,
-          total_amount: parseFloat(o.total_amount) || 0,
+          ...o, total_amount: parseFloat(o.total_amount) || 0
         })),
         topProducts: topProducts.map(p => ({
           ...p,
           total_sold: parseFloat(p.total_sold) || 0,
-          revenue: parseFloat(p.revenue) || 0,
-        }))
+          revenue:    parseFloat(p.revenue) || 0,
+        })),
+        topSales,
       }
     });
   } catch (err) {

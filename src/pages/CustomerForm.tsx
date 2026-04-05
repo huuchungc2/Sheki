@@ -93,7 +93,7 @@ export function CustomerForm() {
   const [fetchLoading, setFetchLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
-  const [phoneError, setPhoneError] = React.useState("");
+  const [errors, setErrors] = React.useState<{ name?: string; phone?: string; email?: string }>({});
 
   const currentUser = React.useMemo(() => {
     const u = localStorage.getItem("user");
@@ -179,27 +179,40 @@ export function CustomerForm() {
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (field === "phone") {
-      const cleaned = value.replace(/\D/g, '');
-      if (cleaned.length > 0 && cleaned.length !== 10) {
-        setPhoneError("Số điện thoại phải có đúng 10 chữ số");
-      } else {
-        setPhoneError("");
-      }
+    // Clear error khi user bắt đầu nhập lại
+    if (errors[field as keyof typeof errors]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
     }
   };
 
-  const validatePhone = (phone: string): boolean => {
-    const cleaned = phone.replace(/\D/g, '');
-    return cleaned.length === 10;
+  const validateForm = (): boolean => {
+    const newErrors: { name?: string; phone?: string; email?: string } = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Vui lòng nhập họ và tên";
+    }
+
+    const cleanedPhone = formData.phone.replace(/\D/g, '');
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Số điện thoại là bắt buộc";
+    } else if (cleanedPhone.length !== 10) {
+      newErrors.phone = "Số điện thoại phải có đúng 10 chữ số";
+    }
+
+    if (formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        newErrors.email = "Địa chỉ email không hợp lệ";
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.phone && !validatePhone(formData.phone)) {
-      setPhoneError("Số điện thoại phải có đúng 10 chữ số");
-      return;
-    }
+    if (!validateForm()) return;
     setIsLoading(true);
     setError(null);
     setSuccess(false);
@@ -343,22 +356,24 @@ export function CustomerForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Họ và tên <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="VD: Nguyễn Thị Lan" required className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                  <input type="text" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="VD: Nguyễn Thị Lan" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.name ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                  {errors.name && <p className="text-xs text-red-500 font-medium">{errors.name}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Số điện thoại <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="0912 345 678" maxLength={10} required className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", phoneError ? "border-red-300 focus:border-red-500 focus:ring-red-500/10" : "focus:border-blue-500 focus:ring-blue-500/10")} />
+                    <input type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="0912 345 678" maxLength={11} className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.phone ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
                   </div>
-                  {phoneError && <p className="text-xs text-red-500 font-medium">{phoneError}</p>}
+                  {errors.phone && <p className="text-xs text-red-500 font-medium">{errors.phone}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Email</label>
                   <div className="relative">
                     <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="email" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="lan.nt@gmail.com" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <input type="text" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="lan.nt@gmail.com" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.email ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
                   </div>
+                  {errors.email && <p className="text-xs text-red-500 font-medium">{errors.email}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Ngày sinh</label>
