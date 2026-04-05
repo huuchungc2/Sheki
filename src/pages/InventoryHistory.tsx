@@ -12,21 +12,66 @@ import {
   FileText,
   Warehouse,
   User,
-  Tag
+  Tag,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn, formatDate, formatCurrency } from "../lib/utils";
 import type { InventoryTransaction } from "../types";
 
-const transactions: (InventoryTransaction & { totalValue: number })[] = [
-  { id: "PNK-001", type: "import", date: "2026-04-03T08:30:00", warehouse: "Kho trung tâm", staff: "Nguyễn Văn An", totalItems: 80, status: "completed", totalValue: 15400000 },
-  { id: "PXK-001", type: "export", date: "2026-04-02T14:20:00", warehouse: "Kho trung tâm", staff: "Trần Thị Bình", totalItems: 12, status: "completed", totalValue: 4200000 },
-  { id: "PNK-002", type: "import", date: "2026-04-01T10:15:00", warehouse: "Kho chi nhánh 1", staff: "Lê Văn Cường", totalItems: 45, status: "completed", totalValue: 8900000 },
-  { id: "PXK-002", type: "export", date: "2026-03-31T16:45:00", warehouse: "Kho trung tâm", staff: "Nguyễn Văn An", totalItems: 5, status: "draft", totalValue: 1250000 },
-  { id: "PNK-003", type: "import", date: "2026-03-30T09:00:00", warehouse: "Kho trung tâm", staff: "Phạm Thị Dung", totalItems: 120, status: "completed", totalValue:  24500000 },
-];
+const API_BASE = "http://localhost:3000/api";
+
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem("token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 export function InventoryHistory() {
+  const [transactions, setTransactions] = React.useState<(InventoryTransaction & { totalValue: number })[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
+  const [type, setType] = React.useState("");
+  const [status, setStatus] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const [total, setTotal] = React.useState(0);
+  const limit = 10;
+
+  const fetchTransactions = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        search,
+        type,
+        status,
+        page: String(page),
+        limit: String(limit),
+      });
+      const res = await fetch(`${API_BASE}/inventory?${params}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to fetch inventory history");
+      const json = await res.json();
+      setTransactions(json.data || []);
+      setTotal(json.total || 0);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, type, status, page]);
+
+  React.useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  const totalPages = Math.ceil(total / limit);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -85,6 +130,8 @@ export function InventoryHistory() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Tìm theo mã phiếu, người lập..." 
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
           />
@@ -94,90 +141,154 @@ export function InventoryHistory() {
             <Calendar className="w-4 h-4" />
             Thời gian
           </button>
-          <select className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20">
-            <option>Tất cả loại phiếu</option>
-            <option>Nhập kho</option>
-            <option>Xuất kho</option>
+          <select 
+            value={type}
+            onChange={(e) => { setType(e.target.value); setPage(1); }}
+            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="">Tất cả loại phiếu</option>
+            <option value="import">Nhập kho</option>
+            <option value="export">Xuất kho</option>
+          </select>
+          <select 
+            value={status}
+            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="completed">Hoàn tất</option>
+            <option value="draft">Lưu nháp</option>
           </select>
         </div>
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mã phiếu</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Loại</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kho / Người lập</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Số lượng</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Giá trị</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-slate-50/50 transition-all group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center",
-                        tx.type === "import" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
-                      )}>
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <span className="text-sm font-bold text-slate-900 font-mono">{tx.id}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn(
-                      "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full",
-                      tx.type === "import" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
-                    )}>
-                      {tx.type === "import" ? "Nhập kho" : "Xuất kho"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm text-slate-900">{formatDate(tx.date)}</p>
-                    <p className="text-xs text-slate-500">{new Date(tx.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-sm text-slate-900">
-                      <Warehouse className="w-3 h-3 text-slate-400" />
-                      {tx.warehouse}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                      <User className="w-3 h-3 text-slate-400" />
-                      {tx.staff}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                    {tx.totalItems} SP
-                  </td>
-                  <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                    {formatCurrency(tx.totalValue)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn(
-                      "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                      tx.status === "completed" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
-                    )}>
-                      {tx.status === "completed" ? "Hoàn tất" : "Lưu nháp"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-all">
-                      <Eye className="w-4 h-4" />
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 text-red-500">
+            <AlertCircle className="w-10 h-10 mb-3" />
+            <p className="text-sm font-medium">{error}</p>
+            <button onClick={fetchTransactions} className="mt-3 text-sm text-blue-600 hover:underline">Thử lại</button>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-200">
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mã phiếu</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Loại</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kho / Người lập</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Số lượng</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Giá trị</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {transactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-slate-50/50 transition-all group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center",
+                            tx.type === "import" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
+                          )}>
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <span className="text-sm font-bold text-slate-900 font-mono">{tx.id}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full",
+                          tx.type === "import" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
+                        )}>
+                          {tx.type === "import" ? "Nhập kho" : "Xuất kho"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-slate-900">{formatDate(tx.date)}</p>
+                        <p className="text-xs text-slate-500">{new Date(tx.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-sm text-slate-900">
+                          <Warehouse className="w-3 h-3 text-slate-400" />
+                          {tx.warehouse}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                          <User className="w-3 h-3 text-slate-400" />
+                          {tx.staff}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                        {tx.totalItems} SP
+                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                        {formatCurrency(tx.totalValue)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                          tx.status === "completed" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
+                        )}>
+                          {tx.status === "completed" ? "Hoàn tất" : "Lưu nháp"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-all">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+                <p className="text-sm text-slate-500">Hiển thị {(page - 1) * limit + 1}–{Math.min(page * limit, total)} của {total} kết quả</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={cn(
+                        "w-8 h-8 rounded-lg text-sm font-medium transition-all",
+                        p === page
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      {p}
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

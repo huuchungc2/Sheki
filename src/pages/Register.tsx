@@ -11,9 +11,9 @@ import {
   AlertCircle
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { auth, db } from "../firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { logger, apiCall } from "../lib/api";
+
+const API_URL = "http://localhost:3000/api";
 
 export function Register() {
   const navigate = useNavigate();
@@ -31,23 +31,27 @@ export function Register() {
     setIsLoading(true);
     setError(null);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = userCredential.user;
-
-      // Create user document in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        displayName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        role: "sales", // Default role
-        createdAt: new Date().toISOString()
-      });
-
+      logger.info('Register attempt', { email: formData.email });
+      const { data, status } = await apiCall(
+        '/auth/register',
+        { method: "POST", body: JSON.stringify({ full_name: formData.fullName, email: formData.email, phone: formData.phone, password: formData.password }) },
+        'Register'
+      );
+      
+      if (!status) {
+        setError(data.error || "Đăng ký thất bại");
+        setIsLoading(false);
+        return;
+      }
+      
+      logger.info('Register success', { email: formData.email });
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      window.dispatchEvent(new Event('auth-change'));
       navigate("/");
     } catch (err: any) {
-      setError("Đăng ký thất bại. Email có thể đã tồn tại hoặc thông tin không hợp lệ.");
-      console.error("Registration Error:", err);
+      logger.error('Register exception', err);
+      setError("Lỗi kết nối server");
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +60,6 @@ export function Register() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="max-w-[1000px] w-full bg-white rounded-[48px] shadow-2xl shadow-slate-200/50 overflow-hidden flex flex-col md:flex-row border border-slate-100">
-        {/* Left Side: Branding & Info */}
         <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="relative z-10">
             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-2xl font-black mb-8 shadow-lg shadow-blue-600/20">
@@ -91,12 +94,10 @@ export function Register() {
             </div>
           </div>
 
-          {/* Decorative elements */}
           <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl"></div>
           <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/5 rounded-full blur-3xl"></div>
         </div>
 
-        {/* Right Side: Register Form */}
         <div className="md:w-1/2 p-12 md:p-16">
           <div className="mb-10">
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Tạo tài khoản mới</h2>
@@ -114,14 +115,7 @@ export function Register() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HỌ VÀ TÊN</label>
               <div className="relative">
                 <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input 
-                  type="text" 
-                  required
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="VD: Lê Hoàng" 
-                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
-                />
+                <input type="text" required value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} placeholder="VD: Lê Hoàng" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />
               </div>
             </div>
 
@@ -129,14 +123,7 @@ export function Register() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">EMAIL TRUY CẬP</label>
               <div className="relative">
                 <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input 
-                  type="email" 
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="admin@velocity.com" 
-                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
-                />
+                <input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@company.com" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />
               </div>
             </div>
 
@@ -144,14 +131,7 @@ export function Register() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">SỐ ĐIỆN THOẠI</label>
               <div className="relative">
                 <Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input 
-                  type="tel" 
-                  required
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="090 123 4567" 
-                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
-                />
+                <input type="tel" required value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="090 123 4567" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />
               </div>
             </div>
 
@@ -159,14 +139,7 @@ export function Register() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">MẬT KHẨU</label>
               <div className="relative">
                 <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input 
-                  type="password" 
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="••••••••" 
-                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
-                />
+                <input type="password" required value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />
               </div>
             </div>
 
@@ -177,11 +150,7 @@ export function Register() {
               </p>
             </div>
 
-            <button 
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-[24px] text-sm font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50"
-            >
+            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-[24px] text-sm font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50">
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (

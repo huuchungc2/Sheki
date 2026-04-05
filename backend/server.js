@@ -1,0 +1,120 @@
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config();
+
+const { getPool } = require('./config/db');
+const authRouter = require('./routes/auth');
+const usersRouter = require('./routes/users');
+const customersRouter = require('./routes/customers');
+const productsRouter = require('./routes/products');
+const ordersRouter = require('./routes/orders');
+const inventoryRouter = require('./routes/inventory');
+const commissionsRouter = require('./routes/commissions');
+const reportsRouter = require('./routes/reports');
+const warehousesRouter = require('./routes/warehouses');
+const categoriesRouter = require('./routes/categories');
+const settingsRouter = require('./routes/settings');
+const importRouter = require('./routes/import');
+const uploadsRouter = require('./routes/uploads');
+const logsRouter = require('./routes/logs');
+const groupsRouter = require('./routes/groups');
+const commissionTiersRouter = require('./routes/commission-tiers');
+const collaboratorsRouter = require('./routes/collaborators');
+const { logMiddleware } = require('./middleware/logger');
+const errorHandler = require('./middleware/errorHandler');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Create logs directory
+const logsDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir);
+}
+
+// Create write stream for access log
+const accessLogStream = fs.createWriteStream(
+  path.join(logsDir, 'access.log'), 
+  { flags: 'a' }
+);
+
+// Middleware
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true
+}));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Logging - HTTP requests
+app.use(morgan('combined', { stream: accessLogStream }));
+app.use(morgan('dev')); // Console logging
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`📝 ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+  });
+  next();
+});
+
+// Activity logging - MUST be before routes to wrap res.json
+app.use(logMiddleware);
+
+// Routes
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/customers', customersRouter);
+app.use('/api/products', productsRouter);
+app.use('/api/orders', ordersRouter);
+app.use('/api/inventory', inventoryRouter);
+app.use('/api/commissions', commissionsRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/warehouses', warehousesRouter);
+app.use('/api/categories', categoriesRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/import', importRouter);
+app.use('/api/uploads', uploadsRouter);
+app.use('/api/logs', logsRouter);
+app.use('/api/groups', groupsRouter);
+app.use('/api/commission-tiers', commissionTiersRouter);
+app.use('/api/collaborators', collaboratorsRouter);
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Health check
+app.get('/api/health', async (req, res) => {
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query('SELECT 1 as test');
+    res.json({ status: 'ok', db: 'connected', test: rows[0].test });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// Error handler
+app.use(errorHandler);
+
+// Start server
+async function start() {
+  try {
+    await getPool();
+    console.log('✅ Database connected');
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`📝 API Health: http://localhost:${PORT}/api/health`);
+    });
+  } catch (err) {
+    console.error('❌ Failed to start server:', err);
+    process.exit(1);
+  }
+}
+
+start();

@@ -1,30 +1,18 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
-  Shield, 
   Mail, 
   Lock, 
   ArrowRight, 
-  Chrome,
-  Github,
   CheckCircle2,
   AlertCircle
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { auth, db } from "../firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-
-const DEMO_ACCOUNTS = [
-  { email: "admin@velocity.com", password: "password123", role: "admin", name: "Quản trị viên" },
-  { email: "sale1@velocity.com", password: "password123", role: "sales", name: "Nhân viên 1" },
-  { email: "sale2@velocity.com", password: "password123", role: "sales", name: "Nhân viên 2" },
-];
+import { API_URL, logger, apiCall } from "../lib/api";
 
 export function Login() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = React.useState(false);
-  const [isSeeding, setIsSeeding] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -33,60 +21,39 @@ export function Login() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    
+    logger.info('Login attempt', { email });
+    
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/");
-    } catch (err: any) {
-      setError("Email hoặc mật khẩu không chính xác. Vui lòng thử lại.");
-      console.error("Login Error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const seedAndLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Try to sign in first
-      await signInWithEmailAndPassword(auth, account.email, account.password);
-      navigate("/");
-    } catch (err: any) {
-      console.log("Initial sign-in failed, checking if we need to seed:", err.code);
+      const { data, status } = await apiCall(
+        '/auth/login',
+        {
+          method: "POST",
+          body: JSON.stringify({ email, password })
+        },
+        'Login'
+      );
       
-      if (err.code === "auth/operation-not-allowed") {
-        setError("Lỗi: Phương thức đăng nhập bằng Email/Mật khẩu chưa được bật trong Firebase Console. Vui lòng bật nó trong phần Authentication > Sign-in method.");
+      if (!status) {
+        logger.warn('Login failed', { email, error: data.error });
+        setError(data.error || "Đăng nhập thất bại");
+        setIsLoading(false);
         return;
       }
-
-      // If user doesn't exist (or invalid credential which could mean doesn't exist)
-      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
-        try {
-          console.log("Attempting to create demo account...");
-          const userCredential = await createUserWithEmailAndPassword(auth, account.email, account.password);
-          const user = userCredential.user;
-          
-          await setDoc(doc(db, "users", user.uid), {
-            uid: user.uid,
-            displayName: account.name,
-            email: account.email,
-            role: account.role,
-            createdAt: new Date().toISOString()
-          });
-          
-          console.log("Demo account created and seeded.");
-          navigate("/");
-        } catch (createErr: any) {
-          if (createErr.code === "auth/email-already-in-use") {
-            setError("Tài khoản này đã tồn tại nhưng mật khẩu không đúng. Vui lòng kiểm tra lại.");
-          } else {
-            setError(`Không thể khởi tạo tài khoản mẫu: ${createErr.message}`);
-          }
-          console.error("Seed Error:", createErr);
-        }
-      } else {
-        setError(`Lỗi đăng nhập: ${err.message}`);
-      }
+      
+      logger.info('Login success', { email, user: data.user });
+      
+      // Store token and user
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      
+      // Notify App component about auth change
+      window.dispatchEvent(new Event('auth-change'));
+      
+      navigate("/");
+    } catch (err: any) {
+      logger.error('Login exception', err);
+      setError("Lỗi kết nối server: " + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -142,49 +109,6 @@ export function Login() {
             <p className="text-slate-400 font-bold mt-2">Đăng nhập để tiếp tục quản lý hệ thống.</p>
           </div>
 
-          {/* Quick Login Section moved up */}
-          <div className="mb-10">
-            <div className="relative flex items-center justify-center mb-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-100"></div>
-              </div>
-              <span className="relative px-4 bg-white text-[10px] font-black text-blue-600 uppercase tracking-widest">Đăng nhập nhanh (Dữ liệu mẫu)</span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => seedAndLogin(acc)}
-                  disabled={isLoading}
-                  className="flex items-center justify-between px-6 py-3 bg-blue-50/50 border border-blue-100/50 rounded-2xl hover:bg-blue-600 hover:text-white transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black transition-colors",
-                      acc.role === "admin" ? "bg-red-100 text-red-600 group-hover:bg-white/20 group-hover:text-white" : "bg-emerald-100 text-emerald-600 group-hover:bg-white/20 group-hover:text-white"
-                    )}>
-                      {acc.role === "admin" ? "AD" : "SA"}
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-black group-hover:text-white transition-colors">{acc.name}</p>
-                      <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest">{acc.email}</p>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 opacity-40 group-hover:opacity-100 transition-all" />
-                </button>
-              ))}
-            </div>
-
-            <div className="relative flex items-center justify-center mt-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-100"></div>
-              </div>
-              <span className="relative px-4 bg-white text-[10px] font-black text-slate-300 uppercase tracking-widest">Hoặc nhập thủ công</span>
-            </div>
-          </div>
-
           <form onSubmit={handleLogin} className="space-y-6">
             {error && (
               <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-xs font-bold">
@@ -201,7 +125,7 @@ export function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@velocity.com" 
+                  placeholder="email@company.com" 
                   className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
                 />
               </div>
@@ -210,7 +134,6 @@ export function Login() {
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">MẬT KHẨU</label>
-                <button type="button" className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Quên mật khẩu?</button>
               </div>
               <div className="relative">
                 <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
@@ -240,11 +163,6 @@ export function Login() {
               )}
             </button>
           </form>
-
-          <p className="mt-10 text-center text-sm font-bold text-slate-400">
-            Chưa có tài khoản?{" "}
-            <Link to="/register" className="text-blue-600 hover:underline">Đăng ký ngay</Link>
-          </p>
         </div>
       </div>
     </div>

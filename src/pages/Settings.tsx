@@ -1,366 +1,313 @@
 import * as React from "react";
 import { 
-  Shield, 
-  Lock, 
-  UserCheck, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Plus, 
-  Save,
-  ChevronRight,
-  Info,
-  CheckCircle2,
-  XCircle,
-  RotateCcw,
-  Users,
-  Package,
-  ShoppingCart,
-  Warehouse,
-  BarChart3,
-  UserCircle,
-  Loader2
+  Shield, Users, Package, ShoppingCart, Warehouse, BarChart3, UserCircle,
+  Lock, Check, X, Save, Loader2, AlertCircle, CheckCircle2, Plus, Trash2, Edit2
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { db } from "../firebase";
-import { collection, doc, getDocs, setDoc, onSnapshot } from "firebase/firestore";
 
-type Permission = {
-  id: string;
-  name: string;
-  checked: boolean;
-};
+const API_URL = "http://localhost:3000/api";
 
-type PermissionGroup = {
-  id: string;
-  name: string;
-  icon: any;
-  permissions: Permission[];
-};
-
-type Role = {
-  id: string;
-  name: string;
-  description: string;
-  isActive?: boolean;
-  groups: PermissionGroup[];
-};
-
-const initialRoles: Role[] = [
-  { 
-    id: "manager", 
-    name: "Manager", 
-    description: "Oversees daily operations, staff performance, and inventory reconciliation.",
-    isActive: true,
-    groups: [
-      {
-        id: "products",
-        name: "PRODUCTS",
-        icon: Package,
-        permissions: [
-          { id: "view_catalog", name: "View Catalog", checked: true },
-          { id: "create_item", name: "Create New Item", checked: true },
-          { id: "edit_pricing", name: "Edit Pricing", checked: true },
-          { id: "delete_products", name: "Delete Products", checked: false },
-          { id: "export_database", name: "Export Database", checked: true },
-        ]
-      },
-      {
-        id: "customers",
-        name: "CUSTOMERS",
-        icon: UserCircle,
-        permissions: [
-          { id: "view_profiles", name: "View Profiles", checked: true },
-          { id: "loyalty_override", name: "Loyalty Points Override", checked: true },
-          { id: "edit_contact", name: "Edit Contact Info", checked: true },
-        ]
-      },
-      {
-        id: "orders",
-        name: "ORDERS",
-        icon: ShoppingCart,
-        permissions: [
-          { id: "view_history", name: "View Order History", checked: true },
-          { id: "process_sales", name: "Process Sales", checked: true },
-          { id: "modify_orders", name: "Modify Orders", checked: true },
-          { id: "cancel_transaction", name: "Cancel Transaction", checked: true },
-        ]
-      },
-      {
-        id: "staff",
-        name: "STAFF & HR",
-        icon: Users,
-        permissions: [
-          { id: "view_directory", name: "View Staff Directory", checked: true },
-          { id: "edit_scheduling", name: "Edit Scheduling", checked: true },
-          { id: "approve_payroll", name: "Approve Payroll", checked: false },
-        ]
-      },
-      {
-        id: "reporting",
-        name: "REPORTING",
-        icon: BarChart3,
-        permissions: [
-          { id: "end_day_reports", name: "End of Day Reports", checked: true },
-          { id: "advanced_analytics", name: "Advanced Analytics", checked: false },
-        ]
-      }
-    ]
-  },
-  { 
-    id: "admin", 
-    name: "Administrator", 
-    description: "Full system access, configuration, and security management.",
-    groups: []
-  },
-  { 
-    id: "sales", 
-    name: "Sales Associate", 
-    description: "Terminal operations, customer checkouts, and simple returns.",
-    groups: []
-  },
-  { 
-    id: "warehouse", 
-    name: "Warehouse Staff", 
-    description: "Receiving, stock movements, and logistics tracking.",
-    groups: []
-  },
-  { 
-    id: "accounting", 
-    name: "Accounting", 
-    description: "Financial reports, payroll processing, and audit preparation.",
-    groups: []
-  },
+const ROLE_CONFIG = [
+  { id: "admin", name: "Quản trị viên", description: "Toàn quyền hệ thống, cấu hình và bảo mật.", icon: Shield },
+  { id: "sales", name: "Nhân viên bán hàng", description: "Tạo đơn hàng, quản lý khách hàng, xem hoa hồng cá nhân.", icon: ShoppingCart },
 ];
 
+const MODULES = [
+  { id: "dashboard", name: "Tổng quan", icon: BarChart3 },
+  { id: "employees", name: "Nhân viên", icon: Users },
+  { id: "products", name: "Sản phẩm", icon: Package },
+  { id: "customers", name: "Khách hàng", icon: UserCircle },
+  { id: "orders", name: "Đơn hàng", icon: ShoppingCart },
+  { id: "inventory", name: "Kho bãi", icon: Warehouse },
+  { id: "reports", name: "Báo cáo", icon: BarChart3 },
+  { id: "settings", name: "Cài đặt", icon: Shield },
+];
+
+const ACTIONS = [
+  { id: "view", name: "Xem" },
+  { id: "create", name: "Thêm" },
+  { id: "edit", name: "Sửa" },
+  { id: "delete", name: "Xóa" },
+];
+
+function getDefaultPermissions(role) {
+  const permissions = [];
+  MODULES.forEach(mod => {
+    ACTIONS.forEach(act => {
+      let allowed = false;
+      if (role === "admin") allowed = true;
+      else if (role === "sales") {
+        if (mod.id === "dashboard" && act.id === "view") allowed = true;
+        if (mod.id === "orders" && ["view", "create", "edit"].includes(act.id)) allowed = true;
+        if (mod.id === "customers" && ["view", "create", "edit"].includes(act.id)) allowed = true;
+        if (mod.id === "reports" && act.id === "view") allowed = true;
+        if (mod.id === "products" && act.id === "view") allowed = true;
+      }
+      permissions.push({ module: mod.id, action: act.id, allowed });
+    });
+  });
+  return permissions;
+}
+
 export function Settings() {
-  const [roles, setRoles] = React.useState<Role[]>([]);
-  const [selectedRoleId, setSelectedRoleId] = React.useState<string>("manager");
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [tab, setTab] = React.useState<"roles" | "groups">("roles");
+  const [selectedRoleId, setSelectedRoleId] = React.useState("admin");
+  const [permissions, setPermissions] = React.useState([]);
+  const [saving, setSaving] = React.useState(false);
+  const [success, setSuccess] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Groups state
+  const [groups, setGroups] = React.useState<any[]>([]);
+  const [editingGroup, setEditingGroup] = React.useState<any>(null);
+  const [groupName, setGroupName] = React.useState("");
+  const [groupDesc, setGroupDesc] = React.useState("");
 
   React.useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "roles"), (snapshot) => {
-      const rolesData = snapshot.docs.map(doc => doc.data() as Role);
-      if (rolesData.length === 0) {
-        // Initialize with defaults if empty
-        initializeRoles();
+    fetchPermissions();
+    fetchGroups();
+  }, [selectedRoleId]);
+
+  const fetchPermissions = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/settings/${selectedRoleId}/permissions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setPermissions(json.data || getDefaultPermissions(selectedRoleId));
       } else {
-        setRoles(rolesData);
-        setIsLoading(false);
+        setPermissions(getDefaultPermissions(selectedRoleId));
       }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const initializeRoles = async () => {
-    setIsLoading(true);
-    try {
-      for (const role of initialRoles) {
-        await setDoc(doc(db, "roles", role.id), role);
-      }
-    } catch (error) {
-      console.error("Error initializing roles:", error);
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      setPermissions(getDefaultPermissions(selectedRoleId));
     }
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  const fetchGroups = async () => {
     try {
-      for (const role of roles) {
-        await setDoc(doc(db, "roles", role.id), role);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/groups`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const json = await res.json();
+        setGroups(json.data || []);
       }
-      alert("Đã lưu thay đổi thành công!");
-    } catch (error) {
-      console.error("Error saving roles:", error);
-      alert("Lỗi khi lưu thay đổi. Vui lòng thử lại.");
-    } finally {
-      setIsSaving(false);
+    } catch (err) {
+      console.error("Failed to fetch groups", err);
     }
   };
 
-  const selectedRole = roles.find(r => r.id === selectedRoleId) || roles[0];
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#FFF5F5] flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-red-600 animate-spin" />
-      </div>
-    );
-  }
-
-  const togglePermission = (groupId: string, permissionId: string) => {
-    setRoles(roles.map(role => {
-      if (role.id === selectedRoleId) {
-        return {
-          ...role,
-          groups: role.groups.map(group => {
-            if (group.id === groupId) {
-              return {
-                ...group,
-                permissions: group.permissions.map(p => 
-                  p.id === permissionId ? { ...p, checked: !p.checked } : p
-                )
-              };
-            }
-            return group;
-          })
-        };
+  const handleSavePermissions = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/settings/${selectedRoleId}/permissions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ permissions })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Lưu thất bại");
       }
-      return role;
-    }));
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const togglePermission = (module: string, action: string) => {
+    setPermissions(prev => prev.map(p => 
+      p.module === module && p.action === action ? { ...p, allowed: !p.allowed } : p
+    ));
+  };
+
+  const handleSaveGroup = async () => {
+    if (!groupName.trim()) return;
+    try {
+      const token = localStorage.getItem("token");
+      const method = editingGroup ? "PUT" : "POST";
+      const url = editingGroup ? `${API_URL}/groups/${editingGroup.id}` : `${API_URL}/groups`;
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: groupName, description: groupDesc })
+      });
+      if (!res.ok) throw new Error("Lưu nhóm thất bại");
+      setGroupName("");
+      setGroupDesc("");
+      setEditingGroup(null);
+      fetchGroups();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteGroup = async (id: number) => {
+    if (!confirm("Bạn có chắc muốn xóa nhóm này?")) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/groups/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Xóa nhóm thất bại");
+      fetchGroups();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const selectedRole = ROLE_CONFIG.find(r => r.id === selectedRoleId) || ROLE_CONFIG[0];
+  const allowedCount = permissions.filter(p => p.allowed).length;
+  const totalCount = permissions.length;
 
   return (
     <div className="min-h-screen bg-[#FFF5F5] -m-8 p-8">
-      {/* Top Header */}
-      <div className="flex items-center justify-between mb-12">
+      <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-12">
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Permissions Engine</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Quản lý hệ thống</h1>
           <nav className="flex items-center gap-8">
-            <button className="text-sm font-bold text-slate-400 hover:text-slate-900 transition-colors">Modules</button>
-            <button className="text-sm font-bold text-red-600 border-b-2 border-red-600 pb-1">Users</button>
-            <button className="text-sm font-bold text-slate-400 hover:text-slate-900 transition-colors">Audit Logs</button>
+            <button onClick={() => setTab("roles")} className={cn("text-sm font-bold pb-1 border-b-2 transition-all", tab === "roles" ? "text-red-600 border-red-600" : "text-slate-400 border-transparent hover:text-slate-900")}>Vai trò & Phân quyền</button>
+            <button onClick={() => setTab("groups")} className={cn("text-sm font-bold pb-1 border-b-2 transition-all", tab === "groups" ? "text-red-600 border-red-600" : "text-slate-400 border-transparent hover:text-slate-900")}>Nhóm nhân viên</button>
           </nav>
-        </div>
-        
-        <div className="flex items-center gap-6">
-          <button className="p-2 text-slate-400 hover:text-slate-900 transition-colors relative">
-            <Shield className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full border-2 border-[#FFF5F5]"></span>
-          </button>
-          <button className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
-            <RotateCcw className="w-5 h-5" />
-          </button>
-          <button 
-            onClick={handleSave}
-            disabled={isSaving}
-            className="px-8 py-3 bg-red-600 text-white rounded-xl text-sm font-black hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 disabled:opacity-50 flex items-center gap-2"
-          >
-            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Save Changes
-          </button>
-          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm">
-            <img src="https://i.pravatar.cc/150?u=admin" alt="Admin" className="w-full h-full object-cover" />
-          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-        {/* Left Column: System Roles */}
-        <div className="lg:col-span-4 space-y-8">
-          <div className="flex items-center justify-between">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">System Roles</h2>
-            <span className="px-3 py-1 bg-red-100 text-red-600 text-[10px] font-black rounded-full uppercase tracking-widest">5 Active</span>
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold">
+          <AlertCircle className="w-5 h-5 shrink-0" /> {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+          <CheckCircle2 className="w-5 h-5 shrink-0" /> Lưu thành công!
+        </div>
+      )}
+
+      {tab === "roles" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          <div className="lg:col-span-4 space-y-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight">Vai trò hệ thống</h2>
+              <span className="px-3 py-1 bg-red-100 text-red-600 text-[10px] font-black rounded-full uppercase tracking-widest">{ROLE_CONFIG.length} Vai trò</span>
+            </div>
+            <div className="space-y-4">
+              {ROLE_CONFIG.map((role) => {
+                const Icon = role.icon;
+                return (
+                  <button key={role.id} onClick={() => setSelectedRoleId(role.id)} className={cn("w-full p-8 rounded-[32px] text-left transition-all relative group", selectedRoleId === role.id ? "bg-white shadow-2xl shadow-red-200/50 border-l-4 border-red-600" : "bg-white/50 hover:bg-white border-l-4 border-transparent")}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <Icon className={cn("w-5 h-5", selectedRoleId === role.id ? "text-red-600" : "text-slate-400")} />
+                      <span className={cn("text-xl font-black tracking-tight", selectedRoleId === role.id ? "text-red-600" : "text-slate-900")}>{role.name}</span>
+                    </div>
+                    <p className="text-sm font-medium text-slate-500 leading-relaxed">{role.description}</p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="space-y-4">
-            {roles.map((role) => (
-              <button
-                key={role.id}
-                onClick={() => setSelectedRoleId(role.id)}
-                className={cn(
-                  "w-full p-8 rounded-[32px] text-left transition-all relative group",
-                  selectedRoleId === role.id 
-                    ? "bg-white shadow-2xl shadow-red-200/50 border-l-4 border-red-600" 
-                    : "bg-white/50 hover:bg-white border-l-4 border-transparent"
-                )}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <span className={cn(
-                    "text-xl font-black tracking-tight",
-                    selectedRoleId === role.id ? "text-red-600" : "text-slate-900"
-                  )}>{role.name}</span>
-                  {selectedRoleId === role.id && (
-                    <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center text-white">
-                      <CheckCircle2 className="w-4 h-4" />
+          <div className="lg:col-span-8 bg-white rounded-[48px] p-12 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">{selectedRole.name}</h2>
+                <p className="text-slate-500 font-medium mt-1">{selectedRole.description}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-bold text-slate-400">{allowedCount}/{totalCount} quyền</span>
+                <button onClick={handleSavePermissions} disabled={saving} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-2xl text-sm font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 disabled:opacity-50">
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {saving ? "Đang lưu..." : "Lưu phân quyền"}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {MODULES.map(mod => {
+                const Icon = mod.icon;
+                const modPerms = permissions.filter(p => p.module === mod.id);
+                return (
+                  <div key={mod.id} className="bg-slate-50 rounded-3xl p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Icon className="w-5 h-5 text-red-600" />
+                      <h3 className="text-lg font-black text-slate-900">{mod.name}</h3>
                     </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {modPerms.map(perm => (
+                        <button key={`${perm.module}-${perm.action}`} onClick={() => togglePermission(perm.module, perm.action)} className={cn("flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-bold transition-all", perm.allowed ? "bg-red-600 text-white shadow-md shadow-red-600/20" : "bg-white text-slate-400 border border-slate-200 hover:border-red-200 hover:text-red-600")}>
+                          {perm.allowed ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                          {ACTIONS.find(a => a.id === perm.action)?.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          <div className="lg:col-span-5 space-y-8">
+            <div className="bg-white rounded-[48px] p-12 shadow-sm">
+              <h2 className="text-2xl font-black text-slate-900 mb-6">{editingGroup ? "Sửa nhóm" : "Thêm nhóm mới"}</h2>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Tên nhóm *</label>
+                  <input type="text" value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="VD: TNK, SHEKI, KHA..." className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Mô tả</label>
+                  <textarea value={groupDesc} onChange={(e) => setGroupDesc(e.target.value)} placeholder="Mô tả nhóm..." rows={3} className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none resize-none" />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={handleSaveGroup} className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all">
+                    <Save className="w-4 h-4" /> {editingGroup ? "Cập nhật" : "Tạo nhóm"}
+                  </button>
+                  {editingGroup && (
+                    <button onClick={() => { setEditingGroup(null); setGroupName(""); setGroupDesc(""); }} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200">
+                      Hủy
+                    </button>
                   )}
                 </div>
-                <p className="text-sm font-medium text-slate-500 leading-relaxed">
-                  {role.description}
-                </p>
-              </button>
-            ))}
-          </div>
-
-          <button className="w-full py-4 bg-red-600 text-white rounded-xl text-sm font-black hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2">
-            <Plus className="w-5 h-5" />
-            Add New Role
-          </button>
-        </div>
-
-        {/* Right Column: Permissions */}
-        <div className="lg:col-span-8 bg-white/50 rounded-[48px] p-12">
-          <div className="flex items-center justify-between mb-12">
-            <div>
-              <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-2">{selectedRole.name} Permissions</h2>
-              <p className="text-slate-500 font-medium">Configure module-level access for the {selectedRole.name} role.</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => {
-                  const original = roles.find(r => r.id === selectedRoleId);
-                  if (original) {
-                    // Reset logic could go here if we kept a copy
-                  }
-                }}
-                className="px-6 py-3 text-sm font-black text-slate-900 hover:bg-white rounded-xl transition-all"
-              >
-                Discard Changes
-              </button>
-              <button 
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-10 py-4 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/20 disabled:opacity-50 flex items-center gap-2"
-              >
-                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                Save Changes
-              </button>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {selectedRole.groups.length > 0 ? (
-              selectedRole.groups.map((group) => (
-                <div key={group.id} className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100">
-                  <div className="flex items-center gap-3 mb-8">
-                    <group.icon className="w-5 h-5 text-blue-600" />
-                    <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest">{group.name}</h3>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    {group.permissions.map((permission) => (
-                      <div key={permission.id} className="flex items-center justify-between group/item">
-                        <span className="text-sm font-bold text-slate-600 group-hover/item:text-slate-900 transition-colors">{permission.name}</span>
-                        <button 
-                          onClick={() => togglePermission(group.id, permission.id)}
-                          className={cn(
-                            "w-6 h-6 rounded-md border-2 transition-all flex items-center justify-center",
-                            permission.checked 
-                              ? "bg-red-600 border-red-600 text-white" 
-                              : "border-slate-200 hover:border-red-300"
-                          )}
-                        >
-                          {permission.checked && <CheckCircle2 className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
+          <div className="lg:col-span-7 bg-white rounded-[48px] p-12 shadow-sm">
+            <h2 className="text-2xl font-black text-slate-900 mb-6">Danh sách nhóm ({groups.length})</h2>
+            {groups.length === 0 ? (
+              <p className="text-center text-slate-400 py-12">Chưa có nhóm nào</p>
             ) : (
-              <div className="col-span-2 py-20 text-center">
-                <Shield className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                <p className="text-slate-400 font-bold">No permissions configured for this role yet.</p>
-                <button className="mt-4 text-red-600 font-black uppercase tracking-widest text-xs hover:underline">Initialize Permissions</button>
+              <div className="space-y-3">
+                {groups.map(group => (
+                  <div key={group.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{group.name}</p>
+                      {group.description && <p className="text-xs text-slate-400 mt-1">{group.description}</p>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => { setEditingGroup(group); setGroupName(group.name); setGroupDesc(group.description || ""); }} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDeleteGroup(group.id)} className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

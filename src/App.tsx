@@ -4,6 +4,9 @@ import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { EmployeeList } from "./pages/EmployeeList";
 import { EmployeeForm } from "./pages/EmployeeForm";
+import { EmployeeDetail } from "./pages/EmployeeDetail";
+import { CollaboratorsPage } from "./pages/CollaboratorsPage";
+import { CollaboratorsCommissionReport } from "./pages/CollaboratorsCommissionReport";
 import { ProductList } from "./pages/ProductList";
 import { ProductForm } from "./pages/ProductForm";
 import { CustomerList } from "./pages/CustomerList";
@@ -14,41 +17,54 @@ import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { OrderSearchDay, OrderSearchMonth, OrderSearchYear, OrderSearchRange } from "./pages/OrderSearch";
-import { auth } from "./firebase";
-import { onAuthStateChanged } from "firebase/auth";
 import { BulkImport } from "./pages/BulkImport";
 import { InventoryHistory } from "./pages/InventoryHistory";
 import { InventoryImport } from "./pages/InventoryImport";
 import { InventoryExport } from "./pages/InventoryExport";
-import { SalaryReport } from "./pages/SalaryReport";
+import { ActivityLog } from "./pages/ActivityLog";
+import { CommissionDetail } from "./pages/CommissionDetail";
+import { OrderCommissionDetail } from "./pages/OrderCommissionDetail";
+import { RevenueReport } from "./pages/RevenueReport";
+import { CommissionReport } from "./pages/CommissionReport";
+import CommissionRules from "./pages/CommissionRules";
+import { ChangePassword } from "./pages/ChangePassword";
+
+function checkAuth() {
+  const token = localStorage.getItem("token");
+  const user = localStorage.getItem("user");
+  return !!(token && user);
+}
+
+function getUserRole() {
+  const user = localStorage.getItem("user");
+  return user ? JSON.parse(user).role : null;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  if (getUserRole() !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(checkAuth);
   const [isAuthReady, setIsAuthReady] = React.useState(false);
 
   React.useEffect(() => {
-    console.log("App: Initializing auth listener...");
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("App: Auth state changed:", user ? "Authenticated" : "Not Authenticated");
-      setIsAuthenticated(!!user);
-      setIsAuthReady(true);
-    });
-    
-    // Safety timeout
-    const timeout = setTimeout(() => {
-      setIsAuthReady((prev) => {
-        if (!prev) {
-          console.warn("App: Auth initialization timed out, forcing ready state.");
-          return true;
-        }
-        return prev;
-      });
-    }, 5000);
+    setIsAuthenticated(checkAuth());
+    setIsAuthReady(true);
+  }, []);
 
-    return () => {
-      unsubscribe();
-      clearTimeout(timeout);
+  // Listen for custom auth change events (login/logout)
+  React.useEffect(() => {
+    const handleAuthChange = () => {
+      const authed = checkAuth();
+      console.log('🔐 Auth state changed:', authed);
+      setIsAuthenticated(authed);
     };
+    window.addEventListener('auth-change', handleAuthChange);
+    return () => window.removeEventListener('auth-change', handleAuthChange);
   }, []);
 
   if (!isAuthReady) {
@@ -77,14 +93,17 @@ export default function App() {
               <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/employees" element={<EmployeeList />} />
-                  <Route path="/employees/new" element={<EmployeeForm />} />
-                  <Route path="/employees/edit/:id" element={<EmployeeForm />} />
-                  <Route path="/employees/import" element={<BulkImport />} />
-                  <Route path="/products" element={<ProductList />} />
-                  <Route path="/products/new" element={<ProductForm />} />
-                  <Route path="/products/edit/:id" element={<ProductForm />} />
-                  <Route path="/products/import" element={<BulkImport />} />
+                  <Route path="/employees" element={<AdminRoute><EmployeeList /></AdminRoute>} />
+                  <Route path="/employees/new" element={<AdminRoute><EmployeeForm /></AdminRoute>} />
+                  <Route path="/employees/edit/:id" element={<AdminRoute><EmployeeForm /></AdminRoute>} />
+                  <Route path="/employees/:id" element={<AdminRoute><EmployeeDetail /></AdminRoute>} />
+                  <Route path="/employees/:id/collaborators" element={<AdminRoute><CollaboratorsPage /></AdminRoute>} />
+                  <Route path="/employees/:id/collaborators/commissions" element={<AdminRoute><CollaboratorsCommissionReport /></AdminRoute>} />
+                  <Route path="/employees/import" element={<AdminRoute><BulkImport /></AdminRoute>} />
+                  <Route path="/products" element={<AdminRoute><ProductList /></AdminRoute>} />
+                  <Route path="/products/new" element={<AdminRoute><ProductForm /></AdminRoute>} />
+                  <Route path="/products/edit/:id" element={<AdminRoute><ProductForm /></AdminRoute>} />
+                  <Route path="/products/import" element={<AdminRoute><BulkImport /></AdminRoute>} />
                   <Route path="/customers" element={<CustomerList />} />
                   <Route path="/customers/new" element={<CustomerForm />} />
                   <Route path="/customers/edit/:id" element={<CustomerForm />} />
@@ -96,11 +115,17 @@ export default function App() {
                   <Route path="/orders/search/month" element={<OrderSearchMonth />} />
                   <Route path="/orders/search/year" element={<OrderSearchYear />} />
                   <Route path="/orders/search/range" element={<OrderSearchRange />} />
-                  <Route path="/inventory" element={<InventoryHistory />} />
-                  <Route path="/inventory/import" element={<InventoryImport />} />
-                  <Route path="/inventory/export" element={<InventoryExport />} />
-                  <Route path="/reports" element={<SalaryReport />} />
-                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/inventory" element={<AdminRoute><InventoryHistory /></AdminRoute>} />
+                  <Route path="/inventory/import" element={<AdminRoute><InventoryImport /></AdminRoute>} />
+                  <Route path="/inventory/export" element={<AdminRoute><InventoryExport /></AdminRoute>} />
+                  <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
+                  <Route path="/logs" element={<AdminRoute><ActivityLog /></AdminRoute>} />
+                  <Route path="/change-password" element={<ChangePassword />} />
+                  <Route path="/reports/revenue" element={<AdminRoute><RevenueReport /></AdminRoute>} />
+                  <Route path="/reports/commissions" element={<CommissionReport />} />
+                  <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionDetail /></AdminRoute>} />
+                  <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
+                  <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

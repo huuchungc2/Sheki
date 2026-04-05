@@ -1,18 +1,21 @@
 import * as React from "react";
-import { Search, Calendar, Filter, ArrowRight } from "lucide-react";
+import { Search, Calendar, Filter, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { cn, formatCurrency } from "../lib/utils";
 
-// Mock data for orders
-const mockOrders = [
-  { id: "ORD-001", customer: "Nguyễn Văn A", date: "2026-04-03", total: 1250000, status: "Hoàn tất" },
-  { id: "ORD-002", customer: "Trần Thị B", date: "2026-04-02", total: 890000, status: "Đang xử lý" },
-  { id: "ORD-003", customer: "Lê Văn C", date: "2026-03-28", total: 2100000, status: "Đang giao" },
-  { id: "ORD-004", customer: "Phạm Thị D", date: "2026-01-15", total: 450000, status: "Đã hủy" },
-  { id: "ORD-005", customer: "Hoàng Văn E", date: "2025-12-20", total: 3200000, status: "Hoàn tất" },
-  { id: "ORD-006", customer: "Vũ Thị F", date: "2026-04-03", total: 750000, status: "Hoàn tất" },
-  { id: "ORD-007", customer: "Đặng Văn G", date: "2026-04-01", total: 1500000, status: "Đang giao" },
-  { id: "ORD-008", customer: "Bùi Thị H", date: "2026-03-15", total: 920000, status: "Hoàn tất" },
-];
+const API_BASE = "http://localhost:3000/api";
+
+interface Order {
+  id: string;
+  customer: string;
+  date: string;
+  total: number;
+  status: string;
+}
+
+interface ApiResponse {
+  data: Order[];
+  total: number;
+}
 
 interface OrderSearchProps {
   title: string;
@@ -21,7 +24,83 @@ interface OrderSearchProps {
 }
 
 function OrderSearchBase({ title, description, type }: OrderSearchProps) {
-  const [results] = React.useState(mockOrders);
+  const [orders, setOrders] = React.useState<Order[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
+  const [status, setStatus] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const limit = 20;
+
+  const [day, setDay] = React.useState("2026-04-03");
+  const [month, setMonth] = React.useState("2026-04");
+  const [year, setYear] = React.useState("2026");
+  const [fromDate, setFromDate] = React.useState("");
+  const [toDate, setToDate] = React.useState("");
+
+  const buildQuery = React.useCallback(() => {
+    const params = new URLSearchParams();
+    params.set("search", search);
+    if (status) params.set("status", status);
+    params.set("page", String(page));
+    params.set("limit", String(limit));
+
+    if (type === "day") {
+      params.set("startDate", day);
+      params.set("endDate", day);
+    } else if (type === "month") {
+      const [y, m] = month.split("-");
+      const lastDay = new Date(Number(y), Number(m), 0).getDate();
+      params.set("startDate", `${y}-${m}-01`);
+      params.set("endDate", `${y}-${m}-${String(lastDay).padStart(2, "0")}`);
+    } else if (type === "year") {
+      params.set("startDate", `${year}-01-01`);
+      params.set("endDate", `${year}-12-31`);
+    } else if (type === "range") {
+      if (fromDate) params.set("startDate", fromDate);
+      if (toDate) params.set("endDate", toDate);
+    }
+
+    return params.toString();
+  }, [type, day, month, year, fromDate, toDate, search, status, page]);
+
+  const fetchOrders = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const query = buildQuery();
+      const res = await fetch(`${API_BASE}/orders?${query}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const json: ApiResponse = await res.json();
+      setOrders(json.data);
+      setTotal(json.total);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+    }
+  }, [buildQuery]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    fetchOrders();
+  };
+
+  const statusBadge = (s: string) =>
+    s === "Hoàn tất"
+      ? "bg-emerald-50 text-emerald-600"
+      : s === "Đang xử lý"
+        ? "bg-amber-50 text-amber-600"
+        : s === "Đang giao"
+          ? "bg-blue-50 text-blue-600"
+          : "bg-red-50 text-red-600";
 
   return (
     <div className="space-y-8">
@@ -39,139 +118,205 @@ function OrderSearchBase({ title, description, type }: OrderSearchProps) {
       </div>
 
       {/* Search Controls */}
-      <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-          {type === "day" && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chọn ngày</label>
-              <div className="relative">
-                <Calendar className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                  type="date" 
-                  defaultValue="2026-04-03"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
-                />
-              </div>
-            </div>
-          )}
-
-          {type === "month" && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chọn tháng</label>
-              <div className="relative">
-                <Calendar className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                  type="month" 
-                  defaultValue="2026-04"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
-                />
-              </div>
-            </div>
-          )}
-
-          {type === "year" && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chọn năm</label>
-              <select className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none">
-                <option>2026</option>
-                <option>2025</option>
-                <option>2024</option>
-              </select>
-            </div>
-          )}
-
-          {type === "range" && (
-            <>
+      <form onSubmit={handleSubmit}>
+        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+            {type === "day" && (
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Từ ngày</label>
-                <input 
-                  type="date" 
-                  className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
-                />
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chọn ngày</label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="date"
+                    value={day}
+                    onChange={(e) => setDay(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đến ngày</label>
-                <input 
-                  type="date" 
-                  className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
-                />
-              </div>
-            </>
-          )}
+            )}
 
-          <button className="flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
-            <Search className="w-4 h-4" />
-            Tìm kiếm
-          </button>
+            {type === "month" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chọn tháng</label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="month"
+                    value={month}
+                    onChange={(e) => setMonth(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {type === "year" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chọn năm</label>
+                <select
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
+                >
+                  <option>2026</option>
+                  <option>2025</option>
+                  <option>2024</option>
+                </select>
+              </div>
+            )}
+
+            {type === "range" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Từ ngày</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đến ngày</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none"
+                  />
+                </div>
+              </>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              {loading ? "Đang tìm..." : "Tìm kiếm"}
+            </button>
+          </div>
         </div>
-      </div>
+      </form>
 
       {/* Results */}
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h2 className="text-lg font-bold text-slate-900">Kết quả tìm kiếm ({results.length})</h2>
+          <h2 className="text-lg font-bold text-slate-900">
+            Kết quả tìm kiếm ({orders.length} / {total})
+          </h2>
           <button className="flex items-center gap-2 text-slate-500 text-sm font-bold hover:text-slate-700 transition-all">
             <Filter className="w-4 h-4" />
             Bộ lọc nâng cao
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Mã đơn hàng</th>
-                <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Khách hàng</th>
-                <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ngày đặt</th>
-                <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng tiền</th>
-                <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Trạng thái</th>
-                <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {results.map((order, index) => (
-                <tr 
-                  key={order.id}
-                  className="hover:bg-slate-50/50 transition-all group"
+        {loading && orders.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <Loader2 className="w-10 h-10 animate-spin mb-4" />
+            <p className="text-sm font-medium">Đang tải dữ liệu...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex flex-col items-center justify-center py-20 text-red-500">
+            <AlertCircle className="w-10 h-10 mb-4" />
+            <p className="text-sm font-medium">{error}</p>
+            <button
+              onClick={fetchOrders}
+              className="mt-4 px-6 py-2 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-all"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && orders.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <Search className="w-10 h-10 mb-4" />
+            <p className="text-sm font-medium">Không tìm thấy đơn hàng nào</p>
+          </div>
+        )}
+
+        {!loading && orders.length > 0 && (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Mã đơn hàng</th>
+                    <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Khách hàng</th>
+                    <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ngày đặt</th>
+                    <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng tiền</th>
+                    <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Trạng thái</th>
+                    <th className="px-8 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="hover:bg-slate-50/50 transition-all group"
+                    >
+                      <td className="px-8 py-5">
+                        <span className="text-sm font-mono font-bold text-blue-600">{order.id}</span>
+                      </td>
+                      <td className="px-8 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
+                            {order.customer.charAt(0)}
+                          </div>
+                          <span className="text-sm font-bold text-slate-900">{order.customer}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-5 text-sm text-slate-500">
+                        {order.date}
+                      </td>
+                      <td className="px-8 py-5 text-sm font-bold text-slate-900">
+                        {formatCurrency(order.total)}
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full",
+                          statusBadge(order.status)
+                        )}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                        <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-blue-600 transition-all">
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {total > limit && (
+              <div className="flex items-center justify-center gap-2 p-6 border-t border-slate-100">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="px-4 py-2 text-sm font-bold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                  <td className="px-8 py-5">
-                    <span className="text-sm font-mono font-bold text-blue-600">{order.id}</span>
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
-                        {order.customer.charAt(0)}
-                      </div>
-                      <span className="text-sm font-bold text-slate-900">{order.customer}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-sm text-slate-500">
-                    {order.date}
-                  </td>
-                  <td className="px-8 py-5 text-sm font-bold text-slate-900">
-                    {formatCurrency(order.total)}
-                  </td>
-                  <td className="px-8 py-5">
-                    <span className={cn(
-                      "text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full",
-                      order.status === "Hoàn tất" ? "bg-emerald-50 text-emerald-600" :
-                      order.status === "Đang xử lý" ? "bg-amber-50 text-amber-600" :
-                      order.status === "Đang giao" ? "bg-blue-50 text-blue-600" :
-                      "bg-red-50 text-red-600"
-                    )}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5 text-right">
-                    <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-blue-600 transition-all">
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  Trước
+                </button>
+                <span className="text-sm font-bold text-slate-500">Trang {page}</span>
+                <button
+                  disabled={page * limit >= total}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-4 py-2 text-sm font-bold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  Sau
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
