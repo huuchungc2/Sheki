@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link } from "react-router-dom";
 import {
   DollarSign, TrendingUp, Users, Download,
-  Loader2, AlertCircle, ChevronRight, ShoppingCart
+  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown
 } from "lucide-react";
 import { formatCurrency, formatDate, cn } from "../lib/utils";
 
@@ -37,8 +37,13 @@ export function CommissionReport() {
     direct_commission: 0, override_commission: 0, total_commission: 0, total_orders: 0
   });
 
-  // Admin view data (từ /reports/salary)
-  const [salesData, setSalesData] = React.useState<any[]>([]);
+  // Admin view data
+  const [salesData, setSalesData]   = React.useState<any[]>([]);
+  const [ctvPairs, setCtvPairs]     = React.useState<any[]>([]);
+  const [ctvOrders, setCtvOrders]   = React.useState<any[]>([]);
+  const [ctvTotals, setCtvTotals]   = React.useState<any>({});
+  const [activeTab, setActiveTab]   = React.useState<"direct" | "ctv">("direct");
+  const [expandedCtv, setExpandedCtv] = React.useState<Set<string>>(new Set());
 
   // Fetch groups
   React.useEffect(() => {
@@ -89,16 +94,25 @@ export function CommissionReport() {
         total_orders:        totalOrders,
       });
 
-      // 3. Admin: fetch /reports/salary để có bảng tổng hợp nhân viên
+      // 3. Admin: fetch salary + CTV commissions
       if (isAdmin) {
         const salaryParams = new URLSearchParams({ month, year });
         if (groupId) salaryParams.set("group_id", groupId);
-        const salaryRes = await fetch(`${API_URL}/reports/salary?${salaryParams}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+
+        const [salaryRes, ctvRes] = await Promise.all([
+          fetch(`${API_URL}/reports/salary?${salaryParams}`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/collaborators/commissions/all?${salaryParams}`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+
         if (salaryRes.ok) {
-          const salaryJson = await salaryRes.json();
-          setSalesData(salaryJson.data?.salesData || []);
+          const j = await salaryRes.json();
+          setSalesData(j.data?.salesData || []);
+        }
+        if (ctvRes.ok) {
+          const j = await ctvRes.json();
+          setCtvPairs(j.data?.pairs || []);
+          setCtvOrders(j.data?.orders || []);
+          setCtvTotals(j.data?.totals || {});
         }
       }
     } catch (err: any) {
@@ -208,16 +222,44 @@ export function CommissionReport() {
         </div>
       </div>
 
-      {/* Admin: bảng tổng hợp nhân viên */}
+      {/* Admin: tabs Hoa hồng NV / Hoa hồng CTV */}
       {isAdmin && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="text-sm font-bold text-slate-700">Tổng hợp hoa hồng nhân viên</h2>
+          {/* Tab header */}
+          <div className="flex border-b border-slate-100">
+            <button
+              onClick={() => setActiveTab("direct")}
+              className={cn("px-6 py-4 text-sm font-semibold transition-colors border-b-2",
+                activeTab === "direct"
+                  ? "border-blue-600 text-blue-600 bg-blue-50/50"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              )}>
+              Hoa hồng nhân viên
+              {salesData.length > 0 && (
+                <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600">{salesData.length}</span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("ctv")}
+              className={cn("px-6 py-4 text-sm font-semibold transition-colors border-b-2",
+                activeTab === "ctv"
+                  ? "border-emerald-600 text-emerald-600 bg-emerald-50/50"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              )}>
+              Hoa hồng từ CTV
+              {ctvTotals.total_override > 0 && (
+                <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-emerald-50 text-emerald-600 font-bold">
+                  {formatCurrency(ctvTotals.total_override)}
+                </span>
+              )}
+            </button>
           </div>
-          {salesData.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-sm">Chưa có dữ liệu trong tháng này</div>
-          ) : (
-            <>
+
+          {/* Tab: Hoa hồng nhân viên */}
+          {activeTab === "direct" && (
+            salesData.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-sm">Chưa có dữ liệu trong tháng này</div>
+            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
@@ -254,32 +296,156 @@ export function CommissionReport() {
                       </tr>
                     ))}
                   </tbody>
-                  {/* Footer sum */}
                   <tfoot>
                     <tr className="bg-slate-800 text-white text-sm font-bold">
                       <td className="px-5 py-3">Tổng cộng</td>
-                      <td className="px-5 py-3 text-center">
-                        {salesData.reduce((s: number, i: any) => s + (i.total_orders || 0), 0)}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        {formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_sales || 0), 0))}
-                      </td>
-                      <td className="px-5 py-3 text-right text-emerald-400">
-                        {formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_commission || 0), 0))}
-                      </td>
-                      <td className="px-5 py-3 text-right text-blue-300">
-                        {formatCurrency(salesData.reduce((s: number, i: any) => s + (i.override_commission || 0), 0))}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        {formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_commission || 0) + (i.override_commission || 0), 0))}
-                      </td>
+                      <td className="px-5 py-3 text-center">{salesData.reduce((s: number, i: any) => s + (i.total_orders || 0), 0)}</td>
+                      <td className="px-5 py-3 text-right">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_sales || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right text-emerald-400">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_commission || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right text-blue-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.override_commission || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_commission || 0) + (i.override_commission || 0), 0))}</td>
                       <td className="px-5 py-3"></td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-            </>
+            )
           )}
+
+          {/* Tab: Hoa hồng từ CTV */}
+          {activeTab === "ctv" && (() => {
+            // Group pairs by sales
+            const bySales: Record<number, any[]> = {};
+            ctvPairs.forEach(p => { if (!bySales[p.sales_id]) bySales[p.sales_id] = []; bySales[p.sales_id].push(p); });
+            const ordersByPair: Record<string, any[]> = {};
+            ctvOrders.forEach(o => {
+              const k = `${o.sales_id}-${o.ctv_id}`;
+              if (!ordersByPair[k]) ordersByPair[k] = [];
+              ordersByPair[k].push(o);
+            });
+            const salesIds = Object.keys(bySales).map(Number);
+
+            return salesIds.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-sm">Chưa có hoa hồng CTV trong tháng này</div>
+            ) : (
+              <div>
+                {salesIds.map(sid => {
+                  const pairs = bySales[sid];
+                  const salesName = pairs[0]?.sales_name || "—";
+                  const salesTotal = pairs.reduce((s: number, p: any) => s + p.override_commission, 0);
+                  const salesKey = `s-${sid}`;
+                  const isOpen = expandedCtv.has(salesKey);
+                  const toggle = (k: string) => setExpandedCtv(prev => {
+                    const next = new Set(prev); next.has(k) ? next.delete(k) : next.add(k); return next;
+                  });
+
+                  return (
+                    <div key={sid} className="border-b border-slate-100 last:border-0">
+                      {/* Sales row */}
+                      <button onClick={() => toggle(salesKey)}
+                        className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-50/60 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                            {salesName.split(" ").map((n: string) => n[0]).join("").slice(0,2).toUpperCase()}
+                          </div>
+                          <div className="text-left">
+                            <p className="text-sm font-bold text-slate-900">{salesName}</p>
+                            <p className="text-xs text-slate-400">{pairs.length} CTV • {pairs.reduce((s: number, p: any) => s + p.total_orders, 0)} đơn</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-emerald-600">{formatCurrency(salesTotal)}</span>
+                          <Link to={`/employees/${sid}`} onClick={e => e.stopPropagation()}
+                            className="text-xs text-blue-600 hover:underline px-2 py-1 bg-blue-50 rounded-lg">Xem NV</Link>
+                          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform", isOpen && "rotate-180")} />
+                        </div>
+                      </button>
+
+                      {/* CTV rows */}
+                      {isOpen && pairs.map((pair: any) => {
+                        const pairKey = `${pair.sales_id}-${pair.ctv_id}`;
+                        const isPairOpen = expandedCtv.has(pairKey);
+                        const pairOrders = ordersByPair[pairKey] || [];
+                        const STATUS_CFG: Record<string, string> = {
+                          pending: "bg-amber-100 text-amber-700", shipping: "bg-blue-100 text-blue-700",
+                          completed: "bg-emerald-100 text-emerald-700", cancelled: "bg-red-100 text-red-600"
+                        };
+                        const STATUS_LABEL: Record<string, string> = {
+                          pending: "Chờ duyệt", shipping: "Đang giao", completed: "Đã giao", cancelled: "Đã hủy"
+                        };
+                        return (
+                          <div key={pairKey} className="border-t border-slate-50">
+                            <button onClick={() => toggle(pairKey)}
+                              className="w-full pl-14 pr-5 py-2.5 flex items-center justify-between bg-slate-50/40 hover:bg-slate-50 transition-colors">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">
+                                  {pair.ctv_name?.split(" ").map((n: string) => n[0]).join("").slice(0,2).toUpperCase()}
+                                </div>
+                                <span className="text-sm font-medium text-slate-700">{pair.ctv_name}</span>
+                                <span className="text-xs text-slate-400">— {pair.total_orders} đơn · DT {formatCurrency(pair.total_revenue)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-emerald-600">{formatCurrency(pair.override_commission)}</span>
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform", isPairOpen && "rotate-180")} />
+                              </div>
+                            </button>
+
+                            {isPairOpen && pairOrders.length > 0 && (
+                              <div className="pl-14 border-t border-slate-100">
+                                <table className="w-full text-xs border-collapse">
+                                  <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-semibold">
+                                      <th className="px-4 py-2 text-left">Mã đơn</th>
+                                      <th className="px-4 py-2 text-left">Ngày</th>
+                                      <th className="px-4 py-2 text-left">Khách hàng</th>
+                                      <th className="px-4 py-2 text-left">Nhóm BH</th>
+                                      <th className="px-4 py-2 text-right">Tổng tiền</th>
+                                      <th className="px-4 py-2 text-right">HH override</th>
+                                      <th className="px-4 py-2 text-center">Trạng thái</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-50">
+                                    {pairOrders.map((o: any) => (
+                                      <tr key={o.order_id} className="hover:bg-slate-50/60">
+                                        <td className="px-4 py-2">
+                                          <Link to={`/orders/edit/${o.order_id}`} className="font-bold text-blue-600 hover:underline font-mono">{o.order_code}</Link>
+                                        </td>
+                                        <td className="px-4 py-2 text-slate-500">{formatDate(o.order_date)}</td>
+                                        <td className="px-4 py-2 text-slate-700">{o.customer_name || "—"}</td>
+                                        <td className="px-4 py-2">
+                                          {o.group_name ? <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{o.group_name}</span> : "—"}
+                                        </td>
+                                        <td className="px-4 py-2 text-right font-semibold text-slate-900">{formatCurrency(o.total_amount)}</td>
+                                        <td className="px-4 py-2 text-right font-bold text-emerald-600">{formatCurrency(o.override_commission)}</td>
+                                        <td className="px-4 py-2 text-center">
+                                          <span className={cn("px-2 py-0.5 rounded-full font-semibold", STATUS_CFG[o.status] || "bg-slate-100 text-slate-600")}>
+                                            {STATUS_LABEL[o.status] || o.status}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+
+                {/* Grand total */}
+                <div className="px-5 py-3.5 bg-slate-800 text-white flex items-center justify-between text-sm font-bold">
+                  <span>Tổng cộng</span>
+                  <div className="flex gap-6">
+                    <span className="text-slate-400 font-normal">Đơn: {ctvTotals.total_orders || 0}</span>
+                    <span className="text-emerald-400">{formatCurrency(ctvTotals.total_override || 0)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
