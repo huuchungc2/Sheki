@@ -16,7 +16,7 @@ const {
 router.get('/', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, status, employee, warehouse, date_from, date_to, page = 1, limit = 20 } = req.query;
+    const { search, status, employee, warehouse, date_from, date_to, group_id, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
     let query = `
@@ -73,6 +73,12 @@ router.get('/', auth, async (req, res, next) => {
       query += ' AND DATE(o.created_at) <= ?';
       countQuery += ' AND DATE(created_at) <= ?';
       params.push(date_to);
+    }
+
+    if (group_id) {
+      query += ' AND o.group_id = ?';
+      countQuery += ' AND group_id = ?';
+      params.push(parseInt(group_id));
     }
 
     query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';

@@ -107,8 +107,12 @@ async function restoreStockOnCancel(orderId, oldStatus) {
 async function recalculateCommission(orderId) {
   const pool = await getPool();
 
+  // Lấy từng item với subtotal thực (sau chiết khấu) và commission_rate
   const [items] = await pool.query(
-    'SELECT oi.commission_amount, oi.commission_rate, oi.qty, oi.unit_price, oi.discount_amount FROM order_items oi WHERE oi.order_id = ?',
+    `SELECT oi.commission_amount, oi.commission_rate, oi.qty, oi.unit_price,
+            oi.discount_amount, oi.subtotal,
+            (oi.unit_price * oi.qty - oi.discount_amount) as net_amount
+     FROM order_items oi WHERE oi.order_id = ?`,
     [orderId]
   );
 
@@ -117,57 +121,88 @@ async function recalculateCommission(orderId) {
   const [orderRows] = await pool.query('SELECT salesperson_id, total_amount FROM orders WHERE id = ?', [orderId]);
   if (orderRows.length === 0) return;
 
-  const userId = orderRows[0].salesperson_id;
+  const userId           = orderRows[0].salesperson_id;
   const orderTotalAmount = parseFloat(orderRows[0].total_amount) || 0;
 
   // Xóa tất cả commission cũ của order này
   await pool.query('DELETE FROM commissions WHERE order_id = ?', [orderId]);
 
-  // 1. Tạo direct commission cho người tạo đơn (sales/CTV)
+  // 1. Direct commission cho người tạo đơn
   await pool.query(
     'INSERT INTO commissions (order_id, user_id, commission_amount, type) VALUES (?, ?, ?, "direct")',
     [orderId, userId, totalCommission]
   );
 
-  // 2. Tính override commission cho Sales quản lý CTV này
-  await calculateOverrideCommissions(orderId, userId, orderTotalAmount);
+  // 2. Override commission — tính per-item, mỗi item tra tier riêng
+  await calculateOverrideCommissions(orderId, userId, orderTotalAmount, items);
 }
 
-async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount) {
+async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount, items) {
   const pool = await getPool();
 
-  // Tìm tất cả Sales quản lý CTV này (bảng collaborators: sales_id quản lý ctv_id)
+  // Lấy group_id của đơn hàng này
+  const [orderRows] = await pool.query('SELECT group_id FROM orders WHERE id = ?', [orderId]);
+  if (!orderRows.length) return;
+  const orderGroupId = orderRows[0].group_id;
+
+  // Tìm tất cả Sales quản lý CTV này
   const [managers] = await pool.query(
-    'SELECT c.sales_id, u.commission_rate FROM collaborators c JOIN users u ON c.sales_id = u.id WHERE c.ctv_id = ?',
+    'SELECT c.sales_id FROM collaborators c WHERE c.ctv_id = ?',
     [ctvUserId]
   );
-
   if (managers.length === 0) return;
 
-  for (const manager of managers) {
-    // Tra bảng commission_tiers theo commission_rate của SALES (người quản lý)
-    const salesCommissionRate = parseFloat(manager.commission_rate) || 0;
-
+  // Cache tiers để không query lặp nhiều lần
+  const tierCache = {};
+  const getTierRate = async (commissionRate) => {
+    const key = String(commissionRate);
+    if (tierCache[key] !== undefined) return tierCache[key];
     const [tiers] = await pool.query(
-      `SELECT sales_override_rate FROM commission_tiers 
-       WHERE ctv_rate_min <= ? AND (ctv_rate_max IS NULL OR ctv_rate_max >= ?) 
+      `SELECT sales_override_rate FROM commission_tiers
+       WHERE ctv_rate_min <= ? AND (ctv_rate_max IS NULL OR ctv_rate_max >= ?)
        ORDER BY ctv_rate_min DESC LIMIT 1`,
-      [salesCommissionRate, salesCommissionRate]
+      [commissionRate, commissionRate]
     );
+    tierCache[key] = tiers.length > 0 ? parseFloat(tiers[0].sales_override_rate) : null;
+    return tierCache[key];
+  };
 
-    if (tiers.length === 0) continue;
+  for (const manager of managers) {
+    // ✅ Rule: B lên đơn TRONG CÙNG NHÓM với A mới tính override
+    if (orderGroupId) {
+      const [inGroup] = await pool.query(
+        'SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ? LIMIT 1',
+        [manager.sales_id, orderGroupId]
+      );
+      if (inGroup.length === 0) continue;
+    }
 
-    const overrideRate = parseFloat(tiers[0].sales_override_rate);
+    // ✅ Tính per-item: mỗi item có commission_rate riêng → tra tier riêng
+    // VD: item SP1 10% → tier 10-30% → 3%, item SP2 7% → tier 7% → 2%
+    let totalOverrideAmount = 0;
+    const itemRates = []; // lưu để ghi override_rate đại diện
 
-    // ✅ ĐÚNG: tính % trên TỔNG TIỀN ĐƠN (không phải trên hoa hồng CTV)
-    // VD: đơn 1,000,000đ × 3% = 30,000đ
-    const overrideAmount = Math.round(orderTotalAmount * overrideRate / 100 * 100) / 100;
+    for (const item of items) {
+      const itemRate = parseFloat(item.commission_rate) || 0;
+      const overrideRate = await getTierRate(itemRate);
+      if (!overrideRate) continue;
 
-    if (overrideAmount <= 0) continue;
+      // override tính trên net_amount của từng item
+      const netAmount = parseFloat(item.net_amount) || 0;
+      const itemOverride = Math.round(netAmount * overrideRate / 100 * 100) / 100;
+      totalOverrideAmount += itemOverride;
+      itemRates.push(overrideRate);
+    }
+
+    if (totalOverrideAmount <= 0) continue;
+
+    // override_rate lưu dạng JSON các rate theo item (hoặc rate đại diện nếu đồng nhất)
+    const uniqueRates = [...new Set(itemRates)];
+    const savedRate = uniqueRates.length === 1 ? uniqueRates[0] : null; // null nếu mix nhiều rate
 
     await pool.query(
-      'INSERT INTO commissions (order_id, user_id, commission_amount, type, ctv_user_id) VALUES (?, ?, ?, "override", ?)',
-      [orderId, manager.sales_id, overrideAmount, ctvUserId]
+      'INSERT INTO commissions (order_id, user_id, commission_amount, type, ctv_user_id, override_rate) VALUES (?, ?, ?, "override", ?, ?)',
+      [orderId, manager.sales_id, Math.round(totalOverrideAmount * 100) / 100, ctvUserId, savedRate]
     );
   }
 }

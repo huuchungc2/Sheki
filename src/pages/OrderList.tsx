@@ -63,6 +63,8 @@ export function OrderList() {
   const [error, setError]           = React.useState<string | null>(null);
   const [search, setSearch]         = React.useState("");
   const [status, setStatus]         = React.useState("");
+  const [groupId, setGroupId]       = React.useState("");
+  const [groups, setGroups]         = React.useState<any[]>([]);
   const [employeeId, setEmployeeId] = React.useState("");  // chỉ admin dùng
   const [employees, setEmployees]   = React.useState<any[]>([]);
   const [dateFrom, setDateFrom]     = React.useState(toDateStr(new Date()));
@@ -79,6 +81,14 @@ export function OrderList() {
   const [bulkLoading, setBulkLoading] = React.useState(false);
 
   const limit = 20;
+
+  // Fetch groups
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    const endpoint = isAdmin ? "/groups" : `/groups/user/${currentUser?.id}`;
+    fetch(`${API_URL}${endpoint}`, { headers: { "Authorization": `Bearer ${token}` } })
+      .then(r => r.json()).then(j => setGroups(j.data || [])).catch(() => {});
+  }, [isAdmin, currentUser?.id]);
 
   // Fetch danh sách nhân viên (admin only)
   React.useEffect(() => {
@@ -101,9 +111,10 @@ export function OrderList() {
         search, status,
         page: String(page),
         limit: String(limit),
-        ...(dateFrom    && { date_from: dateFrom }),
-        ...(dateTo      && { date_to:   dateTo }),
-        ...(employeeId  && { employee:  employeeId }),
+        ...(dateFrom   && { date_from: dateFrom }),
+        ...(dateTo     && { date_to:   dateTo }),
+        ...(employeeId && { employee:  employeeId }),
+        ...(groupId    && { group_id:  groupId }),
       });
       const res = await fetch(`${API_URL}/orders?${params}`, {
         headers: { "Authorization": `Bearer ${token}` }
@@ -118,7 +129,7 @@ export function OrderList() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, employeeId, dateFrom, dateTo, page]);
+  }, [search, status, groupId, employeeId, dateFrom, dateTo, page]);
 
   React.useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -226,6 +237,18 @@ export function OrderList() {
             <option value="cancelled">Đã hủy</option>
           </select>
 
+          {/* Nhóm bán hàng */}
+          <select
+            value={groupId}
+            onChange={(e) => { setGroupId(e.target.value); setPage(1); }}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[140px]"
+          >
+            <option value="">Tất cả nhóm</option>
+            {groups.map((g: any) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+
           {/* Nhân viên — chỉ admin */}
           {isAdmin && (
             <select
@@ -280,9 +303,9 @@ export function OrderList() {
           )}
 
           {/* Xóa lọc */}
-          {(search || status || employeeId || datePreset) && (
+          {(search || status || groupId || employeeId || datePreset) && (
             <button
-              onClick={() => { setSearch(""); setStatus(""); setEmployeeId(""); setDateFrom(""); setDateTo(""); setDatePreset(""); setPage(1); }}
+              onClick={() => { setSearch(""); setStatus(""); setGroupId(""); setEmployeeId(""); setDateFrom(""); setDateTo(""); setDatePreset(""); setPage(1); }}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-xl hover:text-red-600 hover:border-red-200 transition-all"
             >
               <X className="w-3.5 h-3.5" />
@@ -354,6 +377,7 @@ export function OrderList() {
                   {isAdmin && !employeeId && (
                     <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
                   )}
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhóm BH</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Thời gian</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng tiền</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
@@ -365,7 +389,7 @@ export function OrderList() {
               <tbody className="divide-y divide-slate-100">
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-16 text-center text-slate-400">
+                    <td colSpan={10} className="px-4 py-16 text-center text-slate-400">
                       <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-slate-200" />
                       Không có đơn hàng nào
                     </td>
@@ -409,6 +433,12 @@ export function OrderList() {
                           <p className="text-sm text-slate-700 font-medium">{order.salesperson_name || "—"}</p>
                         </td>
                       )}
+                      <td className="px-4 py-3">
+                        {order.group_name
+                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">{order.group_name}</span>
+                          : <span className="text-slate-300 text-xs">—</span>
+                        }
+                      </td>
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-slate-700">{isToday ? "Hôm nay" : (order.created_at ? formatDate(order.created_at) : "—")}</p>
                         <p className="text-xs text-slate-400">{order.created_at ? new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ""}</p>

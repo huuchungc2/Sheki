@@ -69,6 +69,10 @@
 - [x] OrderForm: Group selector + validate tồn kho realtime
 - [x] SalaryReport: filter theo nhóm
 
+### Phase 6: Logic nghiệp vụ đúng theo LOGIC_BUSINESS.md (06/04/2026)
+- [x] **Fix HH CTV theo nhóm** - B lên đơn nhóm X → A chỉ nhận override nếu A thuộc nhóm X
+- [x] **Lưu override_rate tại thời điểm tạo đơn** - Thêm cột `commissions.override_rate`, không tra lại tier khi recalc
+
 ### Phase 5: UX, Hoa hồng & Dashboard (05/04/2026)
 - [x] **Redesign bảng sản phẩm OrderForm** - Font gọn, cột đúng, qty +/- buttons, đơn giá gõ được, chiết khấu/hoa hồng chỉnh được, available_stock hiển thị, cảnh báo vượt tồn
 - [x] **OrderList nâng cấp** - Checkbox bulk action đổi trạng thái, date preset filter (hôm nay/tuần/tháng/năm), filter nhân viên (admin), mặc định lọc hôm nay

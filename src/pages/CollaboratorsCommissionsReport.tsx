@@ -310,9 +310,9 @@ export default function CollaboratorsCommissionsReport() {
                               </div>
                               <div className="text-left">
                                 <p className="text-sm font-semibold text-slate-800">{pair.ctv_name}</p>
-                                <p className="text-xs text-slate-400">
-                                  HH rate: {pair.ctv_rate}% • {pair.total_orders} đơn • DT: {formatCurrency(pair.total_revenue)}
-                                </p>
+                                 <p className="text-xs text-slate-400">
+                                   {pair.total_orders} đơn • DT: {formatCurrency(pair.total_revenue)}
+                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">

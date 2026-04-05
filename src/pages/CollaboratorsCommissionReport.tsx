@@ -235,11 +235,10 @@ export function CollaboratorsCommissionReport() {
                     </div>
                     <div className="text-left">
                       <p className="font-bold text-slate-900">{ctv.collaborator_name}</p>
-                      <p className="text-xs text-slate-400">
-                        Tỷ lệ HH: {ctv.collaborator_rate}% •
-                        {ctv.total_orders} đơn •
-                        DT: {formatCurrency(ctv.total_revenue)}
-                      </p>
+                       <p className="text-xs text-slate-400">
+                         {ctv.total_orders} đơn •
+                         DT: {formatCurrency(ctv.total_revenue)}
+                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -287,11 +286,15 @@ export function CollaboratorsCommissionReport() {
                                     : <span className="text-slate-300">—</span>}
                                 </td>
                                 <td className="px-5 py-2.5 text-right font-semibold text-slate-900">{formatCurrency(o.total_amount)}</td>
-                                <td className="px-5 py-2.5 text-center">
-                                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                    {o.override_rate}%
-                                  </span>
-                                </td>
+                                 <td className="px-5 py-2.5 text-center">
+                                   <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                     {o.override_rate != null
+                                       ? `${o.override_rate}%`
+                                       : o.total_amount > 0
+                                         ? `${(o.override_commission / o.total_amount * 100).toFixed(2)}%`
+                                         : '—'}
+                                   </span>
+                                 </td>
                                 <td className="px-5 py-2.5 text-right font-bold text-emerald-600">{formatCurrency(o.override_commission)}</td>
                                 <td className="px-5 py-2.5 text-center">
                                   <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", st.color)}>{st.label}</span>

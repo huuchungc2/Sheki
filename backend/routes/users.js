@@ -331,13 +331,15 @@ router.get('/:id/collaborators', auth, async (req, res, next) => {
     }
 
     const pool = await getPool();
+    // Dùng bảng collaborators (sales_id → ctv_id), không dùng user_collaborators (rỗng)
     const [rows] = await pool.query(
-      `SELECT uc.id, uc.collaborator_id, uc.commission_rate, uc.created_at,
-              u.full_name, u.email, u.phone, u.role, u.department, u.position, u.is_active
-       FROM user_collaborators uc
-       JOIN users u ON uc.collaborator_id = u.id
-       WHERE uc.user_id = ?
-       ORDER BY uc.created_at DESC`,
+      `SELECT c.id, c.ctv_id as collaborator_id, c.created_at,
+              u.full_name, u.email, u.phone, u.role, u.department, u.position,
+              u.is_active, u.commission_rate
+       FROM collaborators c
+       JOIN users u ON c.ctv_id = u.id
+       WHERE c.sales_id = ?
+       ORDER BY c.created_at DESC`,
       [req.params.id]
     );
 
@@ -374,8 +376,8 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
         col.full_name as collaborator_name,
         col.commission_rate as collaborator_rate,
         COALESCE(SUM(c.commission_amount), 0) as total_override_commission,
-        COALESCE(COUNT(DISTINCT o.id), 0) as total_orders,
-        COALESCE(SUM(o.total_amount), 0) as total_revenue
+        COALESCE(COUNT(DISTINCT c.order_id), 0) as total_orders,
+        COALESCE(SUM(CASE WHEN c.id IS NOT NULL THEN o.total_amount ELSE 0 END), 0) as total_revenue
       FROM collaborators cr
       JOIN users col ON cr.ctv_id = col.id
       LEFT JOIN orders o ON o.salesperson_id = col.id ${extra}
@@ -398,7 +400,7 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
         g.name as group_name,
         cu.name as customer_name,
         c.commission_amount as override_commission,
-        ct.sales_override_rate as override_rate
+        c.override_rate as override_rate
       FROM collaborators cr
       JOIN users col ON cr.ctv_id = col.id
       JOIN orders o ON o.salesperson_id = col.id
@@ -406,8 +408,6 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
         AND c.user_id = ? AND c.type = 'override' AND c.ctv_user_id = col.id
       LEFT JOIN groups g ON o.group_id = g.id
       LEFT JOIN customers cu ON o.customer_id = cu.id
-      LEFT JOIN commission_tiers ct ON ct.ctv_rate_min <= col.commission_rate
-        AND (ct.ctv_rate_max IS NULL OR ct.ctv_rate_max >= col.commission_rate)
       WHERE cr.sales_id = ? ${extra}
       ORDER BY col.full_name, o.created_at DESC
     `, [targetUserId, targetUserId, ...filterParams]);
@@ -463,8 +463,9 @@ router.post('/:id/collaborators', auth, async (req, res, next) => {
       return res.status(404).json({ error: 'Không tìm thấy nhân viên' });
     }
 
+    // Dùng bảng collaborators (sales_id, ctv_id)
     const [duplicate] = await pool.query(
-      'SELECT id FROM user_collaborators WHERE user_id = ? AND collaborator_id = ?',
+      'SELECT id FROM collaborators WHERE sales_id = ? AND ctv_id = ?',
       [userId, collabId]
     );
     if (duplicate.length > 0) {
@@ -472,8 +473,8 @@ router.post('/:id/collaborators', auth, async (req, res, next) => {
     }
 
     await pool.query(
-      'INSERT INTO user_collaborators (user_id, collaborator_id, commission_rate) VALUES (?, ?, ?)',
-      [userId, collabId, commission_rate || 0]
+      'INSERT INTO collaborators (sales_id, ctv_id) VALUES (?, ?)',
+      [userId, collabId]
     );
 
     res.status(201).json({ message: 'Thêm cộng tác viên thành công' });

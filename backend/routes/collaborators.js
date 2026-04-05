@@ -156,7 +156,8 @@ router.get('/commissions/all', auth, async (req, res, next) => {
         o.id as order_id, o.code as order_code,
         o.created_at as order_date, o.total_amount, o.status,
         g.name as group_name, cu.name as customer_name,
-        c.commission_amount as override_commission
+        c.commission_amount as override_commission,
+        c.override_rate as override_rate
       FROM collaborators cr
       JOIN users sal ON cr.sales_id = sal.id
       JOIN users ctv ON cr.ctv_id = ctv.id
@@ -181,6 +182,7 @@ router.get('/commissions/all', auth, async (req, res, next) => {
           ...r,
           total_amount:        parseFloat(r.total_amount) || 0,
           override_commission: parseFloat(r.override_commission) || 0,
+          override_rate:       r.override_rate != null ? parseFloat(r.override_rate) : null,
         })),
         totals: {
           total_override: pairs.reduce((s, r) => s + parseFloat(r.override_commission), 0),

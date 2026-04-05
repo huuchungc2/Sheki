@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [06/04/2026] - Fix tính override per-item (mỗi sản phẩm tra tier riêng)
+### Fixed
+- **calculateOverrideCommissions per-item** - Tính override từng sản phẩm riêng: SP1 10%→tier 3%, SP2 7%→tier 2%, cộng lại → tổng override đúng. Cache tier query để không lặp DB - Files: `backend/services/orderService.js`
+- Kết quả: đơn mix rate sẽ tính đúng từng item thay vì dùng avgRate chung
+
+## [06/04/2026] - Fix tính override_rate đúng theo commission_rate của items
+### Fixed
+- **calculateOverrideCommissions** - Tra tier theo `avgItemRate` (commission_rate trung bình của items trong đơn, VD 10%) thay vì commission_rate của Sales quản lý (5%) → override đúng 3% thay vì 1% - Files: `backend/services/orderService.js`
+- Kết quả: Minh ← Lan, items 10% → tier 10%-30% → **3%** × 10,040,000đ = **301,200đ** ✅
+
+## [06/04/2026] - Fix logic hoa hồng CTV theo nhóm + lưu override_rate
+### Fixed
+- **calculateOverrideCommissions** - Thêm check cùng nhóm: B lên đơn nhóm X → A chỉ nhận override nếu A cũng thuộc nhóm X (đúng LOGIC_BUSINESS.md) - Files: `backend/services/orderService.js`
+- **Lưu override_rate tại thời điểm tạo đơn** - Lưu `override_rate` vào bảng `commissions` khi tạo, không tra lại commission_tiers khi recalc → đơn cũ không bị ảnh hưởng khi admin sửa tier - Files: `backend/services/orderService.js`
+### Added
+- **Cột commissions.override_rate** - `DECIMAL(5,2)` lưu tỷ lệ % override tại thời điểm tạo đơn - DB migration
+### Changed
+- **Recalculate toàn bộ commission** - Chạy lại với logic mới: Minh ← Lan (1%, nhóm SHEKI) = 100,400đ ✅
+
 ## [05/04/2026] - Xuất Excel báo cáo hoa hồng
 ### Added
 - **exportExcel.ts** - Thư viện export 3 loại: `exportSalesCommission` (Sales: chi tiết đơn + tổng kết), `exportAdminCommission` (Admin: tổng hợp NV + chi tiết đơn + HH CTV, 3 sheet), `exportCtvCommission` (HH từ CTV: tổng hợp + chi tiết đơn) - Files: `src/lib/exportExcel.ts`
