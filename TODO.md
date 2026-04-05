@@ -7,11 +7,30 @@
 
 ## 🔴 ĐANG LÀM
 
-- [x] Move NHÓM BÁN HÀNG lên khu vực thông tin khách hàng và bắt buộc chọn khi lên đơn (OrderForm)
-- [x] **Test luồng thêm/sửa/xóa đơn với nhóm bắt buộc** - Validate UI, payload, end-to-end
+- [x] **Test toàn bộ flow với data thực**
+  - Login admin + sales, kiểm tra phân quyền menu
+  - Tạo đơn hàng end-to-end (tạo KH → tạo đơn → xem hoa hồng)
+  - Kiểm tra tồn kho realtime khi lên đơn
+  - Files liên quan: Toàn bộ pages/, backend/routes/
+- [x] **Fix edge cases parse địa chỉ**
+  - Tên không chuẩn trong DB (viết tắt, thiếu dấu...)
+  - Files: `src/pages/CustomerForm.tsx`, `src/pages/OrderForm.tsx`, `src/lib/utils.ts`
+
+---
+
+## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
+
+- [ ] **Thêm validation đầy đủ cho tất cả form**
+  - Required fields, min/max, format check
+  - Hiển thị lỗi rõ ràng dưới mỗi field
+  - Files: tất cả `src/pages/*Form.tsx`
 - [ ] **Implement real-time stock update**
   - Tồn kho cập nhật ngay khi đơn hàng thay đổi status
   - Files: `backend/routes/orders.js`, `backend/services/orderService.js`
+- [ ] **Deploy production**
+  - Setup VPS CentOS/Ubuntu
+  - Config Nginx, PM2, SSL
+  - Files: tạo mới `deploy.sh`, `nginx.conf`
 
 - [ ] **Thêm validation đầy đủ cho tất cả form**
   - Required fields, min/max, format check
@@ -92,56 +111,6 @@
 - [x] Hoa hồng: mặc định 10%, Math.round
 - [x] Activity logging middleware
 - [x] Groups migration fix (bảng groups, user_groups, cột group_id)
-
-### Phase 4: Commission Report Fixes
-- [x] CommissionDetail route missing trong App.tsx
-- [x] OrderList commission_amount hardcoded 10% → dùng DB thực
-- [x] SalaryReport sales view: sai data structure → fetch order-level commissions
-- [x] CommissionDetail: link order code về đúng order search
-- [x] Salary report: SUM(DISTINCT) sai → dùng subquery
-- [x] API mới: GET /api/commissions/orders (order-level commission data)
-
-### Phase 5: Tách báo cáo doanh thu và hoa hồng
-- [x] Tạo RevenueReport.tsx (admin only) - báo cáo doanh thu theo nhân viên
-- [x] Tạo CommissionReport.tsx (admin + sales) - báo cáo hoa hồng riêng
-- [x] Tách menu: Admin có "Báo cáo doanh thu" + "Báo cáo hoa hồng", Sales chỉ có "Hoa hồng của tôi"
-- [x] Xóa SalaryReport.tsx cũ, cập nhật routes App.tsx
-
-### Phase 6: Cải thiện CommissionDetail và menu
-- [x] Menu Báo cáo có submenu (admin: mở rộng → doanh thu + hoa hồng)
-- [x] CommissionDetail: click đơn hàng → expand chi tiết sản phẩm ngay tại chỗ
-- [x] Bỏ "Hoa hồng trung bình" → thay bằng "Lương cơ bản"
-- [x] Commissions API thêm status, total_amount
-
-### Phase 7: CommissionDetail → OrderCommissionDetail
-- [x] Tạo OrderCommissionDetail page - trang riêng chi tiết hoa hồng từng đơn hàng
-- [x] CommissionDetail: click mã đơn → navigate sang OrderCommissionDetail
-- [x] Route mới: /reports/commissions/:userId/order/:orderId
-
-### Phase 8: Employee Detail Overview
-- [x] EmployeeDetail page: nhóm nhân viên, tổng hoa hồng, top 10 SP bán chạy, đơn hàng của NV
-- [x] Backend API: GET /api/users/:id/overview + GET /api/users/:id/orders
-- [x] EmployeeList: click tên NV → navigate tới EmployeeDetail
-
-### Phase 9: Cộng tác viên (Collaborators)
-- [x] Bảng user_collaborators (many-to-many self-referencing)
-- [x] Backend CRUD API: GET/POST/DELETE /api/users/:id/collaborators
-- [x] CollaboratorsPage: trang quản lý CTV cho từng nhân viên
-- [x] EmployeeDetail: nút "Quản lý CTV" → trang collaborators
-
-### Phase 10: Quy tắc hoa hồng phân cấp (Commission Override)
-- [x] DB: commission_tiers (mức hoa hồng CTV → % Sale hưởng) + collaborators (gán CTV cho Sale)
-- [x] Migration: 001_commission_rules.sql + seed tiers mẫu
-- [x] Backend API: GET/POST/PUT/DELETE /api/commission-tiers
-- [x] Backend API: GET/POST/DELETE /api/collaborators + available-ctvs
-- [x] orderService: recalculateCommission tạo cả override commission cho Sale quản lý
-- [x] reports.js: salary report tách direct_commission + override_commission
-- [x] commissions.js: trả về type (direct/override) + ctv_name
-- [x] Frontend: CommissionRules page (2 tabs: mức hoa hồng + gán CTV)
-- [x] CommissionReport: thêm cột "Hoa hồng quản lý CTV" + "Tổng hoa hồng"
-- [x] CommissionDetail: badge phân loại "Trực tiếp" / "Quản lý CTV: tên"
-- [x] Menu Layout: thêm "Quy tắc hoa hồng" (admin only)
-- [x] Route: /commission-rules (AdminRoute)
 
 ---
 

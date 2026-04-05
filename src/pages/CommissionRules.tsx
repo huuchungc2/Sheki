@@ -2,7 +2,7 @@ import * as React from "react";
 import { api } from "../lib/api";
 import { cn, formatCurrency } from "../lib/utils";
 import { Plus, Trash2, Edit2, Users, Percent, Save, X, AlertCircle } from "lucide-react";
-import { formatCtvRate } from "../lib/commissionUtils";
+import { formatCtvRate, calculateLineCommissions } from "../lib/commissionUtils";
 
 interface CommissionTier {
   id: number;
@@ -55,9 +55,9 @@ export default function CommissionRules() {
     setLoading(true);
     try {
       const [tiersRes, collabRes, salesRes] = await Promise.all([
-        api.get("/api/commission-tiers"),
-        api.get("/api/collaborators"),
-        api.get("/api/users?role=sales&limit=100"),
+        api.get("/commission-tiers"),
+        api.get("/collaborators"),
+        api.get("/users?role=sales&limit=100"),
       ]);
       setTiers(tiersRes.data || []);
       setCollaborators(collabRes.data || []);
@@ -99,9 +99,9 @@ export default function CommissionRules() {
         note: tierForm.note || null,
       };
       if (editingTier) {
-        await api.put(`/api/commission-tiers/${editingTier.id}`, payload);
+        await api.put(`/commission-tiers/${editingTier.id}`, payload);
       } else {
-        await api.post("/api/commission-tiers", payload);
+        await api.post("/commission-tiers", payload);
       }
       setShowTierForm(false);
       resetTierForm();
@@ -114,7 +114,7 @@ export default function CommissionRules() {
   const deleteTier = async (id: number) => {
     if (!confirm("Xóa quy tắc này?")) return;
     try {
-      await api.delete(`/api/commission-tiers/${id}`);
+      await api.delete(`/commission-tiers/${id}`);
       fetchData();
     } catch (err: any) {
       alert(err.message || "Có lỗi xảy ra");
@@ -123,7 +123,7 @@ export default function CommissionRules() {
 
   const fetchAvailableCtvs = async (salesId: number) => {
     try {
-      const res = await api.get(`/api/collaborators/available-ctvs?sales_id=${salesId}`);
+      const res = await api.get(`/collaborators/available-ctvs?sales_id=${salesId}`);
       setAvailableCtvs(res.data || []);
     } catch (err) {
       console.error("Failed to fetch available CTVs:", err);
@@ -137,7 +137,7 @@ export default function CommissionRules() {
       return;
     }
     try {
-      await api.post("/api/collaborators", { sales_id: parseInt(selectedSalesId), ctv_id: parseInt(selectedCtvId) });
+      await api.post("/collaborators", { sales_id: parseInt(selectedSalesId), ctv_id: parseInt(selectedCtvId) });
       setSelectedSalesId("");
       setSelectedCtvId("");
       setAvailableCtvs([]);
@@ -150,7 +150,7 @@ export default function CommissionRules() {
   const removeCollaborator = async (salesId: number, ctvId: number) => {
     if (!confirm("Bỏ gán CTV này?")) return;
     try {
-      await api.delete(`/api/collaborators/${salesId}/${ctvId}`);
+      await api.delete(`/collaborators/${salesId}/${ctvId}`);
       fetchData();
     } catch (err: any) {
       alert(err.message || "Có lỗi xảy ra");

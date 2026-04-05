@@ -22,11 +22,16 @@ import {
   Info,
   X,
   Wallet,
-  ArrowRight
+  ArrowRight,
+  Eye
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn, formatCurrency } from "../lib/utils";
-import type { OrderItem, Order } from "../types";
+import { api } from "../lib/api";
+import type { OrderItem } from "../types";
+
+type CustomerLite = { id: string; name: string; phone?: string; address?: string };
+type ProductLite = { id: string; name: string; sku: string; price: number };
 
 export function OrderForm() {
   const navigate = useNavigate();
@@ -37,35 +42,30 @@ export function OrderForm() {
   const [customerSearch, setCustomerSearch] = React.useState("Lê Hoàng");
   const [showCustomerResults, setShowCustomerResults] = React.useState(false);
 
-  const mockCustomers = [
-    { id: "C001", name: "Lê Hoàng", phone: "090 123 4567", initials: "LH", address: "123 Đường ABC, Phường 4, Quận 3, TP. Hồ Chí Minh" },
-    { id: "C002", name: "Nguyễn Anh", phone: "091 999 8888", initials: "NA", address: "456 Đường XYZ, Quận 1, TP. Hồ Chí Minh" },
-    { id: "C003", name: "Minh Tú", phone: "088 222 3333", initials: "MT", address: "789 Đường DEF, Quận 7, TP. Hồ Chí Minh" },
-  ];
+  // Customer search with DB-backed suggestions
+  const [customerQuery, setCustomerQuery] = React.useState("");
+  const [customerSuggestions, setCustomerSuggestions] = React.useState<any[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = React.useState<any>(null);
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = React.useState(false);
 
-  const [selectedCustomer, setSelectedCustomer] = React.useState(mockCustomers[0]);
-
-  const filteredCustomers = mockCustomers.filter(c => 
-    c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
-    c.phone.includes(customerSearch)
-  );
+  const fetchCustomerSuggestions = async (q: string) => {
+    if (!q) { setCustomerSuggestions([]); return; }
+    try {
+      const res = await api.get(`/customers/suggest?q=${encodeURIComponent(q)}`);
+      const data = res?.data ?? [];
+      setCustomerSuggestions(data.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone, address: c.address })));
+    } catch {
+      setCustomerSuggestions([]);
+    }
+  };
 
   const selectCustomer = (customer: any) => {
     setSelectedCustomer(customer);
-    setCustomerSearch(customer.name);
-    setShowCustomerResults(false);
+    setCustomerQuery(customer.name);
+    setShowCustomerSuggestions(false);
   };
 
-  const mockProducts = [
-    { id: "P003", name: "Áo Polo Nam", sku: "PL-003", price: 350000 },
-    { id: "PROD001", name: "Áo thun Cotton Basic", sku: "TS-001", price: 250000 },
-    { id: "PROD002", name: "Quần Jean Slimfit", sku: "JN-002", price: 550000 },
-  ];
-
-  const filteredProducts = mockProducts.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.sku.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Product data now sourced from DB; mock data removed
 
   const addProduct = (product: any) => {
     const existing = items.find(i => i.productId === product.id);
@@ -80,38 +80,125 @@ export function OrderForm() {
         quantity: 1,
         discountRate: 0,
         discountAmount: 0,
-        commissionRate: 5,
-        commissionAmount: product.price * 0.05
+        commissionRate: 10,
+        commissionAmount: product.price * 0.10
       }]);
     }
     setSearchQuery("");
     setShowResults(false);
   };
 
-  const [items, setItems] = React.useState<OrderItem[]>([
-    { 
-      productId: "P001", 
-      productName: "Áo thun Cotton Basic", 
-      sku: "TS-001", 
-      price: 250000, 
-      quantity: 2, 
-      discountRate: 0,
-      discountAmount: 0,
-      commissionRate: 5, 
-      commissionAmount: 25000 
-    },
-    { 
-      productId: "P002", 
-      productName: "Quần Jean Slimfit", 
-      sku: "JN-002", 
-      price: 550000, 
-      quantity: 1, 
-      discountRate: 0,
-      discountAmount: 0,
-      commissionRate: 5, 
-      commissionAmount: 27500 
-    },
-  ]);
+  const [items, setItems] = React.useState<OrderItem[]>([]);
+  const [shipmentAddress, setShipmentAddress] = React.useState<string>("");
+  const [shippingFee, setShippingFee] = React.useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = React.useState<string>("cash");
+  const [note, setNote] = React.useState<string>("");
+
+  // Product suggestions (DB-backed)
+  const [productQuery, setProductQuery] = React.useState("");
+  const [productSuggestions, setProductSuggestions] = React.useState<any[]>([]);
+  const fetchProductSuggestions = async (q: string) => {
+    if (!q) { setProductSuggestions([]); return; }
+    try {
+      const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50`);
+      const data = res?.data ?? [];
+      setProductSuggestions(data.map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, price: Number(p.price) || 0 })));
+    } catch {
+      setProductSuggestions([]);
+    }
+  };
+
+  // Load existing order data when editing
+  React.useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        const res: any = await api.get(`/orders/${id}`);
+        const order = res?.data ?? res;
+        // Customer
+        const cust = {
+          id: order?.customer_id ?? order?.customerId ?? '',
+          name: order?.customer_name ?? order?.customerName ?? '',
+          phone: order?.customer_phone ?? order?.customerPhone ?? '',
+          address: order?.shipping_address ?? ''
+        };
+        setSelectedCustomer(cust as any);
+        setCustomerQuery(cust.name);
+
+        // Items
+        const itemsData = (order?.items ?? []).map((it: any) => ({
+          productId: it.product_id ?? it.productId ?? '',
+          productName: it.product_name ?? it.productName ?? '',
+          sku: it.sku ?? '',
+          price: Number(it.unit_price ?? it.price ?? 0),
+          quantity: Number(it.qty ?? it.quantity ?? 1),
+          discountRate: Number(it.discount_rate ?? 0),
+          discountAmount: Number(it.discount_amount ?? 0),
+          commissionRate: Number(it.commission_rate ?? 10),
+          commissionAmount: Number(it.commission_amount ?? 0),
+        }));
+        if (itemsData.length) setItems(itemsData as any);
+
+        setShipmentAddress(order?.shipping_address ?? '');
+        setShippingFee(order?.shipping_fee ?? 0);
+        setPaymentMethod(order?.payment_method ?? 'cash');
+        setNote(order?.note ?? '');
+      } catch (e) {
+        console.error('Load order error', e);
+      }
+    })();
+  }, [id]);
+
+  // Submit order to backend
+  const submitOrder = async () => {
+    if (!selectedCustomer?.id) {
+      alert('Vui lòng chọn khách hàng');
+      return;
+    }
+    if (items.length === 0) {
+      alert('Vui lòng thêm ít nhất 1 sản phẩm');
+      return;
+    }
+    const itemsPayload = items.map(i => ({
+      product_id: i.productId,
+      qty: i.quantity,
+      unit_price: i.price,
+      discount_rate: i.discountRate,
+      discount_amount: i.discountAmount,
+      commission_rate: i.commissionRate,
+      commission_amount: i.commissionAmount,
+      subtotal: i.subtotal
+    }));
+    const payload: any = {
+      customer_id: selectedCustomer.id,
+      warehouse_id: 1,
+      group_id: null,
+      shipping_address: selectedCustomer.address || '',
+      carrier_service: 'standard',
+      shipping_fee: 0,
+      payment_method: 'cash',
+      discount: 0,
+      note: '',
+      items: itemsPayload
+    };
+    try {
+      let res: any;
+      if (id) {
+        // Editing existing order
+        res = await api.put(`/orders/${id}`, payload);
+      } else {
+        // Creating new order
+        res = await api.post('/orders', payload);
+      }
+      if (res?.id) {
+        navigate(id ? `/orders/edit/${res.id}` : `/orders/edit/${res.id}`);
+      } else {
+        navigate('/orders');
+      }
+    } catch (e) {
+      alert('Lỗi khi tạo đơn hàng');
+    }
+  };
 
   const updateQuantity = (productId: string, delta: number) => {
     setItems(items.map(item => {
@@ -159,9 +246,18 @@ export function OrderForm() {
     }));
   };
 
+  // Helper: ensure odd integer >= 1
+  const clampToOdd = (n: number) => {
+    let v = Math.floor(n);
+    if (!Number.isFinite(v)) v = 1;
+    if (v < 1) v = 1;
+    if (v % 2 === 0) v = v - 1 >= 1 ? v - 1 : 1;
+    // ensure odd
+    return v;
+  };
+
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.price - item.discountAmount), 0);
-  const shippingFee = 30000;
-  const discount = 50000;
+  const discount = 0;
   const tax = subtotal * 0.1;
   const total = subtotal + shippingFee + tax - discount;
 
@@ -189,7 +285,7 @@ export function OrderForm() {
           <button className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
             Lưu bản nháp
           </button>
-          <button className="flex items-center gap-2 px-8 py-3 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/20">
+          <button onClick={submitOrder} className="flex items-center gap-2 px-8 py-3 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/20">
             <Save className="w-5 h-5" />
             {isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}
           </button>
@@ -219,37 +315,36 @@ export function OrderForm() {
                   <input 
                     type="text" 
                     placeholder="Tìm theo tên hoặc SĐT..." 
-                    value={customerSearch}
+                    value={customerQuery}
                     onChange={(e) => {
-                      setCustomerSearch(e.target.value);
-                      setShowCustomerResults(e.target.value.length > 0);
+                      setCustomerQuery(e.target.value);
+                      setShowCustomerSuggestions(e.target.value.length > 0);
+                      fetchCustomerSuggestions(e.target.value);
                     }}
-                    onFocus={() => customerSearch.length > 0 && setShowCustomerResults(true)}
+                    onFocus={() => customerQuery.length > 0 && setShowCustomerSuggestions(true)}
                     className="w-full px-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
                   />
-                  {showCustomerResults && (
+                  {showCustomerSuggestions && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-2xl z-50 overflow-hidden">
                       <div className="max-h-60 overflow-y-auto">
-                        {filteredCustomers.length > 0 ? (
-                          filteredCustomers.map(customer => (
+                        {customerSuggestions.length > 0 ? (
+                          customerSuggestions.map(customer => (
                             <button
                               key={customer.id}
                               onClick={() => selectCustomer(customer)}
                               className="w-full px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
                             >
                               <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
-                                {customer.initials}
+                                {(customer.name || '').split(' ').map((n: string) => n[0]).slice(0,2).join('')}
                               </div>
                               <div>
                                 <p className="text-sm font-black text-slate-900">{customer.name}</p>
-                                <p className="text-[10px] font-bold text-slate-400">{customer.phone}</p>
+                                <p className="text-[10px] font-bold text-slate-400">{customer.phone || ''}</p>
                               </div>
                             </button>
                           ))
                         ) : (
-                          <div className="px-6 py-8 text-center text-slate-400 text-sm font-bold">
-                            Không tìm thấy khách hàng
-                          </div>
+                          <div className="px-6 py-8 text-center text-slate-400 text-sm font-bold">Không tìm thấy khách hàng</div>
                         )}
                       </div>
                     </div>
@@ -257,11 +352,11 @@ export function OrderForm() {
                 </div>
                 <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-[24px] border border-slate-100">
                   <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-xl font-black text-slate-300">
-                    {selectedCustomer.initials}
+                    {selectedCustomer?.name ? selectedCustomer.name.split(' ').map(n => n[0]).slice(0,2).join('') : ''}
                   </div>
                   <div>
-                    <p className="text-base font-black text-slate-900">{selectedCustomer.name}</p>
-                    <p className="text-sm font-bold text-slate-400">{selectedCustomer.phone}</p>
+                    <p className="text-base font-black text-slate-900">{selectedCustomer?.name || 'Chưa chọn'}</p>
+                    <p className="text-sm font-bold text-slate-400">{selectedCustomer?.phone || ''}</p>
                   </div>
                 </div>
               </div>
@@ -273,8 +368,8 @@ export function OrderForm() {
                     <MapPin className="w-4 h-4 absolute left-4 top-4 text-slate-300" />
                     <textarea 
                       placeholder="Nhập địa chỉ chi tiết..." 
-                      value={selectedCustomer.address}
-                      onChange={(e) => setSelectedCustomer({ ...selectedCustomer, address: e.target.value })}
+                      value={selectedCustomer?.address ?? ''}
+                      onChange={(e) => setSelectedCustomer(prev => prev ? { ...prev, address: e.target.value } : prev)}
                       className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-[24px] text-sm transition-all outline-none font-medium min-h-[100px] resize-none"
                     />
                   </div>
@@ -297,20 +392,21 @@ export function OrderForm() {
                 <input 
                   type="text" 
                   placeholder="Tìm sản phẩm, SKU..." 
-                  value={searchQuery}
+                  value={productQuery}
                   onChange={(e) => {
-                    setSearchQuery(e.target.value);
+                    setProductQuery(e.target.value);
                     setShowResults(e.target.value.length > 0);
+                    fetchProductSuggestions(e.target.value);
                   }}
-                  onFocus={() => searchQuery.length > 0 && setShowResults(true)}
+                  onFocus={() => productQuery.length > 0 && setShowResults(true)}
                   className="w-full px-5 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-2xl text-sm transition-all outline-none font-medium"
                 />
 
                 {showResults && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-2xl z-50 overflow-hidden">
                     <div className="max-h-60 overflow-y-auto">
-                      {filteredProducts.length > 0 ? (
-                        filteredProducts.map(product => (
+                      {productSuggestions.length > 0 ? (
+                        productSuggestions.map(product => (
                           <button
                             key={product.id}
                             onClick={() => addProduct(product)}
@@ -321,7 +417,7 @@ export function OrderForm() {
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{product.sku}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm font-black text-red-600">{formatCurrency(product.price)}</p>
+                              <p className="text-sm font-black text-slate-900">{formatCurrency(product.price)}</p>
                               <p className="text-[10px] font-bold text-slate-400">Chọn để thêm</p>
                             </div>
                           </button>
@@ -343,7 +439,7 @@ export function OrderForm() {
                 <thead>
                   <tr className="bg-slate-50/50">
                     <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">SẢN PHẨM</th>
-                    <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">SỐ LƯỢNG</th>
+                    <th className="px-4 py-4 w-28 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">SỐ LƯỢNG</th>
                     <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">ĐƠN GIÁ</th>
                     <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">CHIẾT KHẤU (%)</th>
                     <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">THÀNH TIỀN</th>
@@ -365,49 +461,29 @@ export function OrderForm() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-6">
-                        <div className="flex items-center justify-center gap-3 bg-slate-50 p-1.5 rounded-2xl w-32 mx-auto">
-                          <button 
-                            onClick={() => updateQuantity(item.productId, -1)}
-                            className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 transition-all"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          <span className="text-sm font-black text-slate-900">{item.quantity}</span>
-                          <button 
-                            onClick={() => updateQuantity(item.productId, 1)}
-                            className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 transition-all"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
+        <td className="px-4 py-6 w-28">
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={item.quantity}
+            onChange={(e) => {
+              const raw = Number(e.target.value);
+              const v = Number.isFinite(raw) ? Math.floor(raw) : 0;
+              if (v >= 0) {
+                setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, subtotal: v * it.price, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
+              }
+            }}
+            className="w-full h-14 px-4 bg-slate-50 border border-slate-100 rounded-md text-center text-2xl font-black outline-none"
+          />
+        </td>
                       <td className="px-4 py-6">
                         <p className="text-sm font-black text-slate-900">{formatCurrency(item.price)}</p>
                       </td>
                       <td className="px-4 py-6">
-                        <div className="relative w-20 mx-auto">
-                          <input 
-                            type="number" 
-                            value={item.discountRate}
-                            onChange={(e) => updateDiscount(item.productId, Number(e.target.value))}
-                            className="w-full px-3 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 rounded-xl text-sm font-black text-center outline-none transition-all"
-                          />
-                          <p className="text-[10px] font-bold text-slate-400 mt-1 text-center">{formatCurrency(item.discountAmount)}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-6 text-right">
-                        <p className="text-sm font-black text-slate-900">{formatCurrency(item.quantity * item.price - item.discountAmount)}</p>
-                      </td>
-                      <td className="px-4 py-6">
-                        <div className="relative w-20 mx-auto">
-                          <input 
-                            type="number" 
-                            value={item.commissionRate}
-                            onChange={(e) => updateCommission(item.productId, Number(e.target.value))}
-                            className="w-full px-3 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-emerald-200 rounded-xl text-sm font-black text-center outline-none transition-all"
-                          />
-                          <p className="text-[10px] font-bold text-emerald-500 mt-1 text-center">{formatCurrency(item.commissionAmount)}</p>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{item.commissionRate}%</span>
+                          <span className="text-sm font-black text-slate-900">{formatCurrency(item.commissionAmount)}</span>
                         </div>
                       </td>
                       <td className="px-8 py-6">

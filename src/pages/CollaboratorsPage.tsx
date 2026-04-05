@@ -17,6 +17,15 @@ export function CollaboratorsPage() {
   const [success, setSuccess] = React.useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = React.useState(false);
+  // Sales users for selecting a manager when assigning CTV
+  interface SalesUser {
+    id: number;
+    full_name: string;
+    email: string;
+    phone: string | null;
+  }
+  const [salesUsers, setSalesUsers] = React.useState<SalesUser[]>([]);
+  const [selectedSalesId, setSelectedSalesId] = React.useState<string>("");
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCollabId, setSelectedCollabId] = React.useState<number | null>(null);
   const [commissionRate, setCommissionRate] = React.useState(0);
@@ -28,11 +37,18 @@ export function CollaboratorsPage() {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem("token");
+      if (!token) {
+        setError("Không có token");
+        navigate("/login");
+        setLoading(false);
+        return;
+      }
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [userRes, collabRes] = await Promise.all([
+  const [userRes, collabRes, salesRes] = await Promise.all([
         fetch(`${API_URL}/users/${id}`, { headers }),
         fetch(`${API_URL}/users/${id}/collaborators`, { headers }),
+        fetch(`${API_URL}/users?role=sales&limit=100`, { headers }),
       ]);
 
       // Helper to parse JSON safely or throw with HTML/text error
@@ -56,9 +72,16 @@ export function CollaboratorsPage() {
 
       const userData = await readJsonOrText(userRes);
       const collabData = await readJsonOrText(collabRes);
-
       setUser(userData.data);
       setCollaborators(collabData.data);
+      if (salesRes && salesRes.ok) {
+        try {
+          const salesJson = await salesRes.json();
+          setSalesUsers(salesJson?.data ?? []);
+        } catch {
+          // ignore non-JSON
+        }
+      }
     } catch (err: any) {
       console.error("Collaborators fetch error", err);
       setError(err?.message ?? "Không thể tải danh sách cộng tác viên");
@@ -85,7 +108,7 @@ export function CollaboratorsPage() {
   };
 
   const handleAdd = async () => {
-    if (!selectedCollabId) return;
+    if (selectedCollabId == null) return;
     try {
       setAdding(true);
       setError(null);
@@ -117,7 +140,8 @@ export function CollaboratorsPage() {
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       console.error("Failed to add collaborator", err);
-      setError(err?.message ?? "Có lỗi xảy ra khi thêm cộng tác viên");
+      const msg = err?.message ?? "Có lỗi xảy ra khi thêm cộng tác viên";
+      setError(msg);
     } finally {
       setAdding(false);
     }
@@ -146,7 +170,8 @@ export function CollaboratorsPage() {
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       console.error("Failed to delete collaborator", err);
-      setError(err?.message ?? "Có lỗi xảy ra khi xóa cộng tác viên");
+      const msg = err?.message ?? "Có lỗi xảy ra khi xóa cộng tác viên";
+      setError(msg);
     } finally {
       setDeleting(null);
     }
@@ -351,6 +376,19 @@ export function CollaboratorsPage() {
               </div>
 
               <div className="space-y-2">
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-1">Sale quản lý</label>
+                  <select
+                    value={selectedSalesId}
+                    onChange={(e) => setSelectedSalesId(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="">-- Chọn Sale --</option>
+                    {salesUsers.map((s) => (
+                      <option key={s.id} value={String(s.id)}>{s.full_name} - {s.email}</option>
+                    ))}
+                  </select>
+                </div>
                 <label className="text-sm font-bold text-slate-700">Tỷ lệ hoa hồng (%)</label>
                 <input
                   type="number"

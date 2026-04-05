@@ -34,6 +34,8 @@ const navigationAdmin = [
     { name: "Báo cáo hoa hồng", href: "/reports/commissions" },
   ]},
   { name: "Quy tắc hoa hồng", href: "/commission-rules", icon: DollarSign },
+  { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv", icon: DollarSign },
+  { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv", icon: DollarSign },
   { name: "Nhật ký", href: "/logs", icon: FileText },
   { name: "Cài đặt", href: "/settings", icon: Settings },
 ];
@@ -43,6 +45,7 @@ const navigationSales = [
   { name: "Đơn hàng của tôi", href: "/orders", icon: ShoppingCart },
   { name: "Khách hàng của tôi", href: "/customers", icon: UserCircle },
   { name: "Hoa hồng của tôi", href: "/reports/commissions", icon: DollarSign },
+  { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv", icon: DollarSign },
 ];
 
 const searchNavigation = [
@@ -85,6 +88,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const navigation = currentUser?.role === 'admin' ? navigationAdmin : navigationSales;
+  // Deduplicate potential duplicate entries (e.g., multiple additions of the same href)
+  const visibleNavigation = navigation.filter((item, idx, arr) =>
+    arr.findIndex(i => i.href === item.href) === idx
+  );
   const isAdmin = currentUser?.role === 'admin';
 
   React.useEffect(() => {
@@ -125,7 +132,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 px-4 space-y-1 mt-4">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const hasChildren = 'children' in item && item.children;
             const isActive = location.pathname === item.href || (item.href !== "/" && location.pathname.startsWith(item.href));
             const isSubmenuOpen = openSubmenu === item.name;

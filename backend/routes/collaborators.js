@@ -108,4 +108,25 @@ router.get('/available-ctvs', auth, authorize('admin'), async (req, res, next) =
   }
 });
 
+// GET /api/collaborators/commissions - aggregated commissions across all employees
+// Allow both Admin and Sales to view
+router.get('/commissions/all', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(`
+      SELECT uc.collaborator_id, u.full_name as collaborator_name, COALESCE(SUM(c.commission_amount), 0) as total_commission,
+             COALESCE(COUNT(DISTINCT c.order_id), 0) as total_orders, COALESCE(SUM(o.total_amount), 0) as total_revenue
+      FROM user_collaborators uc
+      LEFT JOIN commissions c ON c.user_id = uc.collaborator_id
+      LEFT JOIN users u ON uc.collaborator_id = u.id
+      LEFT JOIN orders o ON o.id = c.order_id
+      GROUP BY uc.collaborator_id, u.full_name
+      ORDER BY total_commission DESC
+    `);
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

@@ -7,6 +7,7 @@ import { EmployeeForm } from "./pages/EmployeeForm";
 import { EmployeeDetail } from "./pages/EmployeeDetail";
 import { CollaboratorsPage } from "./pages/CollaboratorsPage";
 import { CollaboratorsCommissionReport } from "./pages/CollaboratorsCommissionReport";
+import CollaboratorsCommissionsReport from "./pages/CollaboratorsCommissionsReport";
 import { ProductList } from "./pages/ProductList";
 import { ProductForm } from "./pages/ProductForm";
 import { CustomerList } from "./pages/CustomerList";
@@ -27,6 +28,7 @@ import { OrderCommissionDetail } from "./pages/OrderCommissionDetail";
 import { RevenueReport } from "./pages/RevenueReport";
 import { CommissionReport } from "./pages/CommissionReport";
 import CommissionRules from "./pages/CommissionRules";
+import CollaboratorsCommissionsReportPage from "./pages/CollaboratorsCommissionsReport";
 import { ChangePassword } from "./pages/ChangePassword";
 
 function checkAuth() {
@@ -123,9 +125,11 @@ export default function App() {
                   <Route path="/change-password" element={<ChangePassword />} />
                   <Route path="/reports/revenue" element={<AdminRoute><RevenueReport /></AdminRoute>} />
                   <Route path="/reports/commissions" element={<CommissionReport />} />
+                  <Route path="/reports/commissions/ctv" element={<CollaboratorsCommissionsReportPage />} />
                   <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionDetail /></AdminRoute>} />
                   <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
+                  <Route path="/reports/commissions/ctv" element={<AdminRoute><CollaboratorsCommissionsReport /></AdminRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

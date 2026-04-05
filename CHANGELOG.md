@@ -1,8 +1,13 @@
 # CHANGELOG
 
+## 2026-04-05 - Test flow with real data
+### Added
+- Test flow with real data executed; moved to next task (edge-case address parsing). - Files: TODO.md
+
 ## 2026-04-05 - Order Form Group Move
 ### Changed
 - NHÓM BÁN HÀNG moved into OrderForm near customer info; require selecting a group when creating/updating orders. Payload includes group_id. Files: src/pages/OrderForm.tsx
+- Order Form redesign: add/edit screen updated to include full Vietnam provinces, dynamic district/ward dropdowns, and search-filtered customer suggestions by current sales user; quantity input now supports decimals. Files: src/pages/OrderForm.tsx
 
 ## 05/04/2026 - Fix edge cases parse địa chỉ
 ### Fixed
@@ -205,3 +210,6 @@
 ## [05/04/2026] - [Nhóm bán hàng đảm bảo ổn định UI]
 ### Updated
 - Refactor và làm sạch phần nhóm bán hàng trong OrderForm để tránh nhiễu UI và parse lỗi Babel. Thêm vị trí rõ ràng cho dropdown nhóm bán hàng ở bên trái/two-column layout (File: src/pages/OrderForm.tsx).
+## [05/04/2026] - Implemented Collaborators: Robust error handling for gán CTV
+### Added
+- Implement robust error handling for assigning collaborators in CollaboratorsPage.tsx: gracefully handle non-JSON responses (HTML), read error messages from response text, and log for debugging. Ensure no crashes and actionable UI messages. - Files: src/pages/CollaboratorsPage.tsx
