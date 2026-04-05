@@ -103,7 +103,7 @@ router.get('/summary', auth, async (req, res, next) => {
 router.get('/orders', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { month, year, group_id, page = 1, limit = 50 } = req.query;
+    const { month, year, group_id, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     // Build WHERE + params — dùng chung cho tất cả queries

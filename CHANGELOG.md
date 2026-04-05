@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [06/04/2026] - Verify & Fix OrderSearch, CollaboratorsPage, InventoryImport/Export
+### Fixed
+- **CollaboratorsPage API** - GET/POST/DELETE đều dùng bảng `collaborators` (sales_id/ctv_id) thay vì `user_collaborators` (rỗng) - Files: `backend/routes/users.js`
+- **OrderSearch params** - Sửa `startDate/endDate` → `date_from/date_to` khớp với API `/orders`. Fix statusConfig đúng 4 trạng thái. Thêm navigate click vào đơn. Thêm filter trạng thái - Files: `src/pages/OrderSearch.tsx`
+- **InventoryImport** - Nhận `quantity/unit_price` (từ frontend form) hoặc `qty/price`. Update cả `stock_qty` và `available_stock`. Recalculate stock sau nhập - Files: `backend/routes/inventory.js`
+- **InventoryExport** - Tương tự, check `available_stock` thay vì `stock_qty`. Recalculate sau xuất - Files: `backend/routes/inventory.js`
+### Verified
+- **Login/Register** - API hoạt động đúng, token + user trả về đủ fields
+
 ## [06/04/2026] - Fix tính override per-item (mỗi sản phẩm tra tier riêng)
 ### Fixed
 - **calculateOverrideCommissions per-item** - Tính override từng sản phẩm riêng: SP1 10%→tier 3%, SP2 7%→tier 2%, cộng lại → tổng override đúng. Cache tier query để không lặp DB - Files: `backend/services/orderService.js`

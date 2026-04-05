@@ -45,6 +45,15 @@ export function CommissionReport() {
   const [ctvTotals, setCtvTotals]   = React.useState<any>({});
   const [activeTab, setActiveTab]   = React.useState<"direct" | "ctv">("direct");
   const [expandedCtv, setExpandedCtv] = React.useState<Set<string>>(new Set());
+  const [orderPopup, setOrderPopup]     = React.useState<any | null>(null);
+  const [popupItems, setPopupItems]     = React.useState<any[]>([]);
+  const [popupLoading, setPopupLoading] = React.useState(false);
+
+  // Phân trang bảng chi tiết đơn
+  const [commPage, setCommPage]     = React.useState(1);
+  const [commTotal, setCommTotal]   = React.useState(0);
+  const [commLimit, setCommLimit]   = React.useState(20);
+  const [exporting, setExporting]   = React.useState(false);
 
   // Fetch groups
   React.useEffect(() => {
@@ -61,7 +70,7 @@ export function CommissionReport() {
     setOrderCommissions([]);
     try {
       const token = localStorage.getItem("token");
-      const params = new URLSearchParams({ month, year });
+      const params = new URLSearchParams({ month, year, page: String(commPage), limit: String(commLimit) });
       if (groupId) params.set("group_id", groupId);
 
       // 1. Fetch đơn hàng trực tiếp (type=direct)
@@ -71,6 +80,7 @@ export function CommissionReport() {
       if (!orderRes.ok) throw new Error("Không thể tải báo cáo hoa hồng");
       const orderJson = await orderRes.json();
       setOrderCommissions(orderJson.data || []);
+      setCommTotal(orderJson.total || 0);
       const s = orderJson.summary;
       const directCommission  = parseFloat(s?.direct_commission)  || 0;
       const totalOrders       = parseInt(s?.total_orders)         || 0;
@@ -121,31 +131,69 @@ export function CommissionReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, year, groupId, isAdmin, currentUser?.id]);
+  }, [month, year, groupId, commPage, commLimit, isAdmin, currentUser?.id]);
+
+  // Reset page khi filter hoặc limit thay đổi
+  React.useEffect(() => { setCommPage(1); }, [month, year, groupId, commLimit]);
 
   React.useEffect(() => { fetchReport(); }, [fetchReport]);
 
-  const handleExport = () => {
-    const groupName = groups.find(g => String(g.id) === groupId)?.name || "";
-    if (isAdmin) {
-      exportAdminCommission({
-        salesData,
-        orderCommissions,
-        ctvPairs,
-        ctvOrders,
-        month,
-        year,
-        groupName,
+  const openOrderPopup = async (item: any) => {
+    setOrderPopup(item);
+    setPopupItems([]);
+    setPopupLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/orders/${item.order_id}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-    } else {
-      exportSalesCommission({
-        orders: orderCommissions,
-        summary,
-        userName: currentUser?.full_name || "NhanVien",
-        month,
-        year,
-        groupName,
+      if (res.ok) {
+        const json = await res.json();
+        setPopupItems(json.data?.items || []);
+      }
+    } catch {}
+    finally { setPopupLoading(false); }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const groupName = groups.find(g => String(g.id) === groupId)?.name || "";
+
+      // Fetch toàn bộ data (limit=9999, không phân trang)
+      const allParams = new URLSearchParams({ month, year, page: "1", limit: "9999" });
+      if (groupId) allParams.set("group_id", groupId);
+      const allRes = await fetch(`${API_URL}/commissions/orders?${allParams}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
+      const allJson = await allRes.json();
+      const allOrders = allJson.data || [];
+
+      if (isAdmin) {
+        exportAdminCommission({
+          salesData,
+          orderCommissions: allOrders,
+          ctvPairs,
+          ctvOrders,
+          month,
+          year,
+          groupName,
+        });
+      } else {
+        exportSalesCommission({
+          orders: allOrders,
+          summary,
+          userName: currentUser?.full_name || "NhanVien",
+          month,
+          year,
+          groupName,
+        });
+      }
+    } catch (e) {
+      console.error("Export error", e);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -198,9 +246,12 @@ export function CommissionReport() {
           </select>
           <button
             onClick={handleExport}
-            disabled={loading}
+            disabled={loading || exporting}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50">
-            <Download className="w-4 h-4" /> Xuất Excel
+            {exporting
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang xuất...</>
+              : <><Download className="w-4 h-4" /> Xuất Excel</>
+            }
           </button>
         </div>
       </div>
@@ -342,9 +393,11 @@ export function CommissionReport() {
 
           {/* Tab: Hoa hồng từ CTV */}
           {activeTab === "ctv" && (() => {
-            // Group pairs by sales
+            // Group pairs by sales — chỉ lấy pairs có override > 0
             const bySales: Record<number, any[]> = {};
-            ctvPairs.forEach(p => { if (!bySales[p.sales_id]) bySales[p.sales_id] = []; bySales[p.sales_id].push(p); });
+            ctvPairs
+              .filter(p => p.override_commission > 0)
+              .forEach(p => { if (!bySales[p.sales_id]) bySales[p.sales_id] = []; bySales[p.sales_id].push(p); });
             const ordersByPair: Record<string, any[]> = {};
             ctvOrders.forEach(o => {
               const k = `${o.sales_id}-${o.ctv_id}`;
@@ -479,8 +532,25 @@ export function CommissionReport() {
 
       {/* Bảng chi tiết hoa hồng theo đơn (cả sales lẫn admin đều thấy) */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="text-sm font-bold text-slate-700">Chi tiết hoa hồng theo đơn hàng</h2>
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-700">
+            Chi tiết hoa hồng theo đơn hàng
+            {commTotal > 0 && <span className="ml-2 text-xs font-normal text-slate-400">({commTotal} dòng)</span>}
+          </h2>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span>Hiển thị</span>
+            <select
+              value={commLimit}
+              onChange={e => { setCommLimit(Number(e.target.value)); setCommPage(1); }}
+              className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-blue-300 cursor-pointer"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>dòng/trang</span>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
@@ -507,10 +577,11 @@ export function CommissionReport() {
               ) : orderCommissions.map((item: any) => {
                 const st = statusConfig[item.status] || { label: item.status || "—", color: "bg-slate-50 text-slate-500" };
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                  <tr key={item.id}
+                    className="hover:bg-blue-50/40 transition-colors cursor-pointer"
+                    onClick={() => openOrderPopup(item)}>
                     <td className="px-5 py-3">
-                      <Link to={`/orders/edit/${item.order_id}`}
-                        className="font-bold text-blue-600 hover:underline font-mono">{item.order_code}</Link>
+                      <span className="font-bold text-blue-600 font-mono">{item.order_code}</span>
                     </td>
                     {isAdmin && (
                       <td className="px-5 py-3">
@@ -542,7 +613,9 @@ export function CommissionReport() {
             {orderCommissions.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-800 text-white text-sm font-bold">
-                  <td className="px-5 py-3" colSpan={isAdmin ? 5 : 4}>Tổng cộng ({orderCommissions.length} dòng)</td>
+                  <td className="px-5 py-3" colSpan={isAdmin ? 5 : 4}>
+                    Trang {commPage} — {commTotal} dòng
+                  </td>
                   <td className="px-5 py-3 text-right">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.total_amount, 0))}
                   </td>
@@ -555,7 +628,144 @@ export function CommissionReport() {
             )}
           </table>
         </div>
+
+        {/* Phân trang */}
+        {commTotal > commLimit && (
+          <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-xs text-slate-400">
+              Hiển thị <span className="font-semibold text-slate-700">
+                {(commPage - 1) * commLimit + 1}–{Math.min(commPage * commLimit, commTotal)}
+              </span> / <span className="font-semibold text-slate-700">{commTotal}</span> dòng
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCommPage(p => Math.max(1, p - 1))}
+                disabled={commPage === 1}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200 disabled:opacity-30 transition-all text-sm"
+              >‹</button>
+              {Array.from({ length: Math.min(5, Math.ceil(commTotal / commLimit)) }, (_, i) => {
+                const totalPages = Math.ceil(commTotal / commLimit);
+                let p = i + 1;
+                if (totalPages > 5) {
+                  if (commPage <= 3) p = i + 1;
+                  else if (commPage >= totalPages - 2) p = totalPages - 4 + i;
+                  else p = commPage - 2 + i;
+                }
+                return (
+                  <button key={p} onClick={() => setCommPage(p)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                      commPage === p ? "bg-blue-600 text-white shadow-sm" : "hover:bg-slate-200 text-slate-600"
+                    }`}>
+                    {p}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setCommPage(p => Math.min(Math.ceil(commTotal / commLimit), p + 1))}
+                disabled={commPage >= Math.ceil(commTotal / commLimit)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200 disabled:opacity-30 transition-all text-sm"
+              >›</button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Popup chi tiết đơn hàng */}
+      {orderPopup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setOrderPopup(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-lg font-bold text-slate-900 font-mono">{orderPopup.order_code}</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {formatDate(orderPopup.order_date)} •
+                  {orderPopup.customer_name && ` ${orderPopup.customer_name} •`}
+                  {orderPopup.group_name && ` ${orderPopup.group_name}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={cn("px-2.5 py-1 rounded-full text-xs font-semibold",
+                  statusConfig[orderPopup.status]?.color || "bg-slate-100 text-slate-600")}>
+                  {statusConfig[orderPopup.status]?.label || orderPopup.status}
+                </span>
+                <button onClick={() => setOrderPopup(null)}
+                  className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto">
+              {popupLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                </div>
+              ) : (
+                <>
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-left">Sản phẩm</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-center">SL</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Đơn giá</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">CK</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Thành tiền</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-center">HH%</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">HH</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {popupItems.length === 0 ? (
+                        <tr><td colSpan={7} className="px-5 py-8 text-center text-slate-400">Không có sản phẩm</td></tr>
+                      ) : popupItems.map((item: any, i: number) => {
+                        const net = parseFloat(item.unit_price) * parseFloat(item.qty) - parseFloat(item.discount_amount || 0);
+                        return (
+                          <tr key={i} className="hover:bg-slate-50/50">
+                            <td className="px-5 py-3">
+                              <p className="font-medium text-slate-800">{item.product_name || item.name}</p>
+                              <p className="text-xs text-slate-400 font-mono">{item.sku}</p>
+                            </td>
+                            <td className="px-5 py-3 text-center text-slate-700">{parseFloat(item.qty)}</td>
+                            <td className="px-5 py-3 text-right text-slate-700">{formatCurrency(parseFloat(item.unit_price))}</td>
+                            <td className="px-5 py-3 text-right text-red-500">
+                              {parseFloat(item.discount_amount) > 0 ? `-${formatCurrency(parseFloat(item.discount_amount))}` : "—"}
+                            </td>
+                            <td className="px-5 py-3 text-right font-semibold text-slate-900">{formatCurrency(net)}</td>
+                            <td className="px-5 py-3 text-center">
+                              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                {parseFloat(item.commission_rate)}%
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-right font-bold text-emerald-600">{formatCurrency(parseFloat(item.commission_amount))}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {/* Footer tổng */}
+                  <div className="px-5 py-4 bg-slate-800 text-white flex items-center justify-between text-sm font-bold rounded-b-2xl">
+                    <div className="flex gap-6">
+                      <span className="text-slate-400 font-normal">Tổng tiền:</span>
+                      <span>{formatCurrency(orderPopup.total_amount)}</span>
+                    </div>
+                    <div className="flex gap-6">
+                      <span className="text-slate-400 font-normal">Hoa hồng:</span>
+                      <span className="text-emerald-400">{formatCurrency(orderPopup.commission_amount)}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Search, Calendar, Filter, ArrowRight, Loader2, AlertCircle } from "lucide-react";
-import { cn, formatCurrency } from "../lib/utils";
+import { useNavigate } from "react-router-dom";
+import { cn, formatCurrency, formatDate } from "../lib/utils";
 
 const API_BASE = "http://localhost:3000/api";
 
@@ -24,7 +25,8 @@ interface OrderSearchProps {
 }
 
 function OrderSearchBase({ title, description, type }: OrderSearchProps) {
-  const [orders, setOrders] = React.useState<Order[]>([]);
+  const navigate = useNavigate();
+  const [orders, setOrders] = React.useState<any[]>([]);
   const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -41,25 +43,26 @@ function OrderSearchBase({ title, description, type }: OrderSearchProps) {
 
   const buildQuery = React.useCallback(() => {
     const params = new URLSearchParams();
-    params.set("search", search);
+    if (search) params.set("search", search);
     if (status) params.set("status", status);
     params.set("page", String(page));
     params.set("limit", String(limit));
 
+    // API /orders nhận date_from/date_to (không phải startDate/endDate)
     if (type === "day") {
-      params.set("startDate", day);
-      params.set("endDate", day);
+      params.set("date_from", day);
+      params.set("date_to", day);
     } else if (type === "month") {
       const [y, m] = month.split("-");
       const lastDay = new Date(Number(y), Number(m), 0).getDate();
-      params.set("startDate", `${y}-${m}-01`);
-      params.set("endDate", `${y}-${m}-${String(lastDay).padStart(2, "0")}`);
+      params.set("date_from", `${y}-${m}-01`);
+      params.set("date_to", `${y}-${m}-${String(lastDay).padStart(2, "0")}`);
     } else if (type === "year") {
-      params.set("startDate", `${year}-01-01`);
-      params.set("endDate", `${year}-12-31`);
+      params.set("date_from", `${year}-01-01`);
+      params.set("date_to", `${year}-12-31`);
     } else if (type === "range") {
-      if (fromDate) params.set("startDate", fromDate);
-      if (toDate) params.set("endDate", toDate);
+      if (fromDate) params.set("date_from", fromDate);
+      if (toDate)   params.set("date_to", toDate);
     }
 
     return params.toString();
@@ -93,14 +96,12 @@ function OrderSearchBase({ title, description, type }: OrderSearchProps) {
     fetchOrders();
   };
 
-  const statusBadge = (s: string) =>
-    s === "Hoàn tất"
-      ? "bg-emerald-50 text-emerald-600"
-      : s === "Đang xử lý"
-        ? "bg-amber-50 text-amber-600"
-        : s === "Đang giao"
-          ? "bg-blue-50 text-blue-600"
-          : "bg-red-50 text-red-600";
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    pending:   { label: "Chờ duyệt", color: "bg-amber-50 text-amber-600" },
+    shipping:  { label: "Đang giao", color: "bg-blue-50 text-blue-600" },
+    completed: { label: "Đã giao",   color: "bg-emerald-50 text-emerald-600" },
+    cancelled: { label: "Đã hủy",   color: "bg-red-50 text-red-500" },
+  };
 
   return (
     <div className="space-y-8">
@@ -189,6 +190,18 @@ function OrderSearchBase({ title, description, type }: OrderSearchProps) {
               </>
             )}
 
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Trạng thái</label>
+              <select value={status} onChange={e => setStatus(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-2xl text-sm outline-none">
+                <option value="">Tất cả</option>
+                <option value="pending">Chờ duyệt</option>
+                <option value="shipping">Đang giao</option>
+                <option value="completed">Đã giao</option>
+                <option value="cancelled">Đã hủy</option>
+              </select>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -255,43 +268,46 @@ function OrderSearchBase({ title, description, type }: OrderSearchProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="hover:bg-slate-50/50 transition-all group"
-                    >
-                      <td className="px-8 py-5">
-                        <span className="text-sm font-mono font-bold text-blue-600">{order.id}</span>
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
-                            {order.customer.charAt(0)}
+                  {orders.map((order: any) => {
+                    const st = statusConfig[order.status] || { label: order.status, color: "bg-slate-100 text-slate-500" };
+                    return (
+                      <tr key={order.id}
+                        className="hover:bg-slate-50/50 transition-all group cursor-pointer"
+                        onClick={() => navigate(`/orders/edit/${order.id}`)}
+                      >
+                        <td className="px-8 py-5">
+                          <span className="text-sm font-mono font-bold text-blue-600">{order.code || `#${order.id}`}</span>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
+                              {(order.customer_name || "?").charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">{order.customer_name || "—"}</p>
+                              <p className="text-xs text-slate-400">{order.customer_phone || ""}</p>
+                            </div>
                           </div>
-                          <span className="text-sm font-bold text-slate-900">{order.customer}</span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5 text-sm text-slate-500">
-                        {order.date}
-                      </td>
-                      <td className="px-8 py-5 text-sm font-bold text-slate-900">
-                        {formatCurrency(order.total)}
-                      </td>
-                      <td className="px-8 py-5">
-                        <span className={cn(
-                          "text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full",
-                          statusBadge(order.status)
-                        )}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-right">
-                        <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-blue-600 transition-all">
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-8 py-5 text-sm text-slate-500">
+                          {order.created_at ? formatDate(order.created_at) : "—"}
+                        </td>
+                        <td className="px-8 py-5 text-sm font-bold text-slate-900">
+                          {formatCurrency(order.total_amount || 0)}
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className={cn("text-xs font-bold px-2.5 py-1 rounded-full", st.color)}>
+                            {st.label}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                          <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-blue-600 transition-all">
+                            <ArrowRight className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

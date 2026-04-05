@@ -5,6 +5,8 @@ const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
+
+
 router.get('/', auth, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
@@ -298,9 +300,9 @@ router.get('/:id/orders', auth, async (req, res, next) => {
     let countQuery = 'SELECT COUNT(*) as total FROM orders WHERE salesperson_id = ?';
     const params = [targetUserId];
 
-    if (status)    { query += ' AND o.status = ?';              countQuery += ' AND status = ?';              params.push(status); }
-    if (date_from) { query += ' AND DATE(o.created_at) >= ?';   countQuery += ' AND DATE(created_at) >= ?';   params.push(date_from); }
-    if (date_to)   { query += ' AND DATE(o.created_at) <= ?';   countQuery += ' AND DATE(created_at) <= ?';   params.push(date_to); }
+    if (status) { query += ' AND o.status = ?'; countQuery += ' AND status = ?'; params.push(status); }
+    if (date_from) { query += ' AND DATE(o.created_at) >= ?'; countQuery += ' AND DATE(created_at) >= ?'; params.push(date_from); }
+    if (date_to)   { query += ' AND DATE(o.created_at) <= ?'; countQuery += ' AND DATE(created_at) <= ?'; params.push(date_to); }
 
     query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
@@ -491,7 +493,7 @@ router.delete('/:id/collaborators/:collaboratorId', auth, async (req, res, next)
 
     const pool = await getPool();
     await pool.query(
-      'DELETE FROM user_collaborators WHERE user_id = ? AND collaborator_id = ?',
+      'DELETE FROM collaborators WHERE sales_id = ? AND ctv_id = ?',
       [req.params.id, req.params.collaboratorId]
     );
 

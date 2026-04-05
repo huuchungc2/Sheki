@@ -23,9 +23,12 @@ const paymentConfig: Record<string, { label: string; icon: any }> = {
   card:     { label: "Thẻ ATM",      icon: CreditCard },
 };
 
-// Helper: format YYYY-MM-DD
+// Helper: format YYYY-MM-DD theo local time (tránh lệch múi giờ UTC+7)
 function toDateStr(d: Date) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 type DatePreset = "today" | "week" | "month" | "last_month" | "last_year" | "custom" | "";
@@ -35,11 +38,12 @@ function getPresetRange(preset: DatePreset): { from: string; to: string } {
   const y = today.getFullYear();
   const m = today.getMonth();
   const d = today.getDate();
-  if (preset === "today")      return { from: toDateStr(today), to: toDateStr(today) };
+  if (preset === "today") return { from: toDateStr(today), to: toDateStr(today) };
   if (preset === "week") {
-    const day = today.getDay() || 7;
-    const mon = new Date(today); mon.setDate(d - day + 1);
-    const sun = new Date(today); sun.setDate(d - day + 7);
+    const dow = today.getDay(); // 0=CN, 1=T2...
+    const diffMon = dow === 0 ? -6 : 1 - dow; // T2 đầu tuần
+    const mon = new Date(y, m, d + diffMon);
+    const sun = new Date(y, m, d + diffMon + 6);
     return { from: toDateStr(mon), to: toDateStr(sun) };
   }
   if (preset === "month")      return { from: toDateStr(new Date(y, m, 1)),     to: toDateStr(new Date(y, m + 1, 0)) };

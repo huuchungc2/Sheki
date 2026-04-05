@@ -69,6 +69,12 @@
 - [x] OrderForm: Group selector + validate tồn kho realtime
 - [x] SalaryReport: filter theo nhóm
 
+### Phase 7: Verify & Fix các màn hình chưa test (06/04/2026)
+- [x] **CollaboratorsPage** - Sửa API GET/POST/DELETE dùng bảng `collaborators` thay vì `user_collaborators` (rỗng)
+- [x] **OrderSearch** - Sửa params `startDate/endDate` → `date_from/date_to`, fix statusConfig, thêm navigate click đơn, thêm filter trạng thái
+- [x] **InventoryImport/Export** - Sửa nhận `quantity/unit_price` (frontend) hoặc `qty/price` (API), fix stock_qty + available_stock đồng bộ, recalculate sau nhập/xuất
+- [x] **Login/Register** - Đã test OK, cả 2 hoạt động đúng
+
 ### Phase 6: Logic nghiệp vụ đúng theo LOGIC_BUSINESS.md (06/04/2026)
 - [x] **Fix HH CTV theo nhóm** - B lên đơn nhóm X → A chỉ nhận override nếu A thuộc nhóm X
 - [x] **Lưu override_rate tại thời điểm tạo đơn** - Thêm cột `commissions.override_rate`, không tra lại tier khi recalc

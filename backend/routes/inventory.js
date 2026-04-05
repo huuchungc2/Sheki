@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
+const { recalculateStock } = require('../services/orderService');
 
 router.get('/', auth, async (req, res, next) => {
   try {
@@ -63,8 +64,10 @@ router.post('/import', auth, authorize('admin'), async (req, res, next) => {
     const pool = await getPool();
 
     for (const item of items) {
-      const qty = parseFloat(item.qty);
-      const price = parseFloat(item.price);
+      // Frontend có thể gửi qty hoặc quantity, price hoặc unit_price
+      const qty = parseFloat(item.qty ?? item.quantity ?? 0);
+      const price = parseFloat(item.price ?? item.unit_price ?? 0);
+      if (!qty || qty <= 0) continue;
       const totalValue = qty * price;
 
       await pool.query(
@@ -74,11 +77,15 @@ router.post('/import', auth, authorize('admin'), async (req, res, next) => {
 
       if (status === 'completed' || !status) {
         await pool.query(
-          'UPDATE products SET stock_qty = stock_qty + ? WHERE id = ?',
-          [qty, item.product_id]
+          'UPDATE products SET stock_qty = stock_qty + ?, available_stock = available_stock + ? WHERE id = ?',
+          [qty, qty, item.product_id]
         );
       }
     }
+
+    // Recalculate available_stock sau nhập kho
+    const productIds = [...new Set(items.map(i => i.product_id))];
+    for (const pid of productIds) { await recalculateStock(pid); }
 
     res.status(201).json({ message: 'Nhập kho thành công' });
   } catch (err) {
@@ -97,15 +104,16 @@ router.post('/export', auth, authorize('admin'), async (req, res, next) => {
     const pool = await getPool();
 
     for (const item of items) {
-      const qty = parseFloat(item.qty);
-      const price = parseFloat(item.price);
+      const qty = parseFloat(item.qty ?? item.quantity ?? 0);
+      const price = parseFloat(item.price ?? item.unit_price ?? 0);
+      if (!qty || qty <= 0) continue;
       const totalValue = qty * price;
 
-      const [product] = await pool.query('SELECT stock_qty FROM products WHERE id = ?', [item.product_id]);
+      const [product] = await pool.query('SELECT stock_qty, available_stock FROM products WHERE id = ?', [item.product_id]);
       if (product.length === 0) {
         return res.status(404).json({ error: `Không tìm thấy sản phẩm ID: ${item.product_id}` });
       }
-      if (product[0].stock_qty < qty) {
+      if (parseFloat(product[0].available_stock) < qty) {
         return res.status(400).json({ error: `Số lượng tồn không đủ cho sản phẩm ${item.product_id}` });
       }
 
@@ -116,11 +124,14 @@ router.post('/export', auth, authorize('admin'), async (req, res, next) => {
 
       if (status === 'completed' || !status) {
         await pool.query(
-          'UPDATE products SET stock_qty = stock_qty - ? WHERE id = ?',
-          [qty, item.product_id]
+          'UPDATE products SET stock_qty = stock_qty - ?, available_stock = available_stock - ? WHERE id = ?',
+          [qty, qty, item.product_id]
         );
       }
     }
+
+    const productIds = [...new Set(items.map(i => i.product_id))];
+    for (const pid of productIds) { await recalculateStock(pid); }
 
     res.status(201).json({ message: 'Xuất kho thành công' });
   } catch (err) {

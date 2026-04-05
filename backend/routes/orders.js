@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+
+
 const auth = require('../middleware/auth');
 const { getPool } = require('../config/db');
 const {
@@ -68,7 +70,6 @@ router.get('/', auth, async (req, res, next) => {
       countQuery += ' AND DATE(created_at) >= ?';
       params.push(date_from);
     }
-
     if (date_to) {
       query += ' AND DATE(o.created_at) <= ?';
       countQuery += ' AND DATE(created_at) <= ?';
