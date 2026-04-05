@@ -7,18 +7,17 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **Implement real-time stock update**
-  - Tồn kho cập nhật ngay khi đơn hàng thay đổi status
-  - Files: `backend/routes/orders.js`, `backend/services/orderService.js`
+- [ ] **Deploy production**
+  - Setup VPS CentOS/Ubuntu
+  - Config Nginx, PM2, SSL
+  - Files: tạo mới `deploy.sh`, `nginx.conf`
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
-- [ ] **Deploy production**
-  - Setup VPS CentOS/Ubuntu
-  - Config Nginx, PM2, SSL
-  - Files: tạo mới `deploy.sh`, `nginx.conf`
+- [x] **Xuất Excel báo cáo hoa hồng** - Nút "Xuất báo cáo" trong CommissionReport thực sự export file
+- [ ] **Thông báo realtime** - Bell icon hiển thị số đơn mới, đơn thay đổi trạng thái
 
 ---
 
@@ -69,6 +68,22 @@
 - [x] Groups: bảng groups + user_groups, CRUD, gán NV
 - [x] OrderForm: Group selector + validate tồn kho realtime
 - [x] SalaryReport: filter theo nhóm
+
+### Phase 5: UX, Hoa hồng & Dashboard (05/04/2026)
+- [x] **Redesign bảng sản phẩm OrderForm** - Font gọn, cột đúng, qty +/- buttons, đơn giá gõ được, chiết khấu/hoa hồng chỉnh được, available_stock hiển thị, cảnh báo vượt tồn
+- [x] **OrderList nâng cấp** - Checkbox bulk action đổi trạng thái, date preset filter (hôm nay/tuần/tháng/năm), filter nhân viên (admin), mặc định lọc hôm nay
+- [x] **Fix logic kho hoàn chỉnh** - pending/shipping giữ reserved, completed trừ stock_qty thật, cancelled hoàn kho, delete order hoàn kho
+- [x] **Fix ENUM status orders** - Migration: bỏ draft/confirmed/done → chỉ còn pending/shipping/completed/cancelled
+- [x] **Fix logic hoa hồng override** - Tính % trên tổng tiền đơn (không phải HH của CTV), tra tier theo commission_rate của Sales quản lý
+- [x] **Dashboard Admin** - Doanh thu tháng/hôm nay/% so tháng trước, đơn theo trạng thái, top nhân viên, top sản phẩm, đơn gần đây
+- [x] **Dashboard Sales** - Doanh thu, HH bán hàng, HH từ CTV, đơn theo trạng thái, top sản phẩm, đơn gần đây
+- [x] **EmployeeDetail nâng cấp** - Date filter preset, 5 stat cards (HH bán hàng / HH từ CTV / Tổng HH / Số đơn / Doanh thu), fix statusConfig
+- [x] **CommissionReport nâng cấp** - 4 stat cards đúng (direct/override/tổng/số đơn), cột nhóm BH, filter nhóm, admin: bảng sum + tab HH CTV gộp chung
+- [x] **Màn hình HH CTV Sales** - Filter preset + nhóm, accordion từng CTV, chi tiết đơn per CTV, grand total
+- [x] **Màn hình HH CTV Admin** - Accordion 2 cấp Sales→CTV→Đơn, filter nhóm/sales/search, grand total
+- [x] **Fix bug HH CTV = 0** - Sửa params SQL bị lẫn targetUserId vào filter tháng/năm
+- [x] **Fix CommissionReport Sales** - type=direct only trong /commissions/orders, stat cards lấy override riêng từ CTV API
+- [x] **Gộp HH CTV vào báo cáo Admin** - Tab "Hoa hồng từ CTV" trong trang báo cáo hoa hồng, bỏ menu riêng
 
 ### Phase 4: Validation & Bug Fixes
 - [x] **Thêm validation đầy đủ cho tất cả form** - Required fields, inline errors, format check cho CustomerForm, ProductForm, EmployeeForm, OrderForm

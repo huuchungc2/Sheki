@@ -5,6 +5,7 @@ import {
   ChevronDown, Loader2, AlertCircle, Download, X
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
+import { exportCtvCommission } from "../lib/exportExcel";
 
 const API_URL = "http://localhost:3000/api";
 
@@ -137,8 +138,17 @@ export function CollaboratorsCommissionReport() {
             </p>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm">
-          <Download className="w-4 h-4" /> Xuất báo cáo
+        <button
+          onClick={() => exportCtvCommission({
+            summaryData,
+            orders,
+            totals,
+            userName: currentUser?.full_name || "NhanVien",
+            period: periodLabel,
+          })}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50">
+          <Download className="w-4 h-4" /> Xuất Excel
         </button>
       </div>
 

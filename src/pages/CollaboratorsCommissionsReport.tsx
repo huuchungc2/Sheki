@@ -5,6 +5,7 @@ import {
   Loader2, AlertCircle, Download, X, Search, TrendingUp
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
+import { exportAdminCommission } from "../lib/exportExcel";
 
 const API_URL = "http://localhost:3000/api";
 
@@ -149,8 +150,28 @@ export default function CollaboratorsCommissionsReport() {
           <h1 className="text-2xl font-bold text-slate-900">Báo cáo hoa hồng CTV toàn hệ thống</h1>
           <p className="text-slate-500 text-sm mt-0.5">{periodLabel} — Hoa hồng Sales nhận từ CTV của mình</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm">
-          <Download className="w-4 h-4" /> Xuất báo cáo
+        <button
+          onClick={() => {
+            const { month, year } = (() => {
+              const now = new Date(); const y = now.getFullYear(), m = now.getMonth() + 1;
+              if (preset === "month")      return { month: String(m).padStart(2,"0"), year: String(y) };
+              if (preset === "last_month") return { month: String(m===1?12:m-1).padStart(2,"0"), year: String(m===1?y-1:y) };
+              if (preset === "year")       return { month: "00", year: String(y) };
+              return { month: "00", year: String(y) };
+            })();
+            exportAdminCommission({
+              salesData: [],
+              orderCommissions: [],
+              ctvPairs:  pairs,
+              ctvOrders: orders,
+              month,
+              year,
+              groupName: groups.find(g => String(g.id) === groupId)?.name || "",
+            });
+          }}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50">
+          <Download className="w-4 h-4" /> Xuất Excel
         </button>
       </div>
 

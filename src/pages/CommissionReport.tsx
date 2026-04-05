@@ -5,6 +5,7 @@ import {
   Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown
 } from "lucide-react";
 import { formatCurrency, formatDate, cn } from "../lib/utils";
+import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel";
 
 const API_URL = "http://localhost:3000/api";
 
@@ -124,6 +125,30 @@ export function CommissionReport() {
 
   React.useEffect(() => { fetchReport(); }, [fetchReport]);
 
+  const handleExport = () => {
+    const groupName = groups.find(g => String(g.id) === groupId)?.name || "";
+    if (isAdmin) {
+      exportAdminCommission({
+        salesData,
+        orderCommissions,
+        ctvPairs,
+        ctvOrders,
+        month,
+        year,
+        groupName,
+      });
+    } else {
+      exportSalesCommission({
+        orders: orderCommissions,
+        summary,
+        userName: currentUser?.full_name || "NhanVien",
+        month,
+        year,
+        groupName,
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -171,8 +196,11 @@ export function CommissionReport() {
             className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm">
-            <Download className="w-4 h-4" /> Xuất báo cáo
+          <button
+            onClick={handleExport}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50">
+            <Download className="w-4 h-4" /> Xuất Excel
           </button>
         </div>
       </div>

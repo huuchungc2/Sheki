@@ -1,5 +1,64 @@
 # CHANGELOG
 
+## [05/04/2026] - Xuất Excel báo cáo hoa hồng
+### Added
+- **exportExcel.ts** - Thư viện export 3 loại: `exportSalesCommission` (Sales: chi tiết đơn + tổng kết), `exportAdminCommission` (Admin: tổng hợp NV + chi tiết đơn + HH CTV, 3 sheet), `exportCtvCommission` (HH từ CTV: tổng hợp + chi tiết đơn) - Files: `src/lib/exportExcel.ts`
+- **Nút "Xuất Excel" CommissionReport** - Admin xuất 3 sheet (Tổng hợp NV / Chi tiết đơn / HH từ CTV), Sales xuất 2 sheet (Chi tiết đơn / Tổng kết) - Files: `src/pages/CommissionReport.tsx`
+- **Nút "Xuất Excel" CollaboratorsCommissionReport** - Sales xuất 2 sheet (Tổng hợp CTV / Chi tiết đơn) - Files: `src/pages/CollaboratorsCommissionReport.tsx`
+- **Nút "Xuất Excel" CollaboratorsCommissionsReport** - Admin xuất sheet HH CTV toàn hệ thống - Files: `src/pages/CollaboratorsCommissionsReport.tsx`
+- **xlsx dependency** - Cài thư viện `xlsx` cho frontend
+
+## [05/04/2026] - Gộp báo cáo HH CTV vào trang báo cáo Admin + Fix HH Sales
+### Added
+- **CommissionReport tab HH CTV** - Admin thấy 2 tab: "Hoa hồng nhân viên" + "Hoa hồng từ CTV" (accordion Sales→CTV→Đơn, grand total) - Files: `src/pages/CommissionReport.tsx`
+- **fetch song song** - Promise.all salary + CTV cùng lúc khi admin load - Files: `src/pages/CommissionReport.tsx`
+### Fixed
+- **CommissionReport Sales stat cards = 0** - Gọi thêm API `/users/:id/collaborators/commissions` để lấy override_commission cho stat cards - Files: `src/pages/CommissionReport.tsx`
+- **CommissionReport Sales bảng chi tiết hiện đơn override** - `/commissions/orders` thêm điều kiện `c.type='direct'` khi role=sales - Files: `backend/routes/commissions.js`
+### Removed
+- **Menu "Hoa hồng từ CTV" riêng lẻ** trong Admin nav - Files: `src/components/Layout.tsx`
+
+## [05/04/2026] - Màn hình HH CTV (Sales + Admin) + Fix params SQL
+### Added
+- **CollaboratorsCommissionReport** - Sales: filter preset+nhóm, accordion CTV, chi tiết đơn, grand total - Files: `src/pages/CollaboratorsCommissionReport.tsx`
+- **CollaboratorsCommissionsReport** - Admin: accordion 2 cấp Sales→CTV→Đơn, filter nhóm/sales/search - Files: `src/pages/CollaboratorsCommissionsReport.tsx`
+- **CtvCommissionRoute** - Tự phân biệt Admin/Sales khi vào `/reports/commissions/ctv` - Files: `src/App.tsx`
+### Fixed
+- **HH CTV = 0** - params SQL bị lẫn targetUserId vào đầu filter tháng/năm → MONTH() nhận sai giá trị - Files: `backend/routes/users.js`, `backend/routes/collaborators.js`
+- **Lan hiển thị HH CTV sai** - Route dùng màn hình Admin cho cả Sales → Lan thấy toàn hệ thống. Fix: tách route theo role - Files: `src/App.tsx`
+
+## [05/04/2026] - Dashboard Admin + Sales hoàn chỉnh
+### Added
+- **Dashboard Admin** - Doanh thu tháng/hôm nay/% so tháng trước, 4 box trạng thái đơn, top 5 nhân viên, top 5 sản phẩm chart, đơn gần đây - Files: `src/pages/Dashboard.tsx`
+- **Dashboard Sales** - Doanh thu, HH bán hàng, HH từ CTV, số đơn, 4 box trạng thái, top sản phẩm chart, đơn gần đây - Files: `src/pages/Dashboard.tsx`
+- **Backend /reports/dashboard nâng cấp** - Tháng này/tháng trước/hôm nay, byStatus, commission tách direct/override, topSales (admin), topProducts, recentOrders đủ thông tin - Files: `backend/routes/reports.js`
+
+## [05/04/2026] - CommissionReport nâng cấp + EmployeeDetail date filter
+### Added
+- **CommissionReport 4 stat cards** - HH bán hàng (direct) / HH từ CTV (override) / Tổng HH / Số đơn - Files: `src/pages/CommissionReport.tsx`
+- **CommissionReport filter nhóm** - Sales lấy nhóm của mình, Admin lấy tất cả - Files: `src/pages/CommissionReport.tsx`
+- **CommissionReport cột Nhóm BH** - Hiển thị nhóm bán hàng trong bảng chi tiết đơn - Files: `src/pages/CommissionReport.tsx`
+- **CommissionReport Admin bảng sum** - Footer tổng cộng tất cả cột - Files: `src/pages/CommissionReport.tsx`
+- **EmployeeDetail date filter** - Preset (Tất cả/Hôm nay/Tuần/Tháng/Tháng trước/Năm trước/Tuỳ chọn), 5 stat cards - Files: `src/pages/EmployeeDetail.tsx`
+- **Backend /:id/overview filter date** - month/year params, tách direct/override commission - Files: `backend/routes/users.js`
+- **Backend /commissions/orders nâng cấp** - Thêm group_id filter, group_name, customer_name, summary tách direct/override - Files: `backend/routes/commissions.js`
+
+## [05/04/2026] - OrderList nâng cấp + Fix trạng thái đơn
+### Added
+- **OrderList checkbox bulk action** - Check all/từng dòng, đổi trạng thái nhiều đơn - Files: `src/pages/OrderList.tsx`
+- **OrderList date preset** - Hôm nay/Tuần/Tháng/Tháng trước/Năm trước/Tuỳ chọn, mặc định hôm nay - Files: `src/pages/OrderList.tsx`
+- **OrderList filter nhân viên** - Admin thấy dropdown + cột nhân viên - Files: `src/pages/OrderList.tsx`
+- **Backend /orders date_from/date_to** - Filter theo khoảng ngày - Files: `backend/routes/orders.js`
+### Fixed
+- **Status đơn rỗng** - DB migrate: đơn status='' → pending - DB
+### Removed
+- **Status draft/confirmed/done** - Bỏ khỏi statusConfig, chỉ còn pending/shipping/completed/cancelled
+
+## [05/04/2026] - Redesign bảng sản phẩm OrderForm
+### Changed
+- **Bảng sản phẩm OrderForm** - Font xs, padding gọn, qty input +/- buttons (step 0.1), đơn giá input gõ được (transparent border), chiết khấu % input, hoa hồng % chỉnh được, available_stock hiển thị dưới SKU, row đỏ khi vượt tồn, empty state, tfoot sum - Files: `src/pages/OrderForm.tsx`
+- **Group selector** - Sales chỉ load nhóm của mình, Admin load tất cả - Files: `src/pages/OrderForm.tsx`
+
 ## [05/04/2026] - Fix logic hoa hồng override từ CTV + Tổng quan nhân viên
 ### Fixed
 - **calculateOverrideCommissions** - Sửa đúng theo LOGIC_BUSINESS.md: override tính % trên TỔNG TIỀN ĐƠN (không phải trên hoa hồng CTV). Tra tier theo commission_rate của SALES (người quản lý), không phải CTV - Files: `backend/services/orderService.js`
