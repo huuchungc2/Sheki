@@ -22,6 +22,7 @@ import { BulkImport } from "./pages/BulkImport";
 import { InventoryHistory } from "./pages/InventoryHistory";
 import { InventoryImport } from "./pages/InventoryImport";
 import { InventoryExport } from "./pages/InventoryExport";
+import { Warehouses } from "./pages/Warehouses";
 import { ActivityLog } from "./pages/ActivityLog";
 import { CommissionDetail } from "./pages/CommissionDetail";
 import { OrderCommissionDetail } from "./pages/OrderCommissionDetail";
@@ -127,6 +128,7 @@ export default function App() {
                   <Route path="/inventory" element={<AdminRoute><InventoryHistory /></AdminRoute>} />
                   <Route path="/inventory/import" element={<AdminRoute><InventoryImport /></AdminRoute>} />
                   <Route path="/inventory/export" element={<AdminRoute><InventoryExport /></AdminRoute>} />
+                  <Route path="/warehouses" element={<AdminRoute><Warehouses /></AdminRoute>} />
                   <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                   <Route path="/logs" element={<AdminRoute><ActivityLog /></AdminRoute>} />
                   <Route path="/change-password" element={<ChangePassword />} />

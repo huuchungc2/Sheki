@@ -38,6 +38,8 @@ interface ProductData {
   name: string;
   sku: string;
   unit: string;
+  price?: number;
+  cost_price?: number;
 }
 
 interface FormItem {
@@ -53,7 +55,6 @@ interface FormItem {
 export function InventoryImport() {
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = React.useState<WarehouseData[]>([]);
-  const [products, setProducts] = React.useState<ProductData[]>([]);
   const [loadingData, setLoadingData] = React.useState(true);
   const [dataError, setDataError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
@@ -66,20 +67,34 @@ export function InventoryImport() {
     { id: 1, product_id: "", name: "", sku: "", unit: "", quantity: 1, price: 0 },
   ]);
 
+  // Product search (giống OrderForm)
+  const [productQuery, setProductQuery] = React.useState("");
+  const [productSuggestions, setProductSuggestions] = React.useState<ProductData[]>([]);
+  const [showProductSuggestions, setShowProductSuggestions] = React.useState(false);
+  const productBoxRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!showProductSuggestions) return;
+    const onDown = (e: MouseEvent) => {
+      const el = productBoxRef.current;
+      if (!el) return;
+      if (e.target instanceof Node && !el.contains(e.target)) setShowProductSuggestions(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [showProductSuggestions]);
+
   React.useEffect(() => {
     async function fetchData() {
       setLoadingData(true);
       setDataError(null);
       try {
-        const [whRes, prodRes] = await Promise.all([
+        const [whRes] = await Promise.all([
           fetch(`${API_BASE}/warehouses`, { headers: getAuthHeaders() }),
-          fetch(`${API_BASE}/products`, { headers: getAuthHeaders() }),
         ]);
-        if (!whRes.ok || !prodRes.ok) throw new Error("Failed to load data");
+        if (!whRes.ok) throw new Error("Failed to load data");
         const whJson = await whRes.json();
-        const prodJson = await prodRes.json();
         setWarehouses(whJson.data || []);
-        setProducts(prodJson.data || []);
         if (whJson.data?.length > 0) setWarehouseId(whJson.data[0].id);
       } catch (e: any) {
         setDataError(e.message);
@@ -90,6 +105,39 @@ export function InventoryImport() {
     fetchData();
   }, []);
 
+  React.useEffect(() => {
+    if (!productQuery.trim()) {
+      setProductSuggestions([]);
+      return;
+    }
+    const t = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          search: productQuery.trim(),
+          limit: "20",
+          page: "1",
+        });
+        const res = await fetch(`${API_BASE}/products?${params.toString()}`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const json = await res.json();
+        const data = Array.isArray(json?.data) ? json.data : [];
+        setProductSuggestions(
+          data.map((p: any) => ({
+            id: String(p.id),
+            name: String(p.name ?? ""),
+            sku: String(p.sku ?? ""),
+            unit: String(p.unit ?? ""),
+            price: p.price !== undefined ? Number(p.price) : undefined,
+            cost_price: p.cost_price !== undefined ? Number(p.cost_price) : undefined,
+          }))
+        );
+      } catch {
+        // ignore
+      }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [productQuery]);
+
   const total = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
 
   const addItem = () => {
@@ -97,6 +145,35 @@ export function InventoryImport() {
       ...prev,
       { id: Date.now(), product_id: "", name: "", sku: "", unit: "", quantity: 1, price: 0 },
     ]);
+  };
+
+  const addProduct = (product: ProductData) => {
+    setItems((prev) => {
+      const existing = prev.find((i) => String(i.product_id) === String(product.id));
+      if (existing) {
+        return prev.map((i) =>
+          String(i.product_id) === String(product.id)
+            ? { ...i, quantity: Number((i.quantity + 1).toFixed(3)) }
+            : i
+        );
+      }
+      const defaultPrice = Number(product.cost_price ?? product.price ?? 0) || 0;
+      return [
+        ...prev.filter((i) => i.product_id || prev.length > 1), // tránh giữ row trống đầu tiên
+        {
+          id: Date.now(),
+          product_id: product.id,
+          name: product.name,
+          sku: product.sku,
+          unit: product.unit,
+          quantity: 1,
+          price: defaultPrice,
+        },
+      ];
+    });
+    setProductQuery("");
+    setProductSuggestions([]);
+    setShowProductSuggestions(false);
   };
 
   const removeItem = (id: number) => {
@@ -108,14 +185,6 @@ export function InventoryImport() {
       prev.map((item) => {
         if (item.id !== id) return item;
         const updated = { ...item, [field]: value };
-        if (field === "product_id") {
-          const product = products.find((p) => p.id === value);
-          if (product) {
-            updated.name = product.name;
-            updated.sku = product.sku;
-            updated.unit = product.unit;
-          }
-        }
         return updated;
       })
     );
@@ -223,13 +292,64 @@ export function InventoryImport() {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-900">Danh sách sản phẩm nhập</h2>
-              <button 
-                onClick={addItem}
-                className="flex items-center gap-2 text-blue-600 text-sm font-bold hover:text-blue-700 transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                Thêm sản phẩm
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={addItem}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-sm font-bold transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  Thêm dòng
+                </button>
+              </div>
+            </div>
+
+            {/* Product quick add */}
+            <div className="p-6 border-b border-slate-100">
+              <div className="relative" ref={productBoxRef}>
+                <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={productQuery}
+                  onChange={(e) => {
+                    setProductQuery(e.target.value);
+                    setShowProductSuggestions(e.target.value.trim().length > 0);
+                  }}
+                  onFocus={() => productQuery.trim().length > 0 && setShowProductSuggestions(true)}
+                  placeholder="Tìm sản phẩm theo tên hoặc SKU để thêm nhanh..."
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm outline-none transition-all"
+                />
+
+                {showProductSuggestions && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50">
+                    <div className="max-h-64 overflow-y-auto">
+                      {productSuggestions.length > 0 ? (
+                        productSuggestions.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => addProduct(p)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
+                              <p className="text-[11px] text-slate-400 font-mono uppercase tracking-wide">{p.sku} • {p.unit}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-sm font-bold text-slate-900">
+                                {formatCurrency(Number(p.cost_price ?? p.price ?? 0) || 0)}
+                              </p>
+                              <p className="text-[10px] text-slate-400">Thêm</p>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-8 text-center text-slate-400 text-sm">
+                          Không tìm thấy sản phẩm
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="overflow-x-auto">
@@ -247,18 +367,13 @@ export function InventoryImport() {
                   {items.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/30 transition-all group">
                       <td className="px-6 py-4">
-                        <select
-                          value={item.product_id}
-                          onChange={(e) => updateItem(item.id, "product_id", e.target.value)}
-                          className="w-full px-2 py-1 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-lg text-sm transition-all outline-none"
-                        >
-                          <option value="">Chọn sản phẩm</option>
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                          ))}
-                        </select>
-                        {item.name && (
-                          <p className="text-xs text-slate-500 font-mono mt-1">{item.sku} • {item.unit}</p>
+                        {item.product_id ? (
+                          <>
+                            <p className="text-sm font-bold text-slate-900">{item.name}</p>
+                            <p className="text-xs text-slate-500 font-mono mt-1">{item.sku} • {item.unit}</p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-slate-400">Chưa chọn sản phẩm (dùng ô tìm kiếm phía trên)</p>
                         )}
                       </td>
                       <td className="px-6 py-4">

@@ -66,8 +66,6 @@ export function OrderForm() {
     setShowCustomerSuggestions(false);
   };
 
-  // Product data now sourced from DB; mock data removed
-
   const addProduct = (product: any) => {
     const existing = items.find(i => i.productId === product.id);
     if (existing) {
@@ -102,19 +100,51 @@ export function OrderForm() {
   const [selectedGroupId, setSelectedGroupId] = React.useState<number | null>(null);
   const [groups, setGroups] = React.useState<any[]>([]);
 
-  // Fetch groups — chỉ lấy nhóm của nhân viên đang login
+  // Warehouse state
+  const [selectedWarehouseId, setSelectedWarehouseId] = React.useState<number | null>(null);
+  const [warehouses, setWarehouses] = React.useState<any[]>([]);
+
+  // Fetch danh sách kho
+  React.useEffect(() => {
+    api.get('/warehouses').then((res: any) => {
+      const data = res?.data ?? res ?? [];
+      setWarehouses(Array.isArray(data) ? data : []);
+    }).catch(() => setWarehouses([]));
+  }, []);
+
+  // Khi chọn kho → sync available_stock theo kho
+  React.useEffect(() => {
+    if (!selectedWarehouseId || items.length === 0) return;
+    (async () => {
+      try {
+        const res: any = await api.get(`/inventory/stock-by-warehouse?warehouse_id=${selectedWarehouseId}`);
+        const stockData = res?.data ?? [];
+        setItems(prev => {
+          let changed = false;
+          const next = prev.map(item => {
+            const ws = stockData.find((s: any) => String(s.product_id) === String(item.productId));
+            const nextAvailable = ws ? Number(ws.available_stock) : 0;
+            if (Number((item as any).availableStock ?? 0) !== nextAvailable) changed = true;
+            return { ...item, availableStock: nextAvailable };
+          });
+          return changed ? next : prev;
+        });
+      } catch {}
+    })();
+  }, [selectedWarehouseId, items.map(i => i.productId).join(',')]);
+
+  // Fetch groups
   React.useEffect(() => {
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
     if (!user?.id) return;
-    // Admin xem tất cả nhóm, sales chỉ xem nhóm của mình
     const endpoint = user.role === 'admin' ? '/groups' : `/groups/user/${user.id}`;
     api.get(endpoint).then((res: any) => {
       setGroups(res?.data ?? []);
     }).catch(() => setGroups([]));
   }, []);
 
-  // Product suggestions (DB-backed)
+  // Product suggestions
   const [productQuery, setProductQuery] = React.useState("");
   const [productSuggestions, setProductSuggestions] = React.useState<any[]>([]);
   const fetchProductSuggestions = async (q: string) => {
@@ -128,14 +158,13 @@ export function OrderForm() {
     }
   };
 
-  // Load existing order data when editing
+  // Load existing order khi edit
   React.useEffect(() => {
     if (!id) return;
     (async () => {
       try {
         const res: any = await api.get(`/orders/${id}`);
         const order = res?.data ?? res;
-        // Customer
         const cust = {
           id: order?.customer_id ?? order?.customerId ?? '',
           name: order?.customer_name ?? order?.customerName ?? '',
@@ -145,7 +174,6 @@ export function OrderForm() {
         setSelectedCustomer(cust as any);
         setCustomerQuery(cust.name);
 
-        // Items
         const itemsData = (order?.items ?? []).map((it: any) => ({
           productId: it.product_id ?? it.productId ?? '',
           productName: it.product_name ?? it.productName ?? '',
@@ -166,6 +194,7 @@ export function OrderForm() {
         setPaymentMethod(order?.payment_method ?? 'cash');
         setOrderStatus(order?.status ?? 'pending');
         setSelectedGroupId(order?.group_id ?? null);
+        setSelectedWarehouseId(order?.warehouse_id ?? null);
         setNote(order?.note ?? '');
       } catch (e) {
         console.error('Load order error', e);
@@ -173,13 +202,17 @@ export function OrderForm() {
     })();
   }, [id]);
 
-  // Submit order to backend
+  // Submit
   const submitOrder = async () => {
     setFormError("");
 
-    // Validation
     if (!selectedCustomer?.id) {
       setFormError('Vui lòng chọn khách hàng');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!selectedWarehouseId) {
+      setFormError('Vui lòng chọn kho xuất hàng');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -223,7 +256,7 @@ export function OrderForm() {
     }));
     const payload: any = {
       customer_id: selectedCustomer.id,
-      warehouse_id: 1,
+      warehouse_id: selectedWarehouseId,
       group_id: selectedGroupId,
       shipping_address: shippingAddr,
       carrier_service: 'standard',
@@ -252,60 +285,8 @@ export function OrderForm() {
     }
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
-    setItems(items.map(item => {
-      if (item.productId === productId) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { 
-          ...item, 
-          quantity: newQty,
-          commissionAmount: (item.price * newQty - item.discountAmount) * (item.commissionRate / 100)
-        };
-      }
-      return item;
-    }));
-  };
-
   const removeItem = (productId: string) => {
     setItems(items.filter(item => item.productId !== productId));
-  };
-
-  const updateDiscount = (productId: string, rate: number) => {
-    setItems(items.map(item => {
-      if (item.productId === productId) {
-        const discountAmount = (item.price * item.quantity) * (rate / 100);
-        return { 
-          ...item, 
-          discountRate: rate,
-          discountAmount,
-          commissionAmount: (item.price * item.quantity - discountAmount) * (item.commissionRate / 100)
-        };
-      }
-      return item;
-    }));
-  };
-
-  const updateCommission = (productId: string, rate: number) => {
-    setItems(items.map(item => {
-      if (item.productId === productId) {
-        return { 
-          ...item, 
-          commissionRate: rate,
-          commissionAmount: (item.price * item.quantity - item.discountAmount) * (rate / 100)
-        };
-      }
-      return item;
-    }));
-  };
-
-  // Helper: ensure odd integer >= 1
-  const clampToOdd = (n: number) => {
-    let v = Math.floor(n);
-    if (!Number.isFinite(v)) v = 1;
-    if (v < 1) v = 1;
-    if (v % 2 === 0) v = v - 1 >= 1 ? v - 1 : 1;
-    // ensure odd
-    return v;
   };
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.price - item.discountAmount), 0);
@@ -313,86 +294,122 @@ export function OrderForm() {
   const total = Math.max(0, subtotal + shippingFee + tax - orderDiscount);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-20">
+    <div className="max-w-6xl mx-auto pb-20">
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <button 
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <button
             onClick={() => navigate(-1)}
-            className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-red-600 hover:border-red-100 transition-all shadow-sm"
+            className="w-8 h-8 flex items-center justify-center border border-slate-200 rounded-lg text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-all"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-              {isEdit ? `Chỉnh sửa #${id}` : "Tạo đơn hàng mới"}
+            <h1 className="text-lg font-semibold text-slate-900">
+              {isEdit ? `Chỉnh sửa đơn #${id}` : 'Tạo đơn hàng mới'}
             </h1>
-            <p className="text-slate-400 text-sm font-medium">
-              {isEdit ? "Cập nhật thông tin đơn hàng và trạng thái vận chuyển." : "Thiết lập đơn hàng mới và chỉ định nhân viên phụ trách."}
+            <p className="text-xs text-slate-400">
+              {isEdit ? 'Cập nhật thông tin đơn hàng và trạng thái vận chuyển.' : 'Thiết lập đơn hàng và chỉ định nhân viên phụ trách.'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate(-1)} className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
-            Hủy bỏ
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-slate-50 transition-all"
+          >
+            Hủy
           </button>
-          <button type="button" onClick={submitOrder} className="flex items-center gap-2 px-8 py-3 bg-red-600 text-white rounded-2xl text-sm font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/20">
-            <Save className="w-5 h-5" />
-            {isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}
+          <button
+            type="button"
+            onClick={submitOrder}
+            className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
+          >
+            <Save className="w-4 h-4" />
+            {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
           </button>
         </div>
       </div>
 
-      {/* Form error banner */}
+      {/* Error banner */}
       {formError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl text-sm flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-          <span className="font-bold">{formError}</span>
+        <div className="flex items-center gap-3 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span className="font-medium">{formError}</span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Customer & Products */}
-        <div className="lg:col-span-8 space-y-8">
-          
-          {/* Customer Selection */}
-          <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-slate-900 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-red-600">
-                  <User className="w-5 h-5" />
-                </div>
-                Thông tin khách hàng
-              </h2>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+
+        {/* LEFT COLUMN */}
+        <div className="flex flex-col gap-4">
+
+          {/* Card: Khách hàng */}
+          <div className="bg-white border border-slate-100 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center">
+                <User className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Thông tin khách hàng</span>
             </div>
 
-            {/* Group selector */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                NHÓM BÁN HÀNG <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={selectedGroupId ?? ""}
-                onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
-                className={cn(
-                  "w-full px-5 py-3 bg-slate-50 border rounded-[24px] text-sm font-bold transition-all outline-none",
-                  !selectedGroupId ? "border-amber-300 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10" : "border-transparent focus:border-red-200 focus:ring-4 focus:ring-red-500/5"
-                )}
-              >
-                <option value="">-- Chọn nhóm bán hàng --</option>
-                {groups.map((g: any) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
+            {/* Kho + Nhóm — 2 cột */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-[11px] text-slate-400 mb-1 flex items-center gap-1">
+                  Kho xuất hàng
+                  <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
+                </label>
+                <select
+                  value={selectedWarehouseId ?? ""}
+                  onChange={(e) => setSelectedWarehouseId(e.target.value ? Number(e.target.value) : null)}
+                  className={cn(
+                    "w-full px-3 py-2 border rounded-lg text-sm outline-none transition-all bg-white",
+                    !selectedWarehouseId
+                      ? "border-amber-300 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                      : "border-slate-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                  )}
+                >
+                  <option value="">— Chọn kho xuất hàng —</option>
+                  {warehouses.filter((w: any) => w.is_active).map((w: any) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-400 mb-1 flex items-center gap-1">
+                  Nhóm bán hàng
+                  <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
+                </label>
+                <select
+                  value={selectedGroupId ?? ""}
+                  onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
+                  className={cn(
+                    "w-full px-3 py-2 border rounded-lg text-sm outline-none transition-all bg-white",
+                    !selectedGroupId
+                      ? "border-amber-300 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                      : "border-slate-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                  )}
+                >
+                  <option value="">— Chọn nhóm bán hàng —</option>
+                  {groups.map((g: any) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4">
+            {/* Tìm khách hàng + Địa chỉ — 2 cột */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] text-slate-400 mb-1 block">Tìm khách hàng</label>
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                  <input 
-                    type="text" 
-                    placeholder="Tìm theo tên hoặc SĐT..." 
+                  <Search className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên hoặc SĐT..."
                     value={customerQuery}
                     onChange={(e) => {
                       setCustomerQuery(e.target.value);
@@ -400,76 +417,77 @@ export function OrderForm() {
                       fetchCustomerSuggestions(e.target.value);
                     }}
                     onFocus={() => customerQuery.length > 0 && setShowCustomerSuggestions(true)}
-                    className="w-full px-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
+                    className="w-full pr-9 pl-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all"
                   />
                   {showCustomerSuggestions && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-2xl z-50 overflow-hidden">
-                      <div className="max-h-60 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-lg shadow-lg z-50 overflow-hidden">
+                      <div className="max-h-52 overflow-y-auto">
                         {customerSuggestions.length > 0 ? (
                           customerSuggestions.map(customer => (
                             <button
                               key={customer.id}
                               onClick={() => selectCustomer(customer)}
-                              className="w-full px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                              className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
                             >
-                              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
-                                {(customer.name || '').split(' ').map((n: string) => n[0]).slice(0,2).join('')}
+                              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-[11px] font-semibold text-blue-600 flex-shrink-0">
+                                {(customer.name || '').split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
                               </div>
                               <div>
-                                <p className="text-sm font-black text-slate-900">{customer.name}</p>
-                                <p className="text-[10px] font-bold text-slate-400">{customer.phone || ''}</p>
+                                <p className="text-sm font-medium text-slate-800">{customer.name}</p>
+                                <p className="text-[11px] text-slate-400">{customer.phone || ''}</p>
                               </div>
                             </button>
                           ))
                         ) : (
-                          <div className="px-6 py-8 text-center text-slate-400 text-sm font-bold">Không tìm thấy khách hàng</div>
+                          <div className="px-4 py-6 text-center text-slate-400 text-sm">Không tìm thấy khách hàng</div>
                         )}
                       </div>
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-[24px] border border-slate-100">
-                  <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-xl font-black text-slate-300">
-                    {selectedCustomer?.name ? selectedCustomer.name.split(' ').map(n => n[0]).slice(0,2).join('') : ''}
+                {selectedCustomer && (
+                  <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                    <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-semibold text-blue-600 flex-shrink-0">
+                      {selectedCustomer.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('') || '?'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">{selectedCustomer.name || 'Chưa chọn'}</p>
+                      <p className="text-[11px] text-slate-400">{selectedCustomer.phone || ''}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-base font-black text-slate-900">{selectedCustomer?.name || 'Chưa chọn'}</p>
-                    <p className="text-sm font-bold text-slate-400">{selectedCustomer?.phone || ''}</p>
-                  </div>
-                </div>
+                )}
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ĐỊA CHỈ GIAO HÀNG</label>
-                  <div className="relative">
-                    <MapPin className="w-4 h-4 absolute left-4 top-4 text-slate-300" />
-                    <textarea 
-                      placeholder="Nhập địa chỉ chi tiết..." 
-                      value={selectedCustomer?.address ?? ''}
-                      onChange={(e) => setSelectedCustomer(prev => prev ? { ...prev, address: e.target.value } : prev)}
-                      className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-[24px] text-sm transition-all outline-none font-medium min-h-[100px] resize-none"
-                    />
-                  </div>
+              <div>
+                <label className="text-[11px] text-slate-400 mb-1 block">Địa chỉ giao hàng</label>
+                <div className="relative">
+                  <MapPin className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-300" />
+                  <textarea
+                    placeholder="Nhập địa chỉ chi tiết..."
+                    value={selectedCustomer?.address ?? ''}
+                    onChange={(e) => setSelectedCustomer((prev: any) => prev ? { ...prev, address: e.target.value } : prev)}
+                    className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all resize-none"
+                    rows={3}
+                  />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Product Selection */}
-          <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h2 className="text-xl font-black text-slate-900 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
-                  <Package className="w-5 h-5" />
+          {/* Card: Sản phẩm */}
+          <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-green-50 flex items-center justify-center">
+                  <Package className="w-3.5 h-3.5 text-green-600" />
                 </div>
-                Danh sách sản phẩm
-              </h2>
-              <div className="relative w-full md:w-80">
-                <Search className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input 
-                  type="text" 
-                  placeholder="Tìm sản phẩm, SKU..." 
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Danh sách sản phẩm</span>
+              </div>
+              <div className="relative w-56">
+                <Search className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                <input
+                  type="text"
+                  placeholder="Tìm sản phẩm, SKU..."
                   value={productQuery}
                   onChange={(e) => {
                     setProductQuery(e.target.value);
@@ -477,34 +495,30 @@ export function OrderForm() {
                     fetchProductSuggestions(e.target.value);
                   }}
                   onFocus={() => productQuery.length > 0 && setShowResults(true)}
-                  className="w-full px-5 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-2xl text-sm transition-all outline-none font-medium"
+                  className="w-full pr-9 pl-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all"
                 />
-
                 {showResults && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-2xl z-50 overflow-hidden">
-                    <div className="max-h-60 overflow-y-auto">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-lg shadow-lg z-50 overflow-hidden">
+                    <div className="max-h-52 overflow-y-auto">
                       {productSuggestions.length > 0 ? (
                         productSuggestions.map(product => (
                           <button
                             key={product.id}
                             onClick={() => addProduct(product)}
-                            className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
                           >
                             <div>
-                              <p className="text-sm font-black text-slate-900">{product.name}</p>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{product.sku}</p>
+                              <p className="text-sm font-medium text-slate-800">{product.name}</p>
+                              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono">{product.sku}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm font-black text-slate-900">{formatCurrency(product.price)}</p>
-                              <p className="text-[10px] font-bold text-slate-400">Chọn để thêm</p>
+                              <p className="text-sm font-medium text-slate-800">{formatCurrency(product.price)}</p>
+                              <p className="text-[10px] text-slate-400">Thêm</p>
                             </div>
                           </button>
                         ))
                       ) : (
-                        <div className="px-6 py-8 text-center">
-                          <Package className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                          <p className="text-sm font-bold text-slate-400">Không tìm thấy sản phẩm</p>
-                        </div>
+                        <div className="px-4 py-6 text-center text-slate-400 text-sm">Không tìm thấy sản phẩm</div>
                       )}
                     </div>
                   </div>
@@ -514,21 +528,30 @@ export function OrderForm() {
 
             {items.length === 0 ? (
               <div className="py-12 text-center text-slate-400">
-                <Package className="w-8 h-8 mx-auto mb-2 text-slate-200" />
+                <Package className="w-7 h-7 mx-auto mb-2 text-slate-200" />
                 <p className="text-sm">Chưa có sản phẩm. Tìm và thêm bên trên.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-xs">
+                <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '34%' }} />
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '4%' }} />
+                  </colgroup>
                   <thead>
-                    <tr className="bg-slate-50 border-y border-slate-100 text-slate-400 font-semibold uppercase tracking-wide">
-                      <th className="px-4 py-2 text-left">Sản phẩm</th>
-                      <th className="px-3 py-2 text-center w-32">Số lượng</th>
-                      <th className="px-3 py-2 text-right w-28">Đơn giá</th>
-                      <th className="px-3 py-2 text-center w-20">CK%</th>
-                      <th className="px-3 py-2 text-right w-28">Thành tiền</th>
-                      <th className="px-3 py-2 text-center w-24">Hoa hồng%</th>
-                      <th className="px-2 py-2 w-7"></th>
+                    <tr className="border-b border-slate-100 text-slate-400 text-[11px] uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left font-medium">Sản phẩm</th>
+                      <th className="px-3 py-2 text-center font-medium">Số lượng</th>
+                      <th className="px-3 py-2 text-right font-medium">Đơn giá</th>
+                      <th className="px-2 py-2 text-center font-medium">CK%</th>
+                      <th className="px-3 py-2 text-right font-medium">Thành tiền</th>
+                      <th className="px-3 py-2 text-center font-medium">Hoa hồng</th>
+                      <th className="px-2 py-2"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -536,106 +559,121 @@ export function OrderForm() {
                       const lineTotal = item.quantity * item.price - item.discountAmount;
                       const overStock = item.quantity > (item as any).availableStock;
                       return (
-                        <tr key={item.productId} className={cn("group border-b border-slate-50 last:border-0 transition-colors", overStock ? "bg-red-50/60" : "hover:bg-slate-50/60")}>
-                          {/* Sản phẩm + có thể bán */}
-                          <td className="px-4 py-2">
+                        <tr
+                          key={item.productId}
+                          className={cn(
+                            "group border-b border-slate-50 last:border-0 transition-colors",
+                            overStock ? "bg-red-50/70" : "hover:bg-slate-50/60"
+                          )}
+                        >
+                          <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300 flex-shrink-0">
-                                <Package className="w-3.5 h-3.5" />
+                              <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-slate-300 flex-shrink-0">
+                                <Package className="w-3 h-3" />
                               </div>
                               <div className="min-w-0">
-                                <p className="font-semibold text-slate-800 truncate text-xs leading-tight">{item.productName}</p>
-                                <p className="text-slate-400 font-mono leading-tight">{item.sku}</p>
-                                <p className={cn("leading-tight font-medium", overStock ? "text-red-500" : "text-slate-400")}>
-                                  Có thể bán: <span className="font-bold">{(item as any).availableStock ?? 0}</span>
-                                  {overStock && <span className="ml-1 text-red-500">⚠ Vượt tồn!</span>}
+                                <p className="font-medium text-slate-800 truncate text-xs leading-tight">{item.productName}</p>
+                                <p className="text-slate-400 font-mono text-[10px] leading-tight">{item.sku}</p>
+                                <p className={cn("text-[10px] leading-tight", overStock ? "text-red-500 font-medium" : "text-slate-400")}>
+                                  Tồn: {(item as any).availableStock ?? 0}
+                                  {overStock && <span className="ml-1">⚠ Vượt!</span>}
                                 </p>
                               </div>
                             </div>
                           </td>
-                          {/* Số lượng */}
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2.5">
                             <div className="flex items-center justify-center gap-1">
-                              <button type="button"
+                              <button
+                                type="button"
                                 onClick={() => {
                                   const v = Math.max(0.1, parseFloat((item.quantity - 1).toFixed(1)));
                                   setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
                                 }}
-                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0">
+                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
+                              >
                                 <Minus className="w-2.5 h-2.5" />
                               </button>
-                              <input type="number" min={0.1} step={0.1}
+                              <input
+                                type="number" min={0.1} step={0.1}
                                 value={item.quantity}
                                 onChange={(e) => {
                                   const raw = parseFloat(parseFloat(e.target.value).toFixed(1));
                                   const v = Number.isFinite(raw) && raw > 0 ? raw : 0.1;
                                   setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
                                 }}
-                                className={cn("w-12 h-6 px-1 border rounded text-center text-xs font-semibold outline-none focus:ring-1", overStock ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-200" : "border-slate-200 bg-white focus:border-blue-300 focus:ring-blue-100")}
+                                className={cn(
+                                  "w-11 h-6 px-1 border rounded text-center text-xs font-medium outline-none focus:ring-1 transition-colors",
+                                  overStock
+                                    ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100 text-red-700"
+                                    : "border-slate-200 bg-white focus:border-blue-300 focus:ring-blue-100"
+                                )}
                               />
-                              <button type="button"
+                              <button
+                                type="button"
                                 onClick={() => {
                                   const v = parseFloat((item.quantity + 1).toFixed(1));
                                   setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
                                 }}
-                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0">
+                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
+                              >
                                 <Plus className="w-2.5 h-2.5" />
                               </button>
                             </div>
                           </td>
-                          {/* Đơn giá */}
-                          <td className="px-3 py-2">
-                            <input type="number" min={0}
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="number" min={0}
                               value={item.price}
                               onChange={(e) => {
                                 const p = Math.max(0, Number(e.target.value) || 0);
                                 const da = p * item.quantity * (item.discountRate / 100);
                                 setItems(items.map(it => it.productId === item.productId ? { ...it, price: p, discountAmount: da, commissionAmount: (p * it.quantity - da) * (it.commissionRate / 100) } : it));
                               }}
-                              className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-right text-xs font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
+                              className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-right text-xs font-medium text-slate-700 outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
                             />
                           </td>
-                          {/* Chiết khấu % */}
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-0.5 justify-center">
-                              <input type="number" min={0} max={100}
+                          <td className="px-2 py-2.5">
+                            <div className="flex items-center justify-center gap-0.5">
+                              <input
+                                type="number" min={0} max={100}
                                 value={item.discountRate}
                                 onChange={(e) => {
                                   const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                                   const da = item.price * item.quantity * (r / 100);
                                   setItems(items.map(it => it.productId === item.productId ? { ...it, discountRate: r, discountAmount: da, commissionAmount: (it.price * it.quantity - da) * (it.commissionRate / 100) } : it));
                                 }}
-                                className="w-10 h-6 px-1 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-center text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
+                                className="w-9 h-6 px-1 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-center text-xs font-medium outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
                               />
-                              <span className="text-slate-400">%</span>
+                              <span className="text-slate-400 text-[10px]">%</span>
                             </div>
                           </td>
-                          {/* Thành tiền */}
-                          <td className="px-3 py-2 text-right">
-                            <span className="font-semibold text-slate-900 text-xs">{formatCurrency(lineTotal)}</span>
+                          <td className="px-3 py-2.5 text-right">
+                            <span className="font-medium text-slate-900 text-xs">{formatCurrency(lineTotal)}</span>
                           </td>
-                          {/* Hoa hồng % — chỉnh được */}
-                          <td className="px-3 py-2">
+                          <td className="px-3 py-2.5">
                             <div className="flex flex-col items-center gap-0.5">
                               <div className="flex items-center gap-0.5 justify-center">
-                                <input type="number" min={0} max={100}
+                                <input
+                                  type="number" min={0} max={100}
                                   value={item.commissionRate}
                                   onChange={(e) => {
                                     const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                                     setItems(items.map(it => it.productId === item.productId ? { ...it, commissionRate: r, commissionAmount: (it.price * it.quantity - it.discountAmount) * (r / 100) } : it));
                                   }}
-                                  className="w-10 h-5 px-1 bg-emerald-50 border border-transparent hover:border-emerald-200 focus:bg-white focus:border-emerald-400 rounded text-center text-xs font-bold text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-100 transition-colors"
+                                  className="w-9 h-5 px-1 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded text-center text-xs font-semibold text-green-700 outline-none focus:ring-1 focus:ring-green-100 transition-colors"
                                 />
-                                <span className="text-emerald-600 text-xs font-bold">%</span>
+                                <span className="text-green-600 text-[10px] font-semibold">%</span>
                               </div>
-                              <span className="text-emerald-600 font-semibold">{formatCurrency(item.commissionAmount)}</span>
+                              <span className="text-green-600 text-[10px] font-medium">{formatCurrency(item.commissionAmount)}</span>
                             </div>
                           </td>
-                          {/* Xoá */}
-                          <td className="px-2 py-2 text-center">
-                            <button type="button" onClick={() => removeItem(item.productId)}
-                              className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
-                              <X className="w-3.5 h-3.5" />
+                          <td className="px-2 py-2.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(item.productId)}
+                              className="w-5 h-5 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <X className="w-3 h-3" />
                             </button>
                           </td>
                         </tr>
@@ -643,22 +681,24 @@ export function OrderForm() {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-slate-800 text-white text-xs font-bold">
-                      <td className="px-4 py-2.5 uppercase tracking-wide">Tổng cộng ({items.length} SP)</td>
-                      <td className="px-3 py-2.5 text-center">
+                    <tr className="bg-slate-50 border-t border-slate-100 text-xs">
+                      <td className="px-4 py-2 text-slate-500 font-medium">Tổng cộng ({items.length} SP)</td>
+                      <td className="px-3 py-2 text-center font-medium text-slate-700">
                         {items.reduce((s, i) => s + i.quantity, 0).toFixed(1).replace(/\.0$/, '')}
                       </td>
-                      <td className="px-3 py-2.5"></td>
-                      <td className="px-3 py-2.5 text-center text-red-300">
+                      <td className="px-3 py-2"></td>
+                      <td className="px-2 py-2 text-center text-red-500 text-[10px]">
                         {items.some(i => i.discountAmount > 0) ? `-${formatCurrency(items.reduce((s, i) => s + i.discountAmount, 0))}` : '—'}
                       </td>
-                      <td className="px-3 py-2.5 text-right">
+                      <td className="px-3 py-2 text-right font-medium text-slate-700">
                         {formatCurrency(items.reduce((s, i) => s + (i.quantity * i.price - i.discountAmount), 0))}
                       </td>
-                      <td className="px-3 py-2.5 text-center text-emerald-400">
-                        {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
+                      <td className="px-3 py-2 text-center">
+                        <span className="inline-block bg-green-50 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                          {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
+                        </span>
                       </td>
-                      <td className="px-2 py-2.5"></td>
+                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -667,139 +707,145 @@ export function OrderForm() {
           </div>
         </div>
 
-        {/* Right Column: Summary & Settings */}
-        <div className="lg:col-span-4 space-y-8">
-          
-          {/* Order Summary */}
-          <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl shadow-slate-900/20 relative overflow-hidden">
-            <div className="relative z-10 space-y-6">
-              <h2 className="text-xl font-black flex items-center gap-3">
-                <Calculator className="w-6 h-6 text-red-500" />
-                Tổng kết đơn hàng
-              </h2>
+        {/* RIGHT COLUMN */}
+        <div className="flex flex-col gap-4">
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-sm font-bold text-slate-400">
-                  <span>Tạm tính</span>
-                  <span className="text-white">{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm font-bold text-slate-400">
-                  <span>Phí vận chuyển</span>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="number"
-                      min="0"
-                      value={shippingFee}
-                      onChange={(e) => setShippingFee(Number(e.target.value) || 0)}
-                      className="w-24 px-3 py-1 bg-white/5 border-transparent focus:bg-white/10 rounded-lg text-right text-white outline-none transition-all"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-sm font-bold text-slate-400">
-                  <span>Giảm giá</span>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="number"
-                      min="0"
-                      value={orderDiscount}
-                      onChange={(e) => setOrderDiscount(Number(e.target.value) || 0)}
-                      className="w-24 px-3 py-1 bg-white/5 border-transparent focus:bg-white/10 rounded-lg text-right text-red-400 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-sm font-bold text-slate-400">
-                  <span>Thuế (VAT 10%)</span>
-                  <span className="text-white">{formatCurrency(tax)}</span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm font-bold text-emerald-400 pt-2 border-t border-white/10">
-                  <span>TỔNG HOA HỒNG</span>
-                  <span className="font-black">{formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}</span>
-                </div>
-                
-                <div className="h-px bg-white/10 my-6"></div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-black text-slate-400">TỔNG CỘNG</span>
-                  <span className="text-3xl font-black text-red-500">{formatCurrency(total)}</span>
-                </div>
+          {/* Tổng kết */}
+          <div className="bg-white border border-slate-100 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-6 h-6 rounded-md bg-red-50 flex items-center justify-center">
+                <Calculator className="w-3.5 h-3.5 text-red-500" />
+              </div>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tổng kết đơn hàng</span>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
+                <span className="text-slate-400">Tạm tính</span>
+                <span className="font-medium text-slate-700">{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
+                <span className="text-slate-400">VAT 10%</span>
+                <span className="font-medium text-slate-700">{formatCurrency(tax)}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
+                <span className="text-slate-400">Phí vận chuyển</span>
+                <input
+                  type="number" min="0"
+                  value={shippingFee}
+                  onChange={(e) => setShippingFee(Number(e.target.value) || 0)}
+                  className="w-24 px-2 py-0.5 border border-slate-200 rounded text-right text-sm font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100 transition-colors"
+                />
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
+                <span className="text-slate-400">Giảm giá</span>
+                <input
+                  type="number" min="0"
+                  value={orderDiscount}
+                  onChange={(e) => setOrderDiscount(Number(e.target.value) || 0)}
+                  className="w-24 px-2 py-0.5 border border-slate-200 rounded text-right text-sm font-medium text-red-500 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100 transition-colors"
+                />
+              </div>
+              <div className="flex items-center justify-between pt-3 mt-1">
+                <span className="text-sm font-semibold text-slate-700">Tổng cộng</span>
+                <span className="text-xl font-semibold text-red-600">{formatCurrency(total)}</span>
               </div>
             </div>
-            <div className="absolute -right-10 -bottom-10 opacity-10">
-              <ShoppingCart className="w-48 h-48" />
+            <div className="mt-3 flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg">
+              <span className="text-xs text-green-700">Tổng hoa hồng</span>
+              <span className="text-sm font-semibold text-green-800">
+                {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
+              </span>
             </div>
           </div>
 
-          {/* Settings */}
-          <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-8">
-            <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">PHƯƠNG THỨC THANH TOÁN</label>
-              <div className="grid grid-cols-3 gap-3">
+          {/* Cài đặt */}
+          <div className="bg-white border border-slate-100 rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center">
+                <Info className="w-3.5 h-3.5 text-slate-500" />
+              </div>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Cài đặt đơn hàng</span>
+            </div>
+
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1.5 block">Phương thức thanh toán</label>
+              <div className="flex gap-2">
                 {[
                   { id: 'cash', label: 'Tiền mặt', icon: Wallet },
                   { id: 'card', label: 'Thẻ ATM', icon: CreditCard },
-                  { id: 'transfer', label: 'Chuyển khoản', icon: ArrowRight }
-                ].map((method) => (
-                  <button 
-                    key={method.id}
+                  { id: 'transfer', label: 'Chuyển khoản', icon: ArrowRight },
+                ].map((m) => (
+                  <button
+                    key={m.id}
                     type="button"
-                    onClick={() => setPaymentMethod(method.id)}
+                    onClick={() => setPaymentMethod(m.id)}
                     className={cn(
-                      "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
-                      paymentMethod === method.id
-                        ? "border-red-600 bg-red-50 text-red-600" 
-                        : "border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200"
+                      "flex-1 flex flex-col items-center gap-1 py-2 border rounded-lg text-[10px] font-medium transition-all",
+                      paymentMethod === m.id
+                        ? "border-blue-400 bg-blue-50 text-blue-700"
+                        : "border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200"
                     )}
                   >
-                    <method.icon className="w-5 h-5" />
-                    <span className="text-[10px] font-black uppercase tracking-tighter">{method.label}</span>
+                    <m.icon className="w-3.5 h-3.5" />
+                    {m.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">TRẠNG THÁI ĐƠN HÀNG</label>
-              <select value={orderStatus} onChange={(e) => setOrderStatus(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-[24px] text-sm font-bold transition-all outline-none appearance-none cursor-pointer">
-                <option value="pending">CHỜ DUYỆT</option>
-                <option value="shipping">ĐANG GIAO</option>
-                <option value="completed">ĐÃ GIAO</option>
-                <option value="cancelled">ĐÃ HỦY</option>
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1.5 block">Trạng thái đơn hàng</label>
+              <select
+                value={orderStatus}
+                onChange={(e) => setOrderStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
+              >
+                <option value="pending">Chờ duyệt</option>
+                <option value="shipping">Đang giao</option>
+                <option value="completed">Đã giao</option>
+                <option value="cancelled">Đã hủy</option>
               </select>
             </div>
 
-            <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NHÂN VIÊN PHỤ TRÁCH</label>
-              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-[24px] border border-slate-100">
-                <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-xs font-black text-slate-300">
-                  AD
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1.5 block">Nhân viên phụ trách</label>
+              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-semibold text-blue-600 flex-shrink-0">AD</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800">Admin</p>
+                  <p className="text-[10px] text-slate-400">Quản trị viên</p>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-black text-slate-900">Admin</p>
-                  <p className="text-[10px] font-bold text-slate-400">Quản trị viên</p>
-                </div>
-                <button className="text-red-600 text-[10px] font-black uppercase tracking-widest hover:underline">Thay đổi</button>
+                <button type="button" className="text-[11px] text-blue-600 font-medium hover:underline flex-shrink-0">Đổi</button>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GHI CHÚ ĐƠN HÀNG</label>
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1.5 block">Ghi chú đơn hàng</label>
               <textarea
                 rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Ghi chú thêm về đơn hàng, yêu cầu đặc biệt..."
-                className="w-full px-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-red-200 focus:ring-4 focus:ring-red-500/5 rounded-2xl text-sm font-medium transition-all outline-none resize-none"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all resize-none"
               />
             </div>
 
-            <div className="p-4 bg-blue-50 rounded-2xl flex gap-3">
-              <Info className="w-5 h-5 text-blue-600 shrink-0" />
-              <p className="text-[10px] font-bold text-blue-700 leading-relaxed">
-                Đơn hàng sẽ được tự động cập nhật vào báo cáo doanh thu sau khi trạng thái chuyển sang "ĐÃ GIAO".
+            <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+              <Info className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] text-blue-600 leading-relaxed">
+                Đơn hàng tự động vào báo cáo doanh thu sau khi chuyển sang "Đã giao".
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={submitOrder}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
+          >
+            <Save className="w-4 h-4" />
+            {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
+          </button>
         </div>
       </div>
     </div>

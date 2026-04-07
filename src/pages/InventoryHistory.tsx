@@ -1,7 +1,6 @@
 import * as React from "react";
 import { 
   Search, 
-  Filter, 
   ArrowUpRight, 
   ArrowDownRight, 
   Calendar, 
@@ -18,57 +17,168 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn, formatDate, formatCurrency } from "../lib/utils";
-import type { InventoryTransaction } from "../types";
+import { api } from "../lib/api";
 
-const API_BASE = "http://localhost:3000/api";
+type ApiStockMovementRow = {
+  id: number;
+  warehouse_id: number;
+  warehouse_name: string | null;
+  product_id: number;
+  product_name: string | null;
+  sku: string | null;
+  type: "import" | "export";
+  qty: string | number;
+  reason: string | null;
+  status: "completed" | "draft" | string;
+  total_value: string | number | null;
+  staff_name: string | null;
+  created_at: string;
+};
 
-function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem("token");
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+type UiMovementRow = {
+  id: number;
+  type: "import" | "export";
+  date: string;
+  warehouseName: string;
+  staffName: string;
+  productName: string;
+  sku: string;
+  qty: number;
+  totalValue: number;
+  reason: string;
+  status: string;
+};
+
+function parseApiDate(input: string): Date {
+  // MySQL DATETIME thường về dạng "YYYY-MM-DD HH:mm:ss" (không timezone)
+  // new Date("YYYY-MM-DD HH:mm:ss") có thể parse lệch/Invalid tùy browser → parse thủ công theo local time
+  const s = String(input || "").trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const d = Number(m[3]);
+    const hh = Number(m[4] || 0);
+    const mm = Number(m[5] || 0);
+    const ss = Number(m[6] || 0);
+    return new Date(y, mo, d, hh, mm, ss);
+  }
+  const dt = new Date(s);
+  return Number.isNaN(dt.getTime()) ? new Date() : dt;
 }
 
 export function InventoryHistory() {
-  const [transactions, setTransactions] = React.useState<(InventoryTransaction & { totalValue: number })[]>([]);
+  const [transactions, setTransactions] = React.useState<UiMovementRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [summary, setSummary] = React.useState<{
+    importTotalValue: number;
+    exportTotalValue: number;
+    importCount: number;
+    exportCount: number;
+  } | null>(null);
   const [search, setSearch] = React.useState("");
   const [type, setType] = React.useState("");
   const [status, setStatus] = React.useState("");
+  const [warehouseId, setWarehouseId] = React.useState<string>("");
+  const [warehouses, setWarehouses] = React.useState<any[]>([]);
+  const [dateFrom, setDateFrom] = React.useState<string>("");
+  const [dateTo, setDateTo] = React.useState<string>("");
+  const [isDateOpen, setIsDateOpen] = React.useState(false);
+  const datePopoverRef = React.useRef<HTMLDivElement | null>(null);
   const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const limit = 10;
+
+  // Load warehouses for filter dropdown
+  React.useEffect(() => {
+    api.get('/warehouses')
+      .then((res: any) => {
+        const data = res?.data ?? res ?? [];
+        setWarehouses(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setWarehouses([]));
+  }, []);
+
+  // Close date popover when clicking outside
+  React.useEffect(() => {
+    if (!isDateOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const el = datePopoverRef.current;
+      if (!el) return;
+      if (e.target instanceof Node && !el.contains(e.target)) setIsDateOpen(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [isDateOpen]);
 
   const fetchTransactions = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        search,
-        type,
-        status,
-        page: String(page),
-        limit: String(limit),
-      });
-      const res = await fetch(`${API_BASE}/inventory?${params}`, {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error("Failed to fetch inventory history");
-      const json = await res.json();
-      setTransactions(json.data || []);
-      setTotal(json.total || 0);
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (type) params.set("type", type);
+      if (status) params.set("status", status);
+      if (warehouseId) params.set("warehouse_id", warehouseId);
+      if (dateFrom) params.set("date_from", dateFrom);
+      if (dateTo) params.set("date_to", dateTo);
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+
+      const json: any = await api.get(`/inventory?${params.toString()}`);
+      const rows: ApiStockMovementRow[] = (json?.data ?? []) as any[];
+
+      setTransactions(
+        rows.map((r) => ({
+          id: Number(r.id),
+          type: r.type,
+          // backend có thể trả `created_at` (snake) hoặc `createdAt` (camel) tùy driver/transform
+          date: String((r as any).created_at ?? (r as any).createdAt ?? ""),
+          warehouseName: r.warehouse_name || `Kho #${r.warehouse_id}`,
+          staffName: r.staff_name || "—",
+          productName: r.product_name || `SP #${r.product_id}`,
+          sku: r.sku || "—",
+          qty: Math.abs(Number(r.qty) || 0),
+          totalValue: Number(r.total_value) || 0,
+          reason: r.reason || "—",
+          status: r.status || "draft",
+        }))
+      );
+      setTotal(Number(json?.total) || 0);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [search, type, status, page]);
+  }, [search, type, status, warehouseId, dateFrom, dateTo, page]);
+
+  const fetchSummary = React.useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (warehouseId) params.set("warehouse_id", warehouseId);
+      if (dateFrom) params.set("date_from", dateFrom);
+      if (dateTo) params.set("date_to", dateTo);
+      const json: any = await api.get(`/inventory/summary?${params.toString()}`);
+      const d = json?.data ?? {};
+      setSummary({
+        importTotalValue: Number(d.import_total_value) || 0,
+        exportTotalValue: Number(d.export_total_value) || 0,
+        importCount: Number(d.import_count) || 0,
+        exportCount: Number(d.export_count) || 0,
+      });
+    } catch {
+      setSummary(null);
+    }
+  }, [warehouseId, dateFrom, dateTo]);
 
   React.useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
+
+  React.useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
 
   const totalPages = Math.ceil(total / limit);
 
@@ -103,24 +213,28 @@ export function InventoryHistory() {
         <div className="bg-white p-4 rounded-2xl border border-slate-200">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng nhập tháng này</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xl font-bold text-slate-900">482,000,000 ₫</p>
+            <p className="text-xl font-bold text-slate-900">
+              {formatCurrency(summary?.importTotalValue ?? 0)}
+            </p>
             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">+12%</span>
           </div>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng xuất tháng này</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xl font-bold text-slate-900">156,000,000 ₫</p>
+            <p className="text-xl font-bold text-slate-900">
+              {formatCurrency(summary?.exportTotalValue ?? 0)}
+            </p>
             <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">-5%</span>
           </div>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Số phiếu nhập</p>
-          <p className="text-xl font-bold text-slate-900 mt-2">24 phiếu</p>
+          <p className="text-xl font-bold text-slate-900 mt-2">{(summary?.importCount ?? 0)} phiếu</p>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Số phiếu xuất</p>
-          <p className="text-xl font-bold text-slate-900 mt-2">18 phiếu</p>
+          <p className="text-xl font-bold text-slate-900 mt-2">{(summary?.exportCount ?? 0)} phiếu</p>
         </div>
       </div>
 
@@ -137,10 +251,56 @@ export function InventoryHistory() {
           />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-all">
-            <Calendar className="w-4 h-4" />
-            Thời gian
-          </button>
+          <div className="relative flex-1 md:flex-none" ref={datePopoverRef}>
+            <button
+              type="button"
+              onClick={() => setIsDateOpen((v) => !v)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-all"
+            >
+              <Calendar className="w-4 h-4" />
+              {dateFrom || dateTo ? `${dateFrom || "…"} → ${dateTo || "…"}` : "Thời gian"}
+            </button>
+            {isDateOpen && (
+              <div className="absolute left-0 top-full mt-2 w-[320px] bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-50">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-slate-400 mb-1 block">Từ ngày</label>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 mb-1 block">Đến ngày</label>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); setIsDateOpen(false); }}
+                    className="px-3 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200"
+                  >
+                    Xoá lọc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDateOpen(false)}
+                    className="px-3 py-2 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <select 
             value={type}
             onChange={(e) => { setType(e.target.value); setPage(1); }}
@@ -149,6 +309,16 @@ export function InventoryHistory() {
             <option value="">Tất cả loại phiếu</option>
             <option value="import">Nhập kho</option>
             <option value="export">Xuất kho</option>
+          </select>
+          <select
+            value={warehouseId}
+            onChange={(e) => { setWarehouseId(e.target.value); setPage(1); }}
+            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="">Tất cả kho</option>
+            {warehouses.filter((w: any) => w.is_active).map((w: any) => (
+              <option key={w.id} value={String(w.id)}>{w.name}</option>
+            ))}
           </select>
           <select 
             value={status}
@@ -184,6 +354,7 @@ export function InventoryHistory() {
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Loại</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kho / Người lập</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sản phẩm</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Số lượng</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Giá trị</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
@@ -213,21 +384,46 @@ export function InventoryHistory() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm text-slate-900">{formatDate(tx.date)}</p>
-                        <p className="text-xs text-slate-500">{new Date(tx.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</p>
+                        {tx.date ? (
+                          (() => {
+                            const dt = parseApiDate(tx.date);
+                            return (
+                              <>
+                                <p className="text-sm text-slate-900">{formatDate(dt)}</p>
+                                <p className="text-xs text-slate-500">
+                                  {dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </>
+                            );
+                          })()
+                        ) : (
+                          <p className="text-sm text-slate-400">—</p>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-sm text-slate-900">
                           <Warehouse className="w-3 h-3 text-slate-400" />
-                          {tx.warehouse}
+                          {tx.warehouseName}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                           <User className="w-3 h-3 text-slate-400" />
-                          {tx.staff}
+                          {tx.staffName}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-start gap-2">
+                          <Tag className="w-3 h-3 text-slate-400 mt-0.5" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-900 truncate">{tx.productName}</p>
+                            <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wide">{tx.sku}</p>
+                            {tx.reason !== "—" && (
+                              <p className="text-[11px] text-slate-500 truncate">{tx.reason}</p>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                        {tx.totalItems} SP
+                        {tx.qty}
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-slate-900">
                         {formatCurrency(tx.totalValue)}

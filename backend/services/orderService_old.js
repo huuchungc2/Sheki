@@ -20,77 +20,47 @@ async function generateOrderCode() {
   return `DH-${dateStr}-${String(seq).padStart(4, '0')}`;
 }
 
-// ✅ Tính lại tồn kho theo TỪNG KHO (warehouse_stock)
-async function recalculateWarehouseStock(productId, warehouseId) {
+async function recalculateStock(productId) {
   const pool = await getPool();
 
-  // reserved = SL đơn pending/shipping từ KHO ĐÓ
+  // reserved = SL đơn đang pending/shipping (chưa giao xong, cần giữ hàng)
   const [reservedResult] = await pool.query(
     `SELECT COALESCE(SUM(oi.qty), 0) as reserved
      FROM order_items oi
      JOIN orders o ON oi.order_id = o.id
-     WHERE oi.product_id = ? AND o.warehouse_id = ? AND o.status IN ('pending', 'shipping')`,
-    [productId, warehouseId]
-  );
-
-  const reserved = parseFloat(reservedResult[0].reserved) || 0;
-
-  // Lấy stock_qty của kho đó
-  const [ws] = await pool.query(
-    'SELECT stock_qty FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?',
-    [productId, warehouseId]
-  );
-
-  if (!ws.length) return; // Kho này chưa có sản phẩm
-
-  const stockQty = parseFloat(ws[0].stock_qty) || 0;
-  const availableStock = Math.max(0, stockQty - reserved);
-
-  await pool.query(
-    'UPDATE warehouse_stock SET reserved_stock = ?, available_stock = ? WHERE product_id = ? AND warehouse_id = ?',
-    [reserved, availableStock, productId, warehouseId]
-  );
-}
-
-// ✅ Tính lại tồn kho tổng trong products (tổng tất cả kho)
-async function recalculateProductTotalStock(productId) {
-  const pool = await getPool();
-
-  const [totals] = await pool.query(
-    `SELECT 
-      COALESCE(SUM(stock_qty), 0) as total_stock,
-      COALESCE(SUM(available_stock), 0) as total_available,
-      COALESCE(SUM(reserved_stock), 0) as total_reserved
-     FROM warehouse_stock WHERE product_id = ?`,
+     WHERE oi.product_id = ? AND o.status IN ('pending', 'shipping')`,
     [productId]
   );
 
-  await pool.query(
-    'UPDATE products SET stock_qty = ?, available_stock = ?, reserved_stock = ? WHERE id = ?',
-    [totals[0].total_stock, totals[0].total_available, totals[0].total_reserved, productId]
+  // sold = SL đã xuất thật (completed) — trừ hẳn khỏi stock_qty vật lý
+  const [soldResult] = await pool.query(
+    `SELECT COALESCE(SUM(oi.qty), 0) as sold
+     FROM order_items oi
+     JOIN orders o ON oi.order_id = o.id
+     WHERE oi.product_id = ? AND o.status = 'completed'`,
+    [productId]
   );
-}
 
-// ✅ Hàm chính: recalculate cả warehouse_stock lẫn products
-async function recalculateStock(productId, warehouseId = null) {
-  const pool = await getPool();
+  const reserved = parseFloat(reservedResult[0].reserved) || 0;
+  const sold     = parseFloat(soldResult[0].sold) || 0;
 
-  if (warehouseId) {
-    // Chỉ recalc kho cụ thể
-    await recalculateWarehouseStock(productId, warehouseId);
-  } else {
-    // Recalc tất cả kho có sản phẩm này
-    const [warehouses] = await pool.query(
-      'SELECT DISTINCT warehouse_id FROM warehouse_stock WHERE product_id = ?',
-      [productId]
-    );
-    for (const w of warehouses) {
-      await recalculateWarehouseStock(productId, w.warehouse_id);
-    }
-  }
+  // Lấy stock_qty gốc (initial) — lưu trong trường stock_qty ban đầu khi nhập kho
+  // stock_qty thực = initial_stock - sold
+  // available = stock_qty_thực - reserved
+  const [orig] = await pool.query(
+    'SELECT stock_qty FROM products WHERE id = ?', [productId]
+  );
+  if (!orig.length) return;
 
-  // Cập nhật tổng trong products
-  await recalculateProductTotalStock(productId);
+  // stock_qty trong DB là kho vật lý hiện tại (sau khi trừ completed)
+  // Tính available = stock_qty - reserved (không trừ thêm sold vì stock_qty đã phản ánh thực tế)
+  const stockQty    = parseFloat(orig[0].stock_qty) || 0;
+  const availableStock = Math.max(0, stockQty - reserved);
+
+  await pool.query(
+    'UPDATE products SET reserved_stock = ?, available_stock = ? WHERE id = ?',
+    [reserved, availableStock, productId]
+  );
 }
 
 async function recalculateAllStock() {
@@ -101,58 +71,43 @@ async function recalculateAllStock() {
   }
 }
 
-// ✅ Khi đơn completed: trừ stock_qty vật lý theo đúng KHO
+// Gọi khi đơn chuyển sang completed: trừ hẳn stock_qty vật lý
 async function deductStockOnComplete(orderId) {
   const pool = await getPool();
-
-  const [orderRows] = await pool.query('SELECT warehouse_id FROM orders WHERE id = ?', [orderId]);
-  if (!orderRows.length) return;
-  const warehouseId = orderRows[0].warehouse_id;
-
   const [items] = await pool.query(
     'SELECT product_id, qty FROM order_items WHERE order_id = ?', [orderId]
   );
-
   for (const item of items) {
-    const qty = parseFloat(item.qty);
-
-    // Trừ stock_qty trong warehouse_stock
     await pool.query(
-      'UPDATE warehouse_stock SET stock_qty = GREATEST(0, stock_qty - ?) WHERE product_id = ? AND warehouse_id = ?',
-      [qty, item.product_id, warehouseId]
+      'UPDATE products SET stock_qty = GREATEST(0, stock_qty - ?) WHERE id = ?',
+      [parseFloat(item.qty), item.product_id]
     );
-
-    await recalculateStock(item.product_id, warehouseId);
+    await recalculateStock(item.product_id);
   }
 }
 
-// ✅ Khi đơn cancelled/xóa: hoàn kho đúng KHO
+// Gọi khi đơn bị cancelled: hoàn lại kho (nếu đã completed thì cộng lại stock_qty)
 async function restoreStockOnCancel(orderId, oldStatus) {
   const pool = await getPool();
-
-  const [orderRows] = await pool.query('SELECT warehouse_id FROM orders WHERE id = ?', [orderId]);
-  if (!orderRows.length) return;
-  const warehouseId = orderRows[0].warehouse_id;
-
   const [items] = await pool.query(
     'SELECT product_id, qty FROM order_items WHERE order_id = ?', [orderId]
   );
-
   for (const item of items) {
     if (oldStatus === 'completed') {
-      // Đã trừ stock_qty rồi → cộng lại vào đúng kho
+      // Đã trừ stock_qty rồi → cộng lại
       await pool.query(
-        'UPDATE warehouse_stock SET stock_qty = stock_qty + ? WHERE product_id = ? AND warehouse_id = ?',
-        [parseFloat(item.qty), item.product_id, warehouseId]
+        'UPDATE products SET stock_qty = stock_qty + ? WHERE id = ?',
+        [parseFloat(item.qty), item.product_id]
       );
     }
-    await recalculateStock(item.product_id, warehouseId);
+    await recalculateStock(item.product_id);
   }
 }
 
 async function recalculateCommission(orderId) {
   const pool = await getPool();
 
+  // Lấy từng item với subtotal thực (sau chiết khấu) và commission_rate
   const [items] = await pool.query(
     `SELECT oi.commission_amount, oi.commission_rate, oi.qty, oi.unit_price,
             oi.discount_amount, oi.subtotal,
@@ -169,29 +124,35 @@ async function recalculateCommission(orderId) {
   const userId           = orderRows[0].salesperson_id;
   const orderTotalAmount = parseFloat(orderRows[0].total_amount) || 0;
 
+  // Xóa tất cả commission cũ của order này
   await pool.query('DELETE FROM commissions WHERE order_id = ?', [orderId]);
 
+  // 1. Direct commission cho người tạo đơn
   await pool.query(
     'INSERT INTO commissions (order_id, user_id, commission_amount, type) VALUES (?, ?, ?, "direct")',
     [orderId, userId, totalCommission]
   );
 
+  // 2. Override commission — tính per-item, mỗi item tra tier riêng
   await calculateOverrideCommissions(orderId, userId, orderTotalAmount, items);
 }
 
 async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount, items) {
   const pool = await getPool();
 
+  // Lấy group_id của đơn hàng này
   const [orderRows] = await pool.query('SELECT group_id FROM orders WHERE id = ?', [orderId]);
   if (!orderRows.length) return;
   const orderGroupId = orderRows[0].group_id;
 
+  // Tìm tất cả Sales quản lý CTV này
   const [managers] = await pool.query(
     'SELECT c.sales_id FROM collaborators c WHERE c.ctv_id = ?',
     [ctvUserId]
   );
   if (managers.length === 0) return;
 
+  // Cache tiers để không query lặp nhiều lần
   const tierCache = {};
   const getTierRate = async (commissionRate) => {
     const key = String(commissionRate);
@@ -207,6 +168,7 @@ async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount
   };
 
   for (const manager of managers) {
+    // ✅ Rule: B lên đơn TRONG CÙNG NHÓM với A mới tính override
     if (orderGroupId) {
       const [inGroup] = await pool.query(
         'SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ? LIMIT 1',
@@ -215,14 +177,17 @@ async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount
       if (inGroup.length === 0) continue;
     }
 
+    // ✅ Tính per-item: mỗi item có commission_rate riêng → tra tier riêng
+    // VD: item SP1 10% → tier 10-30% → 3%, item SP2 7% → tier 7% → 2%
     let totalOverrideAmount = 0;
-    const itemRates = [];
+    const itemRates = []; // lưu để ghi override_rate đại diện
 
     for (const item of items) {
       const itemRate = parseFloat(item.commission_rate) || 0;
       const overrideRate = await getTierRate(itemRate);
       if (!overrideRate) continue;
 
+      // override tính trên net_amount của từng item
       const netAmount = parseFloat(item.net_amount) || 0;
       const itemOverride = Math.round(netAmount * overrideRate / 100 * 100) / 100;
       totalOverrideAmount += itemOverride;
@@ -231,8 +196,9 @@ async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount
 
     if (totalOverrideAmount <= 0) continue;
 
+    // override_rate lưu dạng JSON các rate theo item (hoặc rate đại diện nếu đồng nhất)
     const uniqueRates = [...new Set(itemRates)];
-    const savedRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
+    const savedRate = uniqueRates.length === 1 ? uniqueRates[0] : null; // null nếu mix nhiều rate
 
     await pool.query(
       'INSERT INTO commissions (order_id, user_id, commission_amount, type, ctv_user_id, override_rate) VALUES (?, ?, ?, "override", ?, ?)',
@@ -240,6 +206,8 @@ async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount
     );
   }
 }
+
+
 
 async function calculateItemCommission(unitPrice, qty, discountAmount, commissionRate) {
   const netAmount = (parseFloat(unitPrice) * parseFloat(qty)) - parseFloat(discountAmount || 0);

@@ -29,6 +29,7 @@ const navigationAdmin = [
   { name: "Khách hàng", href: "/customers", icon: UserCircle },
   { name: "Đơn hàng", href: "/orders", icon: ShoppingCart },
   { name: "Kho bãi", href: "/inventory", icon: Warehouse },
+  { name: "Kho (tạo & mặc định)", href: "/warehouses", icon: Warehouse },
   { name: "Báo cáo", href: "/reports", icon: BarChart3, children: [
     { name: "Báo cáo doanh thu", href: "/reports/revenue" },
     { name: "Báo cáo hoa hồng", href: "/reports/commissions" },

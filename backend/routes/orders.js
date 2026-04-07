@@ -219,6 +219,12 @@ router.post('/', auth, async (req, res, next) => {
 
     await recalculateCommission(orderId);
 
+    // Nếu tạo đơn với status=completed ngay từ đầu → trừ kho vật lý đúng kho
+    if (orderStatus === 'completed') {
+      await deductStockOnComplete(orderId);
+      await updateLoyaltyPoints(customer_id, orderId, totalAmount);
+    }
+
     res.status(201).json({ id: orderId, code, message: 'Tạo đơn hàng thành công' });
   } catch (err) {
     next(err);

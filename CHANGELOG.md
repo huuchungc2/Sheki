@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [07/04/2026] - OrderForm: Thêm chọn kho xuất hàng
+### Added
+- **Warehouse selector** - Dropdown "KHO XUẤT HÀNG" hiển thị trước nhóm bán hàng, chỉ load kho `is_active=true`, viền amber khi chưa chọn - Files: `src/pages/OrderForm.tsx`
+- **State + useEffect** - `selectedWarehouseId`, `warehouses`, fetch `/warehouses`, tự động sync `available_stock` của từng sản phẩm khi đổi kho qua `/inventory/stock-by-warehouse` - Files: `src/pages/OrderForm.tsx`
+### Fixed
+- **Validation** - Bắt buộc chọn kho trước khi submit (check trước `selectedGroupId`) - Files: `src/pages/OrderForm.tsx`
+- **Payload warehouse_id** - Thay hardcode `warehouse_id: 1` bằng `warehouse_id: selectedWarehouseId` - Files: `src/pages/OrderForm.tsx`
+- **Edit mode** - Load `warehouse_id` từ order khi mở form chỉnh sửa (`setSelectedWarehouseId(order?.warehouse_id ?? null)`) - Files: `src/pages/OrderForm.tsx`
+- **Kho: tạo đơn completed** - Nếu tạo mới đơn với `status=completed` ngay từ đầu thì trừ kho vật lý theo đúng `warehouse_id` và cộng điểm - Files: `backend/routes/orders.js`
+- **Kho: sync tồn theo kho khi thêm SP** - Khi đã chọn kho, thêm sản phẩm mới vào OrderForm sẽ được sync `available_stock` theo kho (không bị stale) - Files: `src/pages/OrderForm.tsx`
+- **Inventory page** - Fix trang `/inventory` hiển thị đúng dữ liệu từ API `/inventory` (map đúng field `created_at/warehouse_name/staff_name/total_value`...), tránh crash do mismatch schema - Files: `src/pages/InventoryHistory.tsx`
+- **Inventory time display** - Parse `created_at` kiểu MySQL DATETIME theo local time để hiển thị đúng giờ/phút trên bảng lịch sử kho - Files: `src/pages/InventoryHistory.tsx`
+- **Inventory API pagination** - Fix `countQuery` dùng alias/join đồng bộ để không lỗi `Unknown column 'sm.type'` khi filter type/status - Files: `backend/routes/inventory.js`
+- **Inventory filters** - Thêm filter theo kho (`warehouse_id`) + filter thời gian (`date_from/date_to`) cho trang Kho, UI popover chọn ngày hoạt động - Files: `src/pages/InventoryHistory.tsx`, `backend/routes/inventory.js`
+- **Inventory summary stats** - Các thẻ thống kê (tổng nhập/xuất + số phiếu) lấy dữ liệu thật từ DB qua API `/inventory/summary` (completed-only, theo tháng hoặc theo date range/kho) - Files: `backend/routes/inventory.js`, `src/pages/InventoryHistory.tsx`
+- **Products filter by warehouse** - Thêm dropdown lọc theo kho ở `/products`; backend hỗ trợ `warehouse_id` và trả `available_stock/stock_qty` theo kho để UI hiển thị đúng - Files: `src/pages/ProductList.tsx`, `backend/routes/products.js`
+- **Inventory Import/Export UI** - Nâng cấp UX thêm sản phẩm bằng ô tìm kiếm gợi ý realtime (giống OrderForm), UI gọn và đẹp hơn - Files: `src/pages/InventoryImport.tsx`, `src/pages/InventoryExport.tsx`
+- **Export transfer + adjustment** - Xuất chuyển kho yêu cầu chọn kho nhận và khi completed sẽ trừ kho xuất + cộng kho nhận; thêm lý do "Xuất điều chỉnh" - Files: `src/pages/InventoryExport.tsx`, `backend/routes/inventory.js`
+- **Export product suggestions** - Khi xuất kho, ô tìm sản phẩm chỉ gợi ý sản phẩm có `available_stock > 0` trong kho xuất (dùng `warehouse_id` + `available_only=1`) - Files: `src/pages/InventoryExport.tsx`, `backend/routes/products.js`
+- **Schema: warehouse_stock** - Bổ sung bảng `warehouse_stock` vào `schema.sql` để khớp logic tồn kho theo kho (unique warehouse_id+product_id, stock/available/reserved) - Files: `schema.sql`
+- **Default warehouse stock init** - Tạo migration init `warehouse_stock` cho toàn bộ sản phẩm hiện có vào "Kho trung tâm" và cập nhật tạo sản phẩm mới để auto thuộc kho mặc định - Files: `migrations/002_init_warehouse_stock_default_central.sql`, `backend/routes/products.js`
+- **Warehouses admin page + default** - Thêm màn hình admin tạo/sửa kho và đặt kho mặc định; backend enforce + tự chuẩn hoá để luôn chỉ có 1 kho default, schema thêm `warehouses.is_default` + migration - Files: `src/pages/Warehouses.tsx`, `src/App.tsx`, `src/components/Layout.tsx`, `backend/routes/warehouses.js`, `backend/routes/products.js`, `schema.sql`, `migrations/003_add_warehouse_default.sql`
+- **Warehouses default radio UI** - Cột "Kho mặc định" hiển thị radio 1 lựa chọn; chọn sẽ auto cập nhật ngay, thay thế kho mặc định hiện tại - Files: `src/pages/Warehouses.tsx`
+- **Local migration runner** - Thêm script chạy file .sql bằng mysql2 để tiện apply migrations trên máy không có mysql CLI - Files: `backend/scripts/runSqlMigration.js`
+- **Seed products into default warehouse** - Thêm migration seed dữ liệu test: tạo `warehouse_stock` cho kho mặc định (kho tổng) với các sản phẩm chưa có warehouse_stock - Files: `migrations/004_seed_default_warehouse_stock_for_testing.sql`
+
 ## [06/04/2026] - Verify & Fix OrderSearch, CollaboratorsPage, InventoryImport/Export
 ### Fixed
 - **CollaboratorsPage API** - GET/POST/DELETE đều dùng bảng `collaborators` (sales_id/ctv_id) thay vì `user_collaborators` (rỗng) - Files: `backend/routes/users.js`

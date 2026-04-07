@@ -54,9 +54,11 @@ CREATE TABLE `warehouses` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `name` VARCHAR(100) NOT NULL,
   `address` TEXT DEFAULT NULL,
+  `is_default` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Kho mặc định/kho tổng hệ thống',
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX `idx_warehouses_is_active` (`is_active`)
+  INDEX `idx_warehouses_is_active` (`is_active`),
+  INDEX `idx_warehouses_is_default` (`is_default`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
@@ -175,7 +177,26 @@ CREATE TABLE `order_items` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 8. STOCK_MOVEMENTS (Xuất nhập tồn)
+-- 8. WAREHOUSE_STOCK (Tồn kho theo kho)
+-- ============================================
+CREATE TABLE `warehouse_stock` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `warehouse_id` INT UNSIGNED NOT NULL,
+  `product_id` INT UNSIGNED NOT NULL,
+  `stock_qty` DECIMAL(10,3) NOT NULL DEFAULT 0 COMMENT 'Tồn vật lý tại kho',
+  `available_stock` DECIMAL(10,3) NOT NULL DEFAULT 0 COMMENT 'Có thể bán tại kho',
+  `reserved_stock` DECIMAL(10,3) NOT NULL DEFAULT 0 COMMENT 'Tạm giữ tại kho',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_warehouse_stock` (`warehouse_id`, `product_id`),
+  INDEX `idx_warehouse_stock_warehouse` (`warehouse_id`),
+  INDEX `idx_warehouse_stock_product` (`product_id`),
+  CONSTRAINT `fk_warehouse_stock_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses`(`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_warehouse_stock_product` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 9. STOCK_MOVEMENTS (Xuất nhập tồn)
 -- ============================================
 CREATE TABLE `stock_movements` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -200,7 +221,7 @@ CREATE TABLE `stock_movements` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 9. COMMISSIONS (Hoa hồng)
+-- 10. COMMISSIONS (Hoa hồng)
 -- ============================================
 CREATE TABLE `commissions` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -217,7 +238,7 @@ CREATE TABLE `commissions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 10. LOYALTY_POINTS (Điểm tích lũy)
+-- 11. LOYALTY_POINTS (Điểm tích lũy)
 -- ============================================
 CREATE TABLE `loyalty_points` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -236,7 +257,7 @@ CREATE TABLE `loyalty_points` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 11. ROLE_PERMISSIONS (Phân quyền)
+-- 12. ROLE_PERMISSIONS (Phân quyền)
 -- ============================================
 CREATE TABLE `role_permissions` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -249,7 +270,7 @@ CREATE TABLE `role_permissions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 12. ACTIVITY_LOGS (Nhật ký hoạt động)
+-- 13. ACTIVITY_LOGS (Nhật ký hoạt động)
 -- ============================================
 CREATE TABLE `activity_logs` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -273,7 +294,7 @@ CREATE TABLE `activity_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 13. GROUPS (Nhóm nhân viên)
+-- 14. GROUPS (Nhóm nhân viên)
 -- ============================================
 CREATE TABLE `groups` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -285,7 +306,7 @@ CREATE TABLE `groups` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 14. USER_GROUPS (Nhóm nhân viên - Many to Many)
+-- 15. USER_GROUPS (Nhóm nhân viên - Many to Many)
 -- ============================================
 CREATE TABLE `user_groups` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

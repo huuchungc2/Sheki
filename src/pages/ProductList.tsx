@@ -51,6 +51,8 @@ export function ProductList() {
   const [search, setSearch] = React.useState("");
   const [category, setCategory] = React.useState("");
   const [categories, setCategories] = React.useState<any[]>([]);
+  const [warehouseId, setWarehouseId] = React.useState("");
+  const [warehouses, setWarehouses] = React.useState<any[]>([]);
   const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const limit = 20;
@@ -59,12 +61,12 @@ export function ProductList() {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      const params = new URLSearchParams({
-        search,
-        category,
-        page: String(page),
-        limit: String(limit),
-      });
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (category) params.set("category", category);
+      if (warehouseId) params.set("warehouse_id", warehouseId);
+      params.set("page", String(page));
+      params.set("limit", String(limit));
       const res = await fetch(`${API_URL}/products?${params}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -77,7 +79,7 @@ export function ProductList() {
     } finally {
       setLoading(false);
     }
-  }, [search, category, page]);
+  }, [search, category, warehouseId, page]);
 
   React.useEffect(() => {
     fetchProducts();
@@ -102,6 +104,24 @@ export function ProductList() {
     fetchCategories();
   }, []);
 
+  // Fetch warehouses for filter
+  React.useEffect(() => {
+    const fetchWarehouses = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_URL}/warehouses`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setWarehouses(json.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch warehouses", err);
+      }
+    };
+    fetchWarehouses();
+  }, []);
   const handleExport = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -214,6 +234,16 @@ export function ProductList() {
             <option value="">Tất cả danh mục</option>
             {categories.map((cat: any) => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+          <select
+            value={warehouseId}
+            onChange={(e) => { setWarehouseId(e.target.value); setPage(1); }}
+            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="">Tất cả kho</option>
+            {warehouses.filter((w: any) => w.is_active).map((w: any) => (
+              <option key={w.id} value={String(w.id)}>{w.name}</option>
             ))}
           </select>
         </div>

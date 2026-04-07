@@ -39,6 +39,7 @@ interface ProductData {
   name: string;
   sku: string;
   unit: string;
+  price?: number;
 }
 
 interface FormItem {
@@ -54,13 +55,13 @@ interface FormItem {
 export function InventoryExport() {
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = React.useState<WarehouseData[]>([]);
-  const [products, setProducts] = React.useState<ProductData[]>([]);
   const [loadingData, setLoadingData] = React.useState(true);
   const [dataError, setDataError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
 
   const [warehouseId, setWarehouseId] = React.useState("");
+  const [toWarehouseId, setToWarehouseId] = React.useState("");
   const [date, setDate] = React.useState(new Date().toISOString().split("T")[0]);
   const [reason, setReason] = React.useState("export_sale");
   const [note, setNote] = React.useState("");
@@ -68,20 +69,34 @@ export function InventoryExport() {
     { id: 1, product_id: "", name: "", sku: "", unit: "", quantity: 1, price: 0 },
   ]);
 
+  // Product search (giống OrderForm)
+  const [productQuery, setProductQuery] = React.useState("");
+  const [productSuggestions, setProductSuggestions] = React.useState<ProductData[]>([]);
+  const [showProductSuggestions, setShowProductSuggestions] = React.useState(false);
+  const productBoxRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!showProductSuggestions) return;
+    const onDown = (e: MouseEvent) => {
+      const el = productBoxRef.current;
+      if (!el) return;
+      if (e.target instanceof Node && !el.contains(e.target)) setShowProductSuggestions(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [showProductSuggestions]);
+
   React.useEffect(() => {
     async function fetchData() {
       setLoadingData(true);
       setDataError(null);
       try {
-        const [whRes, prodRes] = await Promise.all([
+        const [whRes] = await Promise.all([
           fetch(`${API_BASE}/warehouses`, { headers: getAuthHeaders() }),
-          fetch(`${API_BASE}/products`, { headers: getAuthHeaders() }),
         ]);
-        if (!whRes.ok || !prodRes.ok) throw new Error("Failed to load data");
+        if (!whRes.ok) throw new Error("Failed to load data");
         const whJson = await whRes.json();
-        const prodJson = await prodRes.json();
         setWarehouses(whJson.data || []);
-        setProducts(prodJson.data || []);
         if (whJson.data?.length > 0) setWarehouseId(whJson.data[0].id);
       } catch (e: any) {
         setDataError(e.message);
@@ -92,6 +107,40 @@ export function InventoryExport() {
     fetchData();
   }, []);
 
+  React.useEffect(() => {
+    if (!productQuery.trim()) {
+      setProductSuggestions([]);
+      return;
+    }
+    const t = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          search: productQuery.trim(),
+          limit: "20",
+          page: "1",
+          ...(warehouseId ? { warehouse_id: warehouseId } : {}),
+          ...(warehouseId ? { available_only: "1" } : {}),
+        });
+        const res = await fetch(`${API_BASE}/products?${params.toString()}`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const json = await res.json();
+        const data = Array.isArray(json?.data) ? json.data : [];
+        setProductSuggestions(
+          data.map((p: any) => ({
+            id: String(p.id),
+            name: String(p.name ?? ""),
+            sku: String(p.sku ?? ""),
+            unit: String(p.unit ?? ""),
+            price: p.price !== undefined ? Number(p.price) : undefined,
+          }))
+        );
+      } catch {
+        // ignore
+      }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [productQuery, warehouseId]);
+
   const total = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
 
   const addItem = () => {
@@ -99,6 +148,35 @@ export function InventoryExport() {
       ...prev,
       { id: Date.now(), product_id: "", name: "", sku: "", unit: "", quantity: 1, price: 0 },
     ]);
+  };
+
+  const addProduct = (product: ProductData) => {
+    setItems((prev) => {
+      const existing = prev.find((i) => String(i.product_id) === String(product.id));
+      if (existing) {
+        return prev.map((i) =>
+          String(i.product_id) === String(product.id)
+            ? { ...i, quantity: Number((i.quantity + 1).toFixed(3)) }
+            : i
+        );
+      }
+      const defaultPrice = Number(product.price ?? 0) || 0;
+      return [
+        ...prev.filter((i) => i.product_id || prev.length > 1),
+        {
+          id: Date.now(),
+          product_id: product.id,
+          name: product.name,
+          sku: product.sku,
+          unit: product.unit,
+          quantity: 1,
+          price: defaultPrice,
+        },
+      ];
+    });
+    setProductQuery("");
+    setProductSuggestions([]);
+    setShowProductSuggestions(false);
   };
 
   const removeItem = (id: number) => {
@@ -110,14 +188,6 @@ export function InventoryExport() {
       prev.map((item) => {
         if (item.id !== id) return item;
         const updated = { ...item, [field]: value };
-        if (field === "product_id") {
-          const product = products.find((p) => p.id === value);
-          if (product) {
-            updated.name = product.name;
-            updated.sku = product.sku;
-            updated.unit = product.unit;
-          }
-        }
         return updated;
       })
     );
@@ -125,6 +195,10 @@ export function InventoryExport() {
 
   const handleSubmit = async (status: "draft" | "completed") => {
     if (!warehouseId) return;
+    if (reason === 'export_transfer' && (!toWarehouseId || String(toWarehouseId) === String(warehouseId))) {
+      alert("Vui lòng chọn kho nhận khác kho xuất");
+      return;
+    }
     const validItems = items.filter(i => i.product_id && i.quantity > 0);
     if (validItems.length === 0) {
       alert("Vui lòng chọn ít nhất 1 sản phẩm và nhập số lượng");
@@ -134,6 +208,7 @@ export function InventoryExport() {
     try {
       const body = {
         warehouse_id: parseInt(warehouseId),
+        destination_warehouse_id: reason === 'export_transfer' ? (toWarehouseId ? parseInt(toWarehouseId) : null) : null,
         items: validItems.map((i) => ({ product_id: parseInt(i.product_id), qty: i.quantity, price: i.price })),
         reason: reason,
         status,
@@ -225,13 +300,67 @@ export function InventoryExport() {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-900">Danh sách sản phẩm xuất</h2>
-              <button 
-                onClick={addItem}
-                className="flex items-center gap-2 text-blue-600 text-sm font-bold hover:text-blue-700 transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                Thêm sản phẩm
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={addItem}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-sm font-bold transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  Thêm dòng
+                </button>
+              </div>
+            </div>
+
+            {/* Product quick add */}
+            <div className="p-6 border-b border-slate-100">
+              <div className="relative" ref={productBoxRef}>
+                <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={productQuery}
+                  onChange={(e) => {
+                    setProductQuery(e.target.value);
+                    setShowProductSuggestions(e.target.value.trim().length > 0);
+                  }}
+                  onFocus={() => productQuery.trim().length > 0 && setShowProductSuggestions(true)}
+                  placeholder="Tìm sản phẩm theo tên hoặc SKU để thêm nhanh..."
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-transparent focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 rounded-2xl text-sm outline-none transition-all"
+                />
+
+                {showProductSuggestions && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50">
+                    <div className="max-h-64 overflow-y-auto">
+                      {productSuggestions.length > 0 ? (
+                        productSuggestions.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => addProduct(p)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
+                              <p className="text-[11px] text-slate-400 font-mono uppercase tracking-wide">{p.sku} • {p.unit}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-sm font-bold text-slate-900">
+                                {formatCurrency(Number(p.price ?? 0) || 0)}
+                              </p>
+                              <p className="text-[10px] text-slate-400">Thêm</p>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-8 text-center text-slate-400 text-sm">
+                          Không tìm thấy sản phẩm
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="mt-2 text-[11px] text-slate-400">
+                Gợi ý: chọn kho trước để search theo kho (tồn theo kho) nếu cần.
+              </p>
             </div>
             
             <div className="overflow-x-auto">
@@ -249,18 +378,13 @@ export function InventoryExport() {
                   {items.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/30 transition-all group">
                       <td className="px-6 py-4">
-                        <select
-                          value={item.product_id}
-                          onChange={(e) => updateItem(item.id, "product_id", e.target.value)}
-                          className="w-full px-2 py-1 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-lg text-sm transition-all outline-none"
-                        >
-                          <option value="">Chọn sản phẩm</option>
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                          ))}
-                        </select>
-                        {item.name && (
-                          <p className="text-xs text-slate-500 font-mono mt-1">{item.sku} • {item.unit}</p>
+                        {item.product_id ? (
+                          <>
+                            <p className="text-sm font-bold text-slate-900">{item.name}</p>
+                            <p className="text-xs text-slate-500 font-mono mt-1">{item.sku} • {item.unit}</p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-slate-400">Chưa chọn sản phẩm (dùng ô tìm kiếm phía trên)</p>
                         )}
                       </td>
                       <td className="px-6 py-4">
@@ -322,9 +446,28 @@ export function InventoryExport() {
             >
               <option value="export_sale">Xuất bán hàng</option>
               <option value="export_transfer">Xuất chuyển kho</option>
+              <option value="export_adjustment">Xuất điều chỉnh</option>
               <option value="export_return">Xuất trả hàng nhà cung cấp</option>
               <option value="export_destroy">Xuất tiêu hủy / Hư hỏng</option>
             </select>
+            {reason === 'export_transfer' && (
+              <div className="mb-4">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kho nhận (xuất đi đâu)</label>
+                <select
+                  value={toWarehouseId}
+                  onChange={(e) => setToWarehouseId(e.target.value)}
+                  className="mt-2 w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 rounded-2xl text-sm transition-all outline-none"
+                >
+                  <option value="">— Chọn kho nhận —</option>
+                  {warehouses.filter(w => String(w.id) !== String(warehouseId)).map((wh) => (
+                    <option key={wh.id} value={wh.id}>{wh.name}</option>
+                  ))}
+                </select>
+                <p className="mt-2 text-[11px] text-slate-400">
+                  Khi “Hoàn tất”, hệ thống sẽ trừ kho xuất và cộng kho nhận.
+                </p>
+              </div>
+            )}
             <textarea 
               rows={4}
               value={note}

@@ -7,17 +7,17 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **Deploy production**
-  - Setup VPS CentOS/Ubuntu
-  - Config Nginx, PM2, SSL
-  - Files: tạo mới `deploy.sh`, `nginx.conf`
+- [ ] **Thông báo realtime** - Bell icon hiển thị số đơn mới, đơn thay đổi trạng thái
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
 - [x] **Xuất Excel báo cáo hoa hồng** - Nút "Xuất báo cáo" trong CommissionReport thực sự export file
-- [ ] **Thông báo realtime** - Bell icon hiển thị số đơn mới, đơn thay đổi trạng thái
+- [ ] **Deploy production**
+  - Setup VPS CentOS/Ubuntu
+  - Config Nginx, PM2, SSL
+  - Files: tạo mới `deploy.sh`, `nginx.conf`
 
 ---
 
@@ -67,6 +67,7 @@
 - [x] OrderForm: customer search + new customer + address dropdowns
 - [x] Groups: bảng groups + user_groups, CRUD, gán NV
 - [x] OrderForm: Group selector + validate tồn kho realtime
+- [x] OrderForm: Warehouse selector — chọn kho xuất hàng, sync available_stock theo kho
 - [x] SalaryReport: filter theo nhóm
 
 ### Phase 7: Verify & Fix các màn hình chưa test (06/04/2026)
@@ -74,6 +75,22 @@
 - [x] **OrderSearch** - Sửa params `startDate/endDate` → `date_from/date_to`, fix statusConfig, thêm navigate click đơn, thêm filter trạng thái
 - [x] **InventoryImport/Export** - Sửa nhận `quantity/unit_price` (frontend) hoặc `qty/price` (API), fix stock_qty + available_stock đồng bộ, recalculate sau nhập/xuất
 - [x] **Login/Register** - Đã test OK, cả 2 hoạt động đúng
+- [x] **Fix kho: tạo đơn completed + sync tồn theo kho** - Tạo mới đơn `completed` sẽ trừ kho vật lý đúng kho; OrderForm sync `available_stock` theo kho cho sản phẩm mới thêm
+- [x] **Fix Inventory page /inventory** - InventoryHistory map đúng schema API `/inventory`, render ổn định không crash
+- [x] **Fix Inventory time** - Hiển thị thời gian tạo phiếu kho đúng giờ local (parse MySQL DATETIME)
+- [x] **Fix Inventory API countQuery** - Sửa lỗi `Unknown column 'sm.type'` trong filter/pagination của `/inventory`
+- [x] **Inventory filter kho + thời gian** - Trang Kho có dropdown chọn kho + popover chọn khoảng ngày, backend hỗ trợ `date_from/date_to`
+- [x] **Inventory stats thật** - 4 thẻ thống kê trên /inventory lấy dữ liệu DB qua API `/inventory/summary`
+- [x] **Products filter theo kho** - Trang Products có dropdown chọn kho, API `/products` hỗ trợ `warehouse_id` trả tồn theo kho
+- [x] **Inventory Import/Export: tìm sản phẩm đẹp** - Nhập/Xuất kho thêm sản phẩm bằng search suggestions như OrderForm, UI đẹp hơn
+- [x] **Xuất chuyển kho + xuất điều chỉnh** - Xuất chuyển kho có kho nhận (cộng/trừ 2 kho khi completed); thêm lý do xuất điều chỉnh
+- [x] **Xuất kho: chỉ gợi ý SP trong kho** - Search sản phẩm khi xuất chỉ trả SP có thể bán > 0 trong kho xuất
+- [x] **Update schema warehouse_stock** - Bổ sung bảng warehouse_stock vào schema.sql khớp logic tồn kho theo kho
+- [x] **Default kho trung tâm cho sản phẩm** - Init warehouse_stock cho toàn bộ sản phẩm hiện có vào kho trung tâm + tạo sản phẩm mới auto thuộc kho mặc định
+- [x] **Màn hình tạo kho + kho mặc định** - Admin CRUD kho và set 1 kho là kho tổng/mặc định (is_default)
+- [x] **Kho mặc định dạng radio** - Cột kho mặc định là radio (1 lựa chọn), chọn auto cập nhật
+- [x] **Script chạy migration local** - Thêm script Node chạy file SQL khi không có mysql CLI
+- [x] **Seed test: sản phẩm thuộc kho tổng** - Tạo warehouse_stock ở kho mặc định cho các sản phẩm chưa có dữ liệu theo kho
 
 ### Phase 6: Logic nghiệp vụ đúng theo LOGIC_BUSINESS.md (06/04/2026)
 - [x] **Fix HH CTV theo nhóm** - B lên đơn nhóm X → A chỉ nhận override nếu A thuộc nhóm X

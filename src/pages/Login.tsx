@@ -66,10 +66,10 @@ export function Login() {
         <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="relative z-10">
             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-2xl font-black mb-8 shadow-lg shadow-blue-600/20">
-              V
+              S
             </div>
             <h1 className="text-4xl font-black tracking-tight mb-4">
-              Velocity <span className="text-blue-500">Retail</span>
+              Sheki <span className="text-blue-500">ERP</span>
             </h1>
             <p className="text-slate-400 font-medium text-lg leading-relaxed">
               Hệ thống quản lý bán hàng, nhân sự và kho bãi tích hợp mạnh mẽ nhất cho doanh nghiệp của bạn.
@@ -163,6 +163,16 @@ export function Login() {
               )}
             </button>
           </form>
+
+          {/* Link đăng ký */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-slate-400 font-medium">
+              Chưa có tài khoản?{" "}
+              <Link to="/register" className="text-blue-600 font-bold hover:underline">
+                Đăng ký ngay
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
