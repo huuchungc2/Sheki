@@ -298,7 +298,21 @@ async function importProduct(pool, row) {
   
   // Auto-generate SKU if empty
   if (!sku) {
-    sku = 'SKU-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const prefix = `SKU-${dateStr}-`;
+    const [lastRows] = await pool.query(
+      'SELECT sku FROM products WHERE sku LIKE ? ORDER BY sku DESC LIMIT 1',
+      [`${prefix}%`]
+    );
+    let seq = 1;
+    if (lastRows.length > 0 && lastRows[0].sku) {
+      const parts = String(lastRows[0].sku).split('-');
+      const last = parts[parts.length - 1];
+      const n = parseInt(last, 10);
+      if (!Number.isNaN(n)) seq = n + 1;
+    }
+    sku = `${prefix}${String(seq).padStart(4, '0')}`;
   }
 
   const [existing] = await pool.query('SELECT id FROM products WHERE sku = ?', [sku]);

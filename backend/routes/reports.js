@@ -181,12 +181,13 @@ router.get('/salary', auth, async (req, res, next) => {
     const currentMonth = month || new Date().getMonth() + 1;
     const currentYear = year || new Date().getFullYear();
 
-    let groupFilter = '';
-    const params = [currentMonth, currentYear];
-    if (group_id) {
-      groupFilter = ' AND u.id IN (SELECT user_id FROM user_groups WHERE group_id = ?)';
-      params.push(group_id);
-    }
+    // Lọc theo "Nhóm BH" của đơn hàng (orders.group_id), KHÔNG dựa trên user_groups.
+    // Vì báo cáo hoa hồng theo nhóm đang hiển thị theo o.group_id (CommissionReport).
+    const groupId = group_id ? parseInt(group_id) : null;
+    const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
+    const ordersExistsCond = groupId
+      ? ' AND EXISTS (SELECT 1 FROM orders o2 WHERE o2.salesperson_id = u.id AND MONTH(o2.created_at) = ? AND YEAR(o2.created_at) = ? AND o2.group_id = ?)'
+      : '';
 
     const [salesData] = await pool.query(
       `SELECT
@@ -207,6 +208,7 @@ router.get('/salary', auth, async (req, res, next) => {
          FROM orders
          WHERE MONTH(created_at) = ?
            AND YEAR(created_at) = ?
+           ${groupId ? ' AND group_id = ?' : ''}
          GROUP BY salesperson_id
        ) o_stats ON u.id = o_stats.salesperson_id
        LEFT JOIN (
@@ -216,6 +218,7 @@ router.get('/salary', auth, async (req, res, next) => {
          WHERE MONTH(o.created_at) = ?
            AND YEAR(o.created_at) = ?
            AND c.type = 'direct'
+           ${orderGroupCond}
          GROUP BY c.user_id
        ) c_direct ON u.id = c_direct.user_id
        LEFT JOIN (
@@ -225,12 +228,22 @@ router.get('/salary', auth, async (req, res, next) => {
          WHERE MONTH(o.created_at) = ?
            AND YEAR(o.created_at) = ?
            AND c.type = 'override'
+           ${orderGroupCond}
          GROUP BY c.user_id
        ) c_override ON u.id = c_override.user_id
        WHERE u.role = 'sales' AND u.is_active = 1
-       ${groupFilter}
+       ${ordersExistsCond}
        ORDER BY total_sales DESC`,
-      [...params, ...params, ...params]
+      [
+        // o_stats
+        currentMonth, currentYear, ...(groupId ? [groupId] : []),
+        // c_direct
+        currentMonth, currentYear, ...(groupId ? [groupId] : []),
+        // c_override
+        currentMonth, currentYear, ...(groupId ? [groupId] : []),
+        // EXISTS filter
+        ...(groupId ? [currentMonth, currentYear, groupId] : []),
+      ]
     );
 
     // Convert DECIMAL strings to numbers

@@ -157,7 +157,9 @@ export function InventoryImport() {
             : i
         );
       }
-      const defaultPrice = Number(product.cost_price ?? product.price ?? 0) || 0;
+      const cost = Number(product.cost_price ?? 0) || 0;
+      const sell = Number(product.price ?? 0) || 0;
+      const defaultPrice = cost > 0 ? cost : sell;
       return [
         ...prev.filter((i) => i.product_id || prev.length > 1), // tránh giữ row trống đầu tiên
         {
@@ -291,11 +293,64 @@ export function InventoryImport() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Danh sách sản phẩm nhập</h2>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-wide">Danh sách sản phẩm</h2>
+                  <p className="text-[11px] text-slate-400">Tìm kiếm và thêm sản phẩm vào phiếu</p>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
+                <div className="relative w-[320px]" ref={productBoxRef}>
+                  <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <input
+                    value={productQuery}
+                    onChange={(e) => {
+                      setProductQuery(e.target.value);
+                      setShowProductSuggestions(e.target.value.trim().length > 0);
+                    }}
+                    onFocus={() => productQuery.trim().length > 0 && setShowProductSuggestions(true)}
+                    placeholder="Tìm sản phẩm, SKU..."
+                    className="w-full pr-9 pl-4 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm outline-none transition-all"
+                  />
+
+                  {showProductSuggestions && (
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50">
+                      <div className="max-h-64 overflow-y-auto">
+                        {productSuggestions.length > 0 ? (
+                          productSuggestions.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => addProduct(p)}
+                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
+                                <p className="text-[11px] text-slate-400 font-mono uppercase tracking-wide">{p.sku} • {p.unit}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-sm font-bold text-slate-900">
+                                  {formatCurrency((Number(p.cost_price ?? 0) || 0) > 0 ? (Number(p.cost_price) || 0) : (Number(p.price) || 0))}
+                                </p>
+                                <p className="text-[10px] text-slate-400">Thêm</p>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-8 text-center text-slate-400 text-sm">
+                            Không tìm thấy sản phẩm
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={addItem}
-                  className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-sm font-bold transition-all"
+                  className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl text-sm font-semibold transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   Thêm dòng
@@ -303,55 +358,6 @@ export function InventoryImport() {
               </div>
             </div>
 
-            {/* Product quick add */}
-            <div className="p-6 border-b border-slate-100">
-              <div className="relative" ref={productBoxRef}>
-                <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={productQuery}
-                  onChange={(e) => {
-                    setProductQuery(e.target.value);
-                    setShowProductSuggestions(e.target.value.trim().length > 0);
-                  }}
-                  onFocus={() => productQuery.trim().length > 0 && setShowProductSuggestions(true)}
-                  placeholder="Tìm sản phẩm theo tên hoặc SKU để thêm nhanh..."
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm outline-none transition-all"
-                />
-
-                {showProductSuggestions && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50">
-                    <div className="max-h-64 overflow-y-auto">
-                      {productSuggestions.length > 0 ? (
-                        productSuggestions.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => addProduct(p)}
-                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-0"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
-                              <p className="text-[11px] text-slate-400 font-mono uppercase tracking-wide">{p.sku} • {p.unit}</p>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <p className="text-sm font-bold text-slate-900">
-                                {formatCurrency(Number(p.cost_price ?? p.price ?? 0) || 0)}
-                              </p>
-                              <p className="text-[10px] text-slate-400">Thêm</p>
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-4 py-8 text-center text-slate-400 text-sm">
-                          Không tìm thấy sản phẩm
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -364,6 +370,19 @@ export function InventoryImport() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {items.filter(i => i.product_id).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-14 text-center text-slate-400">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
+                            <Package className="w-6 h-6" />
+                          </div>
+                          <p className="text-sm font-medium">Chưa có sản phẩm.</p>
+                          <p className="text-xs">Tìm và thêm bên trên.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
                   {items.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/30 transition-all group">
                       <td className="px-6 py-4">

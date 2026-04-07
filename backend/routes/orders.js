@@ -14,6 +14,7 @@ const {
   calculateItemCommission,
   updateLoyaltyPoints
 } = require('../services/orderService');
+const { publishOrderEvent } = require('../services/notificationHub');
 
 router.get('/', auth, async (req, res, next) => {
   try {
@@ -178,6 +179,23 @@ router.post('/', auth, async (req, res, next) => {
     const pool = await getPool();
     const code = await generateOrderCode();
 
+    // Validate stock: qty <= available_stock in this warehouse (server-side, cannot bypass)
+    for (const it of items) {
+      const productId = it.product_id;
+      const qty = parseFloat(it.qty);
+      if (!productId || !Number.isFinite(qty) || qty <= 0) continue;
+      const [wsRows] = await pool.query(
+        'SELECT available_stock FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ? LIMIT 1',
+        [warehouse_id, productId]
+      );
+      const available = wsRows.length ? parseFloat(wsRows[0].available_stock) || 0 : 0;
+      if (qty > available) {
+        return res.status(400).json({
+          error: `Số lượng vượt tồn kho có thể bán trong kho đã chọn (product_id=${productId}, tối đa=${available})`
+        });
+      }
+    }
+
     let subtotal = 0;
     let totalCommission = 0;
 
@@ -225,6 +243,18 @@ router.post('/', auth, async (req, res, next) => {
       await updateLoyaltyPoints(customer_id, orderId, totalAmount);
     }
 
+    // Realtime notify: tạo đơn mới
+    try {
+      publishOrderEvent('created', {
+        order_id: orderId,
+        order_code: code,
+        status: orderStatus,
+        salesperson_id: req.user.id,
+        group_id: group_id || null,
+        total_amount: totalAmount,
+      });
+    } catch {}
+
     res.status(201).json({ id: orderId, code, message: 'Tạo đơn hàng thành công' });
   } catch (err) {
     next(err);
@@ -249,11 +279,41 @@ router.put('/:id', auth, async (req, res, next) => {
     const { customer_id, warehouse_id, group_id, status, shipping_address, carrier_service, shipping_fee, payment_method, discount, note, items } = req.body;
 
     const oldStatus = order.status;
+    const targetWarehouseId = warehouse_id || order.warehouse_id;
 
     let subtotal = 0;
     let totalCommission = 0;
 
     if (items) {
+      // Validate stock with baseline add-back for current order (pending/shipping only)
+      const addBackAllowed = ['pending', 'shipping'].includes(String(oldStatus)) && String(targetWarehouseId) === String(order.warehouse_id);
+      const [oldItems] = await pool.query(
+        'SELECT product_id, qty FROM order_items WHERE order_id = ?',
+        [req.params.id]
+      );
+      const baselineByProduct = oldItems.reduce((acc, r) => {
+        const pid = String(r.product_id);
+        acc[pid] = (acc[pid] || 0) + (parseFloat(r.qty) || 0);
+        return acc;
+      }, {});
+
+      for (const it of items) {
+        const productId = it.product_id;
+        const qty = parseFloat(it.qty);
+        if (!productId || !Number.isFinite(qty) || qty <= 0) continue;
+        const [wsRows] = await pool.query(
+          'SELECT available_stock FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ? LIMIT 1',
+          [targetWarehouseId, productId]
+        );
+        const available = wsRows.length ? parseFloat(wsRows[0].available_stock) || 0 : 0;
+        const baseline = addBackAllowed ? (parseFloat(baselineByProduct[String(productId)]) || 0) : 0;
+        if (qty > (available + baseline)) {
+          return res.status(400).json({
+            error: `Số lượng vượt tồn kho có thể bán trong kho đã chọn (product_id=${productId}, tối đa=${available + baseline})`
+          });
+        }
+      }
+
       await pool.query('DELETE FROM order_items WHERE order_id = ?', [req.params.id]);
 
       for (const item of items) {
@@ -321,6 +381,21 @@ router.put('/:id', auth, async (req, res, next) => {
 
     if (newStatus === 'completed' && oldStatus !== 'completed') {
       await updateLoyaltyPoints(customer_id || order.customer_id, req.params.id, totalAmount);
+    }
+
+    // Realtime notify: đổi trạng thái
+    if (newStatus !== oldStatus) {
+      try {
+        publishOrderEvent('status_changed', {
+          order_id: parseInt(req.params.id),
+          order_code: order.code,
+          old_status: oldStatus,
+          status: newStatus,
+          salesperson_id: order.salesperson_id,
+          group_id: order.group_id || null,
+          total_amount: totalAmount,
+        });
+      } catch {}
     }
 
     res.json({ message: 'Cập nhật đơn hàng thành công' });

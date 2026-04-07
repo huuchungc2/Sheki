@@ -5,6 +5,27 @@ const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
 
+async function generateProductSku(pool) {
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  const prefix = `SKU-${dateStr}-`;
+
+  const [rows] = await pool.query(
+    'SELECT sku FROM products WHERE sku LIKE ? ORDER BY sku DESC LIMIT 1',
+    [`${prefix}%`]
+  );
+
+  let seq = 1;
+  if (rows.length > 0 && rows[0].sku) {
+    const parts = String(rows[0].sku).split('-');
+    const last = parts[parts.length - 1];
+    const n = parseInt(last, 10);
+    if (!Number.isNaN(n)) seq = n + 1;
+  }
+
+  return `${prefix}${String(seq).padStart(4, '0')}`;
+}
+
 router.get('/', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
@@ -100,6 +121,18 @@ router.get('/', auth, async (req, res, next) => {
   }
 });
 
+// Get next auto SKU (SKU-YYYYMMDD-XXXX), reset per day
+// NOTE: must be declared before '/:id' route
+router.get('/next-sku', auth, authorize('admin'), async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const sku = await generateProductSku(pool);
+    res.json({ data: { sku } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
@@ -138,15 +171,20 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
   try {
     const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images } = req.body;
 
-    if (!name || !sku || !price) {
+    if (!name || !price) {
       return res.status(400).json({ error: 'Thiếu thông tin bắt buộc' });
     }
 
     const pool = await getPool();
 
-    const [existing] = await pool.query('SELECT id FROM products WHERE sku = ?', [sku]);
-    if (existing.length > 0) {
-      return res.status(409).json({ error: 'SKU đã tồn tại' });
+    let finalSku = String(sku || '').trim();
+    if (!finalSku) {
+      finalSku = await generateProductSku(pool);
+    } else {
+      const [existing] = await pool.query('SELECT id FROM products WHERE sku = ?', [finalSku]);
+      if (existing.length > 0) {
+        return res.status(409).json({ error: 'SKU đã tồn tại' });
+      }
     }
 
     // Default warehouse = is_default (fallback: Kho trung tâm, then first active warehouse)
@@ -166,7 +204,7 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
     const [result] = await pool.query(
       `INSERT INTO products (name, sku, category_id, unit, price, cost_price, stock_qty, available_stock, reserved_stock, low_stock_threshold, weight, length, width, height, description, images)
        VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, sku, category_id, unit || 'Cái', price, cost_price || 0, low_stock_threshold || 10, weight, length, width, height, description, images ? JSON.stringify(images) : null]
+      [name, finalSku, category_id, unit || 'Cái', price, cost_price || 0, low_stock_threshold || 10, weight, length, width, height, description, images ? JSON.stringify(images) : null]
     );
 
     const productId = result.insertId;
@@ -192,7 +230,7 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
     // Sync aggregate totals into products
     await recalculateStock(productId);
 
-    res.status(201).json({ id: productId, message: 'Tạo sản phẩm thành công' });
+    res.status(201).json({ id: productId, sku: finalSku, message: 'Tạo sản phẩm thành công' });
   } catch (err) {
     next(err);
   }

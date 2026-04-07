@@ -104,6 +104,11 @@ export function OrderForm() {
   const [selectedWarehouseId, setSelectedWarehouseId] = React.useState<number | null>(null);
   const [warehouses, setWarehouses] = React.useState<any[]>([]);
 
+  // Edit-mode baseline for stock validation (because current order may already be reserved)
+  const [baselineWarehouseId, setBaselineWarehouseId] = React.useState<number | null>(null);
+  const [baselineStatus, setBaselineStatus] = React.useState<string>("");
+  const [baselineQtyByProduct, setBaselineQtyByProduct] = React.useState<Record<string, number>>({});
+
   // Fetch danh sách kho
   React.useEffect(() => {
     api.get('/warehouses').then((res: any) => {
@@ -195,6 +200,16 @@ export function OrderForm() {
         setOrderStatus(order?.status ?? 'pending');
         setSelectedGroupId(order?.group_id ?? null);
         setSelectedWarehouseId(order?.warehouse_id ?? null);
+        setBaselineWarehouseId(order?.warehouse_id ?? null);
+        setBaselineStatus(order?.status ?? '');
+        setBaselineQtyByProduct(
+          (order?.items ?? []).reduce((acc: any, it: any) => {
+            const pid = String(it.product_id ?? it.productId ?? '');
+            const q = Number(it.qty ?? it.quantity ?? 0) || 0;
+            if (pid) acc[pid] = (acc[pid] || 0) + q;
+            return acc;
+          }, {} as Record<string, number>)
+        );
         setNote(order?.note ?? '');
       } catch (e) {
         console.error('Load order error', e);
@@ -229,6 +244,31 @@ export function OrderForm() {
     const zeroQtyItem = items.find(i => !i.quantity || i.quantity <= 0);
     if (zeroQtyItem) {
       setFormError(`Sản phẩm "${zeroQtyItem.productName}" phải có số lượng lớn hơn 0`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Enforce: qty <= available_stock in selected warehouse
+    // Note (edit): available_stock may already exclude this order's reserved qty (pending/shipping),
+    // so allow using baseline qty when editing within same warehouse & reserved statuses.
+    const canAddBackBaseline =
+      Boolean(id) &&
+      selectedWarehouseId != null &&
+      baselineWarehouseId != null &&
+      String(selectedWarehouseId) === String(baselineWarehouseId) &&
+      ['pending', 'shipping'].includes(String(baselineStatus || orderStatus));
+
+    const overStockItem = items.find((i: any) => {
+      const avail = Number(i.availableStock ?? 0) || 0;
+      const base = canAddBackBaseline ? (Number(baselineQtyByProduct[String(i.productId)] ?? 0) || 0) : 0;
+      return Number(i.quantity) > (avail + base);
+    });
+    if (overStockItem) {
+      const avail = Number((overStockItem as any).availableStock ?? 0) || 0;
+      const base = canAddBackBaseline ? (Number(baselineQtyByProduct[String(overStockItem.productId)] ?? 0) || 0) : 0;
+      setFormError(
+        `Sản phẩm "${overStockItem.productName}" vượt tồn kho có thể bán của kho đã chọn (tối đa: ${(avail + base).toFixed(3).replace(/\.?0+$/, '')})`
+      );
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }

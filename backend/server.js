@@ -23,6 +23,7 @@ const logsRouter = require('./routes/logs');
 const groupsRouter = require('./routes/groups');
 const commissionTiersRouter = require('./routes/commission-tiers');
 const collaboratorsRouter = require('./routes/collaborators');
+const notificationsRouter = require('./routes/notifications');
 const { logMiddleware } = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -84,6 +85,7 @@ app.use('/api/logs', logsRouter);
 app.use('/api/groups', groupsRouter);
 app.use('/api/commission-tiers', commissionTiersRouter);
 app.use('/api/collaborators', collaboratorsRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

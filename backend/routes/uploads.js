@@ -42,7 +42,8 @@ router.post('/', auth, upload.single('image'), (req, res) => {
     return res.status(400).json({ error: 'Không có file nào được tải lên' });
   }
   res.json({
-    url: `/api/uploads/${req.file.filename}`,
+    // Static files are served at /uploads (see backend/server.js)
+    url: `/uploads/${req.file.filename}`,
     filename: req.file.filename,
     size: req.file.size
   });
@@ -54,7 +55,7 @@ router.post('/multiple', auth, upload.array('images', 10), (req, res) => {
     return res.status(400).json({ error: 'Không có file nào được tải lên' });
   }
   const files = req.files.map(f => ({
-    url: `/api/uploads/${f.filename}`,
+    url: `/uploads/${f.filename}`,
     filename: f.filename,
     size: f.size
   }));

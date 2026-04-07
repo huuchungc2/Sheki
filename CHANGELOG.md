@@ -1,5 +1,38 @@
 # CHANGELOG
 
+## [07/04/2026] - Fix filter nhóm báo cáo hoa hồng
+### Fixed
+- **Group filter theo “Nhóm BH” của đơn** - Khi chọn nhóm riêng ở CommissionReport, bảng tổng hợp nhân viên (API `/reports/salary`) giờ lọc theo `orders.group_id` (cùng logic với bảng chi tiết đơn), tránh trường hợp “Tất cả” có dữ liệu nhưng chọn nhóm lại rỗng do lọc theo `user_groups` - Files: `backend/routes/reports.js`
+
+## [07/04/2026] - Thông báo realtime (SSE)
+### Added
+- **SSE notifications** - Thêm endpoint realtime `/api/notifications/stream?token=...` và hub phát sự kiện - Files: `backend/routes/notifications.js`, `backend/services/notificationHub.js`, `backend/server.js`
+### Changed
+- **Orders emit events** - Tạo đơn/đổi trạng thái sẽ phát event realtime để UI cập nhật badge - Files: `backend/routes/orders.js`
+- **Bell icon realtime** - Bell icon hiển thị số thông báo mới + dropdown danh sách, click điều hướng tới sửa đơn - Files: `src/components/Layout.tsx`
+
+## [07/04/2026] - Fix sản phẩm: tên kho + khối lượng + upload ảnh
+### Fixed
+- **Upload ảnh sản phẩm** - Fix preview ảnh upload (URL `/api/uploads/...` được render đúng host) + báo lỗi rõ ràng khi upload fail - Files: `src/pages/ProductForm.tsx`
+### Added
+- **Khối lượng sản phẩm (kg)** - Thêm field “Khối lượng (kg)” trong form thêm/sửa và gửi lên API - Files: `src/pages/ProductForm.tsx`
+
+## [07/04/2026] - Revert: danh sách sản phẩm phiên bản cũ
+### Changed
+- **ProductList UI** - Hoàn tác phần hiển thị “tên kho” trong cột kho hàng, quay về layout danh sách sản phẩm phiên bản cũ theo yêu cầu - Files: `src/pages/ProductList.tsx`
+
+## [07/04/2026] - Fix ProductForm: upload ảnh + SKU tự sinh
+### Fixed
+- **Upload ảnh sản phẩm** - Backend trả URL ảnh đúng static `/uploads/...` để preview và lưu ảnh hoạt động ổn định - Files: `backend/routes/uploads.js`, `src/pages/ProductForm.tsx`
+### Added
+- **SKU tự sinh theo ngày** - Khi thêm sản phẩm nếu bỏ trống SKU, hệ thống tự tạo `SKU-YYYYMMDD-XXXX` và reset theo ngày (áp dụng cho cả UI và bulk import) - Files: `backend/routes/products.js`, `backend/routes/import.js`, `src/pages/ProductForm.tsx`, `src/pages/BulkImport.tsx`
+### Changed
+- **Prefill SKU khi thêm mới** - Form thêm sản phẩm tự gọi API lấy SKU kế tiếp và điền vào ô SKU luôn (không cần bấm Lưu mới thấy) - Files: `backend/routes/products.js`, `src/pages/ProductForm.tsx`
+
+## [07/04/2026] - Ràng buộc tồn kho khi tạo/sửa đơn
+### Fixed
+- **Chặn vượt tồn kho theo kho xuất** - Khi tạo/sửa đơn, mỗi sản phẩm bắt buộc `qty <= available_stock` của kho đã chọn; nếu vượt sẽ không cho lưu (check cả frontend và backend) - Files: `src/pages/OrderForm.tsx`, `backend/routes/orders.js`
+
 ## [07/04/2026] - OrderForm: Thêm chọn kho xuất hàng
 ### Added
 - **Warehouse selector** - Dropdown "KHO XUẤT HÀNG" hiển thị trước nhóm bán hàng, chỉ load kho `is_active=true`, viền amber khi chưa chọn - Files: `src/pages/OrderForm.tsx`
@@ -25,6 +58,8 @@
 - **Warehouses default radio UI** - Cột "Kho mặc định" hiển thị radio 1 lựa chọn; chọn sẽ auto cập nhật ngay, thay thế kho mặc định hiện tại - Files: `src/pages/Warehouses.tsx`
 - **Local migration runner** - Thêm script chạy file .sql bằng mysql2 để tiện apply migrations trên máy không có mysql CLI - Files: `backend/scripts/runSqlMigration.js`
 - **Seed products into default warehouse** - Thêm migration seed dữ liệu test: tạo `warehouse_stock` cho kho mặc định (kho tổng) với các sản phẩm chưa có warehouse_stock - Files: `migrations/004_seed_default_warehouse_stock_for_testing.sql`
+- **Inventory Import/Export product picker UI** - Refine UI chọn sản phẩm theo style OrderForm (header + search box, dropdown suggestions đẹp, empty state) - Files: `src/pages/InventoryImport.tsx`, `src/pages/InventoryExport.tsx`
+- **Inventory Import default price** - Khi thêm sản phẩm vào nhập kho, nếu `cost_price=0` sẽ fallback sang `price` để tránh đơn giá = 0 - Files: `src/pages/InventoryImport.tsx`
 
 ## [06/04/2026] - Verify & Fix OrderSearch, CollaboratorsPage, InventoryImport/Export
 ### Fixed

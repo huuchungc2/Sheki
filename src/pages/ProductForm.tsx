@@ -21,6 +21,7 @@ export function ProductForm() {
     price: 0,
     cost_price: 0,
     stock_qty: 0,
+    weight: 0,
     description: "",
   });
   const [images, setImages] = React.useState<string[]>([]);
@@ -31,6 +32,26 @@ export function ProductForm() {
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
   const [errors, setErrors] = React.useState<{ name?: string; sku?: string; price?: string }>({});
+
+  // Prefill SKU on create (server-authoritative sequence)
+  React.useEffect(() => {
+    if (isEdit) return;
+    if (formData.sku.trim()) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch(`${API_URL}/products/next-sku`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(j => {
+        const sku = j?.data?.sku;
+        if (typeof sku === "string" && sku.trim()) {
+          setFormData(prev => prev.sku.trim() ? prev : ({ ...prev, sku }));
+        }
+      })
+      .catch(() => {});
+  }, [isEdit, formData.sku]);
 
   React.useEffect(() => {
     const fetchCategories = async () => {
@@ -70,6 +91,7 @@ export function ProductForm() {
             price: p.price || 0,
             cost_price: p.cost_price || 0,
             stock_qty: p.stock_qty || 0,
+            weight: p.weight || 0,
             description: p.description || "",
           });
           if (p.images) {
@@ -106,7 +128,8 @@ export function ProductForm() {
     if (!formData.name.trim()) {
       newErrors.name = "Vui lòng nhập tên sản phẩm";
     }
-    if (!formData.sku.trim()) {
+    // SKU: allow auto-generate on create
+    if (isEdit && !formData.sku.trim()) {
       newErrors.sku = "Vui lòng nhập mã SKU";
     }
     if (!formData.price || formData.price <= 0) {
@@ -119,7 +142,7 @@ export function ProductForm() {
 
   const getImageUrl = (img: string) => {
     if (img.startsWith('http')) return img;
-    if (img.startsWith('/api')) return img;
+    if (img.startsWith('/api')) return `${API_URL.replace('/api', '')}${img}`;
     if (img.startsWith('/uploads')) return `${API_URL.replace('/api', '')}${img}`;
     return img;
   };
@@ -146,12 +169,15 @@ export function ProductForm() {
           headers: { "Authorization": `Bearer ${token}` },
           body: formData
         });
-        if (res.ok) {
-          const data = await res.json();
-          setImages(prev => [...prev, data.url]);
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || "Upload thất bại");
         }
+        const data = await res.json();
+        if (data?.url) setImages(prev => [...prev, data.url]);
       } catch (err) {
         console.error("Upload failed", err);
+        setError("Tải ảnh lên thất bại. Vui lòng thử lại hoặc kiểm tra định dạng/kích thước ảnh.");
       }
     }
     // Reset input
@@ -161,7 +187,7 @@ export function ProductForm() {
   const removeImage = async (index: number) => {
     const imgUrl = images[index];
     // If it's a local upload, delete from server
-    if (imgUrl.startsWith('/api/uploads/')) {
+    if (imgUrl.startsWith('/uploads/')) {
       try {
         const token = localStorage.getItem("token");
         const filename = imgUrl.split('/').pop();
@@ -185,8 +211,11 @@ export function ProductForm() {
       const token = localStorage.getItem("token");
       const method = isEdit ? "PUT" : "POST";
       const url = isEdit ? `${API_URL}/products/${id}` : `${API_URL}/products`;
+      const finalSku = formData.sku.trim();
       const body = {
         ...formData,
+        // Backend sẽ tự sinh SKU nếu create và sku rỗng
+        sku: finalSku || undefined,
         category_id: formData.category_id ? parseInt(formData.category_id) : null,
         images: images.length > 0 ? images : null,
       };
@@ -199,6 +228,13 @@ export function ProductForm() {
         const err = await res.json();
         throw new Error(err.error || "Thao tác thất bại");
       }
+      // If backend auto-generated SKU, reflect it immediately
+      try {
+        const okJson = await res.json();
+        if (!isEdit && okJson?.sku && !formData.sku.trim()) {
+          setFormData(prev => ({ ...prev, sku: okJson.sku }));
+        }
+      } catch {}
       setSuccess(true);
       setTimeout(() => navigate("/products"), 1000);
     } catch (err: any) {
@@ -325,6 +361,18 @@ export function ProductForm() {
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Cảnh báo hết hàng</label>
                   <input type="number" placeholder="10" className="w-full px-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Khối lượng (kg)</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={formData.weight ?? ""}
+                    onChange={(e) => handleChange("weight", Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none"
+                  />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-2">

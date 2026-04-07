@@ -7,17 +7,17 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **Thông báo realtime** - Bell icon hiển thị số đơn mới, đơn thay đổi trạng thái
+- [ ] **Deploy production**
+  - Setup VPS CentOS/Ubuntu
+  - Config Nginx, PM2, SSL
+  - Files: tạo mới `deploy.sh`, `nginx.conf`
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
 - [x] **Xuất Excel báo cáo hoa hồng** - Nút "Xuất báo cáo" trong CommissionReport thực sự export file
-- [ ] **Deploy production**
-  - Setup VPS CentOS/Ubuntu
-  - Config Nginx, PM2, SSL
-  - Files: tạo mới `deploy.sh`, `nginx.conf`
+- [x] **Thông báo realtime** - Bell icon hiển thị số đơn mới, đơn thay đổi trạng thái
 
 ---
 
@@ -91,6 +91,8 @@
 - [x] **Kho mặc định dạng radio** - Cột kho mặc định là radio (1 lựa chọn), chọn auto cập nhật
 - [x] **Script chạy migration local** - Thêm script Node chạy file SQL khi không có mysql CLI
 - [x] **Seed test: sản phẩm thuộc kho tổng** - Tạo warehouse_stock ở kho mặc định cho các sản phẩm chưa có dữ liệu theo kho
+- [x] **UI chọn sản phẩm nhập/xuất kiểu search** - Chỉnh UI picker theo style search dropdown (như OrderForm)
+- [x] **Nhập kho: đơn giá không =0** - Fallback cost_price→price khi cost_price=0
 
 ### Phase 6: Logic nghiệp vụ đúng theo LOGIC_BUSINESS.md (06/04/2026)
 - [x] **Fix HH CTV theo nhóm** - B lên đơn nhóm X → A chỉ nhận override nếu A thuộc nhóm X
@@ -106,6 +108,7 @@
 - [x] **Dashboard Sales** - Doanh thu, HH bán hàng, HH từ CTV, đơn theo trạng thái, top sản phẩm, đơn gần đây
 - [x] **EmployeeDetail nâng cấp** - Date filter preset, 5 stat cards (HH bán hàng / HH từ CTV / Tổng HH / Số đơn / Doanh thu), fix statusConfig
 - [x] **CommissionReport nâng cấp** - 4 stat cards đúng (direct/override/tổng/số đơn), cột nhóm BH, filter nhóm, admin: bảng sum + tab HH CTV gộp chung
+- [x] **Fix filter nhóm báo cáo hoa hồng** - Chọn "Tất cả" vẫn ra, chọn nhóm riêng giờ hiển thị đúng (salary report lọc theo `orders.group_id` thay vì membership) 
 - [x] **Màn hình HH CTV Sales** - Filter preset + nhóm, accordion từng CTV, chi tiết đơn per CTV, grand total
 - [x] **Màn hình HH CTV Admin** - Accordion 2 cấp Sales→CTV→Đơn, filter nhóm/sales/search, grand total
 - [x] **Fix bug HH CTV = 0** - Sửa params SQL bị lẫn targetUserId vào filter tháng/năm

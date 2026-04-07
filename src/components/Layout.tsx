@@ -64,6 +64,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [openSubmenu, setOpenSubmenu] = React.useState<string | null>(null);
+  const [showNotifMenu, setShowNotifMenu] = React.useState(false);
+  const [notifCount, setNotifCount] = React.useState(0);
+  const [notifItems, setNotifItems] = React.useState<any[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -85,6 +88,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const userStr = localStorage.getItem("user");
     return userStr ? JSON.parse(userStr) : null;
   }, []);
+
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token || !currentUser?.id) return;
+
+    const url = `http://localhost:3000/api/notifications/stream?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
+
+    const onOrder = (ev: MessageEvent) => {
+      try {
+        const data = JSON.parse(ev.data);
+        // Sales: backend already filters; Admin: show all
+        setNotifCount(c => c + 1);
+        setNotifItems(prev => {
+          const next = [data, ...prev];
+          return next.slice(0, 8);
+        });
+      } catch {}
+    };
+
+    es.addEventListener('order', onOrder as any);
+    es.addEventListener('error', () => {
+      // Browser will auto-retry; keep silent to avoid noisy UI
+    });
+
+    return () => {
+      es.removeEventListener('order', onOrder as any);
+      es.close();
+    };
+  }, [currentUser?.id]);
 
   const navigation = currentUser?.role === 'admin' ? navigationAdmin : navigationSales;
   // Deduplicate potential duplicate entries (e.g., multiple additions of the same href)
@@ -303,10 +336,67 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowNotifMenu(v => !v);
+                  setNotifCount(0);
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 relative"
+                aria-label="Thông báo"
+              >
+                <Bell className="w-5 h-5" />
+                {notifCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                    {notifCount > 99 ? "99+" : notifCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifMenu(false)} />
+                  <div className="absolute right-0 top-12 z-50 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                      <p className="text-sm font-bold text-slate-900">Thông báo</p>
+                      <button
+                        onClick={() => { setNotifItems([]); setNotifCount(0); setShowNotifMenu(false); }}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                      >
+                        Xoá
+                      </button>
+                    </div>
+                    {notifItems.length === 0 ? (
+                      <div className="px-4 py-10 text-center text-sm text-slate-400">Chưa có thông báo</div>
+                    ) : (
+                      <div className="max-h-96 overflow-y-auto divide-y divide-slate-50">
+                        {notifItems.map((n, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setShowNotifMenu(false);
+                              if (n?.order_id) navigate(`/orders/edit/${n.order_id}`);
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-all"
+                          >
+                            <p className="text-sm font-semibold text-slate-800">
+                              {n.type === "created"
+                                ? `Đơn mới: ${n.order_code || "—"}`
+                                : `Đổi trạng thái: ${n.order_code || "—"}`}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {n.type === "created"
+                                ? `Trạng thái: ${n.status}`
+                                : `${n.old_status} → ${n.status}`}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
             <div className="h-8 w-px bg-slate-200 mx-2"></div>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">

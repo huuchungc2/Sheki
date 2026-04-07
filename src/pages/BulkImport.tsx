@@ -27,8 +27,8 @@ const entityConfig: Record<string, any> = {
     title: "Nhập sản phẩm hàng loạt",
     description: "Tải lên tệp Excel chứa danh sách sản phẩm.",
     fields: ["name", "sku", "unit", "price", "cost_price", "stock_qty", "low_stock_threshold", "weight", "length", "width", "height", "image_url", "description"],
-    fieldLabels: ["Tên SP *", "SKU *", "Đơn vị", "Giá bán", "Giá vốn", "Tồn kho", "Cảnh báo hết", "Cân nặng (g)", "Dài (cm)", "Rộng (cm)", "Cao (cm)", "URL ảnh", "Mô tả"],
-    required: ["name", "sku"]
+    fieldLabels: ["Tên SP *", "SKU (tự sinh nếu để trống)", "Đơn vị", "Giá bán", "Giá vốn", "Tồn kho", "Cảnh báo hết", "Cân nặng (g)", "Dài (cm)", "Rộng (cm)", "Cao (cm)", "URL ảnh", "Mô tả"],
+    required: ["name"]
   }
 };
 
