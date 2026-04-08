@@ -11,6 +11,14 @@
 ### Changed
 - **EmployeeList search/filter UI** — Tìm kiếm debounce; filter phòng ban/vai trò thực sự gọi API; bulk gán quyền dời xuống cùng hàng filter và thiết kế lại gọn hơn - Files: `src/pages/EmployeeList.tsx`
 
+## [08/04/2026] - Mật khẩu mặc định Sales = abc123
+### Changed
+- **Seed + migration** — Cập nhật seed Sales password sang `abc123` và thêm migration để reset toàn bộ user role `sales` về `abc123` - Files: `schema.sql`, `migrations/008_update_sales_default_password_abc123.sql`, `CLAUDE.md`
+
+## [08/04/2026] - Reset mật khẩu Admin = comiumauden1234
+### Changed
+- **Migration reset admin password** — Cập nhật `password_hash` của role `admin` sang `comiumauden1234` để đăng nhập được ngay trên DB hiện tại - Files: `migrations/009_update_admin_password_comiumauden1234.sql`, `CLAUDE.md`
+
 ## [08/04/2026] - Vai trò động (roles + phân quyền)
 ### Added
 - **Bảng `roles` + `users.role_id`** — Admin định nghĩa vai trò (code, tên, `can_access_admin`, `scope_own_data`); nhân viên gán `role_id`; migration `007` + `schema.sql` cho cài mới - Files: `migrations/007_roles_table.sql`, `schema.sql`

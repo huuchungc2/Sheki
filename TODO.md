@@ -16,6 +16,13 @@
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
+- [x] **Reset mật khẩu Admin = comiumauden1234**
+  - Thêm migration reset role admin + cập nhật CLAUDE.md
+
+- [x] **Cập nhật mật khẩu mặc định Sales = abc123**
+  - Update seed `schema.sql` + cập nhật `CLAUDE.md`
+  - Thêm migration update password_hash cho sales hiện có
+
 - [x] **Hoàn hàng: hỗ trợ hoàn từng phần theo sản phẩm**
   - Admin tạo yêu cầu hoàn với số lượng từng item
   - Approve tạo return + nhập kho + điều chỉnh hoa hồng theo tỷ lệ phần hoàn

@@ -54,9 +54,9 @@ project/
 
 | Tên đăng nhập | Email | Password | Role |
 |---|---|---|---|
-| admin | admin@velocity.vn | admin123 | Admin |
-| lan_sales | lan.sales@velocity.vn | sales123 | Sales |
-| minh_sales | minh.sales@velocity.vn | sales123 | Sales |
+| admin@velocity.vn | admin@velocity.vn | comiumauden1234 | Admin |
+| lan.sales@velocity.vn | lan.sales@velocity.vn | abc123 | Sales |
+| minh.sales@velocity.vn | minh.sales@velocity.vn | abc123 | Sales |
 
 ## ⚠️ Business Rules cốt lõi (KHÔNG được bỏ qua)
 - Mã đơn: `DH-YYYYMMDD-XXXX`, reset theo ngày

@@ -372,10 +372,10 @@ INSERT INTO `role_permissions` (`role`, `module`, `action`, `allowed`) VALUES
 INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `role_id`, `commission_rate`, `is_active`) VALUES
 ('Admin Velocity', 'admin', 'admin@velocity.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 1, 0.00, 1);
 
--- Sales employees (password: sales123)
+-- Sales employees (password: abc123)
 INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `phone`, `role_id`, `commission_rate`, `is_active`) VALUES
-('Nguyễn Thị Lan', 'lan_sales', 'lan.sales@velocity.vn', '$2a$10$B2V8iKNaD94Dizq95/eEvufoc0220B93okzsqMVCW536cp2/aAxbG', '0912345678', 2, 5.00, 1),
-('Trần Văn Minh', 'minh_sales', 'minh.sales@velocity.vn', '$2a$10$B2V8iKNaD94Dizq95/eEvufoc0220B93okzsqMVCW536cp2/aAxbG', '0987654321', 2, 5.00, 1);
+('Nguyễn Thị Lan', 'lan_sales', 'lan.sales@velocity.vn', '$2a$10$qTMEmtj46j0yexPvtoyo3elQvIWkSft96w0DJphILaGewZfSkfYea', '0912345678', 2, 5.00, 1),
+('Trần Văn Minh', 'minh_sales', 'minh.sales@velocity.vn', '$2a$10$qTMEmtj46j0yexPvtoyo3elQvIWkSft96w0DJphILaGewZfSkfYea', '0987654321', 2, 5.00, 1);
 
 -- Default warehouses
 INSERT INTO `warehouses` (`name`, `address`, `is_active`) VALUES
