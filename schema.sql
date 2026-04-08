@@ -7,15 +7,35 @@ CREATE DATABASE IF NOT EXISTS `erp` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb
 USE `erp`;
 
 -- ============================================
--- 1. USERS (Nhân viên)
+-- 1. ROLES (Vai trò — Admin định nghĩa, gán cho nhân viên)
+-- ============================================
+CREATE TABLE `roles` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `code` VARCHAR(64) NOT NULL UNIQUE,
+  `name` VARCHAR(100) NOT NULL,
+  `description` VARCHAR(255) DEFAULT NULL,
+  `can_access_admin` TINYINT(1) NOT NULL DEFAULT 0,
+  `scope_own_data` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1 = chỉ đơn/KH của mình',
+  `is_system` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_roles_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `roles` (`id`, `code`, `name`, `description`, `can_access_admin`, `scope_own_data`, `is_system`) VALUES
+(1, 'admin', 'Quản trị viên', 'Toàn quyền hệ thống', 1, 0, 1),
+(2, 'sales', 'Nhân viên kinh doanh', 'Đơn hàng & KH theo nhân viên', 0, 1, 1);
+
+-- ============================================
+-- 2. USERS (Nhân viên)
 -- ============================================
 CREATE TABLE `users` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   `full_name` VARCHAR(100) NOT NULL,
+  `username` VARCHAR(64) NOT NULL UNIQUE COMMENT 'Tên đăng nhập',
   `email` VARCHAR(100) NOT NULL UNIQUE,
   `password_hash` VARCHAR(255) NOT NULL,
   `phone` VARCHAR(20) DEFAULT NULL,
-  `role` ENUM('admin', 'sales') NOT NULL DEFAULT 'sales',
+  `role_id` INT UNSIGNED NOT NULL,
   `department` VARCHAR(50) DEFAULT NULL,
   `position` VARCHAR(100) DEFAULT NULL,
   `commission_rate` DECIMAL(5,2) DEFAULT 5.00 COMMENT '% hoa hồng',
@@ -29,12 +49,14 @@ CREATE TABLE `users` (
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_users_email` (`email`),
-  INDEX `idx_users_role` (`role`),
-  INDEX `idx_users_is_active` (`is_active`)
+  INDEX `idx_users_username` (`username`),
+  INDEX `idx_users_role_id` (`role_id`),
+  INDEX `idx_users_is_active` (`is_active`),
+  CONSTRAINT `fk_users_role` FOREIGN KEY (`role_id`) REFERENCES `roles`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 2. CATEGORIES (Danh mục sản phẩm)
+-- 3. CATEGORIES (Danh mục sản phẩm)
 -- ============================================
 CREATE TABLE `categories` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -261,7 +283,7 @@ CREATE TABLE `loyalty_points` (
 -- ============================================
 CREATE TABLE `role_permissions` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `role` VARCHAR(20) NOT NULL,
+  `role` VARCHAR(64) NOT NULL,
   `module` VARCHAR(50) NOT NULL,
   `action` VARCHAR(20) NOT NULL,
   `allowed` TINYINT(1) NOT NULL DEFAULT 0,
@@ -347,13 +369,13 @@ INSERT INTO `role_permissions` (`role`, `module`, `action`, `allowed`) VALUES
 -- ============================================
 
 -- Default admin user (password: admin123)
-INSERT INTO `users` (`full_name`, `email`, `password_hash`, `role`, `commission_rate`, `is_active`) VALUES
-('Admin Velocity', 'admin@velocity.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 'admin', 0.00, 1);
+INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `role_id`, `commission_rate`, `is_active`) VALUES
+('Admin Velocity', 'admin', 'admin@velocity.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 1, 0.00, 1);
 
 -- Sales employees (password: sales123)
-INSERT INTO `users` (`full_name`, `email`, `password_hash`, `phone`, `role`, `commission_rate`, `is_active`) VALUES
-('Nguyễn Thị Lan', 'lan.sales@velocity.vn', '$2a$10$B2V8iKNaD94Dizq95/eEvufoc0220B93okzsqMVCW536cp2/aAxbG', '0912345678', 'sales', 5.00, 1),
-('Trần Văn Minh', 'minh.sales@velocity.vn', '$2a$10$B2V8iKNaD94Dizq95/eEvufoc0220B93okzsqMVCW536cp2/aAxbG', '0987654321', 'sales', 5.00, 1);
+INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `phone`, `role_id`, `commission_rate`, `is_active`) VALUES
+('Nguyễn Thị Lan', 'lan_sales', 'lan.sales@velocity.vn', '$2a$10$B2V8iKNaD94Dizq95/eEvufoc0220B93okzsqMVCW536cp2/aAxbG', '0912345678', 2, 5.00, 1),
+('Trần Văn Minh', 'minh_sales', 'minh.sales@velocity.vn', '$2a$10$B2V8iKNaD94Dizq95/eEvufoc0220B93okzsqMVCW536cp2/aAxbG', '0987654321', 2, 5.00, 1);
 
 -- Default warehouses
 INSERT INTO `warehouses` (`name`, `address`, `is_active`) VALUES

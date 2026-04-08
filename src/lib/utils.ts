@@ -19,3 +19,10 @@ export function formatDate(date: Date | string) {
     year: "numeric",
   }).format(new Date(date));
 }
+
+/** Quyền giao diện / API quản trị (JWT có can_access_admin; token cũ fallback role === admin) */
+export function isAdminUser(user: { can_access_admin?: boolean; role?: string } | null | undefined): boolean {
+  if (!user) return false;
+  if (typeof user.can_access_admin === "boolean") return user.can_access_admin;
+  return user.role === "admin";
+}

@@ -16,6 +16,24 @@
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
+- [x] **Hoàn hàng: hỗ trợ hoàn từng phần theo sản phẩm**
+  - Admin tạo yêu cầu hoàn với số lượng từng item
+  - Approve tạo return + nhập kho + điều chỉnh hoa hồng theo tỷ lệ phần hoàn
+  - Chặn hoàn vượt số lượng còn lại (đã trừ các lần hoàn trước)
+
+- [x] **EmployeeForm: fix thiếu vai trò khi thêm/sửa**
+  - Đảm bảo roles load được và luôn có default role_id hợp lệ
+  - Khi roles chưa load, UI hiển thị trạng thái rõ ràng
+
+- [x] **EmployeeList: fix search/filter + redesign bulk gán quyền**
+  - Tìm kiếm debounce, filter department/role thực sự gọi API
+  - Bulk gán quyền nằm cùng hàng filter, UI gọn
+
+- [x] **Nhân viên: cột phân quyền + gán hàng loạt (checkbox) + fix Dashboard/Revenue**
+  - Danh sách nhân viên có cột Phân quyền
+  - Chọn checkbox nhiều nhân viên → gán vai trò hàng loạt
+  - Fix backend reports dùng roles (không dùng users.role đã drop)
+
 - [x] **Xuất Excel báo cáo hoa hồng** - Nút "Xuất báo cáo" trong CommissionReport thực sự export file
 - [x] **Thông báo realtime** - Bell icon hiển thị số đơn mới, đơn thay đổi trạng thái
 
@@ -71,6 +89,7 @@
 - [x] SalaryReport: filter theo nhóm
 
 ### Phase 7: Verify & Fix các màn hình chưa test (06/04/2026)
+- [x] **Vai trò động** - Bảng `roles`, `users.role_id`, API `/api/roles`, trang `/roles`, JWT `can_access_admin`/`scope_own_data`, phân quyền backend/FE theo cờ (migration `007_roles_table.sql`)
 - [x] **CollaboratorsPage** - Sửa API GET/POST/DELETE dùng bảng `collaborators` thay vì `user_collaborators` (rỗng)
 - [x] **OrderSearch** - Sửa params `startDate/endDate` → `date_from/date_to`, fix statusConfig, thêm navigate click đơn, thêm filter trạng thái
 - [x] **InventoryImport/Export** - Sửa nhận `quantity/unit_price` (frontend) hoặc `qty/price` (API), fix stock_qty + available_stock đồng bộ, recalculate sau nhập/xuất
@@ -114,6 +133,12 @@
 - [x] **Fix bug HH CTV = 0** - Sửa params SQL bị lẫn targetUserId vào filter tháng/năm
 - [x] **Fix CommissionReport Sales** - type=direct only trong /commissions/orders, stat cards lấy override riêng từ CTV API
 - [x] **Gộp HH CTV vào báo cáo Admin** - Tab "Hoa hồng từ CTV" trong trang báo cáo hoa hồng, bỏ menu riêng
+- [x] **Fix stat cards Admin (HH bán hàng/CTV/Tổng)** - Admin lấy `override_commission` đúng từ API `/commissions/orders` (không bị 0) - Files: `src/pages/CommissionReport.tsx`
+- [x] **Fix màn hình chi tiết hoa hồng (Admin)** - Summary + trạng thái + link order detail đúng theo nhân viên được chọn - Files: `backend/routes/commissions.js`, `src/pages/CommissionDetail.tsx`
+- [x] **Ghi log lỗi backend ra file** - Ghi `error.log` (middleware errorHandler) + `process.log` (unhandledRejection/uncaughtException) để dễ gửi chẩn đoán bug - Files: `backend/middleware/errorHandler.js`, `backend/server.js`
+- [x] **OrderForm: tồn kho = có thể bán theo kho** - Search sản phẩm gửi `warehouse_id`, edit mode không set 999, hiển thị + validate theo “có thể bán” (available_stock) - Files: `src/pages/OrderForm.tsx`
+- [x] **Hủy đơn = 0 hoa hồng** - Nếu `orders.status='cancelled'` thì xóa commission của đơn và không tính lại - Files: `backend/services/orderService.js`
+- [x] **Luồng hoàn hàng sau chốt** - Admin tạo yêu cầu hoàn + duyệt/từ chối; Sales chỉ xem danh sách đơn hoàn (`/returns`); Admin quản lý tại `/returns/admin`; API `GET /returns` (đơn hoàn), `GET/POST /returns/requests` (admin) - Files: `migrations/005_returns_and_commission_adjustments.sql`, `backend/routes/returns.js`, `backend/routes/commissions.js`, `backend/server.js`, `src/pages/SalesReturnsList.tsx`, `src/pages/AdminReturns.tsx`, `src/pages/CommissionReport.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
 
 ### Phase 4: Validation & Bug Fixes
 - [x] **Thêm validation đầy đủ cho tất cả form** - Required fields, inline errors, format check cho CustomerForm, ProductForm, EmployeeForm, OrderForm

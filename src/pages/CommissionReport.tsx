@@ -21,7 +21,7 @@ export function CommissionReport() {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
   }, []);
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin = currentUser?.can_access_admin === true || currentUser?.role === "admin";
 
   const [loading, setLoading]   = React.useState(true);
   const [error, setError]       = React.useState<string | null>(null);
@@ -87,7 +87,10 @@ export function CommissionReport() {
 
       // 2. Sales: lấy thêm HH từ CTV (override) để hiển thị đúng stat cards
       let overrideCommission = 0;
-      if (!isAdmin && currentUser?.id) {
+      if (isAdmin) {
+        // Admin: /commissions/orders trả về cả direct + override toàn hệ thống
+        overrideCommission = parseFloat(s?.override_commission) || 0;
+      } else if (currentUser?.id) {
         const ctvRes = await fetch(
           `${API_URL}/users/${currentUser.id}/collaborators/commissions?month=${month}&year=${year}${groupId ? `&group_id=${groupId}` : ''}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -585,9 +588,11 @@ export function CommissionReport() {
                     </td>
                     {isAdmin && (
                       <td className="px-5 py-3">
-                        {item.type === "direct"
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Bán hàng</span>
-                          : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">CTV: {item.ctv_name || "?"}</span>
+                        {String(item.entry_kind) === "adjustment"
+                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">Điều chỉnh</span>
+                          : item.type === "direct"
+                            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Bán hàng</span>
+                            : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">CTV: {item.ctv_name || "?"}</span>
                         }
                       </td>
                     )}
@@ -600,7 +605,12 @@ export function CommissionReport() {
                       }
                     </td>
                     <td className="px-5 py-3 text-right font-semibold text-slate-900">{formatCurrency(item.total_amount)}</td>
-                    <td className="px-5 py-3 text-right font-bold text-emerald-600">{formatCurrency(item.commission_amount)}</td>
+                    <td className={cn(
+                      "px-5 py-3 text-right font-bold",
+                      String(item.entry_kind) === "adjustment"
+                        ? (Number(item.commission_amount) < 0 ? "text-rose-600" : "text-emerald-600")
+                        : "text-emerald-600"
+                    )}>{formatCurrency(item.commission_amount)}</td>
                     <td className="px-5 py-3 text-center">
                       <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold", st.color)}>
                         {st.label}

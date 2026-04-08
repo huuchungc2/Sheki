@@ -13,6 +13,12 @@ function authenticateSse(req) {
   if (!token) return { ok: false, status: 401, error: 'Không có token' };
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (typeof decoded.can_access_admin !== 'boolean') {
+      decoded.can_access_admin = decoded.role === 'admin';
+    }
+    if (typeof decoded.scope_own_data !== 'boolean') {
+      decoded.scope_own_data = !decoded.can_access_admin;
+    }
     return { ok: true, user: decoded };
   } catch {
     return { ok: false, status: 401, error: 'Token không hợp lệ' };
@@ -39,7 +45,12 @@ function registerClient(req, res, user) {
   // first chunk so browser considers it "open"
   writeEvent(res, 'connected', { ts: Date.now() });
 
-  clients.set(res, { id: user.id, role: user.role, full_name: user.full_name });
+  clients.set(res, {
+    id: user.id,
+    role: user.role,
+    full_name: user.full_name,
+    can_access_admin: !!user.can_access_admin,
+  });
 
   // keep-alive ping to avoid idle timeouts
   const ping = setInterval(() => {
@@ -56,7 +67,7 @@ function registerClient(req, res, user) {
 
 function shouldDeliver(client, payload) {
   if (!client) return false;
-  if (client.role === 'admin') return true;
+  if (client.can_access_admin || client.role === 'admin') return true;
   // Sales: only own orders
   if (payload && payload.salesperson_id != null) {
     return String(payload.salesperson_id) === String(client.id);

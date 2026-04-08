@@ -54,7 +54,7 @@ export default function CollaboratorsCommissionsReport() {
     const token = localStorage.getItem("token");
     fetch(`${API_URL}/groups`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(j => setGroups(j.data || [])).catch(() => {});
-    fetch(`${API_URL}/users?role=sales&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_URL}/users?scoped=1&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(j => setEmployees(j.data || [])).catch(() => {});
   }, []);
 

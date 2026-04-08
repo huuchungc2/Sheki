@@ -153,6 +153,17 @@ async function restoreStockOnCancel(orderId, oldStatus) {
 async function recalculateCommission(orderId) {
   const pool = await getPool();
 
+  // Nếu đơn đã hủy → không tính hoa hồng (xóa commission nếu có)
+  const [orderCheck] = await pool.query(
+    'SELECT status, salesperson_id, total_amount FROM orders WHERE id = ?',
+    [orderId]
+  );
+  if (!orderCheck.length) return;
+  if (String(orderCheck[0].status) === 'cancelled') {
+    await pool.query('DELETE FROM commissions WHERE order_id = ?', [orderId]);
+    return;
+  }
+
   const [items] = await pool.query(
     `SELECT oi.commission_amount, oi.commission_rate, oi.qty, oi.unit_price,
             oi.discount_amount, oi.subtotal,
@@ -163,11 +174,8 @@ async function recalculateCommission(orderId) {
 
   const totalCommission = items.reduce((sum, item) => sum + parseFloat(item.commission_amount || 0), 0);
 
-  const [orderRows] = await pool.query('SELECT salesperson_id, total_amount FROM orders WHERE id = ?', [orderId]);
-  if (orderRows.length === 0) return;
-
-  const userId           = orderRows[0].salesperson_id;
-  const orderTotalAmount = parseFloat(orderRows[0].total_amount) || 0;
+  const userId           = orderCheck[0].salesperson_id;
+  const orderTotalAmount = parseFloat(orderCheck[0].total_amount) || 0;
 
   await pool.query('DELETE FROM commissions WHERE order_id = ?', [orderId]);
 

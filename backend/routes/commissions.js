@@ -10,52 +10,69 @@ router.get('/', auth, async (req, res, next) => {
     const { user_id, month, year, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = `
-      SELECT c.*, c.type, c.ctv_user_id, o.code as order_code, o.status, o.total_amount, u.full_name as salesperson_name, ctv.full_name as ctv_name
-      FROM commissions c
-      JOIN orders o ON c.order_id = o.id
-      JOIN users u ON c.user_id = u.id
-      LEFT JOIN users ctv ON c.ctv_user_id = ctv.id
-      WHERE 1=1
-    `;
-    let countQuery = 'SELECT COUNT(*) as total FROM commissions c JOIN orders o ON c.order_id = o.id WHERE 1=1';
+    const conditions = ['1=1'];
     const params = [];
 
-    if (req.user.role === 'sales') {
-      query += ' AND c.user_id = ?';
-      countQuery += ' AND c.user_id = ?';
+    if (req.user.scope_own_data) {
+      conditions.push('t.user_id = ?');
       params.push(req.user.id);
     } else if (user_id) {
-      query += ' AND c.user_id = ?';
-      countQuery += ' AND c.user_id = ?';
-      params.push(user_id);
+      conditions.push('t.user_id = ?');
+      params.push(parseInt(user_id));
     }
+    if (month) { conditions.push('MONTH(t.entry_date) = ?'); params.push(parseInt(month)); }
+    if (year)  { conditions.push('YEAR(t.entry_date) = ?');  params.push(parseInt(year)); }
 
-    if (month) {
-      query += ' AND MONTH(c.created_at) = ?';
-      countQuery += ' AND MONTH(c.created_at) = ?';
-      params.push(parseInt(month));
-    }
+    const whereClause = 'WHERE ' + conditions.join(' AND ');
 
-    if (year) {
-      query += ' AND YEAR(c.created_at) = ?';
-      countQuery += ' AND YEAR(c.created_at) = ?';
-      params.push(parseInt(year));
-    }
+    const baseSelect = `
+      SELECT
+        t.id, t.order_id, t.user_id, t.type, t.ctv_user_id,
+        t.commission_amount, t.entry_date as created_at,
+        t.entry_kind,
+        o.code as order_code, o.status, o.total_amount,
+        u.full_name as salesperson_name,
+        ctv.full_name as ctv_name
+      FROM (
+        SELECT
+          c.id, c.order_id, c.user_id, c.type, c.ctv_user_id,
+          c.commission_amount,
+          c.created_at as entry_date,
+          'commission' as entry_kind
+        FROM commissions c
+        UNION ALL
+        SELECT
+          ca.id, ca.order_id, ca.user_id, ca.type, ca.ctv_user_id,
+          ca.amount as commission_amount,
+          ca.created_at as entry_date,
+          'adjustment' as entry_kind
+        FROM commission_adjustments ca
+      ) t
+      JOIN orders o ON t.order_id = o.id
+      JOIN users u ON t.user_id = u.id
+      LEFT JOIN users ctv ON t.ctv_user_id = ctv.id
+    `;
 
-    query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
+    const [rows] = await pool.query(
+      `${baseSelect} ${whereClause} ORDER BY t.entry_date DESC LIMIT ? OFFSET ?`,
+      [...params, parseInt(limit), parseInt(offset)]
+    );
 
-    const [rows] = await pool.query(query, params);
-    const [countRows] = await pool.query(countQuery, params.slice(0, -2));
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) as total FROM (${baseSelect} ${whereClause}) x`,
+      params
+    );
 
-    const formattedRows = rows.map(row => ({
-      ...row,
-      commission_amount: parseFloat(row.commission_amount) || 0,
-      total_amount: parseFloat(row.total_amount) || 0,
-    }));
-
-    res.json({ data: formattedRows, total: countRows[0].total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({
+      data: rows.map(row => ({
+        ...row,
+        commission_amount: parseFloat(row.commission_amount) || 0,
+        total_amount: parseFloat(row.total_amount) || 0,
+      })),
+      total: countRows[0].total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
   } catch (err) {
     next(err);
   }
@@ -64,32 +81,31 @@ router.get('/', auth, async (req, res, next) => {
 router.get('/summary', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { month, year } = req.query;
+    const { user_id, month, year } = req.query;
 
-    let whereClause = 'WHERE 1=1';
+    const conditions = ['1=1'];
     const params = [];
-
-    if (req.user.role === 'sales') {
-      whereClause += ' AND c.user_id = ?';
+    if (req.user.scope_own_data) {
+      conditions.push('t.user_id = ?');
       params.push(req.user.id);
+    } else if (user_id) {
+      conditions.push('t.user_id = ?');
+      params.push(parseInt(user_id));
     }
-
-    if (month) {
-      whereClause += ' AND MONTH(c.created_at) = ?';
-      params.push(parseInt(month));
-    }
-
-    if (year) {
-      whereClause += ' AND YEAR(c.created_at) = ?';
-      params.push(parseInt(year));
-    }
+    if (month) { conditions.push('MONTH(t.entry_date) = ?'); params.push(parseInt(month)); }
+    if (year)  { conditions.push('YEAR(t.entry_date) = ?');  params.push(parseInt(year)); }
+    const whereClause = 'WHERE ' + conditions.join(' AND ');
 
     const [summary] = await pool.query(
       `SELECT
-        COUNT(*) as total_orders,
-        SUM(c.commission_amount) as total_commission,
-        AVG(c.commission_amount) as avg_commission
-       FROM commissions c
+        COUNT(DISTINCT t.order_id) as total_orders,
+        COALESCE(SUM(t.amount), 0) as total_commission,
+        COALESCE(AVG(t.amount), 0) as avg_commission
+       FROM (
+         SELECT order_id, user_id, commission_amount as amount, created_at as entry_date FROM commissions
+         UNION ALL
+         SELECT order_id, user_id, amount, created_at as entry_date FROM commission_adjustments
+       ) t
        ${whereClause}`,
       params
     );
@@ -106,56 +122,75 @@ router.get('/orders', auth, async (req, res, next) => {
     const { month, year, group_id, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build WHERE + params — dùng chung cho tất cả queries
     const conditions = ['1=1'];
     const baseParams = [];
 
-    if (req.user.role === 'sales') {
-      // Sales chỉ thấy đơn mình tự bán (direct), KHÔNG thấy override từ CTV
-      // (override hiển thị riêng ở màn hình "Hoa hồng từ CTV")
-      conditions.push('c.user_id = ?');
-      conditions.push("c.type = 'direct'");
+    // Sales chỉ thấy direct commissions của chính mình (không hiển thị override/adjustment ở bảng này)
+    if (req.user.scope_own_data) {
+      conditions.push('t.user_id = ?');
+      conditions.push("t.type = 'direct'");
+      conditions.push("t.entry_kind = 'commission'");
       baseParams.push(req.user.id);
     }
-    if (month)    { conditions.push('MONTH(o.created_at) = ?'); baseParams.push(parseInt(month)); }
-    if (year)     { conditions.push('YEAR(o.created_at) = ?');  baseParams.push(parseInt(year)); }
+    if (month)    { conditions.push('MONTH(t.entry_date) = ?'); baseParams.push(parseInt(month)); }
+    if (year)     { conditions.push('YEAR(t.entry_date) = ?');  baseParams.push(parseInt(year)); }
     if (group_id) { conditions.push('o.group_id = ?');          baseParams.push(parseInt(group_id)); }
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
-    const [rows] = await pool.query(`
-      SELECT
-        c.id, c.commission_amount, c.type, c.ctv_user_id,
-        ctv.full_name as ctv_name,
-        o.id as order_id, o.code as order_code,
-        o.total_amount, o.status, o.created_at as order_date,
-        o.group_id, g.name as group_name,
-        cu.name as customer_name
-      FROM commissions c
-      JOIN orders o ON c.order_id = o.id
-      LEFT JOIN users ctv ON c.ctv_user_id = ctv.id
+    const baseFrom = `
+      FROM (
+        SELECT
+          c.id, c.order_id, c.user_id, c.type, c.ctv_user_id,
+          c.commission_amount,
+          o.created_at as order_date,
+          c.created_at as entry_date,
+          'commission' as entry_kind
+        FROM commissions c
+        JOIN orders o ON c.order_id = o.id
+        UNION ALL
+        SELECT
+          ca.id, ca.order_id, ca.user_id, ca.type, ca.ctv_user_id,
+          ca.amount as commission_amount,
+          o.created_at as order_date,
+          ca.created_at as entry_date,
+          'adjustment' as entry_kind
+        FROM commission_adjustments ca
+        JOIN orders o ON ca.order_id = o.id
+      ) t
+      JOIN orders o ON t.order_id = o.id
+      LEFT JOIN users ctv ON t.ctv_user_id = ctv.id
       LEFT JOIN groups g ON o.group_id = g.id
       LEFT JOIN customers cu ON o.customer_id = cu.id
+    `;
+
+    const [rows] = await pool.query(`
+      SELECT
+        t.id, t.commission_amount, t.type, t.ctv_user_id, t.entry_kind,
+        ctv.full_name as ctv_name,
+        o.id as order_id, o.code as order_code,
+        o.total_amount, o.status, t.entry_date as order_date,
+        o.group_id, g.name as group_name,
+        cu.name as customer_name
+      ${baseFrom}
       ${whereClause}
-      ORDER BY o.created_at DESC
+      ORDER BY t.entry_date DESC
       LIMIT ? OFFSET ?
     `, [...baseParams, parseInt(limit), offset]);
 
     const [countRows] = await pool.query(`
       SELECT COUNT(*) as total
-      FROM commissions c
-      JOIN orders o ON c.order_id = o.id
+      ${baseFrom}
       ${whereClause}
     `, baseParams);
 
     const [summaryRows] = await pool.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN c.type = 'direct'   THEN c.commission_amount ELSE 0 END), 0) as direct_commission,
-        COALESCE(SUM(CASE WHEN c.type = 'override' THEN c.commission_amount ELSE 0 END), 0) as override_commission,
-        COALESCE(SUM(c.commission_amount), 0) as total_commission,
-        COUNT(DISTINCT CASE WHEN c.type = 'direct' THEN c.order_id END) as total_orders
-      FROM commissions c
-      JOIN orders o ON c.order_id = o.id
+        COALESCE(SUM(CASE WHEN t.type = 'direct'   THEN t.commission_amount ELSE 0 END), 0) as direct_commission,
+        COALESCE(SUM(CASE WHEN t.type = 'override' THEN t.commission_amount ELSE 0 END), 0) as override_commission,
+        COALESCE(SUM(t.commission_amount), 0) as total_commission,
+        COUNT(DISTINCT CASE WHEN t.type = 'direct' AND t.entry_kind='commission' THEN t.order_id END) as total_orders
+      ${baseFrom}
       ${whereClause}
     `, baseParams);
 

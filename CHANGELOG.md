@@ -1,8 +1,77 @@
 # CHANGELOG
 
+## [08/04/2026] - Nhân viên: gán phân quyền hàng loạt + fix Revenue/Dashboard
+### Fixed
+- **Reports dùng roles (không dùng `users.role`)** — Sửa `/reports/dashboard` và `/reports/salary` join `roles` + filter `r.code='sales'` để không 500 sau migration 007 - Files: `backend/routes/reports.js`
+- **Auth tương thích token cũ** — Middleware `auth` tự tra DB lấy `can_access_admin/scope_own_data` theo `role_id` nếu JWT không có fields (tránh 403 “ẩn” sau migration roles) - Files: `backend/middleware/auth.js`
+- **EmployeeList crash (Rules of Hooks)** — Dời `useMemo` lên trước các early-return `loading/error` để tránh “Rendered more hooks than during the previous render” - Files: `src/pages/EmployeeList.tsx`
+- **EmployeeForm thiếu vai trò** — Bổ sung default `role_id` khi roles load xong + UI trạng thái loading/fallback khi không load được roles - Files: `src/pages/EmployeeForm.tsx`
+### Added
+- **Danh sách nhân viên có cột Phân quyền + gán hàng loạt** — Thêm checkbox chọn dòng + thanh bulk action gán `role_id` cho nhiều nhân viên (API `PUT /users/:id/role`) - Files: `src/pages/EmployeeList.tsx`
+### Changed
+- **EmployeeList search/filter UI** — Tìm kiếm debounce; filter phòng ban/vai trò thực sự gọi API; bulk gán quyền dời xuống cùng hàng filter và thiết kế lại gọn hơn - Files: `src/pages/EmployeeList.tsx`
+
+## [08/04/2026] - Vai trò động (roles + phân quyền)
+### Added
+- **Bảng `roles` + `users.role_id`** — Admin định nghĩa vai trò (code, tên, `can_access_admin`, `scope_own_data`); nhân viên gán `role_id`; migration `007` + `schema.sql` cho cài mới - Files: `migrations/007_roles_table.sql`, `schema.sql`
+- **API `/api/roles`** — CRUD vai trò (admin) - Files: `backend/routes/roles.js`, `backend/server.js`
+- **Trang `/roles`** — Danh sách + tạo/sửa/xóa vai trò - Files: `src/pages/RolesPage.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
+### Changed
+- **JWT & middleware** — Login trả `role_id`, `role_name`, `can_access_admin`, `scope_own_data`; `authorize('admin')` và lọc dữ liệu dùng cờ thay vì `role === 'sales'|'admin'` - Files: `backend/routes/auth.js`, `backend/middleware/auth.js`, `backend/middleware/authorize.js`, `backend/routes/users.js`, `backend/routes/customers.js`, `backend/routes/orders.js`, `backend/routes/commissions.js`, `backend/routes/reports.js`, `backend/routes/returns.js`, `backend/routes/collaborators.js`, `backend/routes/import.js`, `backend/services/notificationHub.js`
+- **Frontend** — `isAdminUser()`; menu Vai trò; EmployeeForm chọn `role_id`; các màn admin/scoped dùng `can_access_admin` - Files: `src/lib/utils.ts`, `src/pages/EmployeeForm.tsx`, `src/pages/Dashboard.tsx`, `src/pages/OrderList.tsx`, `src/pages/OrderForm.tsx`, `src/pages/CommissionReport.tsx`, `src/pages/CustomerList.tsx`, `src/pages/EmployeeList.tsx`, `src/pages/CustomerForm.tsx`, `src/pages/CollaboratorsPage.tsx`, `src/pages/CommissionRules.tsx`
+
+## [08/04/2026] - Tên đăng nhập (username)
+### Added
+- **Cột `users.username` (UNIQUE)** — đăng nhập bằng username hoặc email; đăng ký & tạo/sửa nhân viên bắt buộc username (3–32 ký tự: chữ, số, `_`); import Excel nhân viên thêm cột tên đăng nhập - Files: `migrations/006_add_username.sql`, `schema.sql`, `backend/routes/auth.js`, `backend/routes/users.js`, `backend/routes/import.js`
+### Changed
+- **Login, Register, nhân viên** — UI + `CLAUDE.md` tài khoản test - Files: `src/pages/Login.tsx`, `src/pages/Register.tsx`, `src/pages/EmployeeForm.tsx`, `src/pages/EmployeeList.tsx`, `src/pages/EmployeeDetail.tsx`, `CLAUDE.md`
+
+## [08/04/2026] - Sidebar Admin gọn (nhóm menu)
+### Changed
+- **Menu Admin** - Gom thành các nhóm có submenu: Bán hàng, Danh mục, Kho, Báo cáo & HH (gồm Quy tắc hoa hồng), Tra cứu đơn, Nhập Excel; bỏ trùng “Cài đặt” ở giữa danh sách; chỉnh padding/submenu cho gọn - Files: `src/components/Layout.tsx`
+
+## [08/04/2026] - Hoàn hàng: Sales chỉ xem, Admin xử lý
+### Changed
+- **Phân tách màn hoàn** - Sales: menu “Đơn hoàn” → `/returns` chỉ danh sách đơn hoàn (đơn gốc do mình bán). Admin: “Hoàn hàng” → `/returns/admin` tạo yêu cầu hoàn, duyệt/từ chối - Files: `src/pages/SalesReturnsList.tsx`, `src/pages/AdminReturns.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
+### Added
+- **API `GET /api/returns`** - Danh sách bảng `returns` (Sales lọc theo `salesperson_id`, Admin xem tất cả) - Files: `backend/routes/returns.js`
+### Changed
+- **Quyền yêu cầu hoàn** - `POST /api/returns/requests` và `GET /api/returns/requests` chỉ Admin; xóa `ReturnRequests.tsx` - Files: `backend/routes/returns.js`, (removed) `src/pages/ReturnRequests.tsx`
+### Changed
+- **Hoàn từng phần theo sản phẩm** — Admin tạo yêu cầu hoàn với qty từng item; backend chặn hoàn vượt số lượng còn lại; khi duyệt sẽ điều chỉnh hoa hồng theo tỷ lệ giá trị item hoàn (partial) thay vì trừ toàn bộ - Files: `backend/routes/returns.js`, `src/pages/AdminReturns.tsx`
+
 ## [07/04/2026] - Fix filter nhóm báo cáo hoa hồng
 ### Fixed
 - **Group filter theo “Nhóm BH” của đơn** - Khi chọn nhóm riêng ở CommissionReport, bảng tổng hợp nhân viên (API `/reports/salary`) giờ lọc theo `orders.group_id` (cùng logic với bảng chi tiết đơn), tránh trường hợp “Tất cả” có dữ liệu nhưng chọn nhóm lại rỗng do lọc theo `user_groups` - Files: `backend/routes/reports.js`
+
+## [07/04/2026] - Fix báo cáo hoa hồng Admin (stat cards)
+### Fixed
+- **HH từ CTV + Tổng HH trên Admin** - Stat cards trên trang “Báo cáo hoa hồng toàn bộ” lấy `override_commission` đúng từ API `/commissions/orders` (không bị 0 khi là Admin) - Files: `src/pages/CommissionReport.tsx`
+
+## [07/04/2026] - Fix màn hình chi tiết hoa hồng (Admin)
+### Fixed
+- **Summary đúng theo nhân viên** - API `/commissions/summary` hỗ trợ `user_id` cho Admin, tránh summary bị lấy toàn hệ thống khi xem chi tiết từng nhân viên - Files: `backend/routes/commissions.js`
+- **Trạng thái đơn đúng enum mới** - Mapping status `pending/shipping/completed/cancelled` trên bảng chi tiết - Files: `src/pages/CommissionDetail.tsx`
+- **Link qua chi tiết đơn đúng user** - Link sang `/reports/commissions/:userId/order/:orderId` dùng đúng `targetUserId` - Files: `src/pages/CommissionDetail.tsx`
+
+## [07/04/2026] - Backend ghi log lỗi ra file
+### Added
+- **error.log + process.log** - Ghi lỗi runtime ra `backend/logs/error.log` (từ errorHandler) và `backend/logs/process.log` (unhandledRejection/uncaughtException) để dễ gửi log chẩn đoán - Files: `backend/middleware/errorHandler.js`, `backend/server.js`
+
+## [07/04/2026] - OrderForm: tồn kho = có thể bán theo sản phẩm
+### Fixed
+- **Tồn kho hiển thị đúng “Có thể bán” theo kho** - Search sản phẩm gửi `warehouse_id` để lấy `available_stock` theo kho; edit mode không còn default 999 gây sai hiển thị; highlight “vượt tồn” tính theo lượng có thể bán (có cộng baseline khi edit pending/shipping) - Files: `src/pages/OrderForm.tsx`
+
+## [07/04/2026] - Hủy đơn không tính hoa hồng
+### Fixed
+- **Đơn status=cancelled → hoa hồng = 0** - `recalculateCommission` sẽ xóa `commissions` của đơn và không tạo lại khi đơn đã hủy; nếu đổi trạng thái khỏi cancelled thì tính lại như bình thường - Files: `backend/services/orderService.js`
+
+## [07/04/2026] - Luồng hoàn hàng sau chốt + điều chỉnh hoa hồng
+### Added
+- **Yêu cầu hoàn + Duyệt hoàn (Admin)** - Admin tạo yêu cầu hoàn theo đơn và duyệt để tạo “đơn hoàn” và nhập kho lại (sau đó tách UI Sales/Admin, xem mục 08/04/2026) - Files: `backend/routes/returns.js`, `backend/server.js`, `src/App.tsx`, `src/components/Layout.tsx`
+- **Bút toán hoa hồng âm theo ngày hoàn** - Khi Admin duyệt hoàn, hệ thống tạo `commission_adjustments` (âm) để trừ lại hoa hồng của đơn gốc theo tháng phát sinh hoàn, không phá số kỳ trước - Files: `backend/routes/returns.js`, `migrations/005_returns_and_commission_adjustments.sql`
+### Changed
+- **Báo cáo hoa hồng gồm cả điều chỉnh** - API `/commissions` và `/commissions/orders` UNION thêm `commission_adjustments` theo `created_at` của adjustment; UI hiển thị badge “Điều chỉnh” và số âm màu đỏ - Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`
 
 ## [07/04/2026] - Thông báo realtime (SSE)
 ### Added

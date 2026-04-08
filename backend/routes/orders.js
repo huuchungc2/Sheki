@@ -35,7 +35,7 @@ router.get('/', auth, async (req, res, next) => {
     let countQuery = 'SELECT COUNT(*) as total FROM orders WHERE 1=1';
     const params = [];
 
-    if (req.user.role === 'sales') {
+    if (req.user.scope_own_data) {
       query += ' AND o.salesperson_id = ?';
       countQuery += ' AND salesperson_id = ?';
       params.push(req.user.id);
@@ -128,7 +128,7 @@ router.get('/:id', auth, async (req, res, next) => {
       return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
     }
 
-    if (req.user.role === 'sales' && rows[0].salesperson_id !== req.user.id) {
+    if (req.user.scope_own_data && rows[0].salesperson_id !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem đơn hàng này' });
     }
 
@@ -272,7 +272,7 @@ router.put('/:id', auth, async (req, res, next) => {
 
     const order = existing[0];
 
-    if (req.user.role === 'sales' && order.salesperson_id !== req.user.id) {
+    if (req.user.scope_own_data && order.salesperson_id !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
     }
 
@@ -415,7 +415,7 @@ router.delete('/:id', auth, async (req, res, next) => {
 
     const order = existing[0];
 
-    if (req.user.role === 'sales' && order.salesperson_id !== req.user.id) {
+    if (req.user.scope_own_data && order.salesperson_id !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xóa đơn hàng này' });
     }
 

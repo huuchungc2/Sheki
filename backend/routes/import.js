@@ -12,11 +12,11 @@ const router = express.Router();
 // Template definitions
 const TEMPLATES = {
   employees: {
-    headers: ['Họ tên *', 'Email *', 'Số điện thoại', 'Vai trò', 'Phòng ban', 'Chức vụ', '% Hoa hồng', 'Lương cơ bản', 'Ngày vào', 'Địa chỉ', 'Tỉnh/TP', 'Quận/Huyện'],
-    keys: ['full_name', 'email', 'phone', 'role', 'department', 'position', 'commission_rate', 'salary', 'join_date', 'address', 'city', 'district'],
+    headers: ['Họ tên *', 'Tên đăng nhập *', 'Email *', 'Số điện thoại', 'Vai trò', 'Phòng ban', 'Chức vụ', '% Hoa hồng', 'Lương cơ bản', 'Ngày vào', 'Địa chỉ', 'Tỉnh/TP', 'Quận/Huyện'],
+    keys: ['full_name', 'username', 'email', 'phone', 'role', 'department', 'position', 'commission_rate', 'salary', 'join_date', 'address', 'city', 'district'],
     sample: [
-      ['Nguyễn Văn A', 'nguyenvana@email.com', '0901234567', 'sales', 'Kinh doanh', 'Nhân viên', 5.00, 8000000, '2026-01-15', '123 Đường ABC', 'Hà Nội', 'Ba Đình'],
-      ['Trần Thị B', 'tranthib@email.com', '0912345678', 'sales', 'Kinh doanh', 'Nhân viên', 5.00, 9000000, '2026-02-01', '456 Đường XYZ', 'TP. Hồ Chí Minh', 'Quận 1'],
+      ['Nguyễn Văn A', 'nguyenvana', 'nguyenvana@email.com', '0901234567', 'sales', 'Kinh doanh', 'Nhân viên', 5.00, 8000000, '2026-01-15', '123 Đường ABC', 'Hà Nội', 'Ba Đình'],
+      ['Trần Thị B', 'tranthib', 'tranthib@email.com', '0912345678', 'sales', 'Kinh doanh', 'Nhân viên', 5.00, 9000000, '2026-02-01', '456 Đường XYZ', 'TP. Hồ Chí Minh', 'Quận 1'],
     ],
     note: 'Vai trò: admin hoặc sales. Mật khẩu mặc định: 123456'
   },
@@ -215,11 +215,31 @@ async function importData(entity, rows, userId) {
   return result;
 }
 
+async function ensureUniqueUsername(pool, raw) {
+  const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
+  let base = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (base.length < 3) base = `nv_${Date.now()}`;
+  if (base.length > 32) base = base.slice(0, 32);
+  let candidate = base;
+  let n = 0;
+  while (true) {
+    const [r] = await pool.query('SELECT id FROM users WHERE username = ?', [candidate]);
+    if (!r.length) return candidate;
+    n += 1;
+    candidate = `${base.slice(0, 24)}_${n}`;
+  }
+}
+
 async function importEmployee(pool, row) {
   const name = row.full_name || row.name || '';
+  let username = String(row.username || '').trim().toLowerCase();
   const email = row.email || '';
   const phone = row.phone || '';
-  const role = row.role || 'sales';
+  const roleCode = String(row.role || 'sales').trim().toLowerCase();
   const department = row.department || '';
   const position = row.position || '';
   const commissionRate = parseFloat(row.commission_rate) || 5.00;
@@ -236,9 +256,24 @@ async function importEmployee(pool, row) {
     throw new Error('Thiếu email nhân viên');
   }
 
+  const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
+  if (!username || !USERNAME_RE.test(username)) {
+    username = await ensureUniqueUsername(pool, email.split('@')[0]);
+  } else {
+    const [taken] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+    if (taken.length > 0) {
+      return;
+    }
+  }
+
   const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
   if (existing.length > 0) {
     return; // Skip if email already exists
+  }
+
+  const [[roleRow]] = await pool.query('SELECT id FROM roles WHERE code = ?', [roleCode]);
+  if (!roleRow) {
+    throw new Error(`Vai trò không hợp lệ: ${roleCode}`);
   }
 
   const bcrypt = require('bcryptjs');
@@ -246,9 +281,9 @@ async function importEmployee(pool, row) {
   const passwordHash = await bcrypt.hash(defaultPassword, 10);
 
   await pool.query(
-    `INSERT INTO users (full_name, email, password_hash, phone, role, department, position, commission_rate, salary, join_date, address, city, district, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [name, email, passwordHash, phone, role, department, position, commissionRate, salary, joinDate, address, city, district]
+    `INSERT INTO users (full_name, username, email, password_hash, phone, role_id, department, position, commission_rate, salary, join_date, address, city, district, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [name, username, email, passwordHash, phone, roleRow.id, department, position, commissionRate, salary, joinDate, address, city, district]
   );
   
   return true;
@@ -342,7 +377,7 @@ router.get('/export/:entity', auth, authorize('admin'), async (req, res, next) =
     let filename = '';
     
     if (entity === 'employees') {
-      const [data] = await pool.query('SELECT id, full_name, email, phone, role, department, position, commission_rate, salary, join_date, address, city, district, is_active FROM users ORDER BY id');
+      const [data] = await pool.query('SELECT id, full_name, username, email, phone, role, department, position, commission_rate, salary, join_date, address, city, district, is_active FROM users ORDER BY id');
       rows = data;
       headers = ['ID', 'Họ tên', 'Email', 'Số điện thoại', 'Vai trò', 'Phòng ban', 'Chức vụ', '% Hoa hồng', 'Lương', 'Ngày vào', 'Địa chỉ', 'Tỉnh/TP', 'Quận', 'Trạng thái'];
       filename = 'danh_sach_nhan_vien.xlsx';

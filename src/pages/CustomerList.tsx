@@ -39,7 +39,7 @@ function getAuthToken(): string | null {
 function isAdmin(): boolean {
   try {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    return user.role === "admin";
+    return user?.can_access_admin === true || user?.role === "admin";
   } catch {
     return false;
   }

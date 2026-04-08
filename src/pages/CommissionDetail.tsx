@@ -16,6 +16,7 @@ export function CommissionDetail() {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
   }, []);
+  const targetUserId = userId || currentUser?.id;
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -23,7 +24,6 @@ export function CommissionDetail() {
         setLoading(true);
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
-        const targetUserId = userId || currentUser?.id;
         const [commRes, sumRes, userRes] = await Promise.all([
           fetch(`${API_URL}/commissions?user_id=${targetUserId}&limit=100`, { headers }),
           fetch(`${API_URL}/commissions/summary?user_id=${targetUserId}`, { headers }),
@@ -132,13 +132,23 @@ export function CommissionDetail() {
                 <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">Chưa có hoa hồng nào</td></tr>
               ) : (
                 commissions.map((comm) => {
-                  const statusLabel = comm.status === 'done' ? 'Hoàn thành' : comm.status === 'cancelled' ? 'Đã hủy' : comm.status === 'shipping' ? 'Đang giao' : comm.status === 'confirmed' ? 'Đã xác nhận' : 'Nháp';
-                  const statusColor = comm.status === 'done' ? 'bg-emerald-50 text-emerald-600' : comm.status === 'cancelled' ? 'bg-red-50 text-red-600' : comm.status === 'shipping' ? 'bg-blue-50 text-blue-600' : comm.status === 'confirmed' ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-500';
+                  const statusLabel =
+                    comm.status === 'completed' ? 'Đã giao'
+                    : comm.status === 'cancelled' ? 'Đã hủy'
+                    : comm.status === 'shipping' ? 'Đang giao'
+                    : comm.status === 'pending' ? 'Chờ duyệt'
+                    : comm.status || '—';
+                  const statusColor =
+                    comm.status === 'completed' ? 'bg-emerald-50 text-emerald-600'
+                    : comm.status === 'cancelled' ? 'bg-red-50 text-red-600'
+                    : comm.status === 'shipping' ? 'bg-blue-50 text-blue-600'
+                    : comm.status === 'pending' ? 'bg-amber-50 text-amber-600'
+                    : 'bg-slate-50 text-slate-500';
                   const isOverride = comm.type === 'override';
                   return (
                     <tr key={comm.id} className={`hover:bg-slate-50/50 transition-all ${isOverride ? 'bg-blue-50/30' : ''}`}>
                       <td className="px-6 py-4">
-                        <Link to={`/reports/commissions/${userId}/order/${comm.order_id}`} className="text-sm font-bold text-blue-600 hover:underline">
+                        <Link to={`/reports/commissions/${targetUserId}/order/${comm.order_id}`} className="text-sm font-bold text-blue-600 hover:underline">
                           {comm.order_code}
                         </Link>
                       </td>

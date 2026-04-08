@@ -291,6 +291,7 @@ export function EmployeeDetail() {
               </div>
               <div>
                 <p className="font-bold text-slate-900">{user.full_name}</p>
+                <p className="text-xs font-mono text-slate-700">{user.username}</p>
                 <p className="text-xs text-slate-500">{user.email}</p>
                 <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider mt-1",
                   user.is_active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"

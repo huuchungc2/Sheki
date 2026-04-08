@@ -1,7 +1,7 @@
 import * as React from "react";
 import { 
   ArrowLeft, Save, User, Mail, Phone, Briefcase, Calendar,
-  CreditCard, MapPin, Shield, Loader2, AlertCircle, CheckCircle2, Users
+  CreditCard, MapPin, Shield, Loader2, AlertCircle, CheckCircle2, Users, AtSign
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "../lib/utils";
@@ -13,12 +13,16 @@ export function EmployeeForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
 
+  const [roles, setRoles] = React.useState<{ id: number; code: string; name: string }[]>([]);
+  const [rolesLoading, setRolesLoading] = React.useState(true);
+
   const [formData, setFormData] = React.useState({
     full_name: "",
+    username: "",
     email: "",
     password: "",
     phone: "",
-    role: "sales",
+    role_id: 0 as number,
     department: "",
     position: "",
     commission_rate: 5,
@@ -36,11 +40,13 @@ export function EmployeeForm() {
   const [success, setSuccess] = React.useState(false);
   const [errors, setErrors] = React.useState<{
     full_name?: string;
+    username?: string;
     email?: string;
     password?: string;
     phone?: string;
     commission_rate?: string;
     salary?: string;
+    role_id?: string;
   }>({});
 
   React.useEffect(() => {
@@ -58,8 +64,34 @@ export function EmployeeForm() {
         console.error("Failed to fetch groups", err);
       }
     };
+    const fetchRoles = async () => {
+      try {
+        setRolesLoading(true);
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_URL}/roles`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setRoles(json.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch roles", err);
+      } finally {
+        setRolesLoading(false);
+      }
+    };
     fetchGroups();
+    fetchRoles();
   }, []);
+
+  React.useEffect(() => {
+    // Ensure role_id always has a valid default once roles are available
+    if (!roles.length) return;
+    if (formData.role_id) return;
+    const s = roles.find((r) => r.code === "sales") || roles[0];
+    if (s) setFormData((prev) => ({ ...prev, role_id: s.id }));
+  }, [roles, formData.role_id]);
 
   React.useEffect(() => {
     if (isEdit && id) {
@@ -78,10 +110,11 @@ export function EmployeeForm() {
           const emp = json.data;
           setFormData({
             full_name: emp.full_name || "",
+            username: emp.username || "",
             email: emp.email || "",
             password: "",
             phone: emp.phone || "",
-            role: emp.role || "sales",
+            role_id: emp.role_id || 0,
             department: emp.department || "",
             position: emp.position || "",
             commission_rate: emp.commission_rate || 5,
@@ -122,6 +155,13 @@ export function EmployeeForm() {
       newErrors.full_name = "Vui lòng nhập họ và tên";
     }
 
+    const un = formData.username.trim().toLowerCase();
+    if (!un) {
+      newErrors.username = "Vui lòng nhập tên đăng nhập";
+    } else if (!/^[a-zA-Z0-9_]{3,32}$/.test(un)) {
+      newErrors.username = "Tên đăng nhập: 3–32 ký tự, chỉ chữ, số và dấu gạch dưới";
+    }
+
     if (!formData.email.trim()) {
       newErrors.email = "Vui lòng nhập email";
     } else {
@@ -146,6 +186,10 @@ export function EmployeeForm() {
       if (cleanedPhone.length > 0 && cleanedPhone.length !== 10) {
         newErrors.phone = "Số điện thoại phải có đúng 10 chữ số";
       }
+    }
+
+    if (!formData.role_id) {
+      (newErrors as any).role_id = "Chọn vai trò";
     }
 
     if (formData.commission_rate < 0 || formData.commission_rate > 100) {
@@ -175,7 +219,7 @@ export function EmployeeForm() {
       const token = localStorage.getItem("token");
       const method = isEdit ? "PUT" : "POST";
       const url = isEdit ? `${API_URL}/users/${id}` : `${API_URL}/users`;
-      const body: any = { ...formData };
+      const body: any = { ...formData, username: formData.username.trim().toLowerCase(), role_id: formData.role_id };
       if (isEdit && !formData.password) {
         delete body.password;
       }
@@ -280,10 +324,30 @@ export function EmployeeForm() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vai trò</span>
                   </div>
-                  <select value={formData.role} onChange={(e) => handleChange("role", e.target.value)} className="w-full text-lg font-bold text-slate-900 bg-transparent outline-none cursor-pointer">
-                    <option value="sales">Nhân viên bán hàng</option>
-                    <option value="admin">Quản trị viên</option>
+                  <select
+                    value={formData.role_id || ""}
+                    onChange={(e) => handleChange("role_id", Number(e.target.value))}
+                    disabled={rolesLoading || roles.length === 0}
+                    className={cn(
+                      "w-full text-lg font-bold bg-transparent outline-none cursor-pointer",
+                      rolesLoading || roles.length === 0 ? "text-slate-400 cursor-not-allowed" : "text-slate-900"
+                    )}
+                  >
+                    <option value="">
+                      {rolesLoading ? "Đang tải vai trò..." : "— Chọn vai trò —"}
+                    </option>
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.code})
+                      </option>
+                    ))}
                   </select>
+                  {errors.role_id && <p className="text-xs text-red-500 font-medium">{errors.role_id}</p>}
+                  {!rolesLoading && roles.length === 0 && (
+                    <p className="text-xs text-amber-600 font-medium mt-1">
+                      Không tải được danh sách vai trò. Vui lòng thử refresh hoặc đăng nhập lại.
+                    </p>
+                  )}
                 </div>
 
                 {isEdit && (
@@ -355,6 +419,14 @@ export function EmployeeForm() {
                   <label className="text-sm font-bold text-slate-700">Họ và tên <span className="text-red-500">*</span></label>
                   <input type="text" value={formData.full_name} onChange={(e) => handleChange("full_name", e.target.value)} placeholder="VD: Nguyễn Văn An" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.full_name ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
                   {errors.full_name && <p className="text-xs text-red-500 font-medium">{errors.full_name}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Tên đăng nhập <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <AtSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input type="text" autoComplete="username" value={formData.username} onChange={(e) => handleChange("username", e.target.value.toLowerCase())} placeholder="vd: nguyen_van_a" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.username ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                  </div>
+                  {errors.username && <p className="text-xs text-red-500 font-medium">{errors.username}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Email công việc <span className="text-red-500">*</span></label>

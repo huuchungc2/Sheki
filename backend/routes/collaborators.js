@@ -47,13 +47,18 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
     const pool = await getPool();
 
     // Validate: cả 2 phải là role sales
-    const [users] = await pool.query('SELECT id, role FROM users WHERE id IN (?, ?) AND is_active = 1', [sales_id, ctv_id]);
+    const [users] = await pool.query(
+      `SELECT u.id, r.scope_own_data, r.can_access_admin FROM users u
+       JOIN roles r ON u.role_id = r.id
+       WHERE u.id IN (?, ?) AND u.is_active = 1`,
+      [sales_id, ctv_id]
+    );
     if (users.length < 2) {
       return res.status(400).json({ message: 'Không tìm thấy nhân viên hoặc nhân viên không hoạt động' });
     }
     for (const u of users) {
-      if (u.role !== 'sales') {
-        return res.status(400).json({ message: 'Chỉ có thể gán nhân viên role sales' });
+      if (!u.scope_own_data || u.can_access_admin) {
+        return res.status(400).json({ message: 'Chỉ gán được giữa nhân viên có phạm vi đơn hàng của mình (vai trò kiểu kinh doanh)' });
       }
     }
 
@@ -96,10 +101,11 @@ router.get('/available-ctvs', auth, authorize('admin'), async (req, res, next) =
     }
     const pool = await getPool();
     const [rows] = await pool.query(
-      `SELECT id, full_name, email, phone FROM users 
-       WHERE role = 'sales' AND is_active = 1 AND id != ?
-       AND id NOT IN (SELECT ctv_id FROM collaborators WHERE sales_id = ?)
-       ORDER BY full_name`,
+      `SELECT u.id, u.full_name, u.email, u.phone FROM users u
+       JOIN roles r ON u.role_id = r.id
+       WHERE r.scope_own_data = 1 AND r.can_access_admin = 0 AND u.is_active = 1 AND u.id != ?
+       AND u.id NOT IN (SELECT ctv_id FROM collaborators WHERE sales_id = ?)
+       ORDER BY u.full_name`,
       [sales_id, sales_id]
     );
     res.json({ data: rows });

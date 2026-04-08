@@ -24,6 +24,8 @@ const groupsRouter = require('./routes/groups');
 const commissionTiersRouter = require('./routes/commission-tiers');
 const collaboratorsRouter = require('./routes/collaborators');
 const notificationsRouter = require('./routes/notifications');
+const returnsRouter = require('./routes/returns');
+const rolesRouter = require('./routes/roles');
 const { logMiddleware } = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -35,6 +37,30 @@ const logsDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }
+
+// Process-level crash logging (để chẩn đoán lỗi runtime)
+function appendProcessLog(type, err) {
+  try {
+    const payload = {
+      ts: new Date().toISOString(),
+      type,
+      message: err?.message || String(err),
+      stack: err?.stack || null,
+    };
+    fs.appendFileSync(path.join(logsDir, 'process.log'), JSON.stringify(payload) + '\n', 'utf8');
+  } catch (e) {
+    console.error('❌ Failed to write process.log:', e?.message || e);
+  }
+}
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ UnhandledRejection:', reason);
+  appendProcessLog('unhandledRejection', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('❌ UncaughtException:', err);
+  appendProcessLog('uncaughtException', err);
+});
 
 // Create write stream for access log
 const accessLogStream = fs.createWriteStream(
@@ -86,6 +112,8 @@ app.use('/api/groups', groupsRouter);
 app.use('/api/commission-tiers', commissionTiersRouter);
 app.use('/api/collaborators', collaboratorsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/returns', returnsRouter);
+app.use('/api/roles', rolesRouter);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

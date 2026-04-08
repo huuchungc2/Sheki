@@ -50,11 +50,13 @@ project/
 - Menu sidebar tự động ẩn/hiện theo role
 
 ## 🔑 Tài khoản test
-| Email | Password | Role |
-|---|---|---|
-| admin@velocity.vn | admin123 | Admin |
-| lan.sales@velocity.vn | sales123 | Sales |
-| minh.sales@velocity.vn | sales123 | Sales |
+Đăng nhập bằng **tên đăng nhập** hoặc **email** (cùng mật khẩu).
+
+| Tên đăng nhập | Email | Password | Role |
+|---|---|---|---|
+| admin | admin@velocity.vn | admin123 | Admin |
+| lan_sales | lan.sales@velocity.vn | sales123 | Sales |
+| minh_sales | minh.sales@velocity.vn | sales123 | Sales |
 
 ## ⚠️ Business Rules cốt lõi (KHÔNG được bỏ qua)
 - Mã đơn: `DH-YYYYMMDD-XXXX`, reset theo ngày

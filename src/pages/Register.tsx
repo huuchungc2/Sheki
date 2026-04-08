@@ -1,11 +1,11 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
-  Shield, 
   Mail, 
   Lock, 
   ArrowRight, 
   User,
+  AtSign,
   Phone,
   CheckCircle2,
   AlertCircle
@@ -21,6 +21,7 @@ export function Register() {
   const [error, setError] = React.useState<string | null>(null);
   const [formData, setFormData] = React.useState({
     fullName: "",
+    username: "",
     email: "",
     phone: "",
     password: ""
@@ -34,7 +35,13 @@ export function Register() {
       logger.info('Register attempt', { email: formData.email });
       const { data, status } = await apiCall(
         '/auth/register',
-        { method: "POST", body: JSON.stringify({ full_name: formData.fullName, email: formData.email, phone: formData.phone, password: formData.password }) },
+        { method: "POST", body: JSON.stringify({
+          full_name: formData.fullName,
+          username: formData.username.trim().toLowerCase(),
+          email: formData.email.trim(),
+          phone: formData.phone,
+          password: formData.password
+        }) },
         'Register'
       );
       
@@ -120,7 +127,23 @@ export function Register() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">EMAIL TRUY CẬP</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">TÊN ĐĂNG NHẬP</label>
+              <div className="relative">
+                <AtSign className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                <input
+                  type="text"
+                  autoComplete="username"
+                  required
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="3–32 ký tự: chữ, số, _"
+                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">EMAIL</label>
               <div className="relative">
                 <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
                 <input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@company.com" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />

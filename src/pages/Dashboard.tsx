@@ -10,7 +10,7 @@ import {
   BarChart, Bar, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
-import { cn, formatCurrency } from "../lib/utils";
+import { cn, formatCurrency, isAdminUser } from "../lib/utils";
 
 const API_URL = "http://localhost:3000/api";
 
@@ -49,7 +49,7 @@ export function Dashboard() {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
   }, []);
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin = isAdminUser(currentUser);
 
   React.useEffect(() => {
     const token = localStorage.getItem("token");

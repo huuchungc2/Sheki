@@ -104,7 +104,7 @@ export function CustomerForm() {
     const fetchEmployees = async () => {
       try {
         const token = getAuthToken();
-        const res = await fetch(`${API_URL}/users?limit=100`, {
+        const res = await fetch(`${API_URL}/users?scoped=1&limit=100`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (res.ok) {
@@ -412,7 +412,7 @@ export function CustomerForm() {
                     <label className="text-sm font-bold text-slate-700">Nhân viên phụ trách</label>
                     <select value={formData.assigned_employee_id} onChange={(e) => handleChange("assigned_employee_id", e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none">
                       <option value="">Không có</option>
-                      {employees.filter((emp: any) => emp.role === 'sales').map((emp: any) => (
+                      {employees.map((emp: any) => (
                         <option key={emp.id} value={emp.id}>{emp.full_name}</option>
                       ))}
                     </select>

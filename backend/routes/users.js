@@ -10,33 +10,40 @@ const { getPool } = require('../config/db');
 router.get('/', auth, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, department, role, page = 1, limit = 20 } = req.query;
+    const { search, department, role, scoped, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = 'SELECT id, full_name, email, phone, role, department, position, commission_rate, salary, join_date, avatar_url, city, district, is_active, created_at FROM users WHERE 1=1';
-    let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
+    let query = `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, u.role_id,
+      u.department, u.position, u.commission_rate, u.salary, u.join_date, u.avatar_url, u.city, u.district, u.is_active, u.created_at
+      FROM users u JOIN roles r ON u.role_id = r.id WHERE 1=1`;
+    let countQuery = 'SELECT COUNT(*) as total FROM users u JOIN roles r ON u.role_id = r.id WHERE 1=1';
     const params = [];
 
     if (search) {
-      query += ' AND (full_name LIKE ? OR email LIKE ? OR phone LIKE ?)';
-      countQuery += ' AND (full_name LIKE ? OR email LIKE ? OR phone LIKE ?)';
+      query += ' AND (u.full_name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)';
+      countQuery += ' AND (u.full_name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)';
       const like = `%${search}%`;
-      params.push(like, like, like);
+      params.push(like, like, like, like);
     }
 
     if (department) {
-      query += ' AND department = ?';
-      countQuery += ' AND department = ?';
+      query += ' AND u.department = ?';
+      countQuery += ' AND u.department = ?';
       params.push(department);
     }
 
     if (role) {
-      query += ' AND role = ?';
-      countQuery += ' AND role = ?';
+      query += ' AND r.code = ?';
+      countQuery += ' AND r.code = ?';
       params.push(role);
     }
 
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    if (scoped === '1' || scoped === 'true') {
+      query += ' AND r.scope_own_data = 1';
+      countQuery += ' AND r.scope_own_data = 1';
+    }
+
+    query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
     const [rows] = await pool.query(query, params);
@@ -52,7 +59,9 @@ router.get('/:id', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
-      'SELECT id, full_name, email, phone, role, department, position, commission_rate, salary, join_date, avatar_url, address, city, district, postal_code, is_active, created_at FROM users WHERE id = ?',
+      `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, u.role_id,
+        u.department, u.position, u.commission_rate, u.salary, u.join_date, u.avatar_url, u.address, u.city, u.district, u.postal_code, u.is_active, u.created_at
+       FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
       [req.params.id]
     );
 
@@ -66,27 +75,56 @@ router.get('/:id', auth, async (req, res, next) => {
   }
 });
 
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
+
+function normalizeUsername(s) {
+  return String(s || '').trim().toLowerCase();
+}
+
 router.post('/', auth, authorize('admin'), async (req, res, next) => {
   try {
-    const { full_name, email, password, phone, role, department, position, commission_rate, salary, join_date, address, city, district, postal_code } = req.body;
+    const { full_name, email, password, phone, department, position, commission_rate, salary, join_date, address, city, district, postal_code } = req.body;
+    const username = normalizeUsername(req.body.username);
+    let roleId = parseInt(req.body.role_id, 10);
 
-    if (!full_name || !email || !password) {
-      return res.status(400).json({ error: 'Thiếu thông tin bắt buộc' });
+    if (!full_name || !email || !password || !username) {
+      return res.status(400).json({ error: 'Thiếu họ tên, tên đăng nhập, email hoặc mật khẩu' });
+    }
+
+    if (!USERNAME_RE.test(username)) {
+      return res.status(400).json({ error: 'Tên đăng nhập: 3–32 ký tự, chỉ chữ, số và dấu gạch dưới' });
     }
 
     const pool = await getPool();
 
-    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0) {
+    if (!roleId) {
+      const [[sr]] = await pool.query('SELECT id FROM roles WHERE code = ?', ['sales']);
+      roleId = sr?.id;
+    }
+    if (!roleId) {
+      return res.status(400).json({ error: 'Thiếu vai trò (role_id)' });
+    }
+    const [[roleRow]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
+    if (!roleRow) {
+      return res.status(400).json({ error: 'Vai trò không hợp lệ' });
+    }
+
+    const [existingEmail] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existingEmail.length > 0) {
       return res.status(409).json({ error: 'Email đã tồn tại' });
+    }
+
+    const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+    if (existingUser.length > 0) {
+      return res.status(409).json({ error: 'Tên đăng nhập đã được sử dụng' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
     const [result] = await pool.query(
-      `INSERT INTO users (full_name, email, password_hash, phone, role, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      [full_name, email, passwordHash, phone, role || 'sales', department, position, commission_rate || 5.00, salary || 0, join_date, address, city, district, postal_code]
+      `INSERT INTO users (full_name, username, email, password_hash, phone, role_id, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [full_name, username, email, passwordHash, phone, roleId, department, position, commission_rate || 5.00, salary || 0, join_date, address, city, district, postal_code]
     );
 
     res.status(201).json({ id: result.insertId, message: 'Tạo nhân viên thành công' });
@@ -97,27 +135,47 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
 
 router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
   try {
-    const { full_name, email, phone, role, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, password } = req.body;
+    const { full_name, email, phone, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, password } = req.body;
+    const username = normalizeUsername(req.body.username);
+    const roleId = parseInt(req.body.role_id, 10);
+
+    if (!username || !USERNAME_RE.test(username)) {
+      return res.status(400).json({ error: 'Tên đăng nhập: 3–32 ký tự, chỉ chữ, số và dấu gạch dưới' });
+    }
+
+    if (!roleId) {
+      return res.status(400).json({ error: 'Thiếu vai trò (role_id)' });
+    }
 
     const pool = await getPool();
 
-    const [existing] = await pool.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, req.params.id]);
-    if (existing.length > 0) {
+    const [[roleRow]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
+    if (!roleRow) {
+      return res.status(400).json({ error: 'Vai trò không hợp lệ' });
+    }
+
+    const [existingEmail] = await pool.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, req.params.id]);
+    if (existingEmail.length > 0) {
       return res.status(409).json({ error: 'Email đã tồn tại' });
+    }
+
+    const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ? AND id != ?', [username, req.params.id]);
+    if (existingUser.length > 0) {
+      return res.status(409).json({ error: 'Tên đăng nhập đã được sử dụng' });
     }
 
     if (password) {
       const passwordHash = await bcrypt.hash(password, 10);
       await pool.query(
-        `UPDATE users SET full_name = ?, email = ?, phone = ?, role = ?, department = ?, position = ?, commission_rate = ?, salary = ?, join_date = ?, address = ?, city = ?, district = ?, postal_code = ?, is_active = ?, password_hash = ?
+        `UPDATE users SET full_name = ?, username = ?, email = ?, phone = ?, role_id = ?, department = ?, position = ?, commission_rate = ?, salary = ?, join_date = ?, address = ?, city = ?, district = ?, postal_code = ?, is_active = ?, password_hash = ?
          WHERE id = ?`,
-        [full_name, email, phone, role, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, passwordHash, req.params.id]
+        [full_name, username, email, phone, roleId, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, passwordHash, req.params.id]
       );
     } else {
       await pool.query(
-        `UPDATE users SET full_name = ?, email = ?, phone = ?, role = ?, department = ?, position = ?, commission_rate = ?, salary = ?, join_date = ?, address = ?, city = ?, district = ?, postal_code = ?, is_active = ?
+        `UPDATE users SET full_name = ?, username = ?, email = ?, phone = ?, role_id = ?, department = ?, position = ?, commission_rate = ?, salary = ?, join_date = ?, address = ?, city = ?, district = ?, postal_code = ?, is_active = ?
          WHERE id = ?`,
-        [full_name, email, phone, role, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, req.params.id]
+        [full_name, username, email, phone, roleId, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, req.params.id]
       );
     }
 
@@ -139,9 +197,16 @@ router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
 
 router.put('/:id/role', auth, authorize('admin'), async (req, res, next) => {
   try {
-    const { role } = req.body;
+    const roleId = parseInt(req.body.role_id, 10);
+    if (!roleId) {
+      return res.status(400).json({ error: 'Thiếu role_id' });
+    }
     const pool = await getPool();
-    await pool.query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
+    const [[r]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
+    if (!r) {
+      return res.status(400).json({ error: 'Vai trò không hợp lệ' });
+    }
+    await pool.query('UPDATE users SET role_id = ? WHERE id = ?', [roleId, req.params.id]);
     res.json({ message: 'Cập nhật quyền thành công' });
   } catch (err) {
     next(err);
@@ -153,20 +218,21 @@ router.get('/available/collaborators', auth, async (req, res, next) => {
     const pool = await getPool();
     const { exclude_id } = req.query;
 
-    let query = 'SELECT id, full_name, email, phone, role, department, position, is_active FROM users WHERE is_active = 1';
+    let query = `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, u.department, u.position, u.is_active
+      FROM users u JOIN roles r ON u.role_id = r.id WHERE u.is_active = 1`;
     const params = [];
 
     if (exclude_id) {
-      query += ' AND id != ?';
+      query += ' AND u.id != ?';
       params.push(parseInt(exclude_id));
     }
 
-    if (req.user.role === 'sales') {
-      query += ' AND id = ?';
+    if (req.user.scope_own_data) {
+      query += ' AND u.id = ?';
       params.push(req.user.id);
     }
 
-    query += ' ORDER BY full_name ASC';
+    query += ' ORDER BY u.full_name ASC';
 
     const [rows] = await pool.query(query, params);
     res.json({ data: rows });
@@ -177,7 +243,7 @@ router.get('/available/collaborators', auth, async (req, res, next) => {
 
 router.get('/:id/overview', auth, async (req, res, next) => {
   try {
-    if (req.user.role === 'sales' && parseInt(req.params.id) !== req.user.id) {
+    if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem thông tin nhân viên này' });
     }
 
@@ -186,7 +252,9 @@ router.get('/:id/overview', auth, async (req, res, next) => {
     const { date_from, date_to } = req.query;
 
     const [userRows] = await pool.query(
-      'SELECT id, full_name, email, phone, role, department, position, commission_rate, salary, join_date, avatar_url, city, district, is_active, created_at FROM users WHERE id = ?',
+      `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, r.name AS role_name, u.role_id,
+        u.department, u.position, u.commission_rate, u.salary, u.join_date, u.avatar_url, u.city, u.district, u.is_active, u.created_at
+       FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
       [targetUserId]
     );
     if (userRows.length === 0) {
@@ -281,7 +349,7 @@ router.get('/:id/overview', auth, async (req, res, next) => {
 
 router.get('/:id/orders', auth, async (req, res, next) => {
   try {
-    if (req.user.role === 'sales' && parseInt(req.params.id) !== req.user.id) {
+    if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem đơn hàng của nhân viên này' });
     }
 
@@ -328,7 +396,7 @@ router.get('/:id/orders', auth, async (req, res, next) => {
 
 router.get('/:id/collaborators', auth, async (req, res, next) => {
   try {
-    if (req.user.role === 'sales' && parseInt(req.params.id) !== req.user.id) {
+    if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem cộng tác viên của nhân viên này' });
     }
 
@@ -336,10 +404,11 @@ router.get('/:id/collaborators', auth, async (req, res, next) => {
     // Dùng bảng collaborators (sales_id → ctv_id), không dùng user_collaborators (rỗng)
     const [rows] = await pool.query(
       `SELECT c.id, c.ctv_id as collaborator_id, c.created_at,
-              u.full_name, u.email, u.phone, u.role, u.department, u.position,
+              u.full_name, u.email, u.phone, r.code AS role, u.department, u.position,
               u.is_active, u.commission_rate
        FROM collaborators c
        JOIN users u ON c.ctv_id = u.id
+       JOIN roles r ON u.role_id = r.id
        WHERE c.sales_id = ?
        ORDER BY c.created_at DESC`,
       [req.params.id]
@@ -354,7 +423,7 @@ router.get('/:id/collaborators', auth, async (req, res, next) => {
 // Report: tổng hoa hồng từ CTV cho một nhân viên
 router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
   try {
-    if (req.user.role === 'sales' && parseInt(req.params.id) !== req.user.id) {
+    if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem báo cáo CTV' });
     }
 
@@ -443,7 +512,7 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
 
 router.post('/:id/collaborators', auth, async (req, res, next) => {
   try {
-    if (req.user.role === 'sales' && parseInt(req.params.id) !== req.user.id) {
+    if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền thêm cộng tác viên cho nhân viên này' });
     }
 
@@ -487,7 +556,7 @@ router.post('/:id/collaborators', auth, async (req, res, next) => {
 
 router.delete('/:id/collaborators/:collaboratorId', auth, async (req, res, next) => {
   try {
-    if (req.user.role === 'sales' && parseInt(req.params.id) !== req.user.id) {
+    if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xóa cộng tác viên của nhân viên này' });
     }
 
@@ -503,37 +572,10 @@ router.delete('/:id/collaborators/:collaboratorId', auth, async (req, res, next)
   }
 });
 
-router.get('/available/collaborators', auth, async (req, res, next) => {
-  try {
-    const pool = await getPool();
-    const { exclude_id } = req.query;
-
-    let query = 'SELECT id, full_name, email, phone, role, department, position, is_active FROM users WHERE is_active = 1';
-    const params = [];
-
-    if (exclude_id) {
-      query += ' AND id != ?';
-      params.push(parseInt(exclude_id));
-    }
-
-    if (req.user.role === 'sales') {
-      query += ' AND id = ?';
-      params.push(req.user.id);
-    }
-
-    query += ' ORDER BY full_name ASC';
-
-    const [rows] = await pool.query(query, params);
-    res.json({ data: rows });
-  } catch (err) {
-    next(err);
-  }
-});
-
 router.put('/:id/password', auth, async (req, res, next) => {
   try {
     // Only allow users to change their own password, or admin can change any
-    if (req.user.role !== 'admin' && parseInt(req.params.id) !== req.user.id) {
+    if (!req.user.can_access_admin && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền đổi mật khẩu người dùng này' });
     }
     

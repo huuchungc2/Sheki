@@ -60,7 +60,8 @@ export function OrderList() {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
   }, []);
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin =
+    currentUser?.can_access_admin === true || currentUser?.role === "admin";
 
   const [orders, setOrders]         = React.useState<any[]>([]);
   const [loading, setLoading]       = React.useState(true);
@@ -98,7 +99,7 @@ export function OrderList() {
   React.useEffect(() => {
     if (!isAdmin) return;
     const token = localStorage.getItem("token");
-    fetch(`${API_URL}/users?role=sales&limit=100`, {
+    fetch(`${API_URL}/users?scoped=1&limit=100`, {
       headers: { "Authorization": `Bearer ${token}` }
     })
       .then(r => r.json())

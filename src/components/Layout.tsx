@@ -11,32 +11,74 @@ import {
   Settings, 
   LogOut,
   KeyRound,
-  FileText,
   Bell,
   Search,
   Menu,
-  X,
-  ChevronRight,
   ChevronDown,
-  DollarSign
+  DollarSign,
+  ClipboardList,
+  Upload,
 } from "lucide-react";
-import { cn } from "../lib/utils";
+import { cn, isAdminUser } from "../lib/utils";
 
+/** Menu Admin gọn: nhóm submenu, bớt mục trùng (Cài đặt chỉ ở cuối sidebar) */
 const navigationAdmin = [
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
-  { name: "Nhân viên", href: "/employees", icon: Users },
-  { name: "Sản phẩm", href: "/products", icon: Package },
-  { name: "Khách hàng", href: "/customers", icon: UserCircle },
-  { name: "Đơn hàng", href: "/orders", icon: ShoppingCart },
-  { name: "Kho bãi", href: "/inventory", icon: Warehouse },
-  { name: "Kho (tạo & mặc định)", href: "/warehouses", icon: Warehouse },
-  { name: "Báo cáo", href: "/reports", icon: BarChart3, children: [
-    { name: "Báo cáo doanh thu", href: "/reports/revenue" },
-    { name: "Báo cáo hoa hồng", href: "/reports/commissions" },
-  ]},
-  { name: "Quy tắc hoa hồng", href: "/commission-rules", icon: DollarSign },
-  { name: "Nhật ký", href: "/logs", icon: FileText },
-  { name: "Cài đặt", href: "/settings", icon: Settings },
+  {
+    name: "Bán hàng",
+    icon: ShoppingCart,
+    children: [
+      { name: "Đơn hàng", href: "/orders" },
+      { name: "Khách hàng", href: "/customers" },
+      { name: "Hoàn hàng", href: "/returns/admin" },
+    ],
+  },
+  {
+    name: "Danh mục",
+    icon: Package,
+    children: [
+      { name: "Nhân viên", href: "/employees" },
+      { name: "Vai trò", href: "/roles" },
+      { name: "Sản phẩm", href: "/products" },
+    ],
+  },
+  {
+    name: "Kho",
+    icon: Warehouse,
+    children: [
+      { name: "Nhập xuất & tồn", href: "/inventory" },
+      { name: "Kho & mặc định", href: "/warehouses" },
+    ],
+  },
+  {
+    name: "Báo cáo & HH",
+    icon: BarChart3,
+    children: [
+      { name: "Doanh thu", href: "/reports/revenue" },
+      { name: "Hoa hồng", href: "/reports/commissions" },
+      { name: "Quy tắc hoa hồng", href: "/commission-rules" },
+    ],
+  },
+  {
+    name: "Tra cứu đơn",
+    icon: Search,
+    children: [
+      { name: "Theo ngày", href: "/orders/search/day" },
+      { name: "Theo tháng", href: "/orders/search/month" },
+      { name: "Theo năm", href: "/orders/search/year" },
+      { name: "Theo khoảng", href: "/orders/search/range" },
+    ],
+  },
+  {
+    name: "Nhập Excel",
+    icon: Upload,
+    children: [
+      { name: "Sản phẩm", href: "/products/import" },
+      { name: "Khách hàng", href: "/customers/import" },
+      { name: "Nhân viên", href: "/employees/import" },
+    ],
+  },
+  { name: "Nhật ký", href: "/logs", icon: ClipboardList },
 ];
 
 const navigationSales = [
@@ -45,19 +87,7 @@ const navigationSales = [
   { name: "Khách hàng của tôi", href: "/customers", icon: UserCircle },
   { name: "Hoa hồng của tôi", href: "/reports/commissions", icon: DollarSign },
   { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv", icon: DollarSign },
-];
-
-const searchNavigation = [
-  { name: "Tìm theo ngày", href: "/orders/search/day", icon: Search },
-  { name: "Tìm theo tháng", href: "/orders/search/month", icon: Search },
-  { name: "Tìm theo năm", href: "/orders/search/year", icon: Search },
-  { name: "Tìm theo khoảng", href: "/orders/search/range", icon: Search },
-];
-
-const importNavigation = [
-  { name: "Nhập sản phẩm", href: "/products/import", icon: Package },
-  { name: "Nhập khách hàng", href: "/customers/import", icon: UserCircle },
-  { name: "Nhập nhân viên", href: "/employees/import", icon: Users },
+  { name: "Đơn hoàn", href: "/returns", icon: Package },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -119,26 +149,38 @@ export function Layout({ children }: { children: React.ReactNode }) {
     };
   }, [currentUser?.id]);
 
-  const navigation = currentUser?.role === 'admin' ? navigationAdmin : navigationSales;
-  // Deduplicate potential duplicate entries (e.g., multiple additions of the same href)
+  const navigation = isAdminUser(currentUser) ? navigationAdmin : navigationSales;
   const visibleNavigation = navigation.filter((item, idx, arr) =>
-    arr.findIndex(i => i.href === item.href) === idx
+    arr.findIndex(i => i.name === item.name) === idx
   );
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = isAdminUser(currentUser);
+
+  /** Trùng route con (vd /orders/edit) nhưng không tính /orders/search cho mục Đơn hàng */
+  const pathActive = React.useCallback((pathname: string, href: string) => {
+    if (pathname === href) return true;
+    if (href === "/") return false;
+    if (!pathname.startsWith(href + "/")) return false;
+    if (href === "/orders" && pathname.startsWith("/orders/search")) return false;
+    return true;
+  }, []);
 
   React.useEffect(() => {
     console.log('📱 Layout mounted, user:', currentUser?.email, 'role:', currentUser?.role);
   }, []);
 
   React.useEffect(() => {
-    if (isAdmin) {
-      if (location.pathname.startsWith('/reports/revenue') || location.pathname.startsWith('/reports/commissions')) {
-        setOpenSubmenu('Báo cáo');
-      }
-      if (location.pathname.startsWith('/commission-rules')) {
-        setOpenSubmenu(null);
-      }
+    if (!isAdmin) return;
+    const p = location.pathname;
+    if (p === "/" || p.startsWith("/logs") || p.startsWith("/settings") || p.startsWith("/change-password")) {
+      setOpenSubmenu(null);
+      return;
     }
+    if (p.includes("/import")) setOpenSubmenu("Nhập Excel");
+    else if (p.startsWith("/reports/") || p.startsWith("/commission-rules")) setOpenSubmenu("Báo cáo & HH");
+    else if (p.startsWith("/orders/search")) setOpenSubmenu("Tra cứu đơn");
+    else if (p.startsWith("/inventory") || p.startsWith("/warehouses")) setOpenSubmenu("Kho");
+    else if (p.startsWith("/orders") || p.startsWith("/customers") || p.startsWith("/returns")) setOpenSubmenu("Bán hàng");
+    else if (p.startsWith("/employees") || p.startsWith("/products") || p.startsWith("/roles")) setOpenSubmenu("Danh mục");
   }, [location.pathname, isAdmin]);
 
   if (isAuthPage) {
@@ -163,44 +205,53 @@ export function Layout({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        <nav className="flex-1 px-4 space-y-1 mt-4">
+        <nav className="flex-1 px-3 space-y-0.5 mt-2 overflow-y-auto pb-4">
           {visibleNavigation.map((item) => {
-            const hasChildren = 'children' in item && item.children;
-            const isActive = location.pathname === item.href || (item.href !== "/" && location.pathname.startsWith(item.href));
+            const hasChildren = "children" in item && item.children;
+            const children = (item as { children?: { name: string; href: string }[] }).children;
+            let isActive = false;
+            if (hasChildren && children?.length) {
+              isActive = children.some((ch) => pathActive(location.pathname, ch.href));
+            } else if ("href" in item && item.href) {
+              isActive =
+                item.href === "/"
+                  ? location.pathname === "/"
+                  : pathActive(location.pathname, item.href);
+            }
             const isSubmenuOpen = openSubmenu === item.name;
 
             if (hasChildren && isSidebarOpen) {
               return (
                 <div key={item.name}>
                   <button
+                    type="button"
                     onClick={() => setOpenSubmenu(isSubmenuOpen ? null : item.name)}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
-                      isActive 
-                        ? "bg-blue-50 text-blue-600 font-medium" 
+                      "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all group text-left",
+                      isActive
+                        ? "bg-blue-50 text-blue-600 font-medium"
                         : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                     )}
                   >
                     <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
-                    <span>{item.name}</span>
-                    <ChevronDown className={cn("w-4 h-4 ml-auto transition-transform", isSubmenuOpen ? "rotate-180" : "")} />
+                    <span className="text-sm">{item.name}</span>
+                    <ChevronDown className={cn("w-4 h-4 ml-auto shrink-0 transition-transform", isSubmenuOpen ? "rotate-180" : "")} />
                   </button>
                   {isSubmenuOpen && (
-                    <div className="ml-8 mt-1 space-y-1">
-                      {(item.children as any[] || []).map((child) => {
-                        const isChildActive = location.pathname === child.href;
+                    <div className="ml-2 pl-3 border-l border-slate-200 mt-0.5 mb-1 space-y-0.5">
+                      {(children || []).map((child) => {
+                        const isChildActive = pathActive(location.pathname, child.href);
                         return (
                           <Link
                             key={child.name}
                             to={child.href}
                             className={cn(
-                              "flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-sm",
-                              isChildActive 
-                                ? "bg-blue-50 text-blue-600 font-medium" 
+                              "flex items-center gap-2 px-2 py-1.5 rounded-md transition-all text-sm",
+                              isChildActive
+                                ? "bg-blue-50 text-blue-600 font-medium"
                                 : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                             )}
                           >
-                            <div className="w-1.5 h-1.5 rounded-full bg-current" />
                             <span>{child.name}</span>
                           </Link>
                         );
@@ -211,77 +262,41 @@ export function Layout({ children }: { children: React.ReactNode }) {
               );
             }
 
+            if (hasChildren && !isSidebarOpen) {
+              const first = children?.[0];
+              if (!first) return null;
+              return (
+                <Link
+                  key={item.name}
+                  to={first.href}
+                  title={item.name}
+                  className={cn(
+                    "flex items-center justify-center px-3 py-2 rounded-lg transition-all group",
+                    isActive
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  )}
+                >
+                  <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
+                </Link>
+              );
+            }
+
             return (
               <Link
                 key={item.name}
-                to={hasChildren ? (item.children[0] as any).href : item.href}
+                to={"href" in item && item.href ? item.href : "/"}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
-                  isActive 
-                    ? "bg-blue-50 text-blue-600 font-medium" 
+                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-all group",
+                  isActive
+                    ? "bg-blue-50 text-blue-600 font-medium"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 )}
               >
                 <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
-                {isSidebarOpen && <span>{item.name}</span>}
+                {isSidebarOpen && <span className="text-sm">{item.name}</span>}
                 {isActive && isSidebarOpen && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
-                )}
-              </Link>
-            );
-          })}
-
-          {isSidebarOpen && isAdmin && (
-            <div className="pt-4 pb-2 px-3">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3">Tra cứu đơn hàng</span>
-            </div>
-          )}
-
-          {isAdmin && searchNavigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
-                  isActive 
-                    ? "bg-blue-50 text-blue-600 font-medium" 
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                )}
-              >
-                <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
-                {isSidebarOpen && <span>{item.name}</span>}
-                {isActive && isSidebarOpen && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
-                )}
-              </Link>
-            );
-          })}
-
-          {isSidebarOpen && isAdmin && (
-            <div className="pt-4 pb-2 px-3">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3">Nhập dữ liệu hàng loạt</span>
-            </div>
-          )}
-
-          {isAdmin && importNavigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
-                  isActive 
-                    ? "bg-blue-50 text-blue-600 font-medium" 
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                )}
-              >
-                <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
-                {isSidebarOpen && <span>{item.name}</span>}
-                {isActive && isSidebarOpen && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
                 )}
               </Link>
             );
@@ -413,7 +428,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 {currentUser?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || "U"}
               </div>
               <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
-                {currentUser?.role === 'admin' ? 'ADMIN' : 'SALES'}
+                {isAdmin ? "ADMIN" : (currentUser?.role_name || String(currentUser?.role || "USER").toUpperCase())}
               </span>
 
               {/* User dropdown menu */}

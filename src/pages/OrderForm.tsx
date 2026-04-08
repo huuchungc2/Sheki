@@ -143,7 +143,7 @@ export function OrderForm() {
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
     if (!user?.id) return;
-    const endpoint = user.role === 'admin' ? '/groups' : `/groups/user/${user.id}`;
+    const endpoint = user?.can_access_admin || user?.role === "admin" ? "/groups" : `/groups/user/${user.id}`;
     api.get(endpoint).then((res: any) => {
       setGroups(res?.data ?? []);
     }).catch(() => setGroups([]));
@@ -155,7 +155,8 @@ export function OrderForm() {
   const fetchProductSuggestions = async (q: string) => {
     if (!q) { setProductSuggestions([]); return; }
     try {
-      const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50`);
+      const wh = selectedWarehouseId ? `&warehouse_id=${selectedWarehouseId}` : '';
+      const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50${wh}`);
       const data = res?.data ?? [];
       setProductSuggestions(data.map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, price: Number(p.price) || 0, available_stock: Number(p.available_stock) || 0 })));
     } catch {
@@ -184,7 +185,8 @@ export function OrderForm() {
           productName: it.product_name ?? it.productName ?? '',
           sku: it.sku ?? '',
           price: Number(it.unit_price ?? it.price ?? 0),
-          availableStock: Number(it.available_stock ?? 999),
+          // available_stock sẽ được sync lại theo kho qua /inventory/stock-by-warehouse
+          availableStock: Number(it.available_stock ?? 0),
           quantity: Number(it.qty ?? it.quantity ?? 1),
           discountRate: Number(it.discount_rate ?? 0),
           discountAmount: Number(it.discount_amount ?? 0),
@@ -597,7 +599,16 @@ export function OrderForm() {
                   <tbody>
                     {items.map((item) => {
                       const lineTotal = item.quantity * item.price - item.discountAmount;
-                      const overStock = item.quantity > (item as any).availableStock;
+                      const canAddBackBaseline =
+                        Boolean(id) &&
+                        selectedWarehouseId != null &&
+                        baselineWarehouseId != null &&
+                        String(selectedWarehouseId) === String(baselineWarehouseId) &&
+                        ['pending', 'shipping'].includes(String(baselineStatus || orderStatus));
+                      const avail = Number((item as any).availableStock ?? 0) || 0;
+                      const base = canAddBackBaseline ? (Number(baselineQtyByProduct[String(item.productId)] ?? 0) || 0) : 0;
+                      const maxAllowed = avail + base;
+                      const overStock = Number(item.quantity) > maxAllowed;
                       return (
                         <tr
                           key={item.productId}
@@ -615,7 +626,7 @@ export function OrderForm() {
                                 <p className="font-medium text-slate-800 truncate text-xs leading-tight">{item.productName}</p>
                                 <p className="text-slate-400 font-mono text-[10px] leading-tight">{item.sku}</p>
                                 <p className={cn("text-[10px] leading-tight", overStock ? "text-red-500 font-medium" : "text-slate-400")}>
-                                  Tồn: {(item as any).availableStock ?? 0}
+                                  Có thể bán: {maxAllowed.toFixed(3).replace(/\.?0+$/, '')}
                                   {overStock && <span className="ml-1">⚠ Vượt!</span>}
                                 </p>
                               </div>

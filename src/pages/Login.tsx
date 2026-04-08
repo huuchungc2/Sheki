@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
-  Mail, 
+  User,
   Lock, 
   ArrowRight, 
   CheckCircle2,
@@ -14,7 +14,7 @@ export function Login() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [email, setEmail] = React.useState("");
+  const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -22,26 +22,26 @@ export function Login() {
     setIsLoading(true);
     setError(null);
     
-    logger.info('Login attempt', { email });
+    logger.info('Login attempt', { username });
     
     try {
       const { data, status } = await apiCall(
         '/auth/login',
         {
           method: "POST",
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ username: username.trim(), password })
         },
         'Login'
       );
       
       if (!status) {
-        logger.warn('Login failed', { email, error: data.error });
+        logger.warn('Login failed', { username, error: data.error });
         setError(data.error || "Đăng nhập thất bại");
         setIsLoading(false);
         return;
       }
       
-      logger.info('Login success', { email, user: data.user });
+      logger.info('Login success', { username, user: data.user });
       
       // Store token and user
       localStorage.setItem("token", data.token);
@@ -117,18 +117,20 @@ export function Login() {
               </div>
             )}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">EMAIL TRUY CẬP</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">TÊN ĐĂNG NHẬP</label>
               <div className="relative">
-                <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
                 <input 
-                  type="email" 
+                  type="text" 
+                  autoComplete="username"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@company.com" 
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="VD: admin hoặc lan_sales" 
                   className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
                 />
               </div>
+              <p className="text-[11px] text-slate-400 px-1">Có thể dùng tên đăng nhập hoặc email.</p>
             </div>
 
             <div className="space-y-2">

@@ -5,37 +5,56 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const { getPool } = require('../config/db');
 
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
+
+function normalizeUsername(s) {
+  return String(s || '').trim().toLowerCase();
+}
+
 router.get('/me', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
-      'SELECT id, full_name, email, phone, role, commission_rate, department, position, join_date, avatar_url, is_active, created_at FROM users WHERE id = ?',
+      `SELECT u.id, u.full_name, u.username, u.email, u.phone, u.commission_rate, u.department, u.position, u.join_date, u.avatar_url, u.is_active, u.created_at,
+              r.id AS role_id, r.code AS role, r.name AS role_name, r.can_access_admin, r.scope_own_data
+       FROM users u
+       JOIN roles r ON u.role_id = r.id
+       WHERE u.id = ?`,
       [req.user.id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy người dùng' });
-    res.json({ data: rows[0] });
-  } catch (err) { next(err); }
+    const row = rows[0];
+    row.can_access_admin = !!row.can_access_admin;
+    row.scope_own_data = !!row.scope_own_data;
+    res.json({ data: row });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    console.log('Login request:', email);
+    const password = req.body.password;
+    const login = normalizeUsername(req.body.username ?? req.body.email ?? req.body.login ?? '');
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Thiếu email hoặc password' });
+    if (!login || !password) {
+      return res.status(400).json({ error: 'Thiếu tên đăng nhập hoặc mật khẩu' });
     }
 
     const pool = await getPool();
     const [rows] = await pool.query(
-      'SELECT id, full_name, email, password_hash, role, commission_rate, is_active FROM users WHERE email = ?',
-      [email]
+      `SELECT u.id, u.full_name, u.username, u.email, u.password_hash, u.commission_rate, u.is_active,
+              r.id AS role_id, r.code AS role, r.name AS role_name, r.can_access_admin, r.scope_own_data
+       FROM users u
+       JOIN roles r ON u.role_id = r.id
+       WHERE u.username = ? OR u.email = ?`,
+      [login, login]
     );
 
-    console.log('Found users:', rows.length);
+    console.log('Login request:', login, 'found:', rows.length);
 
     if (rows.length === 0) {
-      return res.status(401).json({ error: 'Email hoặc password không đúng' });
+      return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không đúng' });
     }
 
     const user = rows[0];
@@ -47,24 +66,39 @@ router.post('/login', async (req, res, next) => {
     const isValid = await bcrypt.compare(password, user.password_hash);
 
     if (!isValid) {
-      return res.status(401).json({ error: 'Email hoặc password không đúng' });
+      return res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không đúng' });
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, full_name: user.full_name },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    const payload = {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      role_id: user.role_id,
+      role_name: user.role_name,
+      full_name: user.full_name,
+      can_access_admin: !!user.can_access_admin,
+      scope_own_data: !!user.scope_own_data,
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    });
 
     res.json({
       token,
       user: {
         id: user.id,
         full_name: user.full_name,
+        username: user.username,
         email: user.email,
         role: user.role,
-        commission_rate: user.commission_rate
-      }
+        role_id: user.role_id,
+        role_name: user.role_name,
+        can_access_admin: !!user.can_access_admin,
+        scope_own_data: !!user.scope_own_data,
+        commission_rate: user.commission_rate,
+      },
     });
   } catch (err) {
     next(err);
@@ -74,39 +108,69 @@ router.post('/login', async (req, res, next) => {
 router.post('/register', async (req, res, next) => {
   try {
     const { full_name, email, password, phone } = req.body;
+    const username = normalizeUsername(req.body.username);
 
-    if (!full_name || !email || !password) {
-      return res.status(400).json({ error: 'Thiếu thông tin bắt buộc' });
+    if (!full_name || !email || !password || !username) {
+      return res.status(400).json({ error: 'Thiếu họ tên, tên đăng nhập, email hoặc mật khẩu' });
+    }
+
+    if (!USERNAME_RE.test(username)) {
+      return res.status(400).json({ error: 'Tên đăng nhập: 3–32 ký tự, chỉ chữ, số và dấu gạch dưới' });
     }
 
     const pool = await getPool();
 
-    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0) {
+    const [existingEmail] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existingEmail.length > 0) {
       return res.status(409).json({ error: 'Email đã tồn tại' });
+    }
+
+    const [existingUser] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+    if (existingUser.length > 0) {
+      return res.status(409).json({ error: 'Tên đăng nhập đã được sử dụng' });
+    }
+
+    const [[salesRole]] = await pool.query('SELECT id, code, name, can_access_admin, scope_own_data FROM roles WHERE code = ?', ['sales']);
+    if (!salesRole) {
+      return res.status(500).json({ error: 'Thiếu vai trò mặc định (sales) trong hệ thống' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
     const [result] = await pool.query(
-      'INSERT INTO users (full_name, email, password_hash, phone, role, is_active) VALUES (?, ?, ?, ?, "sales", 1)',
-      [full_name, email, passwordHash, phone || null]
+      'INSERT INTO users (full_name, username, email, password_hash, phone, role_id, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)',
+      [full_name, username, email, passwordHash, phone || null, salesRole.id]
     );
 
-    const token = jwt.sign(
-      { id: result.insertId, email, role: 'sales', full_name },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    const payload = {
+      id: result.insertId,
+      email,
+      username,
+      role: salesRole.code,
+      role_id: salesRole.id,
+      role_name: salesRole.name,
+      full_name,
+      can_access_admin: !!salesRole.can_access_admin,
+      scope_own_data: !!salesRole.scope_own_data,
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    });
 
     res.status(201).json({
       token,
       user: {
         id: result.insertId,
         full_name,
+        username,
         email,
-        role: 'sales'
-      }
+        role: salesRole.code,
+        role_id: salesRole.id,
+        role_name: salesRole.name,
+        can_access_admin: !!salesRole.can_access_admin,
+        scope_own_data: !!salesRole.scope_own_data,
+      },
     });
   } catch (err) {
     next(err);

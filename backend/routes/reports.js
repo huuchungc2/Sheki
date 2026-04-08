@@ -12,7 +12,7 @@ router.get('/dashboard', auth, async (req, res, next) => {
     const firstDayLastMonth = new Date(y, m - 1, 1);
     const lastDayLastMonth  = new Date(y, m, 0);
     const todayStart = new Date(y, m, now.getDate());
-    const isSales = req.user.role === 'sales';
+    const isSales = !!req.user.scope_own_data;
     const uid = req.user.id;
 
     // Helper: build salesperson filter
@@ -113,9 +113,10 @@ router.get('/dashboard', auth, async (req, res, next) => {
                 COALESCE(SUM(CASE WHEN c.type='direct' THEN c.commission_amount END),0) as direct_comm,
                 COALESCE(SUM(CASE WHEN c.type='override' THEN c.commission_amount END),0) as override_comm
          FROM users u
+         JOIN roles r ON u.role_id = r.id
          LEFT JOIN orders o ON o.salesperson_id = u.id AND MONTH(o.created_at)=? AND YEAR(o.created_at)=?
          LEFT JOIN commissions c ON c.order_id = o.id AND c.user_id = u.id
-         WHERE u.role='sales' AND u.is_active=1
+         WHERE r.code='sales' AND u.is_active=1
          GROUP BY u.id, u.full_name
          ORDER BY revenue DESC LIMIT 5`,
         [m+1, y]
@@ -201,6 +202,7 @@ router.get('/salary', auth, async (req, res, next) => {
         COALESCE(c_override.override_commission, 0) as override_commission,
         COALESCE(c_direct.direct_commission, 0) + COALESCE(c_override.override_commission, 0) as total_all_commission
        FROM users u
+       JOIN roles r ON u.role_id = r.id
        LEFT JOIN (
          SELECT salesperson_id,
                 COUNT(*) as total_orders,
@@ -231,7 +233,7 @@ router.get('/salary', auth, async (req, res, next) => {
            ${orderGroupCond}
          GROUP BY c.user_id
        ) c_override ON u.id = c_override.user_id
-       WHERE u.role = 'sales' AND u.is_active = 1
+       WHERE r.code = 'sales' AND u.is_active = 1
        ${ordersExistsCond}
        ORDER BY total_sales DESC`,
       [

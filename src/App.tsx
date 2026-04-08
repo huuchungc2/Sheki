@@ -31,11 +31,19 @@ import { CommissionReport } from "./pages/CommissionReport";
 import CommissionRules from "./pages/CommissionRules";
 import CollaboratorsCommissionsReportPage from "./pages/CollaboratorsCommissionsReport";
 import { ChangePassword } from "./pages/ChangePassword";
+import { SalesReturnsList } from "./pages/SalesReturnsList";
+import { AdminReturns } from "./pages/AdminReturns";
+import { RolesPage } from "./pages/RolesPage";
+import { isAdminUser } from "./lib/utils";
+
+function getStoredUser() {
+  const raw = localStorage.getItem("user");
+  return raw ? JSON.parse(raw) : null;
+}
 
 // Route /reports/commissions/ctv — Admin thấy toàn hệ thống, Sales thấy CTV của mình
 function CtvCommissionRoute() {
-  const role = getUserRole();
-  if (role === 'admin') return <CollaboratorsCommissionsReportPage />;
+  if (isAdminUser(getStoredUser())) return <CollaboratorsCommissionsReportPage />;
   return <CollaboratorsCommissionReport />;
 }
 
@@ -45,13 +53,8 @@ function checkAuth() {
   return !!(token && user);
 }
 
-function getUserRole() {
-  const user = localStorage.getItem("user");
-  return user ? JSON.parse(user).role : null;
-}
-
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  if (getUserRole() !== 'admin') {
+  if (!isAdminUser(getStoredUser())) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
@@ -138,6 +141,9 @@ export default function App() {
                   <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionDetail /></AdminRoute>} />
                   <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
+                  <Route path="/roles" element={<AdminRoute><RolesPage /></AdminRoute>} />
+                  <Route path="/returns" element={<SalesReturnsList />} />
+                  <Route path="/returns/admin" element={<AdminRoute><AdminReturns /></AdminRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

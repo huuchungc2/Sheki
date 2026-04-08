@@ -14,7 +14,7 @@ router.get('/', auth, async (req, res, next) => {
     let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE 1=1';
     const params = [];
 
-    if (req.user.role === 'sales') {
+    if (req.user.scope_own_data) {
       query += ' AND (created_by = ? OR assigned_employee_id = ?)';
       countQuery += ' AND (created_by = ? OR assigned_employee_id = ?)';
       params.push(req.user.id, req.user.id);
@@ -37,7 +37,7 @@ router.get('/', auth, async (req, res, next) => {
     params.push(parseInt(limit), parseInt(offset));
 
     const [rows] = await pool.query(query, params);
-    const [countRows] = await pool.query(countQuery, params.slice(0, req.user.role === 'sales' ? -2 : -2));
+    const [countRows] = await pool.query(countQuery, params.slice(0, req.user.scope_own_data ? -2 : -2));
 
     res.json({ data: rows, total: countRows[0].total, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
@@ -54,7 +54,7 @@ router.get('/suggest', auth, async (req, res, next) => {
     const params = [];
 
     // Sales chỉ thấy KH do mình tạo hoặc được gán cho mình
-    if (req.user.role === 'sales') {
+    if (req.user.scope_own_data) {
       query += ' AND (created_by = ? OR assigned_employee_id = ?)';
       params.push(req.user.id, req.user.id);
     }
@@ -86,7 +86,7 @@ router.get('/:id', auth, async (req, res, next) => {
       return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
     }
 
-    if (req.user.role === 'sales' && rows[0].created_by !== req.user.id && rows[0].assigned_employee_id !== req.user.id) {
+    if (req.user.scope_own_data && rows[0].created_by !== req.user.id && rows[0].assigned_employee_id !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem khách hàng này' });
     }
 
@@ -121,7 +121,7 @@ router.put('/:id', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
 
-    if (req.user.role === 'sales') {
+    if (req.user.scope_own_data) {
       const [existing] = await pool.query('SELECT created_by, assigned_employee_id FROM customers WHERE id = ?', [req.params.id]);
       if (existing.length === 0 || (existing[0].created_by !== req.user.id && existing[0].assigned_employee_id !== req.user.id)) {
         return res.status(403).json({ error: 'Không có quyền sửa khách hàng này' });
