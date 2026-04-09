@@ -53,6 +53,11 @@ export function CollaboratorsCommissionReport() {
   const [orders, setOrders]       = React.useState<any[]>([]);
   const [totals, setTotals]       = React.useState<any>({});
   const [expanded, setExpanded]   = React.useState<Set<number>>(new Set());
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  const [detailLoading, setDetailLoading] = React.useState(false);
+  const [detailError, setDetailError] = React.useState<string | null>(null);
+  const [detailOrder, setDetailOrder] = React.useState<any>(null);
+  const [detailOrderId, setDetailOrderId] = React.useState<number | null>(null);
 
   // Fetch groups của user
   React.useEffect(() => {
@@ -92,6 +97,34 @@ export function CollaboratorsCommissionReport() {
     });
   };
 
+  const openOrderDetail = React.useCallback(async (orderId: number) => {
+    setDetailOpen(true);
+    setDetailOrderId(orderId);
+    setDetailLoading(true);
+    setDetailError(null);
+    setDetailOrder(null);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/orders/${orderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Không thể tải chi tiết đơn");
+      const json = await res.json();
+      setDetailOrder(json.data || null);
+    } catch (e: any) {
+      setDetailError(e?.message || "Không thể tải chi tiết đơn");
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  const closeOrderDetail = () => {
+    setDetailOpen(false);
+    setDetailOrderId(null);
+    setDetailOrder(null);
+    setDetailError(null);
+  };
+
   // Group orders by ctv
   const ordersByCtv = React.useMemo(() => {
     const map: Record<number, any[]> = {};
@@ -125,6 +158,108 @@ export function CollaboratorsCommissionReport() {
 
   return (
     <div className="space-y-6">
+      {/* Order detail modal */}
+      {detailOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={closeOrderDetail}>
+          <div
+            className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-400">Chi tiết đơn</p>
+                <p className="font-bold text-slate-900">
+                  {detailOrder?.code || (detailOrderId != null ? `#${detailOrderId}` : "—")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeOrderDetail}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4">
+              {detailLoading ? (
+                <div className="py-10 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                </div>
+              ) : detailError ? (
+                <div className="py-8 text-center text-sm text-red-600">{detailError}</div>
+              ) : !detailOrder ? (
+                <div className="py-8 text-center text-sm text-slate-400">Không có dữ liệu</div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+                      <p className="text-[11px] text-slate-400">Khách hàng</p>
+                      <p className="text-sm font-semibold text-slate-900">{detailOrder.customer_name || "—"}</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+                      <p className="text-[11px] text-slate-400">Tổng tiền</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(detailOrder.total_amount || 0)}</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+                      <p className="text-[11px] text-slate-400">Nhóm</p>
+                      <p className="text-sm font-semibold text-slate-900">{detailOrder.group_name || "—"}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600">
+                      Sản phẩm
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 bg-white">
+                            <th className="px-4 py-2 text-left text-slate-500 font-semibold">Sản phẩm</th>
+                            <th className="px-3 py-2 text-right text-slate-500 font-semibold">SL</th>
+                            <th className="px-3 py-2 text-right text-slate-500 font-semibold">Đơn giá</th>
+                            <th className="px-3 py-2 text-right text-slate-500 font-semibold">Tổng tiền dòng</th>
+                            <th className="px-3 py-2 text-center text-slate-500 font-semibold">Tỷ lệ hưởng</th>
+                            <th className="px-4 py-2 text-right text-slate-500 font-semibold">Tiền hưởng</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {(detailOrder.items || []).map((it: any, idx: number) => {
+                            const net = (Number(it.unit_price) || 0) * (Number(it.qty) || 0) - (Number(it.discount_amount) || 0);
+                            const bd = Array.isArray(detailOrder.override_breakdown)
+                              ? detailOrder.override_breakdown.find((x: any) => String(x.product_id) === String(it.product_id))
+                              : null;
+                            const rateLabel =
+                              bd?.override_rate != null ? `${bd.override_rate}%` : "Nhiều mức";
+                            const amount = bd?.override_amount != null ? bd.override_amount : 0;
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50/60">
+                                <td className="px-4 py-2 text-slate-800 font-medium">{it.product_name || it.productName || "—"}</td>
+                                <td className="px-3 py-2 text-right text-slate-700">{Number(it.qty || 0).toFixed(3).replace(/\.?0+$/, "")}</td>
+                                <td className="px-3 py-2 text-right text-slate-700">{formatCurrency(it.unit_price || 0)}</td>
+                                <td className="px-3 py-2 text-right text-slate-700">{formatCurrency(net)}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 font-semibold">
+                                    {rateLabel}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 text-right text-emerald-700 font-bold">{formatCurrency(amount)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Nếu đơn có nhiều mức tier override, cột “Tỷ lệ” sẽ hiển thị “Nhiều mức”.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -275,8 +410,13 @@ export function CollaboratorsCommissionReport() {
                             return (
                               <tr key={o.order_id} className="hover:bg-slate-50/60 transition-colors">
                                 <td className="px-5 py-2.5">
-                                  <Link to={`/orders/edit/${o.order_id}`}
-                                    className="font-bold text-blue-600 hover:underline font-mono text-xs">{o.order_code}</Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => openOrderDetail(Number(o.order_id))}
+                                    className="font-bold text-blue-600 hover:underline font-mono text-xs"
+                                  >
+                                    {o.order_code}
+                                  </button>
                                 </td>
                                 <td className="px-5 py-2.5 text-slate-500 text-xs">{formatDate(o.order_date)}</td>
                                 <td className="px-5 py-2.5 text-slate-700">{o.customer_name || "—"}</td>
@@ -288,11 +428,9 @@ export function CollaboratorsCommissionReport() {
                                 <td className="px-5 py-2.5 text-right font-semibold text-slate-900">{formatCurrency(o.total_amount)}</td>
                                  <td className="px-5 py-2.5 text-center">
                                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                     {o.override_rate != null
-                                       ? `${o.override_rate}%`
-                                       : o.total_amount > 0
-                                         ? `${(o.override_commission / o.total_amount * 100).toFixed(2)}%`
-                                         : '—'}
+                                    {o.override_rate != null
+                                      ? `${o.override_rate}%`
+                                      : "Nhiều mức"}
                                    </span>
                                  </td>
                                 <td className="px-5 py-2.5 text-right font-bold text-emerald-600">{formatCurrency(o.override_commission)}</td>

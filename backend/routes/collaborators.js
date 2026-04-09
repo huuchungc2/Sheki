@@ -4,6 +4,80 @@ const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
+// GET /api/collaborators/my-managers — CTV xem quản lý; ?group_id= chỉ quản lý thuộc nhóm đó (user_groups)
+// ?include_user_ids=1,2 — thêm user (vd. quản lý đơn đang sửa) nếu chưa có trong danh sách lọc
+router.get('/my-managers', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const uid = req.user.id;
+    const groupIdRaw = req.query.group_id;
+    const groupId =
+      groupIdRaw !== undefined && groupIdRaw !== null && groupIdRaw !== ''
+        ? parseInt(groupIdRaw, 10)
+        : null;
+
+    let sql = `SELECT u.id, u.full_name, u.email, u.phone, u.commission_rate
+       FROM collaborators c
+       JOIN users u ON c.sales_id = u.id
+       WHERE c.ctv_id = ? AND u.is_active = 1`;
+    const params = [uid];
+    if (groupId && Number.isFinite(groupId)) {
+      sql += ` AND EXISTS (
+        SELECT 1 FROM user_groups ug WHERE ug.user_id = u.id AND ug.group_id = ?
+      )`;
+      params.push(groupId);
+    }
+    sql += ` ORDER BY u.full_name`;
+    const [rows] = await pool.query(sql, params);
+
+    const includeRaw = req.query.include_user_ids;
+    if (includeRaw && String(includeRaw).trim()) {
+      const wantIds = String(includeRaw)
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => Number.isFinite(n));
+      const have = new Set(rows.map((r) => r.id));
+      for (const extraId of wantIds) {
+        if (have.has(extraId)) continue;
+        const [pair] = await pool.query(
+          'SELECT 1 FROM collaborators WHERE sales_id = ? AND ctv_id = ? LIMIT 1',
+          [extraId, uid]
+        );
+        if (!pair.length) continue;
+        const [urows] = await pool.query(
+          'SELECT id, full_name, email, phone, commission_rate FROM users WHERE id = ? AND is_active = 1',
+          [extraId]
+        );
+        if (urows.length) rows.push(urows[0]);
+      }
+      rows.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name), 'vi'));
+    }
+
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/collaborators/my-ctvs — Quản lý xem CTV của mình
+router.get('/my-ctvs', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const uid = req.user.id;
+    const [rows] = await pool.query(
+      `SELECT u.id, u.full_name, u.email, u.phone, u.commission_rate
+       FROM collaborators c
+       JOIN users u ON c.ctv_id = u.id
+       WHERE c.sales_id = ? AND u.is_active = 1
+       ORDER BY u.full_name`,
+      [uid]
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/collaborators - Lấy danh sách CTV theo sales hoặc tất cả
 router.get('/', auth, authorize('admin'), async (req, res, next) => {
   try {
@@ -17,7 +91,7 @@ router.get('/', auth, authorize('admin'), async (req, res, next) => {
     }
     const [rows] = await pool.query(
       `SELECT c.*, 
-        s.full_name as sales_name, s.email as sales_email,
+        s.full_name as sales_name, s.email as sales_email, s.commission_rate as sales_commission_rate,
         ctv.full_name as ctv_name, ctv.email as ctv_email, ctv.phone as ctv_phone
        FROM collaborators c
        JOIN users s ON c.sales_id = s.id

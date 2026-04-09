@@ -1,5 +1,108 @@
 # CHANGELOG
 
+## [09/04/2026] - Products: thêm/sửa bắt buộc chọn kho
+### Fixed
+- **ProductForm + Products API** — Bắt buộc chọn `warehouse_id` khi thêm/sửa; tồn kho trong form là **tồn theo kho đã chọn**. Backend cập nhật `warehouse_stock` theo kho rồi sync tổng tồn vào `products` - Files: `src/pages/ProductForm.tsx`, `backend/routes/products.js`
+### Changed
+- **OrderForm search sản phẩm** — Chỉ gợi ý sản phẩm đang kinh doanh (`is_active=1`) để tránh trường hợp kho có hàng nhưng không bán được do sản phẩm đã bị vô hiệu hóa - Files: `src/pages/OrderForm.tsx`, `backend/routes/products.js`
+
+## [09/04/2026] - Orders: không tính HH quản lý khi không chọn
+### Fixed
+- **Hoa hồng** — Đơn `source_type=sales` không còn tính `override` cho quản lý; chỉ tính `direct` cho `salesperson_id` (A). Chỉ khi chọn quản lý (`source_type=collaborator`) thì `direct` cho quản lý - Files: `backend/services/orderService.js`, `LOGIC_BUSINESS.md`
+### Changed
+- **Sửa đơn** — Cho phép đổi qua lại **chọn quản lý / không chọn** khi sửa đơn (Sales) - Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`, `LOGIC_BUSINESS.md`
+
+## [09/04/2026] - Orders: chọn quản lý → CTV direct, quản lý override
+### Fixed
+- **Hoa hồng đúng vai trò** — Khi Sales (CTV) lên đơn và chọn quản lý, hệ thống giữ `salesperson_id` là người lên đơn để nhận `direct`, và tính `override` cho quản lý theo `commission_tiers` (tính trên net_amount từng item). Đồng thời vẫn tương thích đơn legacy đã lưu kiểu “quản lý ăn direct” - Files: `backend/routes/orders.js`, `backend/services/orderService.js`, `backend/routes/users.js`
+- **Danh sách đơn hiển thị hoa hồng đúng** — `commission_amount` trên list lấy `direct` theo `orders.salesperson_id` (không lấy bừa `LIMIT 1`) - Files: `backend/routes/orders.js`, `backend/routes/users.js`
+
+## [09/04/2026] - Orders: Sales chỉ thấy đơn mình bán
+### Fixed
+- **Đơn hàng của tôi (Sales)** — Sales chỉ load đơn có `salesperson_id = user_id`. Không còn load “đơn CTV” chỉ vì mình là quản lý (`collaborator_user_id`), tránh trường hợp Minh thấy đơn của Lan ở màn đơn hàng. Giữ ngoại lệ tương thích dữ liệu legacy (collaborator_user_id là CTV thật) - Files: `backend/routes/orders.js`
+
+## [09/04/2026] - OrderForm: sửa đơn giữ quản lý đã chọn
+### Fixed
+- **Edit order giữ nguyên dropdown quản lý** — Khi mở form sửa đơn `source_type=collaborator`, OrderForm lấy quản lý từ `collaborator_user_id` (semantics mới) và dùng `include_user_ids` để không bị “mất” khi đổi nhóm/refresh list. Payload khi lưu không gửi `collaborator_user_id` sai chiều nữa - Files: `src/pages/OrderForm.tsx`
+
+## [09/04/2026] - CTV commissions: hiển thị nhiều mức + popup chi tiết đơn
+### Fixed
+- **Tỷ lệ nhiều mức không còn =0** — `override_rate` NULL sẽ hiển thị “Nhiều mức” thay vì bị ép thành 0 - Files: `backend/routes/users.js`, `src/pages/CollaboratorsCommissionReport.tsx`, `src/pages/CollaboratorsCommissionsReport.tsx`
+- **Popup chi tiết đơn** — Click mã đơn trong `/reports/commissions/ctv` mở popup hiển thị chi tiết sản phẩm/hoa hồng dòng - Files: `src/pages/CollaboratorsCommissionReport.tsx`, `src/pages/CollaboratorsCommissionsReport.tsx`
+- **Quyền xem chi tiết đơn từ báo cáo CTV** — Sales quản lý có thể xem `/orders/:id` nếu có commission `override` của đơn đó (để popup không 403) - Files: `backend/routes/orders.js`
+- **Popup hiển thị tỷ lệ & tổng tiền theo dòng** — Popup trả thêm `override_breakdown` (net_amount, override_rate, override_amount) và render “Tổng tiền dòng / Tỷ lệ hưởng / Tiền hưởng” theo từng sản phẩm - Files: `backend/routes/orders.js`, `src/pages/CollaboratorsCommissionReport.tsx`, `src/pages/CollaboratorsCommissionsReport.tsx`
+
+## [09/04/2026] - Employees: UI gọn + username linh hoạt
+### Changed
+- **EmployeeList/EmployeeForm UI** — Tinh gọn layout, dễ đọc hơn (thông tin trạng thái rõ ràng, spacing hợp lý) - Files: `src/pages/EmployeeList.tsx`, `src/pages/EmployeeForm.tsx`
+- **Username rule** — Cho phép username dạng `lan.sales`, `minh-sales` (không bắt ký tự đặc biệt nhưng không chặn dấu `.`/`-`); đồng bộ validate FE/BE và import - Files: `backend/routes/auth.js`, `backend/routes/users.js`, `backend/routes/import.js`, `src/pages/EmployeeForm.tsx`
+
+## [09/04/2026] - Khách hàng: bắt phone 10 số + địa chỉ đầy đủ
+### Fixed
+- **Customers API** — POST/PUT validate phone đúng 10 số và địa chỉ đủ (city/district/ward/address); lưu phone đã clean (chỉ số) - Files: `backend/routes/customers.js`
+- **CustomerForm** — Validate bắt buộc địa chỉ đủ + hiển thị inline errors; submit tự clean phone - Files: `src/pages/CustomerForm.tsx`
+
+## [09/04/2026] - Quản lý theo nhóm + HH khi sửa đơn (API)
+### Added
+- **GET /collaborators/my-managers** — `?group_id=` chỉ quản lý thuộc nhóm (`user_groups`); `?include_user_ids=` thêm quản lý đơn đang sửa nếu thiếu trong list - Files: `backend/routes/collaborators.js`
+### Changed
+- **POST/PUT orders** — Suy `source_type=collaborator` khi có `manager_salesperson_id` nhưng thiếu `source_type`; `items` rỗng coi như không gửi - Files: `backend/routes/orders.js`
+- **OrderForm** — Load quản lý theo `selectedGroupId`; tạo đơn mặc định quản lý đầu khi đổi nhóm; payload luôn có `source_type` + `subtotal` dòng; sửa đơn include quản lý hiện tại - Files: `src/pages/OrderForm.tsx`
+- **LOGIC_BUSINESS.md** — Quản lý lọc theo nhóm
+
+## [09/04/2026] - Sửa đơn: HH quản lý khi đổi sang collaborator
+### Fixed
+- **POST/PUT đơn collaborator** — Nếu không gửi `collaborator_user_id`, tự gán CTV = người đang thao tác (khi không phải chính quản lý) để không 403 và `salesperson_id` đúng - Files: `backend/routes/orders.js`
+- **PUT đổi sales ↔ collaborator** — Khi body không có `items` nhưng có `source_type`, load lại dòng từ DB và tính lại % HH / `order_items` - Files: `backend/routes/orders.js`
+
+## [09/04/2026] - Admin: bỏ chọn quản lý HH trên form đơn
+### Changed
+- **OrderForm** — Ẩn hoàn toàn “Quản lý (nhận HH trực tiếp)” với Admin; không gửi `source_type` (PUT giữ nguyên loại đơn) - Files: `src/pages/OrderForm.tsx`
+### Added
+- **API** — `POST/PUT` đơn: Admin không được gửi `source_type=collaborator` (403) - Files: `backend/routes/orders.js`
+- **LOGIC_BUSINESS.md** — Mô tả Admin vs Sales
+
+## [09/04/2026] - Quyền đổi đơn collaborator → sales + mặc định quản lý
+### Changed
+- **PUT `/orders/:id`** — Chỉ **Admin** đổi `source_type` từ collaborator về sales; Sales không còn quyền đó - Files: `backend/routes/orders.js`
+- **OrderForm** — Tạo đơn: mặc định chọn **quản lý trực tiếp đầu tiên**; Sales sửa đơn collaborator: không hiện “Tôi nhận HH”, có thể đổi quản lý khác - Files: `src/pages/OrderForm.tsx`
+- **LOGIC_BUSINESS.md** — Ghi nhận quyền + mặc định dropdown
+
+## [09/04/2026] - OrderForm: một dropdown quản lý + HH trên danh sách SP
+### Changed
+- **OrderForm** — Bỏ checkbox / radio CTV–quản lý / chọn cặp Admin; chỉ còn **Quản lý (nhận HH trực tiếp)** trong card Danh sách sản phẩm; không chọn = HH cho người tạo (chỉnh % từng dòng); có chọn = % quản lý, cột Hoa hồng chỉ hiển thị - Files: `src/pages/OrderForm.tsx`
+### Added
+- **GET /collaborators** — Trả thêm `sales_commission_rate` để Admin chọn quản lý có đúng % HH - Files: `backend/routes/collaborators.js`
+- **LOGIC_BUSINESS.md** — Mô tả dropdown trên form đơn
+
+## [09/04/2026] - HH: sửa đơn collaborator → sales đúng người nhận HH
+### Fixed
+- **PUT `/orders/:id`** — Khi `source_type=sales`, nếu đơn trước là `collaborator` thì gán lại `salesperson_id` = `collaborator_user_id` (A) khi có CTV; đơn không ghi CTV thì giữ quản lý — khớp quy tắc “không chọn quản lý → HH chỉ cho người lên đơn; chọn quản lý → HH cho quản lý”
+- **Quyền** — CTV trên đơn hoặc quản lý (đơn không CTV) được đổi về đơn bán trực tiếp, không chỉ Admin
+### Changed
+- **OrderForm** — Tắt checkbox “ghi nhận quản lý” → reset % HH từng dòng mặc định 10% trước khi lưu - Files: `src/pages/OrderForm.tsx`
+- **LOGIC_BUSINESS.md** — Bổ sung khi sửa đơn đổi nguồn
+
+## [09/04/2026] - Đơn quản lý: không bắt buộc chọn CTV
+### Changed
+- **Orders `source_type=collaborator`** — `collaborator_user_id` có thể NULL (quản lý tự ghi đơn, CTV không hưởng HH); chỉ validate `collaborators` khi có CTV - Files: `backend/routes/orders.js`
+- **OrderForm** — Bỏ chọn CTV khi “Tôi là quản lý”; Admin chọn “chỉ quản lý” hoặc cặp đầy đủ - Files: `src/pages/OrderForm.tsx`
+- **LOGIC_BUSINESS.md** — Mô tả `collaborator_user_id` tùy chọn
+
+## [09/04/2026] - CORS: cho phép đăng nhập từ 127.0.0.1
+### Fixed
+- **CORS** — Thêm `http://127.0.0.1:5173` (và preview port 4173) vì trình duyệt coi `localhost` và `127.0.0.1` là origin khác nhau → trước đây fetch `/api/auth/login` bị chặn khi mở FE bằng 127.0.0.1 - Files: `backend/server.js`
+
+## [09/04/2026] - Đơn ghi nhận quản lý là người bán (source_type collaborator)
+### Added
+- **Migration `010_order_collaborator.sql`** — `orders.source_type` (sales|collaborator), `orders.collaborator_user_id` - Files: `migrations/010_order_source_collaborator.sql`, `schema.sql`
+- **API** — `GET /collaborators/my-managers`, `GET /collaborators/my-ctvs` - Files: `backend/routes/collaborators.js`
+### Changed
+- **Hoa hồng:** `source_type=collaborator` → chỉ HH **direct** cho `salesperson_id` (quản lý), **không** tính override CTV (tránh trùng) - Files: `backend/services/orderService.js`
+- **Orders** — Tạo/sửa đơn collaborator: validate cặp trong `collaborators`; Sales thấy đơn nếu là `salesperson_id` hoặc `collaborator_user_id`; HH item dùng `%` của **quản lý** - Files: `backend/routes/orders.js`
+- **OrderForm** — Checkbox + chọn quản lý/CTV (hoặc Admin chọn cặp) - Files: `src/pages/OrderForm.tsx`
+- **LOGIC_BUSINESS.md** — Mô tả hai kiểu nguồn đơn
+
 ## [09/04/2026] - Đặc tả đa shop (chưa code)
 ### Added
 - **`FEATURE_MULTI_SHOP.md`** — Luồng đăng ký không gắn shop; `user_shops` + role từng shop; admin gán user theo email/username; chọn/đổi shop; JWT `shop_id`; danh sách bảng + migration Sheki + checklist BE/FE + thứ tự triển khai - Files: `FEATURE_MULTI_SHOP.md`, `plan.md` (mục 11), `ROADMAP.md` (Phase 3), `CLAUDE.md`

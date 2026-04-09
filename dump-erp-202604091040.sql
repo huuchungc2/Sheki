@@ -288,7 +288,7 @@ CREATE TABLE `groups` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_groups_is_active` (`is_active`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -297,7 +297,7 @@ CREATE TABLE `groups` (
 
 LOCK TABLES `groups` WRITE;
 /*!40000 ALTER TABLE `groups` DISABLE KEYS */;
-INSERT INTO `groups` VALUES (4,'TNK','Nhom TNK',1,'2026-04-05 10:49:15'),(5,'SHEKI','Nhom SHEKI',1,'2026-04-05 10:49:15'),(6,'KHA','Nhom KHA',1,'2026-04-05 10:49:15');
+INSERT INTO `groups` VALUES (4,'TNK','Nhom TNK',1,'2026-04-05 10:49:15'),(5,'SHEKI','Nhom SHEKI',1,'2026-04-05 10:49:15'),(6,'KHA','Nhom KHA',1,'2026-04-05 10:49:15'),(7,'abc','abc khi nào',0,'2026-04-09 10:37:51');
 /*!40000 ALTER TABLE `groups` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -890,4 +890,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-04-08 19:11:37
+-- Dump completed on 2026-04-09 10:40:11

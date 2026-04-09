@@ -216,14 +216,16 @@ async function importData(entity, rows, userId) {
 }
 
 async function ensureUniqueUsername(pool, raw) {
-  const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
+  const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   let base = String(raw || '')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .replace(/[^a-z0-9._-]+/g, '.')
+    .replace(/^[._-]+|[._-]+$/g, '');
   if (base.length < 3) base = `nv_${Date.now()}`;
   if (base.length > 32) base = base.slice(0, 32);
+  if (!/^[a-z0-9]/.test(base)) base = `nv.${base}`.slice(0, 32);
   let candidate = base;
   let n = 0;
   while (true) {
@@ -256,8 +258,10 @@ async function importEmployee(pool, row) {
     throw new Error('Thiếu email nhân viên');
   }
 
-  const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
-  if (!username || !USERNAME_RE.test(username)) {
+  const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!username || !(USERNAME_RE.test(username) || EMAIL_RE.test(username))) {
+    // Nếu username không hợp lệ → fallback theo prefix email
     username = await ensureUniqueUsername(pool, email.split('@')[0]);
   } else {
     const [taken] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);

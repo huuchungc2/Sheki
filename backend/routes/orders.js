@@ -16,6 +16,8 @@ const {
 } = require('../services/orderService');
 const { publishOrderEvent } = require('../services/notificationHub');
 
+const DEFAULT_LINE_COMMISSION_RATE = 10;
+
 router.get('/', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
@@ -24,7 +26,12 @@ router.get('/', auth, async (req, res, next) => {
 
     let query = `
       SELECT o.*, c.name as customer_name, c.phone as customer_phone, u.full_name as salesperson_name, w.name as warehouse_name, g.name as group_name,
-        COALESCE((SELECT commission_amount FROM commissions WHERE order_id = o.id LIMIT 1), 0) as commission_amount
+        COALESCE((
+          SELECT commission_amount
+          FROM commissions
+          WHERE order_id = o.id AND user_id = o.salesperson_id AND type = 'direct'
+          LIMIT 1
+        ), 0) as commission_amount
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       LEFT JOIN users u ON o.salesperson_id = u.id
@@ -36,6 +43,7 @@ router.get('/', auth, async (req, res, next) => {
     const params = [];
 
     if (req.user.scope_own_data) {
+      // Sales "Đơn hàng của tôi": CHỈ các đơn mình bán
       query += ' AND o.salesperson_id = ?';
       countQuery += ' AND salesperson_id = ?';
       params.push(req.user.id);
@@ -128,8 +136,22 @@ router.get('/:id', auth, async (req, res, next) => {
       return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
     }
 
-    if (req.user.scope_own_data && rows[0].salesperson_id !== req.user.id) {
-      return res.status(403).json({ error: 'Không có quyền xem đơn hàng này' });
+    if (
+      req.user.scope_own_data &&
+      rows[0].salesperson_id !== req.user.id
+    ) {
+      // Cho phép quản lý xem chi tiết đơn nếu có hoa hồng override từ đơn đó
+      // (Dùng cho popup chi tiết đơn ở /reports/commissions/ctv)
+      const [[ov]] = await pool.query(
+        `SELECT 1 as ok
+         FROM commissions c
+         WHERE c.order_id = ? AND c.user_id = ? AND c.type = 'override'
+         LIMIT 1`,
+        [rows[0].id, req.user.id]
+      );
+      if (!ov?.ok) {
+        return res.status(403).json({ error: 'Không có quyền xem đơn hàng này' });
+      }
     }
 
     const [items] = await pool.query(
@@ -162,7 +184,56 @@ router.get('/:id', auth, async (req, res, next) => {
       subtotal: parseFloat(item.subtotal) || 0,
     }));
 
-    res.json({ data: { ...formattedOrder, items: formattedItems } });
+    // Nếu user đang xem với vai trò "quản lý nhận override", trả thêm breakdown theo dòng:
+    // - net_amount dòng
+    // - override_rate theo tier của commission_rate từng dòng
+    // - override_amount theo dòng
+    const [[hasOverride]] = await pool.query(
+      `SELECT 1 as ok
+       FROM commissions c
+       WHERE c.order_id = ? AND c.user_id = ? AND c.type = 'override'
+       LIMIT 1`,
+      [rows[0].id, req.user.id]
+    );
+
+    let override_breakdown = null;
+    if (hasOverride?.ok) {
+      const tierCache = new Map();
+      const getTier = async (ctvRate) => {
+        const key = String(ctvRate);
+        if (tierCache.has(key)) return tierCache.get(key);
+        const [[t]] = await pool.query(
+          `SELECT sales_override_rate
+           FROM commission_tiers
+           WHERE ctv_rate_min <= ? AND (ctv_rate_max IS NULL OR ctv_rate_max >= ?)
+           ORDER BY ctv_rate_min DESC LIMIT 1`,
+          [ctvRate, ctvRate]
+        );
+        const rate = t ? parseFloat(t.sales_override_rate) : null;
+        tierCache.set(key, rate);
+        return rate;
+      };
+
+      override_breakdown = await Promise.all(
+        formattedItems.map(async (it) => {
+          const netAmount =
+            (parseFloat(it.unit_price) || 0) * (parseFloat(it.qty) || 0) - (parseFloat(it.discount_amount) || 0);
+          const ctvRate = parseFloat(it.commission_rate) || 0;
+          const overrideRate = await getTier(ctvRate);
+          const overrideAmount =
+            overrideRate == null ? 0 : Math.round(netAmount * (overrideRate / 100) * 100) / 100;
+          return {
+            product_id: it.product_id,
+            net_amount: Math.round(netAmount * 100) / 100,
+            ctv_rate: Math.round(ctvRate * 100) / 100,
+            override_rate: overrideRate,
+            override_amount: overrideAmount,
+          };
+        })
+      );
+    }
+
+    res.json({ data: { ...formattedOrder, items: formattedItems, override_breakdown } });
   } catch (err) {
     next(err);
   }
@@ -170,13 +241,70 @@ router.get('/:id', auth, async (req, res, next) => {
 
 router.post('/', auth, async (req, res, next) => {
   try {
-    const { customer_id, warehouse_id, group_id, shipping_address, carrier_service, shipping_fee, payment_method, discount, note, items } = req.body;
+    const {
+      customer_id,
+      warehouse_id,
+      group_id,
+      shipping_address,
+      carrier_service,
+      shipping_fee,
+      payment_method,
+      discount,
+      note,
+      items,
+      source_type,
+      manager_salesperson_id,
+      collaborator_user_id,
+    } = req.body;
 
     if (!customer_id || !warehouse_id || !items || items.length === 0) {
       return res.status(400).json({ error: 'Thiếu thông tin bắt buộc' });
     }
 
     const pool = await getPool();
+
+    const parsedMgrPost =
+      manager_salesperson_id !== undefined && manager_salesperson_id !== null && manager_salesperson_id !== ''
+        ? parseInt(manager_salesperson_id, 10)
+        : null;
+    let effectivePostSource = source_type;
+    if (effectivePostSource === undefined && parsedMgrPost && Number.isFinite(parsedMgrPost)) {
+      effectivePostSource = 'collaborator';
+    }
+
+    const isAdminUser = req.user.can_access_admin === true || req.user.role === 'admin';
+    if (isAdminUser && effectivePostSource === 'collaborator') {
+      return res.status(403).json({
+        error: 'Admin không dùng chế độ ghi nhận quản lý nhận HH trực tiếp — chỉ nhân viên Sales.',
+      });
+    }
+
+    let finalSalespersonId = req.user.id;
+    let finalSourceType = effectivePostSource === 'collaborator' ? 'collaborator' : 'sales';
+    let finalCollaboratorUserId = null;
+
+    if (finalSourceType === 'collaborator') {
+      // NEW semantics (theo yêu cầu nghiệp vụ hiện tại):
+      // - salesperson_id = người lên đơn (Lan) => nhận HH direct
+      // - collaborator_user_id = quản lý (Minh) => nhận HH override từ đơn của Lan
+      const managerId = parseInt(manager_salesperson_id, 10);
+      if (!managerId) {
+        return res.status(400).json({ error: 'Cần manager_salesperson_id (quản lý nhận hoa hồng từ CTV)' });
+      }
+
+      // Validate quan hệ quản lý-CTV: managerId phải là sales_id của user hiện tại (CTV)
+      const [pair] = await pool.query(
+        'SELECT 1 FROM collaborators WHERE sales_id = ? AND ctv_id = ? LIMIT 1',
+        [managerId, req.user.id]
+      );
+      if (!pair.length) {
+        return res.status(400).json({ error: 'Quản lý và nhân viên lên đơn không khớp quan hệ đã gán trong hệ thống' });
+      }
+
+      finalSalespersonId = req.user.id;
+      finalCollaboratorUserId = managerId;
+    }
+
     const code = await generateOrderCode();
 
     // Validate stock: qty <= available_stock in this warehouse (server-side, cannot bypass)
@@ -200,8 +328,10 @@ router.post('/', auth, async (req, res, next) => {
     let totalCommission = 0;
 
     for (const item of items) {
+      const rate =
+        parseFloat(item.commission_rate) || 0;
       const discountAmount = (item.unit_price * item.qty * (item.discount_rate || 0)) / 100;
-      const commissionAmount = await calculateItemCommission(item.unit_price, item.qty, discountAmount, item.commission_rate);
+      const commissionAmount = await calculateItemCommission(item.unit_price, item.qty, discountAmount, rate);
       const itemSubtotal = (item.unit_price * item.qty) - discountAmount;
 
       subtotal += itemSubtotal;
@@ -209,6 +339,7 @@ router.post('/', auth, async (req, res, next) => {
 
       item.discount_amount = discountAmount;
       item.commission_amount = commissionAmount;
+      item.commission_rate = rate;
       item.subtotal = itemSubtotal;
     }
 
@@ -218,9 +349,26 @@ router.post('/', auth, async (req, res, next) => {
     const orderStatus = req.body.status || 'pending';
 
     const [orderResult] = await pool.query(
-      `INSERT INTO orders (code, customer_id, salesperson_id, warehouse_id, group_id, status, shipping_address, carrier_service, shipping_fee, payment_method, subtotal, discount, total_amount, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [code, customer_id, req.user.id, warehouse_id, group_id || null, orderStatus, shipping_address, carrier_service, shipping_fee || 0, payment_method || 'cash', subtotal, discount || 0, totalAmount, note]
+      `INSERT INTO orders (code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, payment_method, subtotal, discount, total_amount, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        code,
+        customer_id,
+        finalSalespersonId,
+        warehouse_id,
+        group_id || null,
+        finalSourceType,
+        finalCollaboratorUserId,
+        orderStatus,
+        shipping_address,
+        carrier_service,
+        shipping_fee || 0,
+        payment_method || 'cash',
+        subtotal,
+        discount || 0,
+        totalAmount,
+        note,
+      ]
     );
 
     const orderId = orderResult.insertId;
@@ -249,7 +397,8 @@ router.post('/', auth, async (req, res, next) => {
         order_id: orderId,
         order_code: code,
         status: orderStatus,
-        salesperson_id: req.user.id,
+        salesperson_id: finalSalespersonId,
+        collaborator_user_id: finalCollaboratorUserId,
         group_id: group_id || null,
         total_amount: totalAmount,
       });
@@ -272,11 +421,38 @@ router.put('/:id', auth, async (req, res, next) => {
 
     const order = existing[0];
 
-    if (req.user.scope_own_data && order.salesperson_id !== req.user.id) {
+    if (
+      req.user.scope_own_data &&
+      order.salesperson_id !== req.user.id
+    ) {
       return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
     }
 
-    const { customer_id, warehouse_id, group_id, status, shipping_address, carrier_service, shipping_fee, payment_method, discount, note, items } = req.body;
+    const {
+      customer_id,
+      warehouse_id,
+      group_id,
+      status,
+      shipping_address,
+      carrier_service,
+      shipping_fee,
+      payment_method,
+      discount,
+      note,
+      items,
+      source_type,
+      manager_salesperson_id,
+      collaborator_user_id,
+    } = req.body;
+
+    const parsedManagerInfer =
+      manager_salesperson_id !== undefined && manager_salesperson_id !== null && manager_salesperson_id !== ''
+        ? parseInt(manager_salesperson_id, 10)
+        : null;
+    let effectiveSourceType = source_type;
+    if (effectiveSourceType === undefined && parsedManagerInfer && Number.isFinite(parsedManagerInfer)) {
+      effectiveSourceType = 'collaborator';
+    }
 
     const oldStatus = order.status;
     const targetWarehouseId = warehouse_id || order.warehouse_id;
@@ -284,7 +460,66 @@ router.put('/:id', auth, async (req, res, next) => {
     let subtotal = 0;
     let totalCommission = 0;
 
-    if (items) {
+    let finalSalespersonId = order.salesperson_id;
+    let finalSourceType =
+      String(order.source_type || 'sales') === 'collaborator' ? 'collaborator' : 'sales';
+    let finalCollaboratorUserId = order.collaborator_user_id || null;
+
+    const isAdminUserPut = req.user.can_access_admin === true || req.user.role === 'admin';
+    if (isAdminUserPut && effectiveSourceType === 'collaborator') {
+      return res.status(403).json({
+        error: 'Admin không dùng chế độ ghi nhận quản lý nhận HH trực tiếp — chỉ nhân viên Sales.',
+      });
+    }
+
+    if (effectiveSourceType === 'collaborator' || effectiveSourceType === 'sales') {
+      if (effectiveSourceType === 'collaborator') {
+        const managerId = parseInt(manager_salesperson_id, 10);
+        if (!managerId) {
+          return res.status(400).json({ error: 'Cần manager_salesperson_id (quản lý nhận hoa hồng từ CTV)' });
+        }
+
+        // Validate quan hệ quản lý-CTV theo người đang sửa/lên đơn (sales user)
+        const [pair] = await pool.query(
+          'SELECT 1 FROM collaborators WHERE sales_id = ? AND ctv_id = ? LIMIT 1',
+          [managerId, req.user.id]
+        );
+        if (!pair.length) {
+          return res.status(400).json({ error: 'Quản lý và nhân viên lên đơn không khớp quan hệ đã gán trong hệ thống' });
+        }
+
+        finalSalespersonId = req.user.id;
+        finalCollaboratorUserId = managerId;
+        finalSourceType = 'collaborator';
+      } else {
+        finalSourceType = 'sales';
+        finalCollaboratorUserId = null;
+        // Không chọn quản lý → giữ salesperson_id hiện tại (người lên đơn)
+      }
+    }
+
+    let itemsForPut = items;
+    if (Array.isArray(itemsForPut) && itemsForPut.length === 0) {
+      itemsForPut = null;
+    }
+    if (
+      (!itemsForPut || !Array.isArray(itemsForPut) || itemsForPut.length === 0) &&
+      (effectiveSourceType === 'collaborator' || effectiveSourceType === 'sales')
+    ) {
+      const [rows] = await pool.query(
+        `SELECT product_id, qty, unit_price, discount_rate, commission_rate FROM order_items WHERE order_id = ?`,
+        [req.params.id]
+      );
+      itemsForPut = rows.map((r) => ({
+        product_id: r.product_id,
+        qty: parseFloat(r.qty),
+        unit_price: parseFloat(r.unit_price),
+        discount_rate: parseFloat(r.discount_rate) || 0,
+        commission_rate: parseFloat(r.commission_rate) || 0,
+      }));
+    }
+
+    if (itemsForPut && itemsForPut.length) {
       // Validate stock with baseline add-back for current order (pending/shipping only)
       const addBackAllowed = ['pending', 'shipping'].includes(String(oldStatus)) && String(targetWarehouseId) === String(order.warehouse_id);
       const [oldItems] = await pool.query(
@@ -297,7 +532,7 @@ router.put('/:id', auth, async (req, res, next) => {
         return acc;
       }, {});
 
-      for (const it of items) {
+      for (const it of itemsForPut) {
         const productId = it.product_id;
         const qty = parseFloat(it.qty);
         if (!productId || !Number.isFinite(qty) || qty <= 0) continue;
@@ -316,9 +551,11 @@ router.put('/:id', auth, async (req, res, next) => {
 
       await pool.query('DELETE FROM order_items WHERE order_id = ?', [req.params.id]);
 
-      for (const item of items) {
+      for (const item of itemsForPut) {
+        const rate =
+          parseFloat(item.commission_rate) || 0;
         const discountAmount = (item.unit_price * item.qty * (item.discount_rate || 0)) / 100;
-        const commissionAmount = await calculateItemCommission(item.unit_price, item.qty, discountAmount, item.commission_rate);
+        const commissionAmount = await calculateItemCommission(item.unit_price, item.qty, discountAmount, rate);
         const itemSubtotal = (item.unit_price * item.qty) - discountAmount;
 
         subtotal += itemSubtotal;
@@ -326,12 +563,13 @@ router.put('/:id', auth, async (req, res, next) => {
 
         item.discount_amount = discountAmount;
         item.commission_amount = commissionAmount;
+        item.commission_rate = rate;
         item.subtotal = itemSubtotal;
 
         await pool.query(
           `INSERT INTO order_items (order_id, product_id, qty, unit_price, discount_rate, discount_amount, commission_rate, commission_amount, subtotal)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [req.params.id, item.product_id, item.qty, item.unit_price, item.discount_rate || 0, item.discount_amount, item.commission_rate || 0, item.commission_amount, item.subtotal]
+          [req.params.id, item.product_id, item.qty, item.unit_price, item.discount_rate || 0, item.discount_amount, rate, item.commission_amount, item.subtotal]
         );
       }
     } else {
@@ -345,9 +583,26 @@ router.put('/:id', auth, async (req, res, next) => {
     const totalAmount = subtotal + (shipping_fee !== undefined ? shipping_fee : order.shipping_fee) - (discount !== undefined ? discount : order.discount);
 
     await pool.query(
-      `UPDATE orders SET customer_id = ?, warehouse_id = ?, group_id = ?, status = ?, shipping_address = ?, carrier_service = ?, shipping_fee = ?, payment_method = ?, subtotal = ?, discount = ?, total_amount = ?, note = ?
+      `UPDATE orders SET customer_id = ?, warehouse_id = ?, group_id = ?, salesperson_id = ?, source_type = ?, collaborator_user_id = ?, status = ?, shipping_address = ?, carrier_service = ?, shipping_fee = ?, payment_method = ?, subtotal = ?, discount = ?, total_amount = ?, note = ?
        WHERE id = ?`,
-      [customer_id || order.customer_id, warehouse_id || order.warehouse_id, group_id !== undefined ? group_id : order.group_id, status || order.status, shipping_address || order.shipping_address, carrier_service || order.carrier_service, shipping_fee !== undefined ? shipping_fee : order.shipping_fee, payment_method || order.payment_method, subtotal, discount !== undefined ? discount : order.discount, totalAmount, note || order.note, req.params.id]
+      [
+        customer_id || order.customer_id,
+        warehouse_id || order.warehouse_id,
+        group_id !== undefined ? group_id : order.group_id,
+        finalSalespersonId,
+        finalSourceType,
+        finalCollaboratorUserId,
+        status || order.status,
+        shipping_address || order.shipping_address,
+        carrier_service || order.carrier_service,
+        shipping_fee !== undefined ? shipping_fee : order.shipping_fee,
+        payment_method || order.payment_method,
+        subtotal,
+        discount !== undefined ? discount : order.discount,
+        totalAmount,
+        note || order.note,
+        req.params.id,
+      ]
     );
 
     const newStatus = status || order.status;
@@ -415,7 +670,10 @@ router.delete('/:id', auth, async (req, res, next) => {
 
     const order = existing[0];
 
-    if (req.user.scope_own_data && order.salesperson_id !== req.user.id) {
+    if (
+      req.user.scope_own_data &&
+      order.salesperson_id !== req.user.id
+    ) {
       return res.status(403).json({ error: 'Không có quyền xóa đơn hàng này' });
     }
 

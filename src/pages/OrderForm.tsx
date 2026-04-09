@@ -27,7 +27,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { cn, formatCurrency } from "../lib/utils";
+import { cn, formatCurrency, isAdminUser } from "../lib/utils";
 import { api } from "../lib/api";
 import type { OrderItem } from "../types";
 
@@ -68,9 +68,16 @@ export function OrderForm() {
 
   const addProduct = (product: any) => {
     const existing = items.find(i => i.productId === product.id);
+    const defaultRate = 10;
     if (existing) {
-      setItems(items.map(i => i.productId === product.id ? { ...i, quantity: parseFloat((i.quantity + 1).toFixed(1)) } : i));
+      setItems(items.map(i => {
+        if (i.productId !== product.id) return i;
+        const q = parseFloat((i.quantity + 1).toFixed(1));
+        const net = i.price * q - i.discountAmount;
+        return { ...i, quantity: q, commissionAmount: Math.round(net * (i.commissionRate / 100) * 100) / 100 };
+      }));
     } else {
+      const net = product.price - 0;
       setItems([...items, {
         productId: product.id,
         productName: product.name,
@@ -80,8 +87,8 @@ export function OrderForm() {
         quantity: 1,
         discountRate: 0,
         discountAmount: 0,
-        commissionRate: 10,
-        commissionAmount: product.price * 0.10
+        commissionRate: defaultRate,
+        commissionAmount: Math.round(net * (defaultRate / 100) * 100) / 100
       }]);
     }
     setSearchQuery("");
@@ -99,6 +106,89 @@ export function OrderForm() {
   const [formError, setFormError] = React.useState<string>("");
   const [selectedGroupId, setSelectedGroupId] = React.useState<number | null>(null);
   const [groups, setGroups] = React.useState<any[]>([]);
+
+  const currentUser = React.useMemo(() => {
+    const u = localStorage.getItem("user");
+    return u ? JSON.parse(u) : null;
+  }, []);
+
+  /** null = HH cho người tạo đơn; có id = HH trực tiếp cho quản lý đó (source_type collaborator) */
+  const [directManagerId, setDirectManagerId] = React.useState<number | null>(null);
+  const [myManagers, setMyManagers] = React.useState<any[]>([]);
+  /** Khi sửa đơn collaborator: đảm bảo quản lý hiện tại có trong list (kể cả ngoài nhóm — backend include_user_ids) */
+  const [editIncludeManagerId, setEditIncludeManagerId] = React.useState<number | null>(null);
+  const isAdmin = isAdminUser(currentUser);
+
+  const applyLinesCommission = React.useCallback(
+    (list: { id: number; commission_rate?: number }[], managerId: number | null) => {
+      setItems((prev) =>
+        prev.map((it) => {
+          const net = it.price * it.quantity - it.discountAmount;
+          if (managerId == null) {
+            const r = Number(it.commissionRate) || 10;
+            return {
+              ...it,
+              commissionRate: r,
+              commissionAmount: Math.round(net * (r / 100) * 100) / 100,
+            };
+          }
+          // Khi chọn quản lý: hoa hồng direct vẫn thuộc về người lên đơn (CTV),
+          // nên giữ nguyên commissionRate từng dòng; chỉ đảm bảo tính lại commissionAmount.
+          const r = Number(it.commissionRate) || 10;
+          return {
+            ...it,
+            commissionRate: r,
+            commissionAmount: Math.round(net * (r / 100) * 100) / 100,
+          };
+        })
+      );
+    },
+    []
+  );
+
+  React.useEffect(() => {
+    if (!id) setEditIncludeManagerId(null);
+  }, [id]);
+
+  React.useEffect(() => {
+    if (isAdmin || !selectedGroupId) {
+      setMyManagers([]);
+      return;
+    }
+    const qs = new URLSearchParams({ group_id: String(selectedGroupId) });
+    if (editIncludeManagerId != null) {
+      qs.set("include_user_ids", String(editIncludeManagerId));
+    }
+    api
+      .get(`/collaborators/my-managers?${qs.toString()}`)
+      .then((res: any) => {
+        const list: any[] = Array.isArray(res?.data) ? res.data : [];
+        setMyManagers(list);
+        if (!id) {
+          const pick = list.length ? list[0].id : null;
+          setDirectManagerId(pick);
+          applyLinesCommission(list, pick);
+        }
+      })
+      .catch(() => setMyManagers([]));
+  }, [isAdmin, selectedGroupId, editIncludeManagerId, id, applyLinesCommission]);
+
+  const managerOptions = React.useMemo(() => {
+    return myManagers.map((m: any) => ({
+      id: m.id,
+      full_name: m.full_name,
+      commission_rate: Number(m.commission_rate) || 10,
+    }));
+  }, [myManagers]);
+
+  const applyCommissionForManager = React.useCallback(
+    (mid: number | null) => {
+      applyLinesCommission(managerOptions, mid);
+    },
+    [applyLinesCommission, managerOptions]
+  );
+
+  const [initialOrderSourceType, setInitialOrderSourceType] = React.useState<string | null>(null);
 
   // Warehouse state
   const [selectedWarehouseId, setSelectedWarehouseId] = React.useState<number | null>(null);
@@ -156,7 +246,7 @@ export function OrderForm() {
     if (!q) { setProductSuggestions([]); return; }
     try {
       const wh = selectedWarehouseId ? `&warehouse_id=${selectedWarehouseId}` : '';
-      const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50${wh}`);
+      const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50${wh}&active_only=1`);
       const data = res?.data ?? [];
       setProductSuggestions(data.map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, price: Number(p.price) || 0, available_stock: Number(p.available_stock) || 0 })));
     } catch {
@@ -201,6 +291,16 @@ export function OrderForm() {
         setPaymentMethod(order?.payment_method ?? 'cash');
         setOrderStatus(order?.status ?? 'pending');
         setSelectedGroupId(order?.group_id ?? null);
+        setInitialOrderSourceType(order?.source_type ?? "sales");
+        // NEW semantics: source_type=collaborator => collaborator_user_id là quản lý được chọn
+        if (!isAdmin && order?.source_type === "collaborator" && order?.collaborator_user_id != null) {
+          const mid = Number(order.collaborator_user_id);
+          setDirectManagerId(Number.isFinite(mid) ? mid : null);
+          setEditIncludeManagerId(Number.isFinite(mid) ? mid : null);
+        } else {
+          setDirectManagerId(null);
+          setEditIncludeManagerId(null);
+        }
         setSelectedWarehouseId(order?.warehouse_id ?? null);
         setBaselineWarehouseId(order?.warehouse_id ?? null);
         setBaselineStatus(order?.status ?? '');
@@ -217,7 +317,7 @@ export function OrderForm() {
         console.error('Load order error', e);
       }
     })();
-  }, [id]);
+  }, [id, isAdmin]);
 
   // Submit
   const submitOrder = async () => {
@@ -286,16 +386,28 @@ export function OrderForm() {
       return;
     }
 
-    const itemsPayload = items.map(i => ({
-      product_id: i.productId,
-      qty: i.quantity,
-      unit_price: i.price,
-      discount_rate: i.discountRate,
-      discount_amount: i.discountAmount,
-      commission_rate: i.commissionRate,
-      commission_amount: i.commissionAmount,
-      subtotal: i.subtotal
-    }));
+    if (!isAdmin && directManagerId != null) {
+      const ok = managerOptions.some((o) => o.id === directManagerId);
+      if (!ok) {
+        setFormError("Quản lý nhận HH không hợp lệ — chọn lại trong danh sách");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+    }
+
+    const itemsPayload = items.map(i => {
+      const lineSub = i.quantity * i.price - i.discountAmount;
+      return {
+        product_id: i.productId,
+        qty: i.quantity,
+        unit_price: i.price,
+        discount_rate: i.discountRate,
+        discount_amount: i.discountAmount,
+        commission_rate: i.commissionRate,
+        commission_amount: i.commissionAmount,
+        subtotal: i.subtotal ?? lineSub,
+      };
+    });
     const payload: any = {
       customer_id: selectedCustomer.id,
       warehouse_id: selectedWarehouseId,
@@ -309,6 +421,13 @@ export function OrderForm() {
       note: note,
       items: itemsPayload
     };
+
+    if (!isAdmin) {
+      payload.source_type = directManagerId != null ? "collaborator" : "sales";
+      if (directManagerId != null) {
+        payload.manager_salesperson_id = Number(directManagerId);
+      }
+    }
     try {
       let res: any;
       if (id) {
@@ -427,7 +546,12 @@ export function OrderForm() {
                 </label>
                 <select
                   value={selectedGroupId ?? ""}
-                  onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
+                  onChange={(e) => {
+                    const v = e.target.value ? Number(e.target.value) : null;
+                    setSelectedGroupId(v);
+                    // Khi sửa đơn: giữ include_user_ids để dropdown vẫn render quản lý đang chọn
+                    if (id && directManagerId != null) setEditIncludeManagerId(directManagerId);
+                  }}
                   className={cn(
                     "w-full px-3 py-2 border rounded-lg text-sm outline-none transition-all bg-white",
                     !selectedGroupId
@@ -568,6 +692,35 @@ export function OrderForm() {
               </div>
             </div>
 
+            {!isAdmin && (
+              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/70">
+                <label className="mb-1.5 block text-[11px] font-medium text-slate-600">
+                  Quản lý (nhận HH trực tiếp)
+                </label>
+                <select
+                  value={directManagerId ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const mid = raw === "" ? null : Number(raw);
+                    setDirectManagerId(mid);
+                    if (id) setEditIncludeManagerId(mid);
+                    applyCommissionForManager(mid);
+                  }}
+                  className="w-full max-w-md rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-green-400 focus:ring-2 focus:ring-green-50"
+                >
+                  <option value="">— Tôi nhận HH (người tạo đơn) —</option>
+                  {managerOptions.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.full_name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-[10px] text-slate-400 leading-relaxed">
+                  Mặc định: quản lý trực tiếp đầu tiên trong danh sách. Để trống “Tôi nhận HH”: không có hoa hồng quản lý. Chọn quản lý: quản lý nhận hoa hồng từ CTV (override) theo rule hệ thống; hoa hồng direct vẫn là của người lên đơn.
+                </p>
+              </div>
+            )}
+
             {items.length === 0 ? (
               <div className="py-12 text-center text-slate-400">
                 <Package className="w-7 h-7 mx-auto mb-2 text-slate-200" />
@@ -703,19 +856,21 @@ export function OrderForm() {
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="flex flex-col items-center gap-0.5">
-                              <div className="flex items-center gap-0.5 justify-center">
-                                <input
-                                  type="number" min={0} max={100}
-                                  value={item.commissionRate}
-                                  onChange={(e) => {
-                                    const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                    setItems(items.map(it => it.productId === item.productId ? { ...it, commissionRate: r, commissionAmount: (it.price * it.quantity - it.discountAmount) * (r / 100) } : it));
-                                  }}
-                                  className="w-9 h-5 px-1 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded text-center text-xs font-semibold text-green-700 outline-none focus:ring-1 focus:ring-green-100 transition-colors"
-                                />
-                                <span className="text-green-600 text-[10px] font-semibold">%</span>
-                              </div>
-                              <span className="text-green-600 text-[10px] font-medium">{formatCurrency(item.commissionAmount)}</span>
+                              <>
+                                <div className="flex items-center gap-0.5 justify-center">
+                                  <input
+                                    type="number" min={0} max={100}
+                                    value={item.commissionRate}
+                                    onChange={(e) => {
+                                      const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                      setItems(items.map(it => it.productId === item.productId ? { ...it, commissionRate: r, commissionAmount: (it.price * it.quantity - it.discountAmount) * (r / 100) } : it));
+                                    }}
+                                    className="w-9 h-5 px-1 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded text-center text-xs font-semibold text-green-700 outline-none focus:ring-1 focus:ring-green-100 transition-colors"
+                                  />
+                                  <span className="text-green-600 text-[10px] font-semibold">%</span>
+                                </div>
+                                <span className="text-green-600 text-[10px] font-medium">{formatCurrency(item.commissionAmount)}</span>
+                              </>
                             </div>
                           </td>
                           <td className="px-2 py-2.5 text-center">

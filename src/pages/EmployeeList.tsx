@@ -236,14 +236,24 @@ export function EmployeeList() {
             <p className="text-xl font-bold text-slate-900">{total}</p>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse mr-2"></div>
-            <span className="font-bold">{employees.filter(e => e.is_active).length}</span>
-          </div>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Đang làm việc</p>
-            <p className="text-xl font-bold text-slate-900">Hoạt động</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Trạng thái</p>
+            <p className="text-sm text-slate-600 mt-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="font-semibold text-slate-900">{employees.filter(e => e.is_active).length}</span> đang làm
+              </span>
+              <span className="text-slate-300 mx-2">•</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-slate-300" />
+                <span className="font-semibold text-slate-900">{employees.filter(e => !e.is_active).length}</span> đã nghỉ
+              </span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Trang</p>
+            <p className="text-sm font-bold text-slate-900 mt-1">{page}/{Math.max(1, Math.ceil(total / limit))}</p>
           </div>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">

@@ -29,7 +29,7 @@ async function generateProductSku(pool) {
 router.get('/', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, category, warehouse_id, available_only, status, page = 1, limit = 20 } = req.query;
+    const { search, category, warehouse_id, available_only, active_only, status, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
     let query = `
@@ -51,6 +51,11 @@ router.get('/', auth, async (req, res, next) => {
       WHERE 1=1
     `;
     const params = [];
+
+    if (String(active_only) === '1') {
+      query += ' AND p.is_active = 1';
+      countQuery += ' AND p.is_active = 1';
+    }
 
     if (warehouse_id) {
       // Filter theo kho: vẫn trả TẤT CẢ sản phẩm; nếu kho chưa có record thì tồn = 0
@@ -169,10 +174,13 @@ router.get('/:id', auth, async (req, res, next) => {
 
 router.post('/', auth, authorize('admin'), async (req, res, next) => {
   try {
-    const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images } = req.body;
+    const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images, warehouse_id } = req.body;
 
     if (!name || !price) {
       return res.status(400).json({ error: 'Thiếu thông tin bắt buộc' });
+    }
+    if (!warehouse_id) {
+      return res.status(400).json({ error: 'Vui lòng chọn kho (warehouse_id)' });
     }
 
     const pool = await getPool();
@@ -187,16 +195,16 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
       }
     }
 
-    // Default warehouse = is_default (fallback: Kho trung tâm, then first active warehouse)
-    const [whRows] = await pool.query(
-      `SELECT id FROM warehouses
-       WHERE is_active = 1
-       ORDER BY is_default DESC, (name = 'Kho trung tâm') DESC, id ASC
-       LIMIT 1`
+    const selectedWarehouseId = parseInt(warehouse_id);
+    if (Number.isNaN(selectedWarehouseId)) {
+      return res.status(400).json({ error: 'warehouse_id không hợp lệ' });
+    }
+    const [whCheck] = await pool.query(
+      'SELECT id FROM warehouses WHERE id = ? AND is_active = 1 LIMIT 1',
+      [selectedWarehouseId]
     );
-    const defaultWarehouseId = whRows?.[0]?.id;
-    if (!defaultWarehouseId) {
-      return res.status(400).json({ error: 'Chưa có kho mặc định (warehouses)' });
+    if (!whCheck.length) {
+      return res.status(400).json({ error: 'Kho không tồn tại hoặc đã bị vô hiệu hóa' });
     }
 
     const initialStock = parseFloat(stock_qty || 0) || 0;
@@ -209,7 +217,7 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
 
     const productId = result.insertId;
 
-    // Create per-warehouse stock in default warehouse
+    // Create per-warehouse stock in selected warehouse
     if (initialStock > 0) {
       await pool.query(
         `INSERT INTO warehouse_stock (warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
@@ -217,13 +225,13 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
          ON DUPLICATE KEY UPDATE
            stock_qty = VALUES(stock_qty),
            available_stock = VALUES(available_stock)`,
-        [defaultWarehouseId, productId, initialStock, initialStock]
+        [selectedWarehouseId, productId, initialStock, initialStock]
       );
     } else {
       await pool.query(
         `INSERT IGNORE INTO warehouse_stock (warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
          VALUES (?, ?, 0, 0, 0)`,
-        [defaultWarehouseId, productId]
+        [selectedWarehouseId, productId]
       );
     }
 
@@ -238,24 +246,85 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
 
 router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
   try {
-    const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images, is_active } = req.body;
+    const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images, is_active, warehouse_id } = req.body;
 
     const pool = await getPool();
 
-    const [existing] = await pool.query('SELECT id FROM products WHERE sku = ? AND id != ?', [sku, req.params.id]);
-    if (existing.length > 0) {
-      return res.status(409).json({ error: 'SKU đã tồn tại' });
+    // SKU uniqueness only if sku is provided (avoid false positives on soft-delete updates)
+    if (typeof sku === 'string' && sku.trim()) {
+      const [existing] = await pool.query('SELECT id FROM products WHERE sku = ? AND id != ?', [sku, req.params.id]);
+      if (existing.length > 0) {
+        return res.status(409).json({ error: 'SKU đã tồn tại' });
+      }
     }
 
-    const [currentProduct] = await pool.query('SELECT reserved_stock FROM products WHERE id = ?', [req.params.id]);
-    const reserved = currentProduct[0]?.reserved_stock || 0;
-    const available = Math.max(0, (stock_qty || 0) - reserved);
-
+    // Update product meta (aggregate stock is maintained via warehouse_stock + recalculateStock)
     await pool.query(
-      `UPDATE products SET name = ?, sku = ?, category_id = ?, unit = ?, price = ?, cost_price = ?, stock_qty = ?, available_stock = ?, reserved_stock = ?, low_stock_threshold = ?, weight = ?, length = ?, width = ?, height = ?, description = ?, images = ?, is_active = ?
+      `UPDATE products SET 
+         name = COALESCE(?, name),
+         sku = COALESCE(?, sku),
+         category_id = ?,
+         unit = COALESCE(?, unit),
+         price = COALESCE(?, price),
+         cost_price = COALESCE(?, cost_price),
+         low_stock_threshold = COALESCE(?, low_stock_threshold),
+         weight = ?,
+         length = ?,
+         width = ?,
+         height = ?,
+         description = ?,
+         images = ?,
+         is_active = COALESCE(?, is_active)
        WHERE id = ?`,
-      [name, sku, category_id, unit, price, cost_price, stock_qty, available, reserved, low_stock_threshold, weight, length, width, height, description, images ? JSON.stringify(images) : null, is_active, req.params.id]
+      [
+        name ?? null,
+        (typeof sku === 'string' && sku.trim()) ? sku.trim() : null,
+        (category_id === '' || category_id === undefined) ? null : category_id,
+        unit ?? null,
+        price ?? null,
+        cost_price ?? null,
+        low_stock_threshold ?? null,
+        weight ?? null,
+        length ?? null,
+        width ?? null,
+        height ?? null,
+        description ?? null,
+        images ? JSON.stringify(images) : null,
+        is_active ?? null,
+        req.params.id,
+      ]
     );
+
+    // If updating stock, require warehouse_id (stock is per-warehouse)
+    const hasStockUpdate = stock_qty !== undefined && stock_qty !== null;
+    if (hasStockUpdate) {
+      if (!warehouse_id) {
+        return res.status(400).json({ error: 'Vui lòng chọn kho để cập nhật tồn (warehouse_id)' });
+      }
+      const wid = parseInt(warehouse_id);
+      if (Number.isNaN(wid)) {
+        return res.status(400).json({ error: 'warehouse_id không hợp lệ' });
+      }
+
+      const newStockQty = Math.max(0, parseFloat(stock_qty) || 0);
+      const [curWs] = await pool.query(
+        'SELECT reserved_stock FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ? LIMIT 1',
+        [wid, req.params.id]
+      );
+      const reserved = curWs?.[0]?.reserved_stock ? parseFloat(curWs[0].reserved_stock) : 0;
+      const newAvailable = Math.max(0, newStockQty - (reserved || 0));
+
+      await pool.query(
+        `INSERT INTO warehouse_stock (warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           stock_qty = VALUES(stock_qty),
+           available_stock = VALUES(available_stock)`,
+        [wid, req.params.id, newStockQty, newAvailable, reserved || 0]
+      );
+
+      await recalculateStock(req.params.id);
+    }
 
     res.json({ message: 'Cập nhật sản phẩm thành công' });
   } catch (err) {

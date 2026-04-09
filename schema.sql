@@ -153,6 +153,8 @@ CREATE TABLE `orders` (
   `salesperson_id` INT UNSIGNED NOT NULL COMMENT 'Nhân viên tạo đơn',
   `warehouse_id` INT UNSIGNED NOT NULL,
   `group_id` INT UNSIGNED DEFAULT NULL COMMENT 'Nhóm nhân viên khi lên đơn',
+  `source_type` ENUM('sales','collaborator') NOT NULL DEFAULT 'sales' COMMENT 'sales=bán trực tiếp; collaborator=quản lý là salesperson_id, CTV=collaborator_user_id',
+  `collaborator_user_id` INT UNSIGNED DEFAULT NULL COMMENT 'CTV khi source_type=collaborator',
   `status` ENUM('draft', 'confirmed', 'shipping', 'done', 'cancelled') NOT NULL DEFAULT 'draft',
   `shipping_address` TEXT DEFAULT NULL,
   `carrier_service` VARCHAR(100) DEFAULT NULL,
@@ -172,10 +174,12 @@ CREATE TABLE `orders` (
   INDEX `idx_orders_group` (`group_id`),
   INDEX `idx_orders_status` (`status`),
   INDEX `idx_orders_created_at` (`created_at`),
+  INDEX `idx_orders_collaborator` (`collaborator_user_id`),
   CONSTRAINT `fk_orders_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers`(`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_orders_salesperson` FOREIGN KEY (`salesperson_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_orders_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses`(`id`) ON DELETE RESTRICT,
-  CONSTRAINT `fk_orders_group` FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON DELETE SET NULL
+  CONSTRAINT `fk_orders_group` FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_orders_collaborator_user` FOREIGN KEY (`collaborator_user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================

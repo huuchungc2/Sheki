@@ -158,8 +158,12 @@ export function EmployeeForm() {
     const un = formData.username.trim().toLowerCase();
     if (!un) {
       newErrors.username = "Vui lòng nhập tên đăng nhập";
-    } else if (!/^[a-zA-Z0-9_]{3,32}$/.test(un)) {
-      newErrors.username = "Tên đăng nhập: 3–32 ký tự, chỉ chữ, số và dấu gạch dưới";
+    } else {
+      const usernameRe = /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/;
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!(usernameRe.test(un) || emailRe.test(un))) {
+        newErrors.username = "Tên đăng nhập: có thể dùng username (3–32 ký tự, bắt đầu bằng chữ/số; cho phép . _ -) hoặc dùng email.";
+      }
     }
 
     if (!formData.email.trim()) {

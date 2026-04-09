@@ -75,7 +75,16 @@ router.get('/:id', auth, async (req, res, next) => {
   }
 });
 
-const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
+// Username có thể là:
+// - "username" thường: 3–32 ký tự, bắt đầu bằng chữ/số; cho phép . _ -
+// - hoặc email (để dùng luôn dạng lan.sales@velocity.vn như seed)
+const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidUsernameOrEmail(login) {
+  const s = String(login || '').trim().toLowerCase();
+  return USERNAME_RE.test(s) || EMAIL_RE.test(s);
+}
 
 function normalizeUsername(s) {
   return String(s || '').trim().toLowerCase();
@@ -91,8 +100,8 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
       return res.status(400).json({ error: 'Thiếu họ tên, tên đăng nhập, email hoặc mật khẩu' });
     }
 
-    if (!USERNAME_RE.test(username)) {
-      return res.status(400).json({ error: 'Tên đăng nhập: 3–32 ký tự, chỉ chữ, số và dấu gạch dưới' });
+    if (!isValidUsernameOrEmail(username)) {
+      return res.status(400).json({ error: 'Tên đăng nhập: có thể dùng username (3–32 ký tự, bắt đầu bằng chữ/số; cho phép . _ -) hoặc dùng email.' });
     }
 
     const pool = await getPool();
@@ -139,8 +148,8 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
     const username = normalizeUsername(req.body.username);
     const roleId = parseInt(req.body.role_id, 10);
 
-    if (!username || !USERNAME_RE.test(username)) {
-      return res.status(400).json({ error: 'Tên đăng nhập: 3–32 ký tự, chỉ chữ, số và dấu gạch dưới' });
+    if (!username || !isValidUsernameOrEmail(username)) {
+      return res.status(400).json({ error: 'Tên đăng nhập: có thể dùng username (3–32 ký tự, bắt đầu bằng chữ/số; cho phép . _ -) hoặc dùng email.' });
     }
 
     if (!roleId) {
@@ -360,7 +369,12 @@ router.get('/:id/orders', auth, async (req, res, next) => {
 
     let query = `
       SELECT o.*, c.name as customer_name, c.phone as customer_phone,
-        COALESCE((SELECT commission_amount FROM commissions WHERE order_id = o.id LIMIT 1), 0) as commission_amount
+        COALESCE((
+          SELECT commission_amount
+          FROM commissions
+          WHERE order_id = o.id AND user_id = o.salesperson_id AND type = 'direct'
+          LIMIT 1
+        ), 0) as commission_amount
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE o.salesperson_id = ?
@@ -500,7 +514,7 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
           ...r,
           total_amount:        parseFloat(r.total_amount) || 0,
           override_commission: parseFloat(r.override_commission) || 0,
-          override_rate:       parseFloat(r.override_rate) || 0,
+          override_rate:       r.override_rate != null ? parseFloat(r.override_rate) : null,
         })),
         totals: { total_override_commission: totalOverride, total_orders: totalOrders, total_revenue: totalRevenue },
       }

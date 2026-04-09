@@ -103,12 +103,22 @@ router.post('/', auth, async (req, res, next) => {
     if (!name) {
       return res.status(400).json({ error: 'Thiếu tên khách hàng' });
     }
+    const cleanedPhone = String(phone || '').replace(/\D/g, '');
+    if (!cleanedPhone) {
+      return res.status(400).json({ error: 'Thiếu số điện thoại' });
+    }
+    if (cleanedPhone.length !== 10) {
+      return res.status(400).json({ error: 'Số điện thoại phải có đúng 10 chữ số' });
+    }
+    if (!String(address || '').trim() || !String(city || '').trim() || !String(district || '').trim() || !String(ward || '').trim()) {
+      return res.status(400).json({ error: 'Địa chỉ phải đầy đủ: Tỉnh/TP, Quận/Huyện, Phường/Xã, Số nhà/Đường' });
+    }
 
     const pool = await getPool();
 
     const [result] = await pool.query(
       'INSERT INTO customers (name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, phone, email, address, city, district, ward, birthday, tier || 'new', source, assigned_employee_id, note, req.user.id]
+      [name, cleanedPhone, email, address, city, district, ward, birthday, tier || 'new', source, assigned_employee_id, note, req.user.id]
     );
 
     res.status(201).json({ id: result.insertId, message: 'Tạo khách hàng thành công' });
@@ -129,10 +139,23 @@ router.put('/:id', auth, async (req, res, next) => {
     }
 
     const { name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Thiếu tên khách hàng' });
+    }
+    const cleanedPhone = String(phone || '').replace(/\D/g, '');
+    if (!cleanedPhone) {
+      return res.status(400).json({ error: 'Thiếu số điện thoại' });
+    }
+    if (cleanedPhone.length !== 10) {
+      return res.status(400).json({ error: 'Số điện thoại phải có đúng 10 chữ số' });
+    }
+    if (!String(address || '').trim() || !String(city || '').trim() || !String(district || '').trim() || !String(ward || '').trim()) {
+      return res.status(400).json({ error: 'Địa chỉ phải đầy đủ: Tỉnh/TP, Quận/Huyện, Phường/Xã, Số nhà/Đường' });
+    }
 
     await pool.query(
       'UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, city = ?, district = ?, ward = ?, birthday = ?, tier = ?, source = ?, assigned_employee_id = ?, note = ? WHERE id = ?',
-      [name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note, req.params.id]
+      [name, cleanedPhone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note, req.params.id]
     );
 
     res.json({ message: 'Cập nhật khách hàng thành công' });

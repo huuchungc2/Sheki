@@ -63,6 +63,34 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Products: thêm/sửa bắt buộc chọn kho + tồn kho theo kho**
+  - ProductForm thêm dropdown kho (bắt buộc) và load tồn theo kho khi edit
+  - Products API nhận `warehouse_id`: create/sửa tồn sẽ cập nhật `warehouse_stock` theo kho và sync tổng tồn - Files: `src/pages/ProductForm.tsx`, `backend/routes/products.js`
+
+- [x] **Orders: không tính HH quản lý khi không chọn** — Tắt override commissions trên đơn bán trực tiếp (`sales`)
+- [x] **Sửa đơn: chọn/bỏ chọn quản lý** — Edit đơn cho phép toggle quản lý; HH theo rule mới
+- [x] **Orders: chọn quản lý → CTV có direct, quản lý có override** — Giữ `salesperson_id` là người lên đơn; tính `override` cho quản lý theo tier (tính trên net_amount từng item)
+- [x] **Orders: Sales chỉ thấy đơn mình bán** — Sales chỉ list/view/edit/delete đơn có `salesperson_id = user_id` (trừ legacy collaborator_user_id là CTV thật)
+- [x] **OrderForm: edit giữ quản lý đã chọn** — Load manager từ `collaborator_user_id` (semantics mới), giữ dropdown khi đổi nhóm, payload không gửi `collaborator_user_id` sai
+- [x] **CTV commissions: nhiều mức + popup** — Override_rate nhiều mức hiển thị “Nhiều mức”, click mã đơn mở popup chi tiết đơn trong `/reports/commissions/ctv`
+- [x] **Employees UI + username linh hoạt** — Làm UI EmployeeList/EmployeeForm gọn hơn; username cho phép `.`/`-` và không yêu cầu ký tự đặc biệt
+
+- [x] **CustomerForm + API: bắt phone 10 số + địa chỉ đầy đủ** — Validate FE/BE cho tạo/sửa KH (city/district/ward/address), lưu phone đã clean
+
+- [x] **Quản lý dropdown theo nhóm + HH sửa đơn** — API my-managers `group_id` / `include_user_ids`; POST/PUT suy source_type; OrderForm sync
+
+- [x] **Sửa đơn: đổi sang quản lý → HH đúng** — Auto CTV khi thiếu; PUT tính lại dòng khi đổi `source_type` không kèm items
+
+- [x] **Admin không dùng dropdown quản lý HH + API chặn collaborator** — Form + POST/PUT
+
+- [x] **Quyền + mặc định quản lý đơn** — Chỉ Admin collaborator→sales; Sales chọn/đổi QL; tạo đơn mặc định QL đầu tiên
+
+- [x] **OrderForm đơn giản: một dropdown quản lý (HH) trên danh sách SP** — Bỏ UI chọn CTV/quản lý/cặp; API collaborators có `sales_commission_rate` cho Admin
+
+- [x] **HH khi sửa đơn: collaborator → sales** — `salesperson_id` về đúng A/CTV; quyền CTV đổi về bán trực tiếp; OrderForm reset % HH dòng khi tắt ghi nhận quản lý
+
+- [x] **Đơn ghi nhận quản lý là người bán** — `source_type` + `collaborator_user_id`, API my-managers/my-ctvs, OrderForm, HH không override khi collaborator
+
 - [x] **Đặc tả đa shop** — Ghi `FEATURE_MULTI_SHOP.md` + cập nhật `plan.md`, `ROADMAP.md`, `CLAUDE.md` (chưa sửa code DB/API)
 
 - [x] **Gỡ menu Tra cứu đơn admin** — Dư thừa so với lọc đơn tại Danh sách đơn; redirect `/orders/search/*` → `/orders`

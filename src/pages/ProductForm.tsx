@@ -27,11 +27,13 @@ export function ProductForm() {
   const [images, setImages] = React.useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = React.useState("");
   const [categories, setCategories] = React.useState<any[]>([]);
+  const [warehouses, setWarehouses] = React.useState<any[]>([]);
+  const [warehouseId, setWarehouseId] = React.useState<string>("");
   const [isLoading, setIsLoading] = React.useState(false);
   const [fetchLoading, setFetchLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
-  const [errors, setErrors] = React.useState<{ name?: string; sku?: string; price?: string }>({});
+  const [errors, setErrors] = React.useState<{ name?: string; sku?: string; price?: string; warehouse_id?: string }>({});
 
   // Prefill SKU on create (server-authoritative sequence)
   React.useEffect(() => {
@@ -72,6 +74,30 @@ export function ProductForm() {
   }, []);
 
   React.useEffect(() => {
+    const fetchWarehouses = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_URL}/warehouses`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = (json.data || []).filter((w: any) => w.is_active);
+        setWarehouses(list);
+        // Preselect default warehouse if none chosen yet
+        setWarehouseId((prev) => {
+          if (prev) return prev;
+          const def = list.find((w: any) => w.is_default) || list[0];
+          return def ? String(def.id) : "";
+        });
+      } catch (err) {
+        console.error("Failed to fetch warehouses", err);
+      }
+    };
+    fetchWarehouses();
+  }, []);
+
+  React.useEffect(() => {
     if (isEdit && id) {
       const fetchProduct = async () => {
         try {
@@ -90,7 +116,7 @@ export function ProductForm() {
             unit: p.unit || "Cái",
             price: p.price || 0,
             cost_price: p.cost_price || 0,
-            stock_qty: p.stock_qty || 0,
+            stock_qty: 0,
             weight: p.weight || 0,
             description: p.description || "",
           });
@@ -114,6 +140,33 @@ export function ProductForm() {
     }
   }, [id, isEdit]);
 
+  // When editing, load per-warehouse stock into stock_qty based on selected warehouse
+  React.useEffect(() => {
+    if (!isEdit || !id) return;
+    if (!warehouseId) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const run = async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set("warehouse_id", warehouseId);
+        params.set("product_id", String(id));
+        const res = await fetch(`${API_URL}/inventory/stock-by-warehouse?${params.toString()}`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const row = (json?.data || [])?.[0];
+        const stockQty = row?.stock_qty ?? 0;
+        setFormData((prev) => ({ ...prev, stock_qty: Number(stockQty) || 0 }));
+      } catch {
+        // ignore
+      }
+    };
+    run();
+  }, [isEdit, id, warehouseId]);
+
   const handleChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error khi user bắt đầu sửa field
@@ -123,7 +176,7 @@ export function ProductForm() {
   };
 
   const validateForm = (): boolean => {
-    const newErrors: { name?: string; sku?: string; price?: string } = {};
+    const newErrors: { name?: string; sku?: string; price?: string; warehouse_id?: string } = {};
 
     if (!formData.name.trim()) {
       newErrors.name = "Vui lòng nhập tên sản phẩm";
@@ -134,6 +187,9 @@ export function ProductForm() {
     }
     if (!formData.price || formData.price <= 0) {
       newErrors.price = "Giá bán phải lớn hơn 0";
+    }
+    if (!warehouseId) {
+      newErrors.warehouse_id = "Vui lòng chọn kho";
     }
 
     setErrors(newErrors);
@@ -218,6 +274,7 @@ export function ProductForm() {
         sku: finalSku || undefined,
         category_id: formData.category_id ? parseInt(formData.category_id) : null,
         images: images.length > 0 ? images : null,
+        warehouse_id: warehouseId ? parseInt(warehouseId) : undefined,
       };
       const res = await fetch(url, {
         method,
@@ -359,6 +416,28 @@ export function ProductForm() {
               </h3>
               <div className="space-y-4">
                 <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">Kho <span className="text-red-500">*</span></label>
+                  <select
+                    value={warehouseId}
+                    onChange={(e) => {
+                      setWarehouseId(e.target.value);
+                      if (errors.warehouse_id) setErrors((prev) => ({ ...prev, warehouse_id: undefined }));
+                    }}
+                    className={cn(
+                      "w-full px-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none",
+                      errors.warehouse_id ? "ring-2 ring-red-300 bg-red-50" : ""
+                    )}
+                  >
+                    <option value="">Chọn kho</option>
+                    {warehouses.map((w: any) => (
+                      <option key={w.id} value={String(w.id)}>
+                        {w.name}{w.is_default ? " (mặc định)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.warehouse_id && <p className="text-xs text-red-500 font-medium">{errors.warehouse_id}</p>}
+                </div>
+                <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Cảnh báo hết hàng</label>
                   <input type="number" placeholder="10" className="w-full px-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none" />
                 </div>
@@ -451,7 +530,7 @@ export function ProductForm() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Tổng tồn kho</label>
+                  <label className="text-sm font-bold text-slate-700">Tồn kho theo kho đã chọn</label>
                   <input type="number" step="0.001" min="0" value={formData.stock_qty || ""} onChange={(e) => handleChange("stock_qty", Number(e.target.value))} placeholder="0" className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
                 </div>
                 <div className="space-y-2">

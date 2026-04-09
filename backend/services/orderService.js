@@ -155,7 +155,7 @@ async function recalculateCommission(orderId) {
 
   // Nếu đơn đã hủy → không tính hoa hồng (xóa commission nếu có)
   const [orderCheck] = await pool.query(
-    'SELECT status, salesperson_id, total_amount FROM orders WHERE id = ?',
+    'SELECT status, salesperson_id, total_amount, source_type, collaborator_user_id FROM orders WHERE id = ?',
     [orderId]
   );
   if (!orderCheck.length) return;
@@ -184,10 +184,33 @@ async function recalculateCommission(orderId) {
     [orderId, userId, totalCommission]
   );
 
-  await calculateOverrideCommissions(orderId, userId, orderTotalAmount, items);
+  // Đơn ghi nhận quản lý (2 kiểu legacy/new):
+  // - Legacy (đã có): salesperson_id = quản lý, collaborator_user_id = CTV → chỉ tính direct cho quản lý
+  // - New (theo yêu cầu mới): salesperson_id = người lên đơn (CTV), collaborator_user_id = quản lý → tính direct cho CTV + override cho quản lý
+  const sourceType = String(orderCheck[0].source_type || 'sales');
+  if (sourceType === 'collaborator') {
+    const collaboratorUserId = orderCheck[0].collaborator_user_id ? parseInt(orderCheck[0].collaborator_user_id, 10) : null;
+    if (!collaboratorUserId) return;
+
+    // New mode: (collaborator_user_id -> manager) and (salesperson_id -> ctv) matches collaborators table
+    const [[newPair]] = await pool.query(
+      'SELECT 1 as ok FROM collaborators WHERE sales_id = ? AND ctv_id = ? LIMIT 1',
+      [collaboratorUserId, userId]
+    );
+    if (!newPair?.ok) {
+      // Legacy mode (hoặc dữ liệu không khớp): chỉ tính direct (đã insert ở trên), không tính override
+      return;
+    }
+
+    await calculateOverrideCommissions(orderId, userId, orderTotalAmount, items, collaboratorUserId);
+    return;
+  }
+  // Rule mới: không chọn quản lý → hoa hồng chỉ tính cho người lên đơn (A)
+  // Vì vậy không tính override quản lý trên đơn bán trực tiếp.
+  return;
 }
 
-async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount, items) {
+async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount, items, restrictManagerId = null) {
   const pool = await getPool();
 
   const [orderRows] = await pool.query('SELECT group_id FROM orders WHERE id = ?', [orderId]);
@@ -215,6 +238,9 @@ async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount
   };
 
   for (const manager of managers) {
+    if (restrictManagerId != null && Number(manager.sales_id) !== Number(restrictManagerId)) {
+      continue;
+    }
     if (orderGroupId) {
       const [inGroup] = await pool.query(
         'SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ? LIMIT 1',

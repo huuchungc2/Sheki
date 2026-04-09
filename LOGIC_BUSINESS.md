@@ -35,15 +35,25 @@
 ## 3. ĐƠN HÀNG
 
 ### Khi tạo đơn
-- Phải chọn nhóm bán hàng (để tính hoa hồng quản lý)
+- **Giao diện đơn (Sales):** Dropdown **“Quản lý (nhận HH trực tiếp)”** chỉ hiển thị quản lý **thuộc đúng nhóm bán hàng** đã chọn (quan hệ `collaborators` + quản lý có trong `user_groups` của nhóm đó). **Mặc định** chọn quản lý đầu tiên trong danh sách sau khi chọn nhóm; để trống “Tôi nhận HH” = HH cho **người tạo đơn** (chỉnh % từng dòng); chọn quản lý = HH trực tiếp cho quản lý (cùng % quản lý, cột Hoa hồng chỉ hiển thị).
+- **Admin:** Không dùng dropdown này; đơn Admin tạo/sửa luôn theo kiểu **bán trực tiếp** (`sales`). API **từ chối** `source_type=collaborator` nếu user là Admin.
+- **Hai kiểu nguồn đơn (trường `orders.source_type`):**
+  - **`sales` (mặc định):** `salesperson_id` = người tạo đơn — **HH chỉ tính cho người đó** (không có HH quản lý/override).
+  - **`collaborator`:** Đơn **ghi nhận quản lý là người bán** — `salesperson_id` = **quản lý** (nhận HH trực tiếp). `collaborator_user_id` **tùy chọn**: chỉ ghi khi cần biết CTV nguồn (ví dụ CTV tạo đơn cho quản lý); **quản lý tự tạo đơn** có thể để **NULL** vì CTV không hưởng HH trên loại đơn này. Nếu có `collaborator_user_id` thì cặp phải khớp `collaborators`. **Không** tính HH override kiểu “CTV tự bán” trên đơn này.
+- Phải chọn nhóm bán hàng (để tính hoa hồng quản lý / filter nhóm)
 - Mỗi sản phẩm có hoa hồng mặc định 10%
 - Số tiền hoa hồng per-item = `(unit_price * qty - discount_amount) * commission_rate / 100`
 - **Lưu commission_rate tại thời điểm tạo đơn** — không lấy từ config hiện tại khi báo cáo
 - Mã đơn: `DH-YYYYMMDD-XXXX`, reset theo ngày
 
 ### Khi sửa đơn
+- Đổi giữa **bán trực tiếp** và **ghi nhận quản lý** → server phải **tính lại** `order_items` (HH dòng) và `commissions` theo loại đơn mới; nếu request không gửi lại `items` nhưng có `source_type`, backend tự lấy dòng hiện có để tính lại.
 - Tính lại hoa hồng theo đúng công thức trên
-- Giữ nguyên commission_rate đã lưu
+- Giữ nguyên commission_rate đã lưu (trừ khi đổi kiểu nguồn đơn: bỏ “ghi nhận quản lý” thì tính lại % HH dòng như lúc tạo đơn `sales`)
+- Khi sửa đơn (Sales): có thể **chọn quản lý hoặc không chọn**:
+  - Không chọn quản lý → `source_type=sales`, HH chỉ cho A (`salesperson_id`)
+  - Chọn quản lý → `source_type=collaborator`, HH direct cho quản lý (`salesperson_id`), `collaborator_user_id` = A
+- **Admin** sửa đơn: form không có dropdown quản lý.
 
 ### Khi xóa đơn
 - Hoa hồng đơn đó = 0 (trừ đi khỏi tổng)
@@ -77,25 +87,13 @@ ctv_commission_rate = 3%
 A được thêm: 1,000,000 × 3% = 30,000đ
 ```
 
-### Hoa hồng Quản lý
-- Nếu nhân viên có quản lý (admin gán) → quản lý được hưởng thêm
-- Tỷ lệ dựa vào bảng cấu hình theo khoảng commission_rate:
-
-| Commission rate của Sale | Quản lý được |
-|---|---|
-| 10% - 30% | 3% |
-| 7% | 2% |
-| 4% - 5% | 1% |
-| Khoảng khác | Admin tự cấu hình |
-
-- Bảng cấu hình này Admin tự định nghĩa tùy ý
-- **Lưu tỷ lệ tại thời điểm tạo đơn**
+### Hoa hồng Quản lý (override) — ĐÃ TẮT
+- Theo rule hiện tại: **không chọn quản lý → chỉ A**, **chọn quản lý → chỉ quản lý** ⇒ **không dùng** cơ chế “override quản lý” nữa.
 
 ### Tổng lương nhân viên
 ```
 Lương = Hoa hồng bản thân (tổng từng đơn)
-      + Hoa hồng từ CTV (tổng từng đơn của từng CTV trong cùng nhóm)
-      + Hoa hồng quản lý (nếu có quản lý)
+      + Hoa hồng từ CTV (nếu có cấu hình riêng)
 ```
 
 ---

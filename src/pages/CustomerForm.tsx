@@ -93,7 +93,15 @@ export function CustomerForm() {
   const [fetchLoading, setFetchLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
-  const [errors, setErrors] = React.useState<{ name?: string; phone?: string; email?: string }>({});
+  const [errors, setErrors] = React.useState<{
+    name?: string;
+    phone?: string;
+    email?: string;
+    city?: string;
+    district?: string;
+    ward?: string;
+    address?: string;
+  }>({});
 
   const currentUser = React.useMemo(() => {
     const u = localStorage.getItem("user");
@@ -186,7 +194,15 @@ export function CustomerForm() {
   };
 
   const validateForm = (): boolean => {
-    const newErrors: { name?: string; phone?: string; email?: string } = {};
+    const newErrors: {
+      name?: string;
+      phone?: string;
+      email?: string;
+      city?: string;
+      district?: string;
+      ward?: string;
+      address?: string;
+    } = {};
 
     if (!formData.name.trim()) {
       newErrors.name = "Vui lòng nhập họ và tên";
@@ -198,6 +214,11 @@ export function CustomerForm() {
     } else if (cleanedPhone.length !== 10) {
       newErrors.phone = "Số điện thoại phải có đúng 10 chữ số";
     }
+
+    if (!formData.city?.trim()) newErrors.city = "Vui lòng chọn Tỉnh/TP";
+    if (!formData.district?.trim()) newErrors.district = "Vui lòng chọn Quận/Huyện";
+    if (!formData.ward?.trim()) newErrors.ward = "Vui lòng chọn Phường/Xã";
+    if (!formData.address?.trim()) newErrors.address = "Vui lòng nhập Số nhà/Tên đường";
 
     if (formData.email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -222,6 +243,7 @@ export function CustomerForm() {
       const url = isEdit ? `${API_URL}/customers/${id}` : `${API_URL}/customers`;
       const body = {
         ...formData,
+        phone: formData.phone.replace(/\D/g, ''),
         assigned_employee_id: formData.assigned_employee_id ? parseInt(formData.assigned_employee_id) : null,
       };
       const res = await fetch(url, {
@@ -393,19 +415,31 @@ export function CustomerForm() {
 
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <select value={formData.city} onChange={(e) => handleChange("city", e.target.value)} className="px-3 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/10">
+                  <div className="space-y-1">
+                    <select value={formData.city} onChange={(e) => handleChange("city", e.target.value)} className={cn("w-full px-3 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2", errors.city ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")}>
                     <option value="">Tỉnh/TP</option>
                     {cities.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <select value={formData.district} onChange={(e) => handleChange("district", e.target.value)} disabled={!formData.city} className="px-3 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/10 disabled:bg-slate-100">
+                    </select>
+                    {errors.city && <p className="text-[11px] text-red-500 font-medium">{errors.city}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <select value={formData.district} onChange={(e) => handleChange("district", e.target.value)} disabled={!formData.city} className={cn("w-full px-3 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2 disabled:bg-slate-100", errors.district ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")}>
                     <option value="">Quận/Huyện</option>
                     {formData.city && districts.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <select value={formData.ward} onChange={(e) => handleChange("ward", e.target.value)} disabled={!formData.district} className="px-3 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/10 disabled:bg-slate-100">
+                    </select>
+                    {errors.district && <p className="text-[11px] text-red-500 font-medium">{errors.district}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <select value={formData.ward} onChange={(e) => handleChange("ward", e.target.value)} disabled={!formData.district} className={cn("w-full px-3 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2 disabled:bg-slate-100", errors.ward ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")}>
                     <option value="">Phường/Xã</option>
                     {formData.city && formData.district && wards.map(w => <option key={w} value={w}>{w}</option>)}
-                  </select>
-                  <input type="text" value={formData.address} onChange={(e) => handleChange("address", e.target.value)} placeholder="Số nhà, tên đường" className="px-3 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/10" />
+                    </select>
+                    {errors.ward && <p className="text-[11px] text-red-500 font-medium">{errors.ward}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <input type="text" value={formData.address} onChange={(e) => handleChange("address", e.target.value)} placeholder="Số nhà, tên đường" className={cn("w-full px-3 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2", errors.address ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                    {errors.address && <p className="text-[11px] text-red-500 font-medium">{errors.address}</p>}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">

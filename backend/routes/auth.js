@@ -5,7 +5,16 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const { getPool } = require('../config/db');
 
-const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
+// Username có thể là:
+// - "username" thường: 3–32 ký tự, bắt đầu bằng chữ/số; cho phép . _ -
+// - hoặc email (để dùng luôn dạng lan.sales@velocity.vn như seed)
+const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidUsernameOrEmail(login) {
+  const s = String(login || '').trim().toLowerCase();
+  return USERNAME_RE.test(s) || EMAIL_RE.test(s);
+}
 
 function normalizeUsername(s) {
   return String(s || '').trim().toLowerCase();
@@ -114,8 +123,8 @@ router.post('/register', async (req, res, next) => {
       return res.status(400).json({ error: 'Thiếu họ tên, tên đăng nhập, email hoặc mật khẩu' });
     }
 
-    if (!USERNAME_RE.test(username)) {
-      return res.status(400).json({ error: 'Tên đăng nhập: 3–32 ký tự, chỉ chữ, số và dấu gạch dưới' });
+    if (!isValidUsernameOrEmail(username)) {
+      return res.status(400).json({ error: 'Tên đăng nhập: có thể dùng username (3–32 ký tự, bắt đầu bằng chữ/số; cho phép . _ -) hoặc dùng email.' });
     }
 
     const pool = await getPool();
