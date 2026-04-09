@@ -60,16 +60,6 @@ const navigationAdmin = [
     ],
   },
   {
-    name: "Tra cứu đơn",
-    icon: Search,
-    children: [
-      { name: "Theo ngày", href: "/orders/search/day" },
-      { name: "Theo tháng", href: "/orders/search/month" },
-      { name: "Theo năm", href: "/orders/search/year" },
-      { name: "Theo khoảng", href: "/orders/search/range" },
-    ],
-  },
-  {
     name: "Nhập Excel",
     icon: Upload,
     children: [
@@ -155,12 +145,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
   const isAdmin = isAdminUser(currentUser);
 
-  /** Trùng route con (vd /orders/edit) nhưng không tính /orders/search cho mục Đơn hàng */
+  /** Trùng route con (vd /orders/edit) */
   const pathActive = React.useCallback((pathname: string, href: string) => {
     if (pathname === href) return true;
     if (href === "/") return false;
     if (!pathname.startsWith(href + "/")) return false;
-    if (href === "/orders" && pathname.startsWith("/orders/search")) return false;
     return true;
   }, []);
 
@@ -177,7 +166,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
     if (p.includes("/import")) setOpenSubmenu("Nhập Excel");
     else if (p.startsWith("/reports/") || p.startsWith("/commission-rules")) setOpenSubmenu("Báo cáo & HH");
-    else if (p.startsWith("/orders/search")) setOpenSubmenu("Tra cứu đơn");
     else if (p.startsWith("/inventory") || p.startsWith("/warehouses")) setOpenSubmenu("Kho");
     else if (p.startsWith("/orders") || p.startsWith("/customers") || p.startsWith("/returns")) setOpenSubmenu("Bán hàng");
     else if (p.startsWith("/employees") || p.startsWith("/products") || p.startsWith("/roles")) setOpenSubmenu("Danh mục");

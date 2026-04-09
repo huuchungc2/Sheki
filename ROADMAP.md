@@ -54,22 +54,23 @@
 
 ---
 
-## Phase 3 — Multi-tenant SaaS
+## Phase 3 — Multi-tenant / đa shop
+
+### Đặc tả (đã ghi trong repo)
+- **`FEATURE_MULTI_SHOP.md`** — luồng đăng ký không shop, `user_shops`, chọn shop, JWT `shop_id`, danh sách bảng + thứ tự code.
 
 ### Mục tiêu
 - Nhiều shop dùng chung hệ thống
 - Mỗi shop data riêng biệt (Sheki chỉ thấy Sheki)
-- Có thể bán cho shop khác
+- (Tuỳ chọn sau) SaaS: bán cho shop khác, subdomain, billing
 
 ### Thay đổi kỹ thuật cần làm
-- Thêm bảng `tenants` (shops)
-- Thêm `tenant_id` vào tất cả bảng
-- Middleware tự động filter theo tenant
-- Subdomain riêng cho mỗi shop: `sheki.app.vn`, `shop2.app.vn`
-- Trang admin tổng (super admin)
-- Billing / subscription management
+- Bảng `shops` + `user_shops` + `shop_id` trên bảng nghiệp vụ (chi tiết trong `FEATURE_MULTI_SHOP.md`)
+- Middleware filter theo `shop_id` từ JWT
+- (Tuỳ chọn) Subdomain: `sheki.app.vn`, `shop2.app.vn`
+- (Tuỳ chọn) Super admin + billing
 
 ### Điều kiện để bắt đầu Phase 3
-- [ ] Phase 1 + 2 hoàn chỉnh
-- [ ] Có ít nhất 1 khách hàng muốn dùng
-- [ ] Thiết kế lại DB schema cho multi-tenant
+- [ ] Phase 1 + 2 hoàn chỉnh (hoặc ưu tiên nghiệp vụ)
+- [ ] Đọc và chốt `FEATURE_MULTI_SHOP.md`
+- [ ] Migration + test trên bản sao DB

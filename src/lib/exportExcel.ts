@@ -251,3 +251,55 @@ export function exportCtvCommission(opts: {
 
   XLSX.writeFile(wb, `HoaHong_CTV_${userName.replace(/\s+/g, "_")}_${period.replace(/\s+/g, "_")}.xlsx`);
 }
+
+// ─── Báo cáo doanh thu (trang Revenue) ─────────────────────────────────────
+export function exportRevenueReport(opts: {
+  salesData: any[];
+  summary: { totalSales?: number; totalCommission?: number; totalEmployees?: number };
+  month: string;
+  year: string;
+  groupName?: string;
+}) {
+  const { salesData, summary, month, year, groupName } = opts;
+  const wb = XLSX.utils.book_new();
+  const period = `Tháng ${parseInt(month, 10)}/${year}${groupName ? ` — Nhóm: ${groupName}` : ""}`;
+
+  const rows: any[][] = [
+    ["BÁO CÁO DOANH THU THEO NHÂN VIÊN"],
+    [`Kỳ: ${period}`],
+    [],
+    ["Nhân viên", "Số đơn", "Doanh số", "HH bán hàng", "HH từ CTV", "Tổng hoa hồng"],
+  ];
+
+  const sorted = [...salesData].sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0));
+  sorted.forEach((s) => {
+    const direct = s.total_commission || 0;
+    const override = s.override_commission || 0;
+    const total =
+      s.total_all_commission != null
+        ? s.total_all_commission
+        : direct + override;
+    rows.push([s.full_name, s.total_orders || 0, s.total_sales || 0, direct, override, total]);
+  });
+
+  rows.push([]);
+  const totalOrders = sorted.reduce((acc, s) => acc + (s.total_orders || 0), 0);
+  rows.push([
+    "TỔNG CỘNG",
+    totalOrders,
+    summary.totalSales ?? sorted.reduce((acc, s) => acc + (s.total_sales || 0), 0),
+    sorted.reduce((acc, s) => acc + (s.total_commission || 0), 0),
+    sorted.reduce((acc, s) => acc + (s.override_commission || 0), 0),
+    summary.totalCommission ??
+      sorted.reduce(
+        (acc, s) =>
+          acc + (s.total_all_commission ?? ((s.total_commission || 0) + (s.override_commission || 0))),
+        0
+      ),
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 28 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, ws, "Doanh thu");
+  XLSX.writeFile(wb, `DoanhThu_T${parseInt(month, 10)}_${year}.xlsx`);
+}

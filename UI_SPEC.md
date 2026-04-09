@@ -134,16 +134,15 @@ Input: 6px
 | 9 | CustomerForm | /customers/new, /edit/:id | Admin+Sales |
 | 10 | OrderList | /orders | Admin+Sales |
 | 11 | OrderForm | /orders/new, /edit/:id | Admin+Sales |
-| 12 | OrderSearch | /orders/search | Admin |
-| 13 | InventoryHistory | /inventory | Admin |
-| 14 | InventoryImport | /inventory/import | Admin |
-| 15 | InventoryExport | /inventory/export | Admin |
-| 16 | BulkImport | /import | Admin |
-| 17 | CommissionReport | /reports/commissions | Admin+Sales |
-| 18 | CTVCommissionReport | /reports/ctv-commissions | Admin+Sales |
-| 19 | RevenueReport | /reports/revenue | Admin+Sales |
-| 20 | ActivityLog | /logs | Admin |
-| 21 | Settings | /settings | Admin |
+| 12 | InventoryHistory | /inventory | Admin |
+| 13 | InventoryImport | /inventory/import | Admin |
+| 14 | InventoryExport | /inventory/export | Admin |
+| 15 | BulkImport | /import | Admin |
+| 16 | CommissionReport | /reports/commissions | Admin+Sales |
+| 17 | CTVCommissionReport | /reports/ctv-commissions | Admin+Sales |
+| 18 | RevenueReport | /reports/revenue | Admin+Sales |
+| 19 | ActivityLog | /logs | Admin |
+| 20 | Settings | /settings | Admin |
 
 ---
 

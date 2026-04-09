@@ -17,7 +17,6 @@ import { OrderForm } from "./pages/OrderForm";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
-import { OrderSearchDay, OrderSearchMonth, OrderSearchYear, OrderSearchRange } from "./pages/OrderSearch";
 import { BulkImport } from "./pages/BulkImport";
 import { InventoryHistory } from "./pages/InventoryHistory";
 import { InventoryImport } from "./pages/InventoryImport";
@@ -124,10 +123,7 @@ export default function App() {
                   <Route path="/orders" element={<OrderList />} />
                   <Route path="/orders/new" element={<OrderForm />} />
                   <Route path="/orders/edit/:id" element={<OrderForm />} />
-                  <Route path="/orders/search/day" element={<OrderSearchDay />} />
-                  <Route path="/orders/search/month" element={<OrderSearchMonth />} />
-                  <Route path="/orders/search/year" element={<OrderSearchYear />} />
-                  <Route path="/orders/search/range" element={<OrderSearchRange />} />
+                  <Route path="/orders/search/*" element={<Navigate to="/orders" replace />} />
                   <Route path="/inventory" element={<AdminRoute><InventoryHistory /></AdminRoute>} />
                   <Route path="/inventory/import" element={<AdminRoute><InventoryImport /></AdminRoute>} />
                   <Route path="/inventory/export" element={<AdminRoute><InventoryExport /></AdminRoute>} />

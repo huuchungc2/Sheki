@@ -63,9 +63,16 @@ Hệ thống quản lý bán hàng nội bộ cho công ty Velocity.
 - Số lượng nhập phải `<= available_stock`
 - Nếu vượt tồn: border đỏ + cảnh báo "Vượt tồn!"
 
+### 11. Đa shop (SPEC — chưa code trong repo)
+- **Hiện tại:** một shop ngầm định (Sheki); toàn bộ dữ liệu như một tenant.
+- **Mục tiêu:** nhiều shop A/B/C, **dữ liệu riêng**; một user có thể vào nhiều shop với **role từng shop** qua bảng `user_shops`.
+- **Đăng ký:** không gắn shop; **admin** thêm user vào shop sau (theo email / tên đăng nhập).
+- **Đăng nhập:** chọn shop (hoặc nhớ shop); JWT mang **`shop_id`** hiện tại; đổi shop trong app.
+- **Đặc tả đầy đủ:** `FEATURE_MULTI_SHOP.md` (migration, bảng, checklist BE/FE, thứ tự làm).
+
 ---
 
-## MÀN HÌNH (21 screens)
+## MÀN HÌNH (20 screens)
 
 | # | Màn hình | Route | Role |
 |---|----------|-------|------|
@@ -80,16 +87,15 @@ Hệ thống quản lý bán hàng nội bộ cho công ty Velocity.
 | 9 | CustomerForm | /customers/new, /customers/edit/:id | Admin+Sales |
 | 10 | OrderList | /orders | Admin+Sales |
 | 11 | OrderForm | /orders/new, /orders/edit/:id | Admin+Sales |
-| 12 | OrderSearch (4 variants) | /orders/search/* | Admin only |
-| 13 | InventoryHistory | /inventory | Admin only |
-| 14 | InventoryImport | /inventory/import | Admin only |
-| 15 | InventoryExport | /inventory/export | Admin only |
-| 16 | BulkImport | /{entity}/import | Admin only |
-| 17 | SalaryReport | /reports | Admin+Sales |
-| 18 | CommissionDetail | /reports/commissions/:userId | Admin only |
-| 19 | ActivityLog | /logs | Admin only |
-| 20 | ChangePassword | /change-password | All |
-| 21 | Settings | /settings | Admin only |
+| 12 | InventoryHistory | /inventory | Admin only |
+| 13 | InventoryImport | /inventory/import | Admin only |
+| 14 | InventoryExport | /inventory/export | Admin only |
+| 15 | BulkImport | /{entity}/import | Admin only |
+| 16 | SalaryReport | /reports | Admin+Sales |
+| 17 | CommissionDetail | /reports/commissions/:userId | Admin only |
+| 18 | ActivityLog | /logs | Admin only |
+| 19 | ChangePassword | /change-password | All |
+| 20 | Settings | /settings | Admin only |
 
 ---
 
@@ -161,9 +167,8 @@ src/
 │   ├── ProductForm.tsx       # Admin only, image upload
 │   ├── CustomerList.tsx      # Sales sees only own customers
 │   ├── CustomerForm.tsx      # 10-digit phone, address dropdowns
-│   ├── OrderList.tsx         # Sales sees only own orders
+│   ├── OrderList.tsx         # Sales sees only own orders (lọc ngày/tuần/tháng/năm)
 │   ├── OrderForm.tsx         # Customer search + new customer + address dropdowns
-│   ├── OrderSearch.tsx       # 4 variants (day/month/year/range)
 │   ├── InventoryHistory.tsx  # Admin only
 │   ├── InventoryImport.tsx   # Admin, decimal qty
 │   ├── InventoryExport.tsx   # Admin, decimal qty

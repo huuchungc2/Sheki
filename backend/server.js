@@ -62,12 +62,6 @@ process.on('uncaughtException', (err) => {
   appendProcessLog('uncaughtException', err);
 });
 
-// Create write stream for access log
-const accessLogStream = fs.createWriteStream(
-  path.join(logsDir, 'access.log'), 
-  { flags: 'a' }
-);
-
 // Middleware
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3000'],
@@ -77,8 +71,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Logging - HTTP requests
-app.use(morgan('combined', { stream: accessLogStream }));
-app.use(morgan('dev')); // Console logging
+// NOTE: per requirement: do NOT write access.log (only error.log via errorHandler)
+app.use(morgan('dev')); // Console logging only
 
 // Request logging middleware
 app.use((req, res, next) => {

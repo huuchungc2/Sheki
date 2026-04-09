@@ -7,6 +7,7 @@
 4. `LOGIC_BUSINESS.md` → nghiệp vụ hoa hồng, lương, CTV
 5. `UI_SPEC.md` → chuẩn giao diện Sheki
 6. `plan.md` → business rules chi tiết, DB schema, cấu trúc thư mục
+7. **Khi làm đa shop:** `FEATURE_MULTI_SHOP.md` (đặc tả đầy đủ) — không đoán mò ngoài file này
 
 ---
 

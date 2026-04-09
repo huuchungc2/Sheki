@@ -7,14 +7,15 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **Deploy production**
-  - Setup VPS CentOS/Ubuntu
-  - Config Nginx, PM2, SSL
-  - Files: tạo mới `deploy.sh`, `nginx.conf`
+- [ ] **Deploy production (chạy trên VPS)**
+  - Chạy `deploy.sh` trên VPS CentOS 7.9
+  - Cấu hình DOMAIN/SSL + kiểm tra Nginx/PM2
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
+
+- [ ] **Đa shop (multi-tenant)** — Đọc `FEATURE_MULTI_SHOP.md`; triển khai theo giai đoạn: DB `shops` + `user_shops` + `shop_id` → auth/switch-shop → middleware từng route → FE chọn shop → UI admin gán user
 
 - [x] **Reset mật khẩu Admin = comiumauden1234**
   - Thêm migration reset role admin + cập nhật CLAUDE.md
@@ -61,6 +62,15 @@
 ---
 
 ## ✅ HOÀN THÀNH
+
+- [x] **Đặc tả đa shop** — Ghi `FEATURE_MULTI_SHOP.md` + cập nhật `plan.md`, `ROADMAP.md`, `CLAUDE.md` (chưa sửa code DB/API)
+
+- [x] **Gỡ menu Tra cứu đơn admin** — Dư thừa so với lọc đơn tại Danh sách đơn; redirect `/orders/search/*` → `/orders`
+
+- [x] **RevenueReport — UI Sheki + export Excel** — Header/breadcrumb, KPI 4 ô, bảng xếp hạng + link NV, HH tổng (gồm CTV), xuất file Excel
+
+- [x] **Backend logging: bỏ access.log**
+  - Tắt morgan ghi file access.log, chỉ giữ error.log
 
 ### Phase 1: Setup & Infrastructure
 - [x] Phân tích 21 màn hình giao diện

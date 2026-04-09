@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [09/04/2026] - Đặc tả đa shop (chưa code)
+### Added
+- **`FEATURE_MULTI_SHOP.md`** — Luồng đăng ký không gắn shop; `user_shops` + role từng shop; admin gán user theo email/username; chọn/đổi shop; JWT `shop_id`; danh sách bảng + migration Sheki + checklist BE/FE + thứ tự triển khai - Files: `FEATURE_MULTI_SHOP.md`, `plan.md` (mục 11), `ROADMAP.md` (Phase 3), `CLAUDE.md`
+
+## [09/04/2026] - Gỡ menu Tra cứu đơn (admin)
+### Removed
+- **Tra cứu đơn** — Xóa nhóm menu sidebar admin (theo ngày/tháng/năm/khoảng); xóa `OrderSearch.tsx`; URL `/orders/search/*` redirect về `/orders` - Files: `src/components/Layout.tsx`, `src/App.tsx`, `src/pages/OrderSearch.tsx` (deleted), `plan.md`, `UI_SPEC.md`
+
+## [09/04/2026] - Thiết kế lại màn Doanh thu (Revenue)
+### Changed
+- **RevenueReport** — Header gradient + breadcrumb, bộ lọc theo UI_SPEC (màu Primary #E31837), 4 thẻ KPI (thêm tổng đơn), bảng có hạng #/link NV, biểu đồ top doanh số màu Sheki; cột hoa hồng hiển thị **tổng HH** (gồm CTV) khớp API - Files: `src/pages/RevenueReport.tsx`
+### Added
+- **Xuất Excel doanh thu** — Nút gọi `exportRevenueReport` (chi tiết HH bán/CTV/tổng) - Files: `src/lib/exportExcel.ts`
+
 ## [08/04/2026] - Nhân viên: gán phân quyền hàng loạt + fix Revenue/Dashboard
 ### Fixed
 - **Reports dùng roles (không dùng `users.role`)** — Sửa `/reports/dashboard` và `/reports/salary` join `roles` + filter `r.code='sales'` để không 500 sau migration 007 - Files: `backend/routes/reports.js`
@@ -18,6 +32,14 @@
 ## [08/04/2026] - Reset mật khẩu Admin = comiumauden1234
 ### Changed
 - **Migration reset admin password** — Cập nhật `password_hash` của role `admin` sang `comiumauden1234` để đăng nhập được ngay trên DB hiện tại - Files: `migrations/009_update_admin_password_comiumauden1234.sql`, `CLAUDE.md`
+
+## [08/04/2026] - Backend logging: bỏ access.log
+### Changed
+- **Chỉ ghi error.log** — Tắt ghi `access.log` (morgan stream) và chỉ log HTTP ra console; lỗi vẫn ghi `backend/logs/error.log` qua `errorHandler` - Files: `backend/server.js`
+
+## [08/04/2026] - Deploy production (CentOS 7.9)
+### Added
+- **Script deploy + Nginx config mẫu** — Thêm `deploy.sh` (Node+PM2, build FE, cấu hình Nginx, Certbot) và `nginx.conf` sample để triển khai VPS CentOS 7.9 - Files: `deploy.sh`, `nginx.conf`
 
 ## [08/04/2026] - Vai trò động (roles + phân quyền)
 ### Added
