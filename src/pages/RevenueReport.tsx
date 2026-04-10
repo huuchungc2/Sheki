@@ -25,7 +25,7 @@ import { formatCurrency, cn } from "../lib/utils";
 import { exportRevenueReport } from "../lib/exportExcel";
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
-  "http://localhost:3000/api";
+  "/api";
 
 /** Sheki primary — UI_SPEC */
 const PRIMARY = "#E31837";

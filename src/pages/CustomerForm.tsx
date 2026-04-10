@@ -9,7 +9,7 @@ import locationsData from "../lib/vietnam-locations-simple.json";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
-  "http://localhost:3000/api";
+  "/api";
 const LOCATIONS = locationsData as any;
 
 // Parse old address string to extract city/district/ward

@@ -3,27 +3,17 @@ import {
   ArrowLeft, 
   Search, 
   Plus, 
-  Trash2, 
   Save, 
   User, 
-  Phone, 
   CreditCard, 
-  Truck, 
   Package,
-  ShoppingCart,
-  ChevronRight,
   MapPin,
-  Tag,
   Minus,
-  DollarSign,
-  Warehouse,
-  Percent,
   Calculator,
   Info,
   X,
   Wallet,
   ArrowRight,
-  Eye,
   AlertTriangle
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -242,6 +232,7 @@ export function OrderForm() {
   // Product suggestions
   const [productQuery, setProductQuery] = React.useState("");
   const [productSuggestions, setProductSuggestions] = React.useState<any[]>([]);
+  const productInputRef = React.useRef<HTMLInputElement | null>(null);
   const fetchProductSuggestions = async (q: string) => {
     if (!q) { setProductSuggestions([]); return; }
     try {
@@ -450,15 +441,47 @@ export function OrderForm() {
     setItems(items.filter(item => item.productId !== productId));
   };
 
+  const updateItem = React.useCallback((productId: string, patch: Partial<OrderItem>) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.productId !== productId) return it;
+        const next = { ...it, ...patch } as OrderItem;
+        const net = next.price * next.quantity - next.discountAmount;
+        const r = Number(next.commissionRate) || 0;
+        return {
+          ...next,
+          commissionAmount: Math.round(net * (r / 100) * 100) / 100,
+        };
+      })
+    );
+  }, []);
+
+  const computeStockMeta = React.useCallback(
+    (item: any) => {
+      const canAddBackBaseline =
+        Boolean(id) &&
+        selectedWarehouseId != null &&
+        baselineWarehouseId != null &&
+        String(selectedWarehouseId) === String(baselineWarehouseId) &&
+        ["pending", "shipping"].includes(String(baselineStatus || orderStatus));
+      const avail = Number(item?.availableStock ?? 0) || 0;
+      const base = canAddBackBaseline ? Number(baselineQtyByProduct[String(item.productId)] ?? 0) || 0 : 0;
+      const maxAllowed = avail + base;
+      const overStock = Number(item.quantity) > maxAllowed;
+      return { maxAllowed, overStock };
+    },
+    [id, selectedWarehouseId, baselineWarehouseId, baselineStatus, orderStatus, baselineQtyByProduct]
+  );
+
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.price - item.discountAmount), 0);
   const tax = subtotal * 0.1;
   const total = Math.max(0, subtotal + shippingFee + tax - orderDiscount);
 
   return (
-    <div className="max-w-6xl mx-auto pb-20">
+    <div className="max-w-6xl mx-auto pb-32 lg:pb-20">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -475,18 +498,18 @@ export function OrderForm() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:justify-end">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-slate-50 transition-all"
+            className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-slate-50 transition-all"
           >
             Hủy
           </button>
           <button
             type="button"
             onClick={submitOrder}
-            className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
+            className="hidden sm:flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
           >
             <Save className="w-4 h-4" />
             {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
@@ -517,8 +540,8 @@ export function OrderForm() {
             </div>
 
             {/* Kho + Nhóm — 2 cột */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div className="hidden sm:block">
                 <label className="text-[11px] text-slate-400 mb-1 flex items-center gap-1">
                   Kho xuất hàng
                   <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
@@ -568,7 +591,7 @@ export function OrderForm() {
             </div>
 
             {/* Tìm khách hàng + Địa chỉ — 2 cột */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] text-slate-400 mb-1 block">Tìm khách hàng</label>
                 <div className="relative">
@@ -649,8 +672,8 @@ export function OrderForm() {
                 </div>
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Danh sách sản phẩm</span>
               </div>
-              <div className="relative w-56">
-                <Search className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
+              <div className="relative hidden sm:block w-56">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
                 <input
                   type="text"
                   placeholder="Tìm sản phẩm, SKU..."
@@ -661,7 +684,7 @@ export function OrderForm() {
                     fetchProductSuggestions(e.target.value);
                   }}
                   onFocus={() => productQuery.length > 0 && setShowResults(true)}
-                  className="w-full pr-9 pl-3 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all"
+                  className="w-full pr-3 pl-9 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all"
                 />
                 {showResults && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-lg shadow-lg z-50 overflow-hidden">
@@ -692,6 +715,94 @@ export function OrderForm() {
               </div>
             </div>
 
+            {/* Mobile: Kho xuất hàng nằm cùng khu vực chọn sản phẩm */}
+            <div className="sm:hidden px-4 py-3 border-b border-slate-100 bg-white">
+              <label className="text-[11px] text-slate-500 mb-1 flex items-center gap-1">
+                Kho xuất hàng
+                <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
+              </label>
+              <select
+                value={selectedWarehouseId ?? ""}
+                onChange={(e) => setSelectedWarehouseId(e.target.value ? Number(e.target.value) : null)}
+                className={cn(
+                  "w-full h-10 px-3 border rounded-lg text-sm outline-none transition-all bg-white",
+                  !selectedWarehouseId
+                    ? "border-amber-300 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                    : "border-slate-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                )}
+              >
+                <option value="">— Chọn kho xuất hàng —</option>
+                {warehouses.filter((w: any) => w.is_active).map((w: any) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Mobile product picker: 1 hàng ngang (input + nút) */}
+            <div className="sm:hidden px-4 py-3 border-b border-slate-100 bg-white">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <input
+                    ref={productInputRef}
+                    type="text"
+                    placeholder="Tìm sản phẩm..."
+                    value={productQuery}
+                    onChange={(e) => {
+                      setProductQuery(e.target.value);
+                      setShowResults(e.target.value.length > 0);
+                      fetchProductSuggestions(e.target.value);
+                    }}
+                    onFocus={() => {
+                      if (productQuery.length > 0) setShowResults(true);
+                    }}
+                    className="w-full h-10 pl-10 pr-3 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
+                  />
+                  {showResults && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-lg shadow-lg z-50 overflow-hidden">
+                      <div className="max-h-64 overflow-y-auto">
+                        {productSuggestions.length > 0 ? (
+                          productSuggestions.map((product) => (
+                            <button
+                              key={product.id}
+                              onClick={() => addProduct(product)}
+                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-slate-800 truncate">{product.name}</p>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono">{product.sku}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0 pl-3">
+                                <p className="text-sm font-semibold text-slate-800">{formatCurrency(product.price)}</p>
+                                <p className="text-[10px] text-slate-400">Thêm</p>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-6 text-center text-slate-400 text-sm">Không tìm thấy sản phẩm</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    productInputRef.current?.focus();
+                    setShowResults(true);
+                    if (productQuery.length > 0) fetchProductSuggestions(productQuery);
+                  }}
+                  className="h-10 w-10 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-green-700 hover:bg-green-50 hover:border-green-200 transition-colors"
+                  aria-label="Mở tìm sản phẩm"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
             {!isAdmin && (
               <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/70">
                 <label className="mb-1.5 block text-[11px] font-medium text-slate-600">
@@ -716,7 +827,7 @@ export function OrderForm() {
                   ))}
                 </select>
                 <p className="mt-1.5 text-[10px] text-slate-400 leading-relaxed">
-                  Mặc định: quản lý trực tiếp đầu tiên trong danh sách. Để trống “Tôi nhận HH”: không có hoa hồng quản lý. Chọn quản lý: quản lý nhận hoa hồng từ CTV (override) theo rule hệ thống; hoa hồng direct vẫn là của người lên đơn.
+                  Mặc định: quản lý trực tiếp đầu tiên trong danh sách. Để trống “Tôi nhận HH”: đơn bán trực tiếp (HH thuộc người tạo đơn). Chọn quản lý: đơn ghi nhận quản lý là người bán (HH trực tiếp thuộc quản lý).
                 </p>
               </div>
             )}
@@ -727,7 +838,156 @@ export function OrderForm() {
                 <p className="text-sm">Chưa có sản phẩm. Tìm và thêm bên trên.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                {/* Mobile: 1 dòng / 1 sản phẩm (dạng bảng, cuộn ngang nếu cần) */}
+                <div className="block sm:hidden">
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[920px]">
+                      <div className="sticky top-0 z-10 px-4 pt-3 pb-2 border-b border-slate-100 bg-slate-50">
+                        <div className="flex gap-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                          <div className="w-[260px]">Sản phẩm</div>
+                          <div className="w-[190px] text-center">Số lượng</div>
+                          <div className="w-[140px] text-right">Đơn giá</div>
+                          <div className="w-[90px] text-center">CK%</div>
+                          <div className="w-[90px] text-center">HH%</div>
+                          <div className="w-[120px] text-right">Thành tiền</div>
+                          <div className="w-[30px]"></div>
+                        </div>
+                      </div>
+
+                      <div className="px-4 py-2 divide-y divide-slate-100">
+                      {items.map((item) => {
+                        const { maxAllowed, overStock } = computeStockMeta(item as any);
+                        const lineTotal = item.quantity * item.price - item.discountAmount;
+                        return (
+                          <div
+                            key={item.productId}
+                            className={cn(
+                              "flex items-center gap-3 py-2.5",
+                              overStock ? "bg-red-50/40" : ""
+                            )}
+                          >
+                            <div className="w-[260px] min-w-0">
+                              <p className="text-[13px] font-semibold text-slate-800 truncate">{item.productName}</p>
+                              <p className="mt-0.5 text-[10px] text-slate-400 font-mono uppercase tracking-wide truncate">{item.sku}</p>
+                              <p className={cn("mt-0.5 text-[10px]", overStock ? "text-red-600 font-medium" : "text-slate-500")}>
+                                Có thể bán: {maxAllowed.toFixed(3).replace(/\.?0+$/, "")}
+                                {overStock && <span className="ml-1">— Vượt tồn</span>}
+                              </p>
+                            </div>
+
+                            <div className="w-[190px]">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const v = Math.max(0.1, parseFloat((item.quantity - 1).toFixed(1)));
+                                    updateItem(item.productId, { quantity: v });
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600"
+                                >
+                                  <Minus className="w-4 h-4" />
+                                </button>
+                                <input
+                                  type="number"
+                                  min={0.1}
+                                  step={0.1}
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const raw = parseFloat(parseFloat(e.target.value).toFixed(1));
+                                    const v = Number.isFinite(raw) && raw > 0 ? raw : 0.1;
+                                    updateItem(item.productId, { quantity: v });
+                                  }}
+                                  className={cn(
+                                    "w-20 h-8 rounded-lg border px-2 text-center text-[13px] font-semibold outline-none",
+                                    overStock
+                                      ? "border-red-300 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-100"
+                                      : "border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-50"
+                                  )}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const v = parseFloat((item.quantity + 1).toFixed(1));
+                                    updateItem(item.productId, { quantity: v });
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="w-[140px]">
+                              <input
+                                type="number"
+                                min={0}
+                                value={item.price}
+                                onChange={(e) => {
+                                  const p = Math.max(0, Number(e.target.value) || 0);
+                                  const da = p * item.quantity * (item.discountRate / 100);
+                                  updateItem(item.productId, { price: p, discountAmount: da });
+                                }}
+                                className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-right text-[13px] font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-50"
+                              />
+                            </div>
+
+                            <div className="w-[90px] flex justify-center">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={item.discountRate}
+                                onChange={(e) => {
+                                  const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                  const da = item.price * item.quantity * (r / 100);
+                                  updateItem(item.productId, { discountRate: r, discountAmount: da });
+                                }}
+                                className="w-16 h-8 rounded-lg border border-slate-200 bg-white px-2 text-center text-[13px] font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-50"
+                              />
+                            </div>
+
+                            <div className="w-[90px] flex justify-center">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={item.commissionRate}
+                                onChange={(e) => {
+                                  const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                  updateItem(item.productId, { commissionRate: r });
+                                }}
+                                className="w-16 h-8 rounded-lg border border-green-200 bg-green-50 px-2 text-center text-[13px] font-semibold text-green-800 outline-none focus:ring-2 focus:ring-green-100"
+                              />
+                            </div>
+
+                            <div className="w-[120px] text-right">
+                              <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(lineTotal)}</p>
+                              <p className="mt-0.5 text-[10px] font-semibold text-green-700">
+                                HH: {formatCurrency(item.commissionAmount)}
+                              </p>
+                            </div>
+
+                            <div className="w-[30px] flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => removeItem(item.productId)}
+                                className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+                                aria-label="Xóa sản phẩm"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                </div>
+
+                {/* Desktop/tablet: table như cũ */}
+                <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
                   <colgroup>
                     <col style={{ width: '34%' }} />
@@ -752,16 +1012,7 @@ export function OrderForm() {
                   <tbody>
                     {items.map((item) => {
                       const lineTotal = item.quantity * item.price - item.discountAmount;
-                      const canAddBackBaseline =
-                        Boolean(id) &&
-                        selectedWarehouseId != null &&
-                        baselineWarehouseId != null &&
-                        String(selectedWarehouseId) === String(baselineWarehouseId) &&
-                        ['pending', 'shipping'].includes(String(baselineStatus || orderStatus));
-                      const avail = Number((item as any).availableStock ?? 0) || 0;
-                      const base = canAddBackBaseline ? (Number(baselineQtyByProduct[String(item.productId)] ?? 0) || 0) : 0;
-                      const maxAllowed = avail + base;
-                      const overStock = Number(item.quantity) > maxAllowed;
+                      const { maxAllowed, overStock } = computeStockMeta(item as any);
                       return (
                         <tr
                           key={item.productId}
@@ -791,7 +1042,7 @@ export function OrderForm() {
                                 type="button"
                                 onClick={() => {
                                   const v = Math.max(0.1, parseFloat((item.quantity - 1).toFixed(1)));
-                                  setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
+                                  updateItem(item.productId, { quantity: v });
                                 }}
                                 className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
                               >
@@ -803,7 +1054,7 @@ export function OrderForm() {
                                 onChange={(e) => {
                                   const raw = parseFloat(parseFloat(e.target.value).toFixed(1));
                                   const v = Number.isFinite(raw) && raw > 0 ? raw : 0.1;
-                                  setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
+                                  updateItem(item.productId, { quantity: v });
                                 }}
                                 className={cn(
                                   "w-11 h-6 px-1 border rounded text-center text-xs font-medium outline-none focus:ring-1 transition-colors",
@@ -816,7 +1067,7 @@ export function OrderForm() {
                                 type="button"
                                 onClick={() => {
                                   const v = parseFloat((item.quantity + 1).toFixed(1));
-                                  setItems(items.map(it => it.productId === item.productId ? { ...it, quantity: v, commissionAmount: (v * it.price - it.discountAmount) * (it.commissionRate / 100) } : it));
+                                  updateItem(item.productId, { quantity: v });
                                 }}
                                 className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
                               >
@@ -831,7 +1082,7 @@ export function OrderForm() {
                               onChange={(e) => {
                                 const p = Math.max(0, Number(e.target.value) || 0);
                                 const da = p * item.quantity * (item.discountRate / 100);
-                                setItems(items.map(it => it.productId === item.productId ? { ...it, price: p, discountAmount: da, commissionAmount: (p * it.quantity - da) * (it.commissionRate / 100) } : it));
+                                updateItem(item.productId, { price: p, discountAmount: da });
                               }}
                               className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-right text-xs font-medium text-slate-700 outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
                             />
@@ -844,7 +1095,7 @@ export function OrderForm() {
                                 onChange={(e) => {
                                   const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                                   const da = item.price * item.quantity * (r / 100);
-                                  setItems(items.map(it => it.productId === item.productId ? { ...it, discountRate: r, discountAmount: da, commissionAmount: (it.price * it.quantity - da) * (it.commissionRate / 100) } : it));
+                                updateItem(item.productId, { discountRate: r, discountAmount: da });
                                 }}
                                 className="w-9 h-6 px-1 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-center text-xs font-medium outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
                               />
@@ -863,7 +1114,7 @@ export function OrderForm() {
                                     value={item.commissionRate}
                                     onChange={(e) => {
                                       const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                      setItems(items.map(it => it.productId === item.productId ? { ...it, commissionRate: r, commissionAmount: (it.price * it.quantity - it.discountAmount) * (r / 100) } : it));
+                                      updateItem(item.productId, { commissionRate: r });
                                     }}
                                     className="w-9 h-5 px-1 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded text-center text-xs font-semibold text-green-700 outline-none focus:ring-1 focus:ring-green-100 transition-colors"
                                   />
@@ -908,7 +1159,8 @@ export function OrderForm() {
                     </tr>
                   </tfoot>
                 </table>
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -1047,11 +1299,41 @@ export function OrderForm() {
           <button
             type="button"
             onClick={submitOrder}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
+            className="hidden lg:flex w-full items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
           >
             <Save className="w-4 h-4" />
             {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
           </button>
+        </div>
+      </div>
+
+      {/* Mobile sticky action bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden">
+        <div className="mx-auto max-w-6xl px-3 pb-3">
+          <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur shadow-lg">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
+              <div>
+                <p className="text-[10px] text-slate-500">Tổng cộng</p>
+                <p className="text-base font-semibold text-red-600">{formatCurrency(total)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-slate-500">Hoa hồng</p>
+                <p className="text-sm font-semibold text-green-700">
+                  {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
+                </p>
+              </div>
+            </div>
+            <div className="p-3">
+              <button
+                type="button"
+                onClick={submitOrder}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-all"
+              >
+                <Save className="w-4 h-4" />
+                {isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

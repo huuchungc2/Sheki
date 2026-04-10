@@ -63,6 +63,15 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Orders: thiết kế lại màn hình lên đơn trên mobile web**
+  - OrderForm responsive: layout 1 cột trên mobile + sticky bar “Tổng cộng / Lưu đơn”
+  - Cải thiện picker sản phẩm trên mobile: 1 hàng ngang (ô tìm + nút thao tác)
+  - Danh sách sản phẩm: mobile hiển thị dạng card (dễ thao tác), desktop giữ table - Files: `src/pages/OrderForm.tsx`
+  - Chuẩn hoá font toàn hệ thống: base 14px giống ERP (nhanh.vn) - Files: `src/index.css`
+
+- [x] **UI: menu mobile mặc định co lại**
+  - Sidebar mobile dạng drawer, vào app auto đóng, đổi route tự đóng; không auto bung submenu - Files: `src/components/Layout.tsx`
+
 - [x] **Products: thêm/sửa bắt buộc chọn kho + tồn kho theo kho**
   - ProductForm thêm dropdown kho (bắt buộc) và load tồn theo kho khi edit
   - Products API nhận `warehouse_id`: create/sửa tồn sẽ cập nhật `warehouse_stock` theo kho và sync tổng tồn - Files: `src/pages/ProductForm.tsx`, `backend/routes/products.js`

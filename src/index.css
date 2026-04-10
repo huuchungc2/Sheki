@@ -7,8 +7,12 @@
 }
 
 @layer base {
+  html {
+    /* Typography scale kiểu ERP: body 13px, gọn hơn */
+    font-size: 13px;
+  }
   body {
-    @apply font-sans text-slate-900 antialiased;
+    @apply font-sans text-slate-900 antialiased leading-[1.4];
   }
 }
 

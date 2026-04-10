@@ -10,7 +10,7 @@ import { cn, formatCurrency, formatDate } from "../lib/utils";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
-  "http://localhost:3000/api";
+  "/api";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending:   { label: "Chờ duyệt", color: "bg-amber-100 text-amber-700",    icon: Clock },

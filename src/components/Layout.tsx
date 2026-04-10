@@ -23,7 +23,7 @@ import { cn, isAdminUser } from "../lib/utils";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
-  "http://localhost:3000/api";
+  "/api";
 
 /** Menu Admin gọn: nhóm submenu, bớt mục trùng (Cài đặt chỉ ở cuối sidebar) */
 const navigationAdmin = [
@@ -95,6 +95,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const apply = () => {
+      const mobile = mq.matches;
+      setIsMobile(mobile);
+      setIsSidebarOpen(!mobile); // mobile: đóng mặc định; desktop: mở
+      if (mobile) setOpenSubmenu(null);
+    };
+    apply();
+    const onChange = () => apply();
+    // safari/iOS compat
+    if ("addEventListener" in mq) (mq as any).addEventListener("change", onChange);
+    else (mq as any).addListener(onChange);
+    return () => {
+      if ("removeEventListener" in mq) (mq as any).removeEventListener("change", onChange);
+      else (mq as any).removeListener(onChange);
+    };
+  }, []);
 
   const handleLogout = () => {
     console.log('👋 Logging out user:', currentUser?.email);
@@ -161,19 +181,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
     console.log('📱 Layout mounted, user:', currentUser?.email, 'role:', currentUser?.role);
   }, []);
 
+  // Mobile: đổi route thì tự đóng menu/drawer và đóng dropdown
   React.useEffect(() => {
-    if (!isAdmin) return;
-    const p = location.pathname;
-    if (p === "/" || p.startsWith("/logs") || p.startsWith("/settings") || p.startsWith("/change-password")) {
+    setShowUserMenu(false);
+    setShowNotifMenu(false);
+    if (isMobile) {
+      setIsSidebarOpen(false);
       setOpenSubmenu(null);
-      return;
     }
-    if (p.includes("/import")) setOpenSubmenu("Nhập Excel");
-    else if (p.startsWith("/reports/") || p.startsWith("/commission-rules")) setOpenSubmenu("Báo cáo & HH");
-    else if (p.startsWith("/inventory") || p.startsWith("/warehouses")) setOpenSubmenu("Kho");
-    else if (p.startsWith("/orders") || p.startsWith("/customers") || p.startsWith("/returns")) setOpenSubmenu("Bán hàng");
-    else if (p.startsWith("/employees") || p.startsWith("/products") || p.startsWith("/roles")) setOpenSubmenu("Danh mục");
-  }, [location.pathname, isAdmin]);
+  }, [location.pathname, isMobile]);
 
   if (isAuthPage) {
     return <>{children}</>;
@@ -182,10 +198,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
+      {isMobile && isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden
+        />
+      )}
       <aside 
         className={cn(
           "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed h-full z-50",
-          isSidebarOpen ? "w-64" : "w-20"
+          isMobile
+            ? cn("w-72 max-w-[85vw]", isSidebarOpen ? "translate-x-0" : "-translate-x-full")
+            : (isSidebarOpen ? "w-64" : "w-20")
         )}
       >
         <div className="p-6 flex items-center gap-3">
@@ -321,10 +346,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main className={cn(
         "flex-1 transition-all duration-300 min-h-screen flex flex-col",
-        isSidebarOpen ? "ml-64" : "ml-20"
+        isMobile ? "ml-0" : (isSidebarOpen ? "ml-64" : "ml-20")
       )}>
         {/* TopBar */}
-        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 px-8 flex items-center justify-between">
+        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 px-4 sm:px-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -457,7 +482,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content */}
-        <div className="p-8 max-w-7xl mx-auto w-full">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
           <div key={location.pathname}>
             {children}
           </div>

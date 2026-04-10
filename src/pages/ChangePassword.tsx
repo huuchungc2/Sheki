@@ -4,7 +4,7 @@ import { ArrowLeft, Lock, Save, AlertCircle, CheckCircle2, Loader2 } from "lucid
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
-  "http://localhost:3000/api";
+  "/api";
 
 export function ChangePassword() {
   const navigate = useNavigate();

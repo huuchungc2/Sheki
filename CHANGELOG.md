@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [10/04/2026] - Orders: thiết kế lại màn hình lên đơn trên mobile web
+### Changed
+- **OrderForm responsive** — Chuyển layout lên đơn sang mobile-first: các khối thông tin tự về 1 cột trên màn nhỏ, **Kho xuất hàng dời về khu vực chọn sản phẩm**, thêm sticky bar “Tổng cộng / Lưu đơn”, danh sách sản phẩm mobile chuyển sang **1 dòng / 1 sản phẩm** (cuộn ngang) có **header tên cột sticky**, thao tác giống quick order - Files: `src/pages/OrderForm.tsx`
+
+## [10/04/2026] - Dev: truy cập web bằng điện thoại (LAN) không lỗi API
+### Fixed
+- **API dev trên mobile** — Dùng API relative `/api` + cấu hình Vite proxy `/api`/`/uploads` về backend để truy cập từ điện thoại trong cùng mạng LAN; backend nới CORS cho origin LAN (192.168/10/172.16-31). Đồng bộ toàn bộ màn hình frontend bỏ fallback `http://localhost:3000/api` - Files: `src/lib/api.ts`, `.env.development`, `vite.config.ts`, `backend/server.js`, `src/pages/*`
+
+## [10/04/2026] - UI: chuẩn hoá font toàn hệ thống
+### Changed
+- **Typography base** — Set `html` font-size = **13px** (style ERP giống nhanh.vn, gọn hơn), giữ line-height 1.4 để dễ đọc trên mobile - Files: `src/index.css`
+
+## [10/04/2026] - UI: mobile menu mặc định co lại
+### Changed
+- **Layout mobile** — Sidebar chuyển sang dạng drawer trên mobile: vào app mặc định **đóng**, có overlay, đổi route tự đóng; bỏ auto-expand submenu; padding page responsive (`p-4` mobile) - Files: `src/components/Layout.tsx`
+
 ## [09/04/2026] - Products: thêm/sửa bắt buộc chọn kho
 ### Fixed
 - **ProductForm + Products API** — Bắt buộc chọn `warehouse_id` khi thêm/sửa; tồn kho trong form là **tồn theo kho đã chọn**. Backend cập nhật `warehouse_stock` theo kho rồi sync tổng tồn vào `products` - Files: `src/pages/ProductForm.tsx`, `backend/routes/products.js`

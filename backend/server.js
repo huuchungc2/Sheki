@@ -71,10 +71,15 @@ const CORS_ORIGINS = [
   'http://localhost:4173',
   'http://127.0.0.1:4173',
 ];
+
+const isAllowedLanOrigin = (origin) => {
+  if (!origin) return true;
+  return /^http:\/\/(192\.168|10|172\.(1[6-9]|2\d|3[0-1]))\.\d+\.\d+:(5173|4173)$/.test(origin);
+};
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || CORS_ORIGINS.includes(origin)) {
+      if (!origin || CORS_ORIGINS.includes(origin) || isAllowedLanOrigin(origin)) {
         return callback(null, true);
       }
       callback(null, false);

@@ -9,7 +9,7 @@ import { cn, formatCurrency } from "../lib/utils";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
-  "http://localhost:3000/api";
+  "/api";
 
 function formatStock(qty: number | string): string {
   const num = parseFloat(String(qty));

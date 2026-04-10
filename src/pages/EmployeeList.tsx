@@ -24,7 +24,7 @@ import { cn, formatDate } from "../lib/utils";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
-  "http://localhost:3000/api";
+  "/api";
 
 export function EmployeeList() {
   const [employees, setEmployees] = React.useState<any[]>([]);

@@ -6,7 +6,7 @@ import { BarChart3 as BarChart } from "lucide-react";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
-  "http://localhost:3000/api";
+  "/api";
 
 export function CollaboratorsPage() {
   const { id } = useParams();
