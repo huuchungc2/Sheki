@@ -2,7 +2,9 @@ import * as React from "react";
 import { Shield, Plus, Pencil, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "../lib/utils";
 
-import.meta.env.VITE_API_URL || "/api"
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 type Role = {
   id: number;

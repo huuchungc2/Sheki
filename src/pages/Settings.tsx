@@ -5,7 +5,9 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
-import.meta.env.VITE_API_URL || "/api"
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 const ROLE_CONFIG = [
   { id: "admin", name: "Quản trị viên", description: "Toàn quyền hệ thống, cấu hình và bảo mật.", icon: Shield },

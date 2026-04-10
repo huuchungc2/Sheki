@@ -18,7 +18,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import { cn, formatCurrency } from "../lib/utils";
 
-import.meta.env.VITE_API_URL || "/api"
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem("token");

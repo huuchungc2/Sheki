@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import { cn, isAdminUser } from "../lib/utils";
 
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
+
 /** Menu Admin gọn: nhóm submenu, bớt mục trùng (Cài đặt chỉ ở cuối sidebar) */
 const navigationAdmin = [
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
@@ -113,7 +117,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem("token");
     if (!token || !currentUser?.id) return;
 
-    const url = `http://localhost:3000/api/notifications/stream?token=${encodeURIComponent(token)}`;
+    const url = `${API_URL}/notifications/stream?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
 
     const onOrder = (ev: MessageEvent) => {

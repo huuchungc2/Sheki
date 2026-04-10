@@ -6,7 +6,9 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 
-import.meta.env.VITE_API_URL || "/api"
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 const entityConfig: Record<string, any> = {
   employees: {

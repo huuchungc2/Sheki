@@ -4,7 +4,9 @@ import { ArrowLeft, Users, Plus, Search, Loader2, AlertCircle, Trash2, CheckCirc
 import { cn } from "../lib/utils";
 import { BarChart3 as BarChart } from "lucide-react";
 
-import.meta.env.VITE_API_URL || "/api"
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 export function CollaboratorsPage() {
   const { id } = useParams();

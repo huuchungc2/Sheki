@@ -3,7 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, TrendingUp, DollarSign, Calendar, Loader2, AlertCircle } from "lucide-react";
 import { formatCurrency, formatDate } from "../lib/utils";
 
-import.meta.env.VITE_API_URL || "/api"
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 export function CommissionDetail() {
   const { userId } = useParams();

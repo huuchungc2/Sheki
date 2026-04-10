@@ -2,7 +2,9 @@ import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Lock, Save, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
-import.meta.env.VITE_API_URL || "/api"
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 export function ChangePassword() {
   const navigate = useNavigate();

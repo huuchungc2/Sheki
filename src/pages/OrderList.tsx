@@ -8,7 +8,9 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
 
-import.meta.env.VITE_API_URL || "/api"
+const API_URL =
+  (import.meta as any)?.env?.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending:   { label: "Chờ duyệt", color: "bg-amber-100 text-amber-700",    icon: Clock },
