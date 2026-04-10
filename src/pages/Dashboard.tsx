@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { cn, formatCurrency, isAdminUser } from "../lib/utils";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 const STATUS_CFG: Record<string, { label: string; color: string; icon: any; bg: string }> = {
   pending:   { label: "Chờ duyệt", color: "text-amber-600",  icon: Clock,         bg: "bg-amber-50" },

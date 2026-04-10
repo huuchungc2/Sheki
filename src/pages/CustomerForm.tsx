@@ -7,7 +7,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "../lib/utils";
 import locationsData from "../lib/vietnam-locations-simple.json";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 const LOCATIONS = locationsData as any;
 
 // Parse old address string to extract city/district/ward

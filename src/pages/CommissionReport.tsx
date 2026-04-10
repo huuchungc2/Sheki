@@ -7,7 +7,7 @@ import {
 import { formatCurrency, formatDate, cn } from "../lib/utils";
 import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending:   { label: "Chờ duyệt", color: "bg-amber-50 text-amber-600" },

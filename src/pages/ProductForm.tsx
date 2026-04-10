@@ -6,7 +6,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import { cn } from "../lib/utils";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 export function ProductForm() {
   const navigate = useNavigate();

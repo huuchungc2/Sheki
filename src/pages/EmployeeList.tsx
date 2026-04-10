@@ -22,7 +22,7 @@ import {
 import { Link } from "react-router-dom";
 import { cn, formatDate } from "../lib/utils";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 export function EmployeeList() {
   const [employees, setEmployees] = React.useState<any[]>([]);

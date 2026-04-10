@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending:   { label: "Chờ duyệt", color: "bg-amber-100 text-amber-700" },

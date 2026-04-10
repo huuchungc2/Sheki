@@ -7,7 +7,7 @@ import {
 import { Link } from "react-router-dom";
 import { cn, formatCurrency } from "../lib/utils";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 function formatStock(qty: number | string): string {
   const num = parseFloat(String(qty));

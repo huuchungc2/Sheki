@@ -7,7 +7,7 @@ import {
 import { cn, formatCurrency, formatDate } from "../lib/utils";
 import { exportCtvCommission } from "../lib/exportExcel";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 const STATUS_CFG: Record<string, { label: string; color: string }> = {
   pending:   { label: "Chờ duyệt", color: "bg-amber-100 text-amber-700" },

@@ -23,8 +23,7 @@ import {
 } from "recharts";
 import { formatCurrency, cn } from "../lib/utils";
 import { exportRevenueReport } from "../lib/exportExcel";
-
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 /** Sheki primary — UI_SPEC */
 const PRIMARY = "#E31837";

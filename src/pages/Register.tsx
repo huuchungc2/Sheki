@@ -13,7 +13,7 @@ import {
 import { cn } from "../lib/utils";
 import { logger, apiCall } from "../lib/api";
 
-const API_URL = "http://localhost:3000/api";
+import.meta.env.VITE_API_URL || "/api"
 
 export function Register() {
   const navigate = useNavigate();
