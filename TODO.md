@@ -63,6 +63,14 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Admin: Thu chi** — Chọn NV, loại Thu/Chi, nhóm bán hàng (theo `user_groups`), ghi chú, số tiền; danh sách + lọc + xóa — Files: `migrations/015_cash_transactions.sql`, `schema.sql`, `backend/routes/cash-transactions.js`, `backend/server.js`, `src/pages/CashTransactions.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
+
+- [x] **Dashboard: Tổng lượng + ship KH + NV chịu (tháng)** — API + UI — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`, `LOGIC_BUSINESS.md`
+
+- [x] **API default active_only + EmployeeList «Tất cả»** — GET products/users mặc định chỉ active; `active_only=all` — Files: `backend/routes/products.js`, `backend/routes/users.js`, `src/pages/EmployeeList.tsx`
+
+- [x] **Rà soát active_only** — Mọi màn gợi ý SP / chọn NV dùng `active_only=1` — Files: `InventoryExport.tsx`, `InventoryImport.tsx`, `CustomerForm.tsx`, `OrderList.tsx`, `CollaboratorsCommissionsReport.tsx`, `CommissionRules.tsx`, `CollaboratorsPage.tsx`, `OrderForm_old.tsx`, `OrderForm (1).tsx`
+
 - [x] **Danh sách SP & nhân viên: xóa/vô hiệu + hiển thị đúng** — `DELETE` SP, `active_only` API + UI, sửa PUT product partial — Files: `backend/routes/products.js`, `backend/routes/users.js`, `src/pages/ProductList.tsx`, `src/pages/EmployeeList.tsx`
 
 - [x] **Báo cáo hoa hồng: cột Lương + Tổng lượng** — Cùng công thức danh sách đơn; tổng kỳ = tổng HH + ship KH trả − NV chịu (ship/NV một lần/đơn) — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`

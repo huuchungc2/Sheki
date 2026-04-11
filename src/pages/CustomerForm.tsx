@@ -114,7 +114,7 @@ export function CustomerForm() {
     const fetchEmployees = async () => {
       try {
         const token = getAuthToken();
-        const res = await fetch(`${API_URL}/users?scoped=1&limit=100`, {
+        const res = await fetch(`${API_URL}/users?scoped=1&limit=100&active_only=1`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (res.ok) {

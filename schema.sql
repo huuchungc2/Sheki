@@ -351,6 +351,28 @@ CREATE TABLE `user_groups` (
   CONSTRAINT `fk_user_groups_group` FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================
+-- 16. CASH_TRANSACTIONS (Thu chi — Admin)
+-- ============================================
+CREATE TABLE `cash_transactions` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL COMMENT 'Nhân viên',
+  `group_id` INT UNSIGNED DEFAULT NULL COMMENT 'Nhóm BH (NULL = không gắn)',
+  `kind` ENUM('income','expense') NOT NULL COMMENT 'Thu / Chi',
+  `amount` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  `note` TEXT DEFAULT NULL,
+  `created_by` INT UNSIGNED NOT NULL COMMENT 'Admin tạo bản ghi',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  INDEX `idx_cash_tx_user` (`user_id`),
+  INDEX `idx_cash_tx_group` (`group_id`),
+  INDEX `idx_cash_tx_kind` (`kind`),
+  INDEX `idx_cash_tx_created` (`created_at`),
+  CONSTRAINT `fk_cash_tx_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_cash_tx_group` FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_cash_tx_creator` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Default permissions for admin (all allowed)
 INSERT INTO `role_permissions` (`role`, `module`, `action`, `allowed`) VALUES
 ('admin', 'dashboard', 'view', 1), ('admin', 'dashboard', 'create', 1), ('admin', 'dashboard', 'edit', 1), ('admin', 'dashboard', 'delete', 1),
@@ -378,13 +400,13 @@ INSERT INTO `role_permissions` (`role`, `module`, `action`, `allowed`) VALUES
 -- ============================================
 
 -- Default admin user (password: admin123)
-INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `role_id`, `commission_rate`, `is_active`) VALUES
-('Admin Velocity', 'admin', 'admin@velocity.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 1, 0.00, 1);
+INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `role_id`, `commission_rate`, `is_active`, `join_date`) VALUES
+('Admin Velocity', 'admin', 'admin@velocity.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 1, 0.00, 1, '2020-01-01');
 
 -- Sales employees (password: abc123)
-INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `phone`, `role_id`, `commission_rate`, `is_active`) VALUES
-('Nguyễn Thị Lan', 'lan_sales', 'lan.sales@velocity.vn', '$2a$10$qTMEmtj46j0yexPvtoyo3elQvIWkSft96w0DJphILaGewZfSkfYea', '0912345678', 2, 5.00, 1),
-('Trần Văn Minh', 'minh_sales', 'minh.sales@velocity.vn', '$2a$10$qTMEmtj46j0yexPvtoyo3elQvIWkSft96w0DJphILaGewZfSkfYea', '0987654321', 2, 5.00, 1);
+INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `phone`, `role_id`, `commission_rate`, `is_active`, `join_date`) VALUES
+('Nguyễn Thị Lan', 'lan_sales', 'lan.sales@velocity.vn', '$2a$10$qTMEmtj46j0yexPvtoyo3elQvIWkSft96w0DJphILaGewZfSkfYea', '0912345678', 2, 5.00, 1, '2020-01-01'),
+('Trần Văn Minh', 'minh_sales', 'minh.sales@velocity.vn', '$2a$10$qTMEmtj46j0yexPvtoyo3elQvIWkSft96w0DJphILaGewZfSkfYea', '0987654321', 2, 5.00, 1, '2020-01-01');
 
 -- Default warehouses
 INSERT INTO `warehouses` (`name`, `address`, `is_active`) VALUES

@@ -93,6 +93,7 @@ Trường hợp: theo đơn, **số phải thu từ khách** (ví dụ sau ship/
 - **Danh sách đơn — cột Lương (theo đơn):** `Hoa hồng (HH direct trên đơn) + (KH trả phí ship) − Tiền NV chịu`. **KH trả phí ship** = `shipping_fee` khi `ship_payer` = khách, = **0** khi shop trả ship.
 - **Báo cáo hoa hồng — bảng chi tiết theo đơn:** cột **Lương** cùng công thức trên **theo từng dòng** (dòng HH + phần ship/NV chỉ tính ở **một dòng đầu** mỗi `order_id` để không nhân đôi ship/NV). **Tổng lượng (kỳ)** = tổng tiền HH các dòng + tổng phí ship KH trả − tổng NV chịu, với **ship và NV cộng một lần theo mỗi đơn** trong phạm vi lọc.
 - **Admin — bảng Hoa hồng nhân viên (`/reports/salary`):** **Phí ship KH trả** và **Tiền NV chịu** chỉ cộng theo các đơn mà NV đó là **`orders.salesperson_id`** (người lên đơn / phụ trách đơn). Người chỉ nhận **HH override** (ví dụ quản lý) **không** nhận ship/NV của đơn CTV — **Tổng lượng** = Tổng HH (direct + override) + ship − NV chịu (ship/NV theo đơn của mình).
+- **Tổng quan (`/reports/dashboard`):** Tháng hiện tại — **Phí ship KH trả**, **Tiền NV chịu**, **Tổng lượng** (tổng HH tháng + ship − NV); Admin = toàn hệ thống; Sales = đơn `salesperson_id` = mình; đơn `cancelled` không tính ship/NV.
 
 ---
 

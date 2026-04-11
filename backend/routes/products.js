@@ -52,7 +52,13 @@ router.get('/', auth, async (req, res, next) => {
     `;
     const params = [];
 
-    if (String(active_only) === '1') {
+    // Mặc định chỉ SP đang kinh doanh; active_only=all → mọi SP; active_only=0 → chỉ đã ngừng
+    if (String(active_only) === 'all') {
+      // không lọc is_active
+    } else if (String(active_only) === '0') {
+      query += ' AND p.is_active = 0';
+      countQuery += ' AND p.is_active = 0';
+    } else {
       query += ' AND p.is_active = 1';
       countQuery += ' AND p.is_active = 1';
     }

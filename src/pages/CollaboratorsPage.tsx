@@ -50,7 +50,7 @@ export function CollaboratorsPage() {
   const [userRes, collabRes, salesRes] = await Promise.all([
         fetch(`${API_URL}/users/${id}`, { headers }),
         fetch(`${API_URL}/users/${id}/collaborators`, { headers }),
-        fetch(`${API_URL}/users?scoped=1&limit=100`, { headers }),
+        fetch(`${API_URL}/users?scoped=1&limit=100&active_only=1`, { headers }),
       ]);
 
       // Helper to parse JSON safely or throw with HTML/text error

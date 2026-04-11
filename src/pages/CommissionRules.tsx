@@ -57,7 +57,7 @@ export default function CommissionRules() {
       const [tiersRes, collabRes, salesRes] = await Promise.all([
         api.get("/commission-tiers"),
         api.get("/collaborators"),
-        api.get("/users?scoped=1&limit=100"),
+        api.get("/users?scoped=1&limit=100&active_only=1"),
       ]);
       setTiers(tiersRes.data || []);
       setCollaborators(collabRes.data || []);

@@ -63,6 +63,23 @@ router.get('/dashboard', auth, async (req, res, next) => {
       [m+1, y, ...(isSales ? [uid] : [])]
     );
 
+    // ── Ship KH trả + NV chịu (theo đơn tháng này; sales = chỉ đơn của mình) — cùng logic báo cáo HH ──
+    const orderMonthSpFilter = isSales ? ' AND o.salesperson_id = ?' : '';
+    const [shipNvMonth] = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+         COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+       FROM orders o
+       WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
+         AND o.status != 'cancelled'${orderMonthSpFilter}`,
+      [m + 1, y, ...(isSales ? [uid] : [])]
+    );
+    const totalCommMonth =
+      (parseFloat(commThis[0].direct_commission) || 0) + (parseFloat(commThis[0].override_commission) || 0);
+    const totalKhachShip = parseFloat(shipNvMonth[0].total_khach_ship) || 0;
+    const totalNvChiu = parseFloat(shipNvMonth[0].total_nv_chiu) || 0;
+    const totalLuongMonth = totalCommMonth + totalKhachShip - totalNvChiu;
+
     // ── Khách hàng ──
     const custFilter = isSales ? ' AND created_by = ?' : '';
     const [custTotal] = await pool.query(
@@ -151,7 +168,12 @@ router.get('/dashboard', auth, async (req, res, next) => {
         commission: {
           direct:   parseFloat(commThis[0].direct_commission) || 0,
           override: parseFloat(commThis[0].override_commission) || 0,
-          total:    (parseFloat(commThis[0].direct_commission) || 0) + (parseFloat(commThis[0].override_commission) || 0),
+          total:    totalCommMonth,
+        },
+        luongMonth: {
+          total_khach_ship: totalKhachShip,
+          total_nv_chiu:    totalNvChiu,
+          total_luong:      totalLuongMonth,
         },
         customers: {
           total: parseInt(custTotal[0].total) || 0,

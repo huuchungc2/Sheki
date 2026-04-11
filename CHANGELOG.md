@@ -1,5 +1,52 @@
 # CHANGELOG
 
+## [11/04/2026] - DB: join_date mọi user = 01/01/2020 (seed + migration)
+### Changed
+- **Migration `016_users_join_date_2020.sql`** — `UPDATE users SET join_date = '2020-01-01'` — chạy trước khi dump lên VPS
+- **schema.sql** — Seed user kèm `join_date` — Files: `schema.sql`, `migrations/016_users_join_date_2020.sql`
+
+## [11/04/2026] - Thu chi: lọc tháng/năm + xuất Excel
+### Added
+- **GET /api/cash-transactions/export** — Cùng bộ lọc với danh sách, trả toàn bộ dòng (không phân trang) — Files: `backend/routes/cash-transactions.js`
+### Changed
+- **GET /api/cash-transactions** — Lọc `year` + `month` (thay cho `date_from` / `date_to`)
+- **CashTransactions** — Dropdown Tháng / Năm, nút **Xuất Excel** — Files: `src/pages/CashTransactions.tsx`, `src/lib/exportExcel.ts` (`exportCashTransactions`)
+
+## [11/04/2026] - Thu chi: format tiền + hiện nhóm khi chọn NV
+### Changed
+- **CashTransactions** — Ô số tiền format kiểu VNĐ (locale vi-VN); khi chọn NV hiển thị chip nhóm BH (hoặc báo chưa gán nhóm) — Files: `src/pages/CashTransactions.tsx`
+
+## [11/04/2026] - Thu chi: ô gõ tìm nhân viên (form + lọc)
+### Changed
+- **CashTransactions** — Combobox tìm theo tên / username / email / SĐT; sau lưu phiếu reset ô chọn NV — Files: `src/pages/CashTransactions.tsx`
+
+## [11/04/2026] - Thu chi: tối ưu mobile (thẻ + touch)
+### Changed
+- **CashTransactions** — Dưới `md`: danh sách dạng thẻ, không cuộn ngang; form/lọc/nút phân trang `min-h` touch; desktop giữ bảng — Files: `src/pages/CashTransactions.tsx`
+
+## [11/04/2026] - Admin: màn hình Thu chi (nhân viên + nhóm BH + loại + ghi chú)
+### Added
+- **Bảng `cash_transactions`** — migration `015_cash_transactions.sql`, cập nhật `schema.sql`
+- **API** — `GET/POST/DELETE /api/cash-transactions` (Admin) — Files: `backend/routes/cash-transactions.js`, `backend/server.js`
+- **FE** — `/cash-transactions`: form + danh sách, lọc NV/loại/ngày — Files: `src/pages/CashTransactions.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
+
+## [11/04/2026] - Dashboard: Phí ship KH, NV chịu, Tổng lượng (tháng)
+### Added
+- **GET /reports/dashboard** — `luongMonth`: `total_khach_ship`, `total_nv_chiu`, `total_luong` (tháng hiện tại; đơn không hủy) — Files: `backend/routes/reports.js`
+- **Dashboard** — 3 thẻ KPI (Admin + Sales) — Files: `src/pages/Dashboard.tsx`, `LOGIC_BUSINESS.md`
+
+## [11/04/2026] - API mặc định: chỉ SP/NV `is_active=1` (active_only=all để xem hết)
+### Changed
+- **GET /api/products** — Mặc định `p.is_active = 1`; `active_only=all` bỏ lọc; `active_only=0` chỉ SP đã ngừng — Files: `backend/routes/products.js`
+- **GET /api/users** — Mặc định `u.is_active = 1`; `active_only=all` bỏ lọc — Files: `backend/routes/users.js`
+- **EmployeeList** — Lọc «Tất cả» gửi `active_only=all` — Files: `src/pages/EmployeeList.tsx`
+
+## [11/04/2026] - Rà soát: `active_only=1` mọi màn tìm SP / NV
+### Changed
+- **InventoryExport, InventoryImport, OrderForm_old, OrderForm (1)** — gợi ý sản phẩm chỉ `is_active=1`
+- **CustomerForm, OrderList, CollaboratorsCommissionsReport, CommissionRules, CollaboratorsPage** — danh sách NV (scoped) chỉ `is_active=1`
+- **OrderForm** — đã có `active_only=1`; **ProductList, EmployeeList** — đã cấu hình trước đó
+
 ## [11/04/2026] - Fix: xóa / vô hiệu SP & nhân viên + lọc danh sách
 ### Fixed
 - **ProductList** — Gọi `DELETE /products/:id` (trước đây dùng `PUT` `{is_active:0}` dễ lỗi); danh sách chỉ SP `active_only=1`; nút xóa chỉ Admin — Files: `src/pages/ProductList.tsx`

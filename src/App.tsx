@@ -33,6 +33,7 @@ import { ChangePassword } from "./pages/ChangePassword";
 import { SalesReturnsList } from "./pages/SalesReturnsList";
 import { AdminReturns } from "./pages/AdminReturns";
 import { RolesPage } from "./pages/RolesPage";
+import { CashTransactions } from "./pages/CashTransactions";
 import { isAdminUser } from "./lib/utils";
 
 function getStoredUser() {
@@ -137,6 +138,7 @@ export default function App() {
                   <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionDetail /></AdminRoute>} />
                   <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
+                  <Route path="/cash-transactions" element={<AdminRoute><CashTransactions /></AdminRoute>} />
                   <Route path="/roles" element={<AdminRoute><RolesPage /></AdminRoute>} />
                   <Route path="/returns" element={<SalesReturnsList />} />
                   <Route path="/returns/admin" element={<AdminRoute><AdminReturns /></AdminRoute>} />

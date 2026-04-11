@@ -4,7 +4,8 @@ import {
   DollarSign, Users, Package, ShoppingCart,
   TrendingUp, TrendingDown, Clock, Truck,
   CheckCircle2, XCircle, ChevronRight,
-  Loader2, AlertCircle, ArrowUpRight, ArrowDownRight
+  Loader2, AlertCircle, ArrowUpRight, ArrowDownRight,
+  Wallet, CircleDollarSign,
 } from "lucide-react";
 import {
   BarChart, Bar, Cell, XAxis, YAxis,
@@ -86,6 +87,7 @@ export function Dashboard() {
   const topSales     = d?.topSales     || [];
   const byStatus     = d?.byStatus     || {};
   const commission   = d?.commission   || { direct: 0, override: 0, total: 0 };
+  const luongMonth   = d?.luongMonth   || { total_khach_ship: 0, total_nv_chiu: 0, total_luong: 0 };
   const thisMonth    = d?.thisMonth    || {};
   const today        = d?.today        || {};
   const customers    = d?.customers    || {};
@@ -159,6 +161,34 @@ export function Dashboard() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Khách hàng</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{(customers.total || 0).toLocaleString()}</p>
               <p className="text-xs text-slate-400 mt-1">Mới tháng này: +{customers.new || 0}</p>
+            </div>
+          </div>
+
+          {/* Lương / ship / NV chịu — tháng này */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80">
+              <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
+                <Truck className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wide">Phí ship KH trả</p>
+              <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Tháng này (theo đơn)</p>
+            </div>
+            <div className="bg-gradient-to-br from-rose-50 to-white p-5 rounded-2xl border border-rose-100 shadow-sm ring-1 ring-rose-100/80">
+              <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 mb-3">
+                <CircleDollarSign className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-rose-600/90 uppercase tracking-wide">Tiền NV chịu</p>
+              <p className="text-xl font-bold text-rose-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Tháng này (theo đơn)</p>
+            </div>
+            <div className="bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80">
+              <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
+                <Wallet className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lượng</p>
+              <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_luong || 0)}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Tổng HH + ship KH − NV chịu</p>
             </div>
           </div>
 
@@ -333,6 +363,34 @@ export function Dashboard() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Đơn hàng tháng</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{thisMonth.total_orders || 0}</p>
               <p className="text-xs text-slate-400 mt-1">Hôm nay: {today.total_orders || 0} đơn</p>
+            </div>
+          </div>
+
+          {/* Lương / ship / NV chịu — tháng này (của bạn) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80">
+              <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
+                <Truck className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wide">Phí ship KH trả</p>
+              <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Đơn bạn phụ trách — tháng này</p>
+            </div>
+            <div className="bg-gradient-to-br from-rose-50 to-white p-5 rounded-2xl border border-rose-100 shadow-sm ring-1 ring-rose-100/80">
+              <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 mb-3">
+                <CircleDollarSign className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-rose-600/90 uppercase tracking-wide">Tiền NV chịu</p>
+              <p className="text-xl font-bold text-rose-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Đơn bạn phụ trách — tháng này</p>
+            </div>
+            <div className="bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80">
+              <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
+                <Wallet className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lượng</p>
+              <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_luong || 0)}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Tổng HH + ship KH − NV chịu</p>
             </div>
           </div>
 

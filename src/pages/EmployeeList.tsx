@@ -99,6 +99,7 @@ export function EmployeeList() {
       if (roleCode) params.set("role", roleCode);
       if (statusFilter === "active") params.set("active_only", "1");
       else if (statusFilter === "inactive") params.set("active_only", "0");
+      else if (statusFilter === "all") params.set("active_only", "all");
       const res = await fetch(`${API_URL}/users?${params}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });

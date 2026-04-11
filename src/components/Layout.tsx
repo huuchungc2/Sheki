@@ -61,6 +61,7 @@ const navigationAdmin = [
       { name: "Doanh thu", href: "/reports/revenue" },
       { name: "Hoa hồng", href: "/reports/commissions" },
       { name: "Quy tắc hoa hồng", href: "/commission-rules" },
+      { name: "Thu chi", href: "/cash-transactions" },
     ],
   },
   {

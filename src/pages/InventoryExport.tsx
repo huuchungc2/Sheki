@@ -120,6 +120,7 @@ export function InventoryExport() {
           search: productQuery.trim(),
           limit: "20",
           page: "1",
+          active_only: "1",
           ...(warehouseId ? { warehouse_id: warehouseId } : {}),
           ...(warehouseId ? { available_only: "1" } : {}),
         });

@@ -19,12 +19,15 @@ router.get('/', auth, authorize('admin'), async (req, res, next) => {
     let countQuery = 'SELECT COUNT(*) as total FROM users u JOIN roles r ON u.role_id = r.id WHERE 1=1';
     const params = [];
 
-    if (active_only === '1') {
-      query += ' AND u.is_active = 1';
-      countQuery += ' AND u.is_active = 1';
+    // Mặc định chỉ NV đang làm; active_only=all → tất cả; active_only=0 → chỉ đã nghỉ
+    if (String(active_only) === 'all') {
+      // không lọc is_active
     } else if (active_only === '0') {
       query += ' AND u.is_active = 0';
       countQuery += ' AND u.is_active = 0';
+    } else {
+      query += ' AND u.is_active = 1';
+      countQuery += ' AND u.is_active = 1';
     }
 
     if (search) {

@@ -147,7 +147,7 @@ export function OrderForm() {
   const fetchProductSuggestions = async (q: string) => {
     if (!q) { setProductSuggestions([]); return; }
     try {
-      const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50`);
+      const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50&active_only=1`);
       const data = res?.data ?? [];
       setProductSuggestions(data.map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, price: Number(p.price) || 0, available_stock: Number(p.available_stock) || 0 })));
     } catch {

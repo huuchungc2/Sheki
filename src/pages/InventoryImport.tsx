@@ -118,6 +118,7 @@ export function InventoryImport() {
           search: productQuery.trim(),
           limit: "20",
           page: "1",
+          active_only: "1",
         });
         const res = await fetch(`${API_BASE}/products?${params.toString()}`, { headers: getAuthHeaders() });
         if (!res.ok) return;

@@ -110,7 +110,7 @@ export function OrderList() {
   React.useEffect(() => {
     if (!isAdmin) return;
     const token = localStorage.getItem("token");
-    fetch(`${API_URL}/users?scoped=1&limit=100`, {
+    fetch(`${API_URL}/users?scoped=1&limit=100&active_only=1`, {
       headers: { "Authorization": `Bearer ${token}` }
     })
       .then(r => r.json())

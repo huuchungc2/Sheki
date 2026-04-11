@@ -326,3 +326,76 @@ export function exportRevenueReport(opts: {
   XLSX.utils.book_append_sheet(wb, ws, "Doanh thu");
   XLSX.writeFile(wb, `DoanhThu_T${parseInt(month, 10)}_${year}.xlsx`);
 }
+
+/** Báo cáo Thu chi (Admin) */
+export function exportCashTransactions(opts: {
+  rows: any[];
+  year: string;
+  month: string;
+}) {
+  const { rows, year, month } = opts;
+  const wb = XLSX.utils.book_new();
+  const period = `Tháng ${parseInt(month, 10)}/${year}`;
+  const detail: any[][] = [
+    ["BÁO CÁO THU CHI"],
+    [`Kỳ: ${period}`],
+    [],
+    [
+      "Thời gian",
+      "Nhân viên",
+      "Username",
+      "Loại",
+      "Nhóm BH",
+      "Số tiền (VNĐ)",
+      "Ghi chú",
+      "Người tạo",
+    ],
+  ];
+
+  let sumThu = 0;
+  let sumChi = 0;
+  rows.forEach((r) => {
+    const amt = Number(r.amount) || 0;
+    if (r.kind === "income") sumThu += amt;
+    else sumChi += amt;
+    detail.push([
+      r.created_at ? new Date(r.created_at).toLocaleString("vi-VN") : "",
+      r.user_full_name || "",
+      r.user_username || "",
+      r.kind === "income" ? "Thu" : "Chi",
+      r.group_name || "—",
+      amt,
+      r.note || "",
+      r.created_by_name || "",
+    ]);
+  });
+
+  detail.push([]);
+  detail.push(["Tổng Thu", "", "", "", "", sumThu, "", ""]);
+  detail.push(["Tổng Chi", "", "", "", "", sumChi, "", ""]);
+  detail.push([]);
+  detail.push([
+    "Chênh (Thu − Chi)",
+    "",
+    "",
+    "",
+    "",
+    sumThu - sumChi,
+    "",
+    "",
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(detail);
+  ws["!cols"] = [
+    { wch: 20 },
+    { wch: 22 },
+    { wch: 14 },
+    { wch: 8 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 28 },
+    { wch: 18 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, "Thu chi");
+  XLSX.writeFile(wb, `ThuChi_T${parseInt(month, 10)}_${year}.xlsx`);
+}
