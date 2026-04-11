@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [11/04/2026] - RevenueReport: biểu đồ xếp hạng — hẹp khoảng cách hàng
+### Fixed
+- **Xếp hạng doanh số** — Chiều cao biểu đồ tính theo số NV (`~32px`/hàng), bỏ `min-h` cố định; cột mảnh hơn, `barCategoryGap` 4%, tooltip/cursor nhạt — Files: `src/pages/RevenueReport.tsx`
+
+## [11/04/2026] - RevenueReport: bố cục & giao diện (Sheki / Dashboard)
+### Changed
+- **RevenueReport** — Bỏ header gradient tối; tiêu đề + breadcrumb + badge kỳ; khối lọc trắng có icon; KPI giống Dashboard; biểu đồ full width phía trên, bảng phía dưới; bảng header `slate-50` — Files: `src/pages/RevenueReport.tsx`
+
 ## [11/04/2026] - DB: join_date mọi user = 01/01/2020 (seed + migration)
 ### Changed
 - **Migration `016_users_join_date_2020.sql`** — `UPDATE users SET join_date = '2020-01-01'` — chạy trước khi dump lên VPS
