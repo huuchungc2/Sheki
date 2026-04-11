@@ -25,6 +25,15 @@ const paymentConfig: Record<string, { label: string; icon: any }> = {
   card:     { label: "Thẻ ATM",      icon: CreditCard },
 };
 
+/** Cùng công thức danh sách đơn / LOGIC_BUSINESS — dùng chung bảng + mobile card */
+function computeOrderMoney(order: any) {
+  const khachTraShip = order.ship_payer === "shop" ? 0 : Number(order.shipping_fee) || 0;
+  const commissionAmt = Number(order.commission_amount) || 0;
+  const nvChiuAmt = Number(order.salesperson_absorbed_amount) || 0;
+  const luongDon = commissionAmt + khachTraShip - nvChiuAmt;
+  return { khachTraShip, commissionAmt, nvChiuAmt, luongDon };
+}
+
 // Helper: format YYYY-MM-DD theo local time (tránh lệch múi giờ UTC+7)
 function toDateStr(d: Date) {
   const y = d.getFullYear();
@@ -366,10 +375,16 @@ export function OrderList() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
         </div>
+      ) : orders.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center text-slate-400">
+          <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-slate-200" />
+          Không có đơn hàng nào
+        </div>
       ) : (
         <>
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <table className="w-full text-left border-collapse text-sm">
+          {/* Tablet/desktop: bảng đầy cột */}
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-4 py-3 w-10">
@@ -387,26 +402,25 @@ export function OrderList() {
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhóm BH</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Thời gian</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng tiền</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">
+                    KH Trả Ship
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">NV chịu</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Trạng thái</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Thanh toán</th>
                   <th className="px-4 py-3 w-24"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {orders.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="px-4 py-16 text-center text-slate-400">
-                      <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-slate-200" />
-                      Không có đơn hàng nào
-                    </td>
-                  </tr>
-                ) : orders.map((order: any) => {
+                {orders.map((order: any) => {
                   const st = statusConfig[order.status] || { label: order.status, color: "bg-slate-100 text-slate-600", icon: Clock };
                   const pay = paymentConfig[order.payment_method] || { label: order.payment_method || "—", icon: Wallet };
                   const isSelected = selected.has(order.id);
                   const initials = (order.customer_name || "?").split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
                   const isToday = order.created_at && new Date(order.created_at).toDateString() === new Date().toDateString();
+                  const { khachTraShip, commissionAmt, nvChiuAmt, luongDon } = computeOrderMoney(order);
                   return (
                     <tr key={order.id}
                       className={cn("group transition-colors cursor-pointer",
@@ -454,7 +468,35 @@ export function OrderList() {
                         <span className="text-sm font-bold text-slate-900">{formatCurrency(order.total_amount || 0)}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
+                        <span className="text-sm font-medium text-slate-900 tabular-nums">
+                          {formatCurrency(
+                            order.ship_payer === "shop" ? 0 : Number(order.shipping_fee) || 0
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={cn(
+                          "text-sm tabular-nums",
+                          Number(order.salesperson_absorbed_amount) > 0 ? "font-semibold text-rose-700" : "text-slate-400"
+                        )}>
+                          {Number(order.salesperson_absorbed_amount) > 0
+                            ? formatCurrency(order.salesperson_absorbed_amount)
+                            : "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
                         <span className="text-sm font-semibold text-emerald-600">{formatCurrency(order.commission_amount || 0)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span
+                          className={cn(
+                            "text-sm font-semibold tabular-nums",
+                            luongDon < 0 ? "text-red-600" : "text-violet-800"
+                          )}
+                          title="HH + KH ship − NV chịu"
+                        >
+                          {formatCurrency(luongDon)}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", st.color)}>
@@ -469,7 +511,8 @@ export function OrderList() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Luôn hiện: mobile/touch không có hover → trước đây opacity-0 khiến mất icon */}
+                        <div className="flex items-center justify-end gap-1">
                           <Link to={`/orders/edit/${order.id}`}
                             className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-all"
                           >
@@ -489,6 +532,147 @@ export function OrderList() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: thẻ cuộn dọc — đủ cột như bảng, không cuộn ngang */}
+          <div className="md:hidden space-y-3">
+            {orders.map((order: any) => {
+              const st = statusConfig[order.status] || { label: order.status, color: "bg-slate-100 text-slate-600", icon: Clock };
+              const pay = paymentConfig[order.payment_method] || { label: order.payment_method || "—", icon: Wallet };
+              const isSelected = selected.has(order.id);
+              const initials = (order.customer_name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+              const isToday = order.created_at && new Date(order.created_at).toDateString() === new Date().toDateString();
+              const { khachTraShip, luongDon } = computeOrderMoney(order);
+              return (
+                <div
+                  key={order.id}
+                  className={cn(
+                    "rounded-xl border border-slate-200 bg-white p-3 shadow-sm",
+                    isSelected ? "border-blue-300 bg-blue-50/50" : ""
+                  )}
+                >
+                  <div className="flex gap-2.5">
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleOne(order.id)}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <button
+                        type="button"
+                        className="w-full text-left"
+                        onClick={() => navigate(`/orders/edit/${order.id}`)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-sm font-bold text-red-600 font-mono">{order.code || `#${order.id}`}</span>
+                          <span className={cn("inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0", st.color)}>
+                            <st.icon className="w-3 h-3" />
+                            {st.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 text-sm leading-tight">{order.customer_name || "—"}</p>
+                            <p className="text-xs text-slate-400">{order.customer_phone || ""}</p>
+                          </div>
+                        </div>
+                      </button>
+
+                      {isAdmin && !employeeId && (
+                        <p className="text-[11px] text-slate-700">
+                          <span className="text-slate-500">Nhân viên:</span> {order.salesperson_name || "—"}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {order.group_name ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700">
+                            {order.group_name}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">Nhóm BH: —</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-600">
+                        <span className="text-slate-500">Thời gian:</span>{" "}
+                        {isToday ? "Hôm nay" : order.created_at ? formatDate(order.created_at) : "—"}
+                        {order.created_at
+                          ? ` · ${new Date(order.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`
+                          : ""}
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2 pt-2 border-t border-slate-100 text-[11px]">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-slate-500">Tổng tiền</span>
+                          <span className="font-bold text-slate-900 tabular-nums">{formatCurrency(order.total_amount || 0)}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-slate-500">KH Trả Ship</span>
+                          <span className="font-medium text-slate-900 tabular-nums">{formatCurrency(khachTraShip)}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-slate-500">NV chịu</span>
+                          <span
+                            className={cn(
+                              "tabular-nums",
+                              Number(order.salesperson_absorbed_amount) > 0 ? "font-semibold text-rose-700" : "text-slate-400"
+                            )}
+                          >
+                            {Number(order.salesperson_absorbed_amount) > 0
+                              ? formatCurrency(order.salesperson_absorbed_amount)
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-slate-500">Hoa hồng</span>
+                          <span className="font-semibold text-emerald-600 tabular-nums">{formatCurrency(order.commission_amount || 0)}</span>
+                        </div>
+                        <div className="col-span-2 flex justify-between items-center gap-2 pt-1 border-t border-slate-50">
+                          <span className="text-slate-500">Lương</span>
+                          <span
+                            className={cn(
+                              "font-semibold tabular-nums text-sm",
+                              luongDon < 0 ? "text-red-600" : "text-violet-800"
+                            )}
+                            title="HH + KH ship − NV chịu"
+                          >
+                            {formatCurrency(luongDon)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <pay.icon className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                          <span>Thanh toán: {pay.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Link
+                            to={`/orders/edit/${order.id}`}
+                            className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-all"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(order.id)}
+                            disabled={deleting === order.id}
+                            className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white flex items-center justify-center text-slate-500 transition-all disabled:opacity-50"
+                          >
+                            {deleting === order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Pagination */}

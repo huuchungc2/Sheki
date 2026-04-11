@@ -38,6 +38,8 @@ export function EmployeeList() {
   const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const limit = 20;
+  /** active_only API: mặc định chỉ NV đang làm — sau khi "xóa" (vô hiệu) sẽ biến khỏi danh sách */
+  const [statusFilter, setStatusFilter] = React.useState<"active" | "all" | "inactive">("active");
   // Bulk select + bulk role
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [bulkRoleId, setBulkRoleId] = React.useState<number | "">("");
@@ -58,7 +60,7 @@ export function EmployeeList() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
   }, [employees]);
 
-  const hasAnyFilter = Boolean(searchInput.trim() || department || roleCode);
+  const hasAnyFilter = Boolean(searchInput.trim() || department || roleCode || statusFilter !== "active");
 
   React.useEffect(() => {
     const fetchRoles = async () => {
@@ -95,6 +97,8 @@ export function EmployeeList() {
       if (searchTerm) params.set("search", searchTerm);
       if (department) params.set("department", department);
       if (roleCode) params.set("role", roleCode);
+      if (statusFilter === "active") params.set("active_only", "1");
+      else if (statusFilter === "inactive") params.set("active_only", "0");
       const res = await fetch(`${API_URL}/users?${params}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -110,7 +114,7 @@ export function EmployeeList() {
     }
   };
 
-  React.useEffect(() => { fetchEmployees(); }, [page, searchTerm, department, roleCode]);
+  React.useEffect(() => { fetchEmployees(); }, [page, searchTerm, department, roleCode, statusFilter]);
 
   const handleExport = async (entity: string) => {
     try {
@@ -141,7 +145,8 @@ export function EmployeeList() {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error("Xóa thất bại");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Xóa thất bại");
       fetchEmployees();
     } catch (err: any) {
       alert(err.message);
@@ -309,11 +314,25 @@ export function EmployeeList() {
                   </option>
                 ))}
               </select>
+              <div className="w-px h-5 bg-slate-200" />
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as "active" | "all" | "inactive");
+                  setPage(1);
+                }}
+                className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer"
+                title="Trạng thái làm việc"
+              >
+                <option value="active">Đang làm việc</option>
+                <option value="all">Tất cả</option>
+                <option value="inactive">Đã nghỉ</option>
+              </select>
             </div>
 
             {hasAnyFilter && (
               <button
-                onClick={() => { setSearchInput(""); setDepartment(""); setRoleCode(""); setPage(1); }}
+                onClick={() => { setSearchInput(""); setDepartment(""); setRoleCode(""); setStatusFilter("active"); setPage(1); }}
                 className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-500 hover:text-blue-600 hover:border-blue-200 transition-all"
               >
                 Xóa lọc
@@ -446,12 +465,17 @@ export function EmployeeList() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <div className="flex items-center justify-end gap-2">
                         <Link to={`/employees/edit/${employee.id}`} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all" title="Chỉnh sửa">
                           <Edit2 className="w-4 h-4" />
                         </Link>
                         {(currentUser?.can_access_admin || currentUser?.role === "admin") && (
-                          <button onClick={() => handleDelete(employee.id)} className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all" title="Xóa">
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(employee.id)}
+                            className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all"
+                            title="Vô hiệu hóa nhân viên"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         )}

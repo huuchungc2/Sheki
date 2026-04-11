@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link } from "react-router-dom";
 import {
   DollarSign, TrendingUp, Users, Download,
-  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown
+  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign
 } from "lucide-react";
 import { formatCurrency, formatDate, cn } from "../lib/utils";
 import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel";
@@ -37,7 +37,13 @@ export function CommissionReport() {
   // Sales view data (từ /commissions/orders)
   const [orderCommissions, setOrderCommissions] = React.useState<any[]>([]);
   const [summary, setSummary] = React.useState<any>({
-    direct_commission: 0, override_commission: 0, total_commission: 0, total_orders: 0
+    direct_commission: 0,
+    override_commission: 0,
+    total_commission: 0,
+    total_orders: 0,
+    total_khach_ship: 0,
+    total_nv_chiu: 0,
+    total_luong: 0,
   });
 
   // Admin view data
@@ -68,7 +74,15 @@ export function CommissionReport() {
   const fetchReport = React.useCallback(async () => {
     setLoading(true);
     setError(null);
-    setSummary({ direct_commission: 0, override_commission: 0, total_commission: 0, total_orders: 0 });
+    setSummary({
+      direct_commission: 0,
+      override_commission: 0,
+      total_commission: 0,
+      total_orders: 0,
+      total_khach_ship: 0,
+      total_nv_chiu: 0,
+      total_luong: 0,
+    });
     setOrderCommissions([]);
     try {
       const token = localStorage.getItem("token");
@@ -84,8 +98,11 @@ export function CommissionReport() {
       setOrderCommissions(orderJson.data || []);
       setCommTotal(orderJson.total || 0);
       const s = orderJson.summary;
-      const directCommission  = parseFloat(s?.direct_commission)  || 0;
-      const totalOrders       = parseInt(s?.total_orders)         || 0;
+      const directCommission = parseFloat(s?.direct_commission) || 0;
+      const totalOrders = parseInt(s?.total_orders) || 0;
+      const totalKhachShip = parseFloat(s?.total_khach_ship) || 0;
+      const totalNvChiu = parseFloat(s?.total_nv_chiu) || 0;
+      const totalLuongApi = parseFloat(s?.total_luong) || 0;
 
       // 2. Sales: lấy thêm HH từ CTV (override) để hiển thị đúng stat cards
       let overrideCommission = 0;
@@ -104,10 +121,13 @@ export function CommissionReport() {
       }
 
       setSummary({
-        direct_commission:   directCommission,
+        direct_commission: directCommission,
         override_commission: overrideCommission,
-        total_commission:    directCommission + overrideCommission,
-        total_orders:        totalOrders,
+        total_commission: directCommission + overrideCommission,
+        total_orders: totalOrders,
+        total_khach_ship: totalKhachShip,
+        total_nv_chiu: totalNvChiu,
+        total_luong: totalLuongApi,
       });
 
       // 3. Admin: fetch salary + CTV commissions
@@ -174,6 +194,7 @@ export function CommissionReport() {
       });
       const allJson = await allRes.json();
       const allOrders = allJson.data || [];
+      const periodSummary = { ...summary, ...(allJson.summary || {}) };
 
       if (isAdmin) {
         exportAdminCommission({
@@ -184,11 +205,12 @@ export function CommissionReport() {
           month,
           year,
           groupName,
+          periodSummary,
         });
       } else {
         exportSalesCommission({
           orders: allOrders,
-          summary,
+          summary: periodSummary,
           userName: currentUser?.full_name || "NhanVien",
           month,
           year,
@@ -261,8 +283,8 @@ export function CommissionReport() {
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stat cards — HH → ship KH → NV chịu → tổng lượng */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
         {/* Tổng HH bán hàng (direct) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-3">
@@ -293,6 +315,36 @@ export function CommissionReport() {
             {formatCurrency((summary.direct_commission || 0) + (summary.override_commission || 0))}
           </p>
           <p className="text-xs text-slate-400 mt-0.5">Bán hàng + CTV</p>
+        </div>
+
+        {/* Phí ship khách trả (cả kỳ, mỗi đơn 1 lần) */}
+        <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80">
+          <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
+            <Truck className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wider">Phí ship KH trả</p>
+          <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums">{formatCurrency(summary.total_khach_ship || 0)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">Tổng (theo đơn trong kỳ)</p>
+        </div>
+
+        {/* Tiền NV chịu */}
+        <div className="bg-gradient-to-br from-rose-50 to-white p-5 rounded-2xl border border-rose-100 shadow-sm ring-1 ring-rose-100/80">
+          <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 mb-3">
+            <CircleDollarSign className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-rose-600/90 uppercase tracking-wider">Tiền NV chịu</p>
+          <p className="text-xl font-bold text-rose-800 mt-1 tabular-nums">{formatCurrency(summary.total_nv_chiu || 0)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">Tổng (theo đơn trong kỳ)</p>
+        </div>
+
+        {/* Tổng lượng */}
+        <div className="bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80 xl:ring-2 xl:ring-violet-200/60">
+          <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
+            <Wallet className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wider">Tổng lượng</p>
+          <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums">{formatCurrency(summary.total_luong || 0)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">HH + ship KH − NV chịu</p>
         </div>
 
         {/* Số đơn */}
@@ -354,6 +406,9 @@ export function CommissionReport() {
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">HH bán hàng</th>
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">HH từ CTV</th>
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng HH</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-sky-600 uppercase tracking-wide text-right whitespace-nowrap">Phí ship KH</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-rose-600 uppercase tracking-wide text-right whitespace-nowrap">NV chịu</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-violet-600 uppercase tracking-wide text-right whitespace-nowrap">Tổng lượng</th>
                       <th className="px-5 py-3 w-8"></th>
                     </tr>
                   </thead>
@@ -370,6 +425,15 @@ export function CommissionReport() {
                         <td className="px-5 py-3 text-right font-semibold text-blue-600">{formatCurrency(item.override_commission || 0)}</td>
                         <td className="px-5 py-3 text-right font-bold text-slate-900">
                           {formatCurrency((item.total_commission || 0) + (item.override_commission || 0))}
+                        </td>
+                        <td className="px-5 py-3 text-right font-semibold text-sky-800 tabular-nums">
+                          {formatCurrency(item.total_khach_ship || 0)}
+                        </td>
+                        <td className="px-5 py-3 text-right font-semibold text-rose-800 tabular-nums">
+                          {formatCurrency(item.total_nv_chiu || 0)}
+                        </td>
+                        <td className="px-5 py-3 text-right font-bold text-violet-800 tabular-nums">
+                          {formatCurrency(Number(item.total_luong) || 0)}
                         </td>
                         <td className="px-5 py-3 text-right">
                           <Link to={`/reports/commissions/${item.id}`}
@@ -388,6 +452,9 @@ export function CommissionReport() {
                       <td className="px-5 py-3 text-right text-emerald-400">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_commission || 0), 0))}</td>
                       <td className="px-5 py-3 text-right text-blue-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.override_commission || 0), 0))}</td>
                       <td className="px-5 py-3 text-right">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_commission || 0) + (i.override_commission || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right text-sky-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_khach_ship || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right text-rose-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_nv_chiu || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right text-violet-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (Number(i.total_luong) || 0), 0))}</td>
                       <td className="px-5 py-3"></td>
                     </tr>
                   </tfoot>
@@ -568,13 +635,14 @@ export function CommissionReport() {
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhóm BH</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng tiền</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {orderCommissions.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 8 : 7} className="px-5 py-12 text-center text-slate-400">
+                  <td colSpan={isAdmin ? 9 : 8} className="px-5 py-12 text-center text-slate-400">
                     Chưa có hoa hồng trong tháng {month}/{year}
                     {groupId ? ` — nhóm đã chọn` : ""}
                   </td>
@@ -613,6 +681,12 @@ export function CommissionReport() {
                         ? (Number(item.commission_amount) < 0 ? "text-rose-600" : "text-emerald-600")
                         : "text-emerald-600"
                     )}>{formatCurrency(item.commission_amount)}</td>
+                    <td className={cn(
+                      "px-5 py-3 text-right font-bold",
+                      Number(item.luong) < 0 ? "text-red-600" : "text-violet-800"
+                    )}>
+                      {formatCurrency(Number(item.luong) || 0)}
+                    </td>
                     <td className="px-5 py-3 text-center">
                       <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold", st.color)}>
                         {st.label}
@@ -634,7 +708,16 @@ export function CommissionReport() {
                   <td className="px-5 py-3 text-right text-emerald-400">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.commission_amount, 0))}
                   </td>
+                  <td className="px-5 py-3 text-right text-violet-300">
+                    {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.luong || 0), 0))}
+                  </td>
                   <td className="px-5 py-3"></td>
+                </tr>
+                <tr className="bg-slate-100 border-t border-slate-200 text-xs text-slate-600">
+                  <td className="px-5 py-2 text-right font-medium" colSpan={isAdmin ? 9 : 8}>
+                    Tổng lượng (cả kỳ lọc):{' '}
+                    <span className="font-bold text-violet-700">{formatCurrency(summary.total_luong || 0)}</span>
+                  </td>
                 </tr>
               </tfoot>
             )}

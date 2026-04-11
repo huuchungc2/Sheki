@@ -258,28 +258,38 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
       }
     }
 
-    // Update product meta (aggregate stock is maintained via warehouse_stock + recalculateStock)
+    // Cập nhật từng phần: IF(flag, newVal, col) — flag=0 → giữ cột cũ (tránh PUT chỉ is_active làm mất danh mục/ảnh)
+    const hasCategory = Object.prototype.hasOwnProperty.call(req.body, 'category_id');
+    const categoryBind = hasCategory
+      ? (category_id === '' || category_id === null ? null : category_id)
+      : null;
+    const hasImages = Object.prototype.hasOwnProperty.call(req.body, 'images');
+    const imagesBind = hasImages ? (images ? JSON.stringify(images) : null) : null;
+    const hasIsActive = Object.prototype.hasOwnProperty.call(req.body, 'is_active');
+    const isActiveBind = hasIsActive ? (is_active ? 1 : 0) : null;
+
     await pool.query(
       `UPDATE products SET 
          name = COALESCE(?, name),
          sku = COALESCE(?, sku),
-         category_id = ?,
+         category_id = IF(?, ?, category_id),
          unit = COALESCE(?, unit),
          price = COALESCE(?, price),
          cost_price = COALESCE(?, cost_price),
          low_stock_threshold = COALESCE(?, low_stock_threshold),
-         weight = ?,
-         length = ?,
-         width = ?,
-         height = ?,
-         description = ?,
-         images = ?,
-         is_active = COALESCE(?, is_active)
+         weight = COALESCE(?, weight),
+         length = COALESCE(?, length),
+         width = COALESCE(?, width),
+         height = COALESCE(?, height),
+         description = COALESCE(?, description),
+         images = IF(?, ?, images),
+         is_active = IF(?, ?, is_active)
        WHERE id = ?`,
       [
         name ?? null,
         (typeof sku === 'string' && sku.trim()) ? sku.trim() : null,
-        (category_id === '' || category_id === undefined) ? null : category_id,
+        hasCategory ? 1 : 0,
+        categoryBind,
         unit ?? null,
         price ?? null,
         cost_price ?? null,
@@ -289,8 +299,10 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
         width ?? null,
         height ?? null,
         description ?? null,
-        images ? JSON.stringify(images) : null,
-        is_active ?? null,
+        hasImages ? 1 : 0,
+        imagesBind,
+        hasIsActive ? 1 : 0,
+        isActiveBind,
         req.params.id,
       ]
     );

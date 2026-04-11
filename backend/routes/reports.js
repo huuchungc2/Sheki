@@ -200,7 +200,9 @@ router.get('/salary', auth, async (req, res, next) => {
         COALESCE(o_stats.total_sales, 0) as total_sales,
         COALESCE(c_direct.direct_commission, 0) as total_commission,
         COALESCE(c_override.override_commission, 0) as override_commission,
-        COALESCE(c_direct.direct_commission, 0) + COALESCE(c_override.override_commission, 0) as total_all_commission
+        COALESCE(c_direct.direct_commission, 0) + COALESCE(c_override.override_commission, 0) as total_all_commission,
+        COALESCE(ship_nv.total_khach_ship, 0) as total_khach_ship,
+        COALESCE(ship_nv.total_nv_chiu, 0) as total_nv_chiu
        FROM users u
        JOIN roles r ON u.role_id = r.id
        LEFT JOIN (
@@ -233,6 +235,16 @@ router.get('/salary', auth, async (req, res, next) => {
            ${orderGroupCond}
          GROUP BY c.user_id
        ) c_override ON u.id = c_override.user_id
+       LEFT JOIN (
+         SELECT salesperson_id,
+                COALESCE(SUM(CASE WHEN ship_payer = 'shop' THEN 0 ELSE shipping_fee END), 0) AS total_khach_ship,
+                COALESCE(SUM(salesperson_absorbed_amount), 0) AS total_nv_chiu
+         FROM orders
+         WHERE MONTH(created_at) = ?
+           AND YEAR(created_at) = ?
+           ${groupId ? ' AND group_id = ?' : ''}
+         GROUP BY salesperson_id
+       ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE r.code = 'sales' AND u.is_active = 1
        ${ordersExistsCond}
        ORDER BY total_sales DESC`,
@@ -243,22 +255,32 @@ router.get('/salary', auth, async (req, res, next) => {
         currentMonth, currentYear, ...(groupId ? [groupId] : []),
         // c_override
         currentMonth, currentYear, ...(groupId ? [groupId] : []),
+        // ship_nv — chỉ theo NV phụ trách đơn (salesperson_id), không nhân cho người chỉ HH override
+        currentMonth, currentYear, ...(groupId ? [groupId] : []),
         // EXISTS filter
         ...(groupId ? [currentMonth, currentYear, groupId] : []),
       ]
     );
 
     // Convert DECIMAL strings to numbers
-    const formattedSalesData = salesData.map(s => ({
-      ...s,
-      total_orders: parseInt(s.total_orders) || 0,
-      total_sales: parseFloat(s.total_sales) || 0,
-      total_commission: parseFloat(s.total_commission) || 0,
-      override_commission: parseFloat(s.override_commission) || 0,
-      total_all_commission: parseFloat(s.total_all_commission) || 0,
-      salary: parseFloat(s.salary) || 0,
-      commission_rate: parseFloat(s.commission_rate) || 0,
-    }));
+    const formattedSalesData = salesData.map(s => {
+      const totalAll = parseFloat(s.total_all_commission) || 0;
+      const khach = parseFloat(s.total_khach_ship) || 0;
+      const nv = parseFloat(s.total_nv_chiu) || 0;
+      return {
+        ...s,
+        total_orders: parseInt(s.total_orders) || 0,
+        total_sales: parseFloat(s.total_sales) || 0,
+        total_commission: parseFloat(s.total_commission) || 0,
+        override_commission: parseFloat(s.override_commission) || 0,
+        total_all_commission: totalAll,
+        total_khach_ship: khach,
+        total_nv_chiu: nv,
+        total_luong: totalAll + khach - nv,
+        salary: parseFloat(s.salary) || 0,
+        commission_rate: parseFloat(s.commission_rate) || 0,
+      };
+    });
 
     const totalSales = formattedSalesData.reduce((sum, s) => sum + s.total_sales, 0);
     const totalCommission = formattedSalesData.reduce((sum, s) => sum + s.total_all_commission, 0);

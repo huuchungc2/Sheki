@@ -15,6 +15,7 @@ const {
   updateLoyaltyPoints
 } = require('../services/orderService');
 const { publishOrderEvent } = require('../services/notificationHub');
+const { computeOrderCollects, round2 } = require('../utils/orderCollect');
 
 const DEFAULT_LINE_COMMISSION_RATE = 10;
 
@@ -107,6 +108,11 @@ router.get('/', auth, async (req, res, next) => {
         discount: parseFloat(row.discount) || 0,
         tax_amount: parseFloat(row.tax_amount) || 0,
         shipping_fee: parseFloat(row.shipping_fee) || 0,
+        ship_payer: row.ship_payer === 'shop' ? 'shop' : 'customer',
+        deposit: parseFloat(row.deposit) || 0,
+        customer_collect: parseFloat(row.customer_collect) || 0,
+        shop_collect: parseFloat(row.shop_collect) || 0,
+        salesperson_absorbed_amount: parseFloat(row.salesperson_absorbed_amount) || 0,
         commission_amount: parseFloat(row.commission_amount) || 0,
       };
     });
@@ -171,6 +177,11 @@ router.get('/:id', auth, async (req, res, next) => {
       discount: parseFloat(order.discount) || 0,
       tax_amount: parseFloat(order.tax_amount) || 0,
       shipping_fee: parseFloat(order.shipping_fee) || 0,
+      ship_payer: order.ship_payer === 'shop' ? 'shop' : 'customer',
+      deposit: parseFloat(order.deposit) || 0,
+      customer_collect: parseFloat(order.customer_collect) || 0,
+      shop_collect: parseFloat(order.shop_collect) || 0,
+      salesperson_absorbed_amount: parseFloat(order.salesperson_absorbed_amount) || 0,
     };
 
     const formattedItems = items.map(item => ({
@@ -248,6 +259,9 @@ router.post('/', auth, async (req, res, next) => {
       shipping_address,
       carrier_service,
       shipping_fee,
+      ship_payer,
+      deposit,
+      salesperson_absorbed_amount,
       payment_method,
       discount,
       note,
@@ -343,14 +357,19 @@ router.post('/', auth, async (req, res, next) => {
       item.subtotal = itemSubtotal;
     }
 
-    const totalAmount = subtotal + (shipping_fee || 0) - (discount || 0);
+    const shipFee = round2(shipping_fee);
+    const shipPayerVal = ship_payer === 'shop' ? 'shop' : 'customer';
+    const depositVal = round2(deposit);
+    const salespersonAbsorbedVal = round2(salesperson_absorbed_amount);
+    const { customer_collect, shop_collect } = computeOrderCollects(subtotal, shipFee, depositVal, shipPayerVal);
+    const totalAmount = customer_collect;
 
     // Dùng status từ request, mặc định 'pending' (KHÔNG dùng 'draft')
     const orderStatus = req.body.status || 'pending';
 
     const [orderResult] = await pool.query(
-      `INSERT INTO orders (code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, payment_method, subtotal, discount, total_amount, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO orders (code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, ship_payer, deposit, customer_collect, shop_collect, salesperson_absorbed_amount, payment_method, subtotal, discount, total_amount, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         code,
         customer_id,
@@ -362,7 +381,12 @@ router.post('/', auth, async (req, res, next) => {
         orderStatus,
         shipping_address,
         carrier_service,
-        shipping_fee || 0,
+        shipFee,
+        shipPayerVal,
+        depositVal,
+        customer_collect,
+        shop_collect,
+        salespersonAbsorbedVal,
         payment_method || 'cash',
         subtotal,
         discount || 0,
@@ -436,6 +460,9 @@ router.put('/:id', auth, async (req, res, next) => {
       shipping_address,
       carrier_service,
       shipping_fee,
+      ship_payer,
+      deposit,
+      salesperson_absorbed_amount,
       payment_method,
       discount,
       note,
@@ -580,10 +607,25 @@ router.put('/:id', auth, async (req, res, next) => {
       }
     }
 
-    const totalAmount = subtotal + (shipping_fee !== undefined ? shipping_fee : order.shipping_fee) - (discount !== undefined ? discount : order.discount);
+    const shipFeePut = round2(shipping_fee !== undefined ? shipping_fee : order.shipping_fee);
+    const shipPayerPut =
+      ship_payer !== undefined ? (ship_payer === 'shop' ? 'shop' : 'customer') : (order.ship_payer === 'shop' ? 'shop' : 'customer');
+    const depositPut =
+      deposit !== undefined ? round2(deposit) : round2(order.deposit != null ? order.deposit : 0);
+    const salespersonAbsorbedPut =
+      salesperson_absorbed_amount !== undefined
+        ? round2(salesperson_absorbed_amount)
+        : round2(order.salesperson_absorbed_amount != null ? order.salesperson_absorbed_amount : 0);
+    const { customer_collect: custCol, shop_collect: shopCol } = computeOrderCollects(
+      subtotal,
+      shipFeePut,
+      depositPut,
+      shipPayerPut
+    );
+    const totalAmount = custCol;
 
     await pool.query(
-      `UPDATE orders SET customer_id = ?, warehouse_id = ?, group_id = ?, salesperson_id = ?, source_type = ?, collaborator_user_id = ?, status = ?, shipping_address = ?, carrier_service = ?, shipping_fee = ?, payment_method = ?, subtotal = ?, discount = ?, total_amount = ?, note = ?
+      `UPDATE orders SET customer_id = ?, warehouse_id = ?, group_id = ?, salesperson_id = ?, source_type = ?, collaborator_user_id = ?, status = ?, shipping_address = ?, carrier_service = ?, shipping_fee = ?, ship_payer = ?, deposit = ?, customer_collect = ?, shop_collect = ?, salesperson_absorbed_amount = ?, payment_method = ?, subtotal = ?, discount = ?, total_amount = ?, note = ?
        WHERE id = ?`,
       [
         customer_id || order.customer_id,
@@ -595,7 +637,12 @@ router.put('/:id', auth, async (req, res, next) => {
         status || order.status,
         shipping_address || order.shipping_address,
         carrier_service || order.carrier_service,
-        shipping_fee !== undefined ? shipping_fee : order.shipping_fee,
+        shipFeePut,
+        shipPayerPut,
+        depositPut,
+        custCol,
+        shopCol,
+        salespersonAbsorbedPut,
         payment_method || order.payment_method,
         subtotal,
         discount !== undefined ? discount : order.discount,

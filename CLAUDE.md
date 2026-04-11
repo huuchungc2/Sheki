@@ -63,6 +63,10 @@ project/
 - Mã đơn: `DH-YYYYMMDD-XXXX`, reset theo ngày
 - Số lượng: DECIMAL(10,3) — hỗ trợ 0.5kg, 1.25m
 - Hoa hồng: per-item, `(unit_price * qty - discount_amount) * commission_rate / 100`, mặc định 10%
+- Chiết khấu dòng: `discount_rate` nhập trên OrderForm (giống HH%), mặc định **0%**; `discount_amount = unit_price * qty * discount_rate / 100` — trên UI tổng các dòng gọi **Tổng CK**
+- **Giá trị đơn** (màn hình đơn) = **Tạm tính** = tổng sau chiết khấu dòng (`subtotal`) — không phải thu khách
+- **Tiền NV chịu (UI):** phần chênh lệch khi khách trả ít hơn số phải thu; lưu DB/API `orders.salesperson_absorbed_amount`; **không** đổi công thức thu khách; sau này **trừ HH** — `LOGIC_BUSINESS.md` §3
+- **Ship / cọc / thu:** Mỗi đơn có phí ship **khách trả** (mặc định) hoặc **shop trả**; có **tiền cọc**, **thu khách**, **shop thu**. Công thức: shop trả ship → thu khách = shop thu = Tạm tính − ship − cọc; khách trả ship → thu khách = Tạm tính + ship − cọc, shop thu = Tạm tính − cọc — chi tiết `LOGIC_BUSINESS.md` §3. DB: `ship_payer`, `deposit`, `customer_collect`, `shop_collect`; **`orders.total_amount` = thu khách** (đồng bộ báo cáo/loyalty).
 - Tồn kho: `stock_qty = available_stock + reserved_stock`
 - Địa chỉ: LUÔN normalize — bỏ prefix "Thành phố/Quận/Phường" khi so sánh
 - Khách hàng: KHÔNG UNIQUE phone/email — trùng nhau là bình thường

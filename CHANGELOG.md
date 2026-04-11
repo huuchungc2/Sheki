@@ -1,5 +1,126 @@
 # CHANGELOG
 
+## [11/04/2026] - Fix: xóa / vô hiệu SP & nhân viên + lọc danh sách
+### Fixed
+- **ProductList** — Gọi `DELETE /products/:id` (trước đây dùng `PUT` `{is_active:0}` dễ lỗi); danh sách chỉ SP `active_only=1`; nút xóa chỉ Admin — Files: `src/pages/ProductList.tsx`
+- **products PUT** — Cập nhật từng phần an toàn (`IF` cho `category_id` / `images` / `is_active`) — Files: `backend/routes/products.js`
+- **GET /users** — Query `active_only=1|0` — Files: `backend/routes/users.js`
+- **EmployeeList** — Mặc định chỉ NV đang làm; lọc Đang làm / Tất cả / Đã nghỉ; thông báo lỗi API; nút thao tác luôn hiện — Files: `src/pages/EmployeeList.tsx`
+
+## [11/04/2026] - Fix: ship/NV bảng HH NV theo `salesperson_id` (không trùng Lan–Minh)
+### Fixed
+- **`GET /reports/salary`** — Phí ship KH + Tiền NV chịu chỉ từ đơn mà NV là **salesperson_id**; người chỉ có HH override không bị cộng ship/NV của đơn người khác — Files: `backend/routes/reports.js`, `LOGIC_BUSINESS.md`
+
+## [11/04/2026] - Admin: bảng Hoa hồng NV + 3 cột ship / NV chịu / Tổng lượng
+### Added
+- **GET /reports/salary** — `total_khach_ship`, `total_nv_chiu`, `total_luong` theo từng sales (đơn × NV distinct) — Files: `backend/routes/reports.js`
+- **CommissionReport** tab Hoa hồng nhân viên + **exportExcel** sheet Tổng hợp NV — Files: `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`
+
+## [11/04/2026] - Báo cáo HH: thẻ Phí ship KH + Tiền NV chịu
+### Changed
+- **CommissionReport** — KPI hiển thị **Tổng phí ship KH trả** và **Tổng tiền NV chịu** (cả kỳ), grid 7 cột — Files: `src/pages/CommissionReport.tsx`
+
+## [11/04/2026] - Báo cáo hoa hồng: cột Lương + Tổng lượng
+### Added
+- **GET /api/commissions/orders** — `luong`, `khach_tra_ship`, `nv_chiu_display`, `summary.total_khach_ship`, `summary.total_nv_chiu`, `summary.total_luong` (ship/NV một lần theo đơn; `ROW_NUMBER` cho nhiều dòng cùng đơn) — Files: `backend/routes/commissions.js`
+- **CommissionReport** — cột **Lương**, thẻ **Tổng lượng**, dòng tổng kỳ dưới bảng — Files: `src/pages/CommissionReport.tsx`
+- **exportExcel** — cột Lương + chỉ số kỳ trong export Sales/Admin — Files: `src/lib/exportExcel.ts`
+- **LOGIC_BUSINESS.md** — mô tả Lương / Tổng lượng trên báo cáo HH
+
+## [11/04/2026] - Danh sách đơn: mobile thẻ dọc (không cuộn ngang)
+### Changed
+- **OrderList** — `md:hidden` thẻ đơn đủ trường như bảng; bảng chỉ `md+` — Files: `src/pages/OrderList.tsx`
+
+## [11/04/2026] - Danh sách đơn: cột Lương gọn (chỉ tên cột)
+### Changed
+- **OrderList** — Bỏ dòng phụ «HH + KH ship − NV chịu» dưới tiêu đề Lương — Files: `src/pages/OrderList.tsx`
+
+## [11/04/2026] - Danh sách đơn: mobile cùng cột như laptop
+### Changed
+- **`OrderList`** — Bỏ layout mobile riêng; mọi màn hình dùng một bảng đủ cột, mobile `overflow-x` cuộn ngang — Files: `src/pages/OrderList.tsx`
+
+## [11/04/2026] - Danh sách đơn: layout mobile (thẻ) — KH ship, NV chịu, Lương
+### Added
+- **`OrderList`** — `md:hidden` thẻ đơn hiển thị đủ số liệu; bảng chỉ `md:block` — `computeOrderMoney()` dùng chung — Files: `src/pages/OrderList.tsx`
+
+## [11/04/2026] - Danh sách đơn: cột Lương (HH + KH ship − NV chịu)
+### Added
+- **OrderList** — cột **Lương** = `commission_amount + khách_trả_phí_ship − salesperson_absorbed_amount`; **LOGIC_BUSINESS.md** — Files: `src/pages/OrderList.tsx`, `LOGIC_BUSINESS.md`
+
+## [11/04/2026] - OrderForm: nhân viên phụ trách = sales thực tế
+### Fixed
+- **OrderForm** — Bỏ placeholder Admin; hiển thị `salesperson_name` (sửa đơn) hoặc user đang đăng nhập (tạo đơn); mô tả “Nhân viên bán hàng (sales)” — Files: `src/pages/OrderForm.tsx`
+
+## [11/04/2026] - Danh sách đơn: icon Sửa/Xóa luôn hiện (mobile)
+### Fixed
+- **OrderList** — bỏ `opacity-0` + `group-hover` trên nút sửa/xóa (touch không hover → icon bị ẩn) — Files: `src/pages/OrderList.tsx`
+
+## [11/04/2026] - Danh sách đơn: cột Ship & NV chịu
+### Added
+- **OrderList** — cột **KH Trả Ship** (chỉ số tiền KH trả phần ship; shop trả hộ = 0), cột **NV chịu** — Files: `src/pages/OrderList.tsx`
+
+## [11/04/2026] - OrderForm mobile: tổng kết thu gọn khi vào trang
+### Changed
+- Thanh dưới (`sm`) mặc định 1 dòng (Thu khách + Lưu); chạm mở đủ phí ship / cọc / Tiền NV chịu / HH — tránh khối lớn như popup khi load — Files: `src/pages/OrderForm.tsx`
+
+## [11/04/2026] - Đơn hàng: đổi cột/API `nv_chiu` → `salesperson_absorbed_amount`
+### Changed
+- **Migration `014_rename_nv_chiu_salesperson_absorbed_amount.sql`**: đổi tên cột tiếng Anh; API JSON `salesperson_absorbed_amount` — Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`, `schema.sql`, docs
+
+## [11/04/2026] - Đơn hàng: cột `nv_chiu` + form Tiền NV chịu
+### Added
+- **Migration `013_orders_nv_chiu.sql`**: `orders.nv_chiu` — Tiền NV chịu (không đổi `computeOrderCollects` / `total_amount`)
+### Changed
+- **`backend/routes/orders.js`**, **`OrderForm`**, **`schema.sql`**, **`LOGIC_BUSINESS.md`**, **`CLAUDE.md`**
+
+## [11/04/2026] - Nghiệp vụ: Tiền NV chịu (chênh lệch thu, trừ HH sau)
+### Added
+- **LOGIC_BUSINESS.md** §3 — Định nghĩa khi khách trả thiếu, NV bù phần còn lại; tên UI đề xuất **Tiền NV chịu**; gợi ý trừ HH kỳ quyết toán — **CLAUDE.md** bullet
+
+## [11/04/2026] - Mặc định phí ship: khách trả
+### Changed
+- **OrderForm** — `shipPayer` mặc định `customer`; **`backend/routes/orders.js`** — API không gửi `ship_payer` thì coi là khách; **`schema.sql`**, migration **`012_ship_payer_default_customer.sql`** — DEFAULT DB `customer`; **LOGIC_BUSINESS.md**, **CLAUDE.md**
+
+## [11/04/2026] - Giá trị đơn = subtotal (sau CK dòng)
+### Changed
+- **OrderForm** — **Giá trị đơn** luôn bằng tổng sau chiết khấu dòng (`subtotal`), không còn gán bằng thu khách; bỏ dòng Tạm tính trùng — Files: `src/pages/OrderForm.tsx`, `LOGIC_BUSINESS.md`, `CLAUDE.md`
+
+## [11/04/2026] - OrderForm: phí ship & cọc hiển thị format tiền
+### Changed
+- **`MoneyAmountField`** — Bấm để sửa; lúc xem dùng `formatCurrency` giống Tạm tính / Thu khách (desktop + mobile sticky) - Files: `src/pages/OrderForm.tsx`
+
+## [11/04/2026] - Đơn hàng: ship shop/khách, cọc, thu khách, shop thu (FE + BE)
+### Added
+- **Migration `011_order_ship_payer_deposit_collect.sql`**: `ship_payer`, `deposit`, `customer_collect`, `shop_collect`; backfill đơn cũ
+- **`backend/utils/orderCollect.js`**, **`src/lib/orderCollect.ts`**: công thức thu — `orders.total_amount` = thu khách
+### Changed
+- **`backend/routes/orders.js`**: POST/PUT/GET; **`OrderForm`**: desktop + **mobile sticky** đủ nhập phí ship, cọc, chọn ship shop/khách, Thu khách / Shop thu / Giá trị đơn; **`schema.sql`**, **`CLAUDE.md`**
+
+## [11/04/2026] - Quy tắc ship / cọc / thu khách / shop thu
+### Added
+- **LOGIC_BUSINESS.md** §3 — Bảng công thức theo shop trả vs khách trả ship; **CLAUDE.md** — bullet tóm tắt
+
+## [11/04/2026] - OrderForm: nhãn Giá trị đơn
+### Changed
+- Đổi **Tổng cộng** → **Giá trị đơn** (tổng kết, sticky mobile, footer bảng SP) - Files: `src/pages/OrderForm.tsx`
+
+## [11/04/2026] - OrderForm: nhãn Tổng CK
+### Changed
+- Đổi nhãn **Chiết khấu (dòng)** → **Tổng CK** (tổng kết + sticky mobile) - Files: `src/pages/OrderForm.tsx`
+
+## [11/04/2026] - OrderForm: ô CK/HH desktop lớn hơn
+### Changed
+- **Web (bảng sm+)** — Tăng kích thước ô nhập CK% và HH% (`w-14 h-8`, `text-sm`, ký hiệu % `text-xs`) - Files: `src/pages/OrderForm.tsx`
+
+## [11/04/2026] - OrderForm: CK% nhập từng dòng (mặc định 0)
+### Changed
+- **Chiết khấu** — Mỗi dòng sản phẩm cho nhập **CK%** như cột HH% (mặc định 0); style rose để phân biệt HH xanh. Sửa `addProduct` khi tăng SL cùng SP: đồng bộ `discount_amount` theo `discount_rate` - Files: `src/pages/OrderForm.tsx`, `CLAUDE.md`
+
+## [11/04/2026] - OrderForm: ẩn VAT, chiết khấu chỉ hiển thị
+### Changed
+- **OrderForm** — Bỏ dòng VAT 10% và không cộng thuế vào tổng (khớp cách tính `total_amount` phía backend). Bỏ nhập giảm giá cấp đơn; hiển thị **tổng chiết khấu theo dòng** (read-only). Cột CK trên bảng sản phẩm chỉ hiển thị % (không nhập); đồng bộ `discountAmount` khi đổi SL/đơn giá - Files: `src/pages/OrderForm.tsx`
+- **Mobile** — Thêm hàng tổng cuối bảng ngang (tổng SL, tổng CK, tạm tính HH); thanh sticky dưới cùng hiển thị đủ Tạm tính / Chiết khấu (dòng) / Phí VC / Tổng cộng / HH (không VAT) - Files: `src/pages/OrderForm.tsx`
+
 ## [10/04/2026] - Orders: thiết kế lại màn hình lên đơn trên mobile web
 ### Changed
 - **OrderForm responsive** — Chuyển layout lên đơn sang mobile-first: các khối thông tin tự về 1 cột trên màn nhỏ, **Kho xuất hàng dời về khu vực chọn sản phẩm**, thêm sticky bar “Tổng cộng / Lưu đơn”, danh sách sản phẩm mobile chuyển sang **1 dòng / 1 sản phẩm** (cuộn ngang) có **header tên cột sticky**, thao tác giống quick order - Files: `src/pages/OrderForm.tsx`

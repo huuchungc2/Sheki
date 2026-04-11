@@ -69,6 +69,7 @@ export function ProductList() {
       if (warehouseId) params.set("warehouse_id", warehouseId);
       params.set("page", String(page));
       params.set("limit", String(limit));
+      params.set("active_only", "1");
       const res = await fetch(`${API_URL}/products?${params}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -145,16 +146,25 @@ export function ProductList() {
     }
   };
 
+  const currentUser = React.useMemo(() => {
+    const u = localStorage.getItem("user");
+    return u ? JSON.parse(u) : null;
+  }, []);
+  const canAdmin = currentUser?.can_access_admin === true || currentUser?.role === "admin";
+
   const handleDelete = async (id: string) => {
-    if (!confirm("Bạn có chắc muốn xóa sản phẩm này?")) return;
+    if (!canAdmin) {
+      return;
+    }
+    if (!confirm("Vô hiệu hóa sản phẩm này? (Không hiển thị trong danh sách mặc định)")) return;
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/products/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ is_active: 0 })
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Không thể xóa sản phẩm");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Không thể xóa sản phẩm");
       fetchProducts();
     } catch (err: any) {
       setError(err.message);
@@ -342,12 +352,16 @@ export function ProductList() {
                           <Link to={`/products/edit/${product.id}`} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
                             <Edit2 className="w-4 h-4" />
                           </Link>
-                          <button 
-                            onClick={() => handleDelete(product.id)}
-                            className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {canAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(product.id)}
+                              className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all"
+                              title="Vô hiệu hóa sản phẩm"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

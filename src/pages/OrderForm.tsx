@@ -14,15 +14,77 @@ import {
   X,
   Wallet,
   ArrowRight,
-  AlertTriangle
+  AlertTriangle,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { cn, formatCurrency, isAdminUser } from "../lib/utils";
 import { api } from "../lib/api";
 import type { OrderItem } from "../types";
+import { computeOrderCollects, type ShipPayer } from "../lib/orderCollect";
 
 type CustomerLite = { id: string; name: string; phone?: string; address?: string };
 type ProductLite = { id: string; name: string; sku: string; price: number };
+
+/** Phí ship / cọc: hiển thị như các dòng tiền (formatCurrency), click để nhập số */
+function MoneyAmountField({
+  value,
+  onChange,
+  className,
+  inputClassName,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  className?: string;
+  inputClassName?: string;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState("");
+
+  const openEdit = () => {
+    setDraft(value <= 0 ? "" : String(Math.round(value)));
+    setEditing(true);
+  };
+
+  if (editing) {
+    return (
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value.replace(/\D/g, ""))}
+        onBlur={() => {
+          const d = draft.replace(/\D/g, "");
+          onChange(d === "" ? 0 : parseInt(d, 10));
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        className={cn(
+          "min-w-[7rem] max-w-[12rem] px-2 py-0.5 border border-blue-300 rounded text-right font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 tabular-nums",
+          inputClassName
+        )}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={openEdit}
+      className={cn(
+        "max-w-[12rem] text-right font-medium text-slate-700 tabular-nums hover:text-slate-900 rounded px-1 py-0.5 -mr-1 hover:bg-slate-50",
+        className
+      )}
+    >
+      {formatCurrency(value)}
+    </button>
+  );
+}
 
 export function OrderForm() {
   const navigate = useNavigate();
@@ -63,8 +125,10 @@ export function OrderForm() {
       setItems(items.map(i => {
         if (i.productId !== product.id) return i;
         const q = parseFloat((i.quantity + 1).toFixed(1));
-        const net = i.price * q - i.discountAmount;
-        return { ...i, quantity: q, commissionAmount: Math.round(net * (i.commissionRate / 100) * 100) / 100 };
+        const rate = Math.min(100, Math.max(0, Number(i.discountRate) || 0));
+        const da = Math.round(i.price * q * (rate / 100) * 100) / 100;
+        const net = i.price * q - da;
+        return { ...i, quantity: q, discountAmount: da, commissionAmount: Math.round(net * (i.commissionRate / 100) * 100) / 100 };
       }));
     } else {
       const net = product.price - 0;
@@ -89,13 +153,19 @@ export function OrderForm() {
   const [items, setItems] = React.useState<OrderItem[]>([]);
   const [shipmentAddress, setShipmentAddress] = React.useState<string>("");
   const [shippingFee, setShippingFee] = React.useState<number>(0);
-  const [orderDiscount, setOrderDiscount] = React.useState<number>(0);
+  /** shop = shop trả ship (mặc định); customer = khách trả ship */
+  const [shipPayer, setShipPayer] = React.useState<ShipPayer>("customer");
+  const [deposit, setDeposit] = React.useState<number>(0);
+  /** Tiền NV chịu — NV tự bỏ ra (không đổi công thức thu khách); API/DB: salesperson_absorbed_amount */
+  const [salespersonAbsorbedAmount, setSalespersonAbsorbedAmount] = React.useState<number>(0);
   const [paymentMethod, setPaymentMethod] = React.useState<string>("cash");
   const [orderStatus, setOrderStatus] = React.useState<string>("pending");
   const [note, setNote] = React.useState<string>("");
   const [formError, setFormError] = React.useState<string>("");
   const [selectedGroupId, setSelectedGroupId] = React.useState<number | null>(null);
   const [groups, setGroups] = React.useState<any[]>([]);
+  /** Tên NV bán trên đơn (`salesperson_id`) — từ API khi sửa; đơn mới = người đang đăng nhập */
+  const [orderSalespersonName, setOrderSalespersonName] = React.useState<string | null>(null);
 
   const currentUser = React.useMemo(() => {
     const u = localStorage.getItem("user");
@@ -137,7 +207,10 @@ export function OrderForm() {
   );
 
   React.useEffect(() => {
-    if (!id) setEditIncludeManagerId(null);
+    if (!id) {
+      setEditIncludeManagerId(null);
+      setOrderSalespersonName(null);
+    }
   }, [id]);
 
   React.useEffect(() => {
@@ -278,7 +351,9 @@ export function OrderForm() {
 
         setShipmentAddress(order?.shipping_address ?? '');
         setShippingFee(Number(order?.shipping_fee ?? 0));
-        setOrderDiscount(Number(order?.discount ?? 0));
+        setShipPayer(order?.ship_payer === "shop" ? "shop" : "customer");
+        setDeposit(Number(order?.deposit ?? 0));
+        setSalespersonAbsorbedAmount(Number(order?.salesperson_absorbed_amount ?? 0));
         setPaymentMethod(order?.payment_method ?? 'cash');
         setOrderStatus(order?.status ?? 'pending');
         setSelectedGroupId(order?.group_id ?? null);
@@ -304,6 +379,7 @@ export function OrderForm() {
           }, {} as Record<string, number>)
         );
         setNote(order?.note ?? '');
+        setOrderSalespersonName(order?.salesperson_name ?? null);
       } catch (e) {
         console.error('Load order error', e);
       }
@@ -406,9 +482,12 @@ export function OrderForm() {
       shipping_address: shippingAddr,
       carrier_service: 'standard',
       shipping_fee: shippingFee,
+      ship_payer: shipPayer,
+      deposit: deposit,
+      salesperson_absorbed_amount: salespersonAbsorbedAmount,
       payment_method: paymentMethod,
       status: orderStatus,
-      discount: orderDiscount,
+      discount: 0,
       note: note,
       items: itemsPayload
     };
@@ -446,10 +525,13 @@ export function OrderForm() {
       prev.map((it) => {
         if (it.productId !== productId) return it;
         const next = { ...it, ...patch } as OrderItem;
-        const net = next.price * next.quantity - next.discountAmount;
-        const r = Number(next.commissionRate) || 0;
+        const rate = Math.min(100, Math.max(0, Number(next.discountRate) || 0));
+        const da = Math.round(next.price * next.quantity * (rate / 100) * 100) / 100;
+        const withDisc = { ...next, discountRate: rate, discountAmount: da };
+        const net = withDisc.price * withDisc.quantity - withDisc.discountAmount;
+        const r = Number(withDisc.commissionRate) || 0;
         return {
-          ...next,
+          ...withDisc,
           commissionAmount: Math.round(net * (r / 100) * 100) / 100,
         };
       })
@@ -474,11 +556,40 @@ export function OrderForm() {
   );
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.price - item.discountAmount), 0);
-  const tax = subtotal * 0.1;
-  const total = Math.max(0, subtotal + shippingFee + tax - orderDiscount);
+  const lineDiscountTotal = items.reduce((sum, item) => sum + item.discountAmount, 0);
+  const { customerCollect, shopCollect } = React.useMemo(
+    () => computeOrderCollects(subtotal, shippingFee, deposit, shipPayer),
+    [subtotal, shippingFee, deposit, shipPayer]
+  );
+
+  const responsibleSalesDisplay = React.useMemo(() => {
+    if (!id) {
+      return currentUser?.full_name || currentUser?.username || "—";
+    }
+    return orderSalespersonName?.trim() || "…";
+  }, [id, currentUser, orderSalespersonName]);
+
+  const responsibleSalesInitials = React.useMemo(() => {
+    const n = responsibleSalesDisplay.replace(/[.\s]+/g, " ").trim();
+    if (!n || n === "…") return "?";
+    const parts = n.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase().slice(0, 2);
+    }
+    return n.slice(0, 2).toUpperCase();
+  }, [responsibleSalesDisplay]);
+
+  /** Mobile: thanh dưới mặc định thu gọn — tránh “popup” che màn hình khi vừa vào trang */
+  const [mobileSummaryExpanded, setMobileSummaryExpanded] = React.useState(false);
 
   return (
-    <div className="max-w-6xl mx-auto pb-32 lg:pb-20">
+    <div
+      className={cn(
+        "max-w-6xl mx-auto",
+        mobileSummaryExpanded ? "pb-32" : "pb-24",
+        "sm:pb-8 lg:pb-20"
+      )}
+    >
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
@@ -494,7 +605,9 @@ export function OrderForm() {
               {isEdit ? `Chỉnh sửa đơn #${id}` : 'Tạo đơn hàng mới'}
             </h1>
             <p className="text-xs text-slate-400">
-              {isEdit ? 'Cập nhật thông tin đơn hàng và trạng thái vận chuyển.' : 'Thiết lập đơn hàng và chỉ định nhân viên phụ trách.'}
+              {isEdit
+                ? 'Cập nhật thông tin đơn hàng và trạng thái vận chuyển.'
+                : 'Đơn ghi nhận nhân viên bán hàng (sales) là người đang đăng nhập.'}
             </p>
           </div>
         </div>
@@ -925,8 +1038,7 @@ export function OrderForm() {
                                 value={item.price}
                                 onChange={(e) => {
                                   const p = Math.max(0, Number(e.target.value) || 0);
-                                  const da = p * item.quantity * (item.discountRate / 100);
-                                  updateItem(item.productId, { price: p, discountAmount: da });
+                                  updateItem(item.productId, { price: p });
                                 }}
                                 className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-right text-[13px] font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-50"
                               />
@@ -940,10 +1052,9 @@ export function OrderForm() {
                                 value={item.discountRate}
                                 onChange={(e) => {
                                   const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                  const da = item.price * item.quantity * (r / 100);
-                                  updateItem(item.productId, { discountRate: r, discountAmount: da });
+                                  updateItem(item.productId, { discountRate: r });
                                 }}
-                                className="w-16 h-8 rounded-lg border border-slate-200 bg-white px-2 text-center text-[13px] font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-50"
+                                className="w-16 h-8 rounded-lg border border-rose-200 bg-rose-50 px-2 text-center text-[13px] font-semibold text-rose-800 outline-none focus:ring-2 focus:ring-rose-100"
                               />
                             </div>
 
@@ -981,6 +1092,27 @@ export function OrderForm() {
                           </div>
                         );
                       })}
+                      {/* Mobile: tổng dòng (khớp desktop tfoot — có tổng CK, không VAT) */}
+                      <div className="flex gap-3 items-center py-2.5 border-t border-slate-200 bg-slate-50 text-[11px]">
+                        <div className="w-[260px] shrink-0 font-semibold text-slate-600">
+                          Giá trị đơn ({items.length} SP)
+                        </div>
+                        <div className="w-[190px] shrink-0 text-center font-medium text-slate-700">
+                          {items.reduce((s, i) => s + i.quantity, 0).toFixed(1).replace(/\.0$/, "")}
+                        </div>
+                        <div className="w-[140px] shrink-0" />
+                        <div className="w-[90px] shrink-0 text-center text-red-600 font-medium tabular-nums">
+                          {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
+                        </div>
+                        <div className="w-[90px] shrink-0" />
+                        <div className="w-[120px] shrink-0 text-right">
+                          <p className="text-[13px] font-semibold text-slate-800">{formatCurrency(subtotal)}</p>
+                          <p className="mt-0.5 text-[10px] font-semibold text-green-700">
+                            HH: {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
+                          </p>
+                        </div>
+                        <div className="w-[30px] shrink-0" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1081,25 +1213,23 @@ export function OrderForm() {
                               value={item.price}
                               onChange={(e) => {
                                 const p = Math.max(0, Number(e.target.value) || 0);
-                                const da = p * item.quantity * (item.discountRate / 100);
-                                updateItem(item.productId, { price: p, discountAmount: da });
+                                updateItem(item.productId, { price: p });
                               }}
                               className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-right text-xs font-medium text-slate-700 outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
                             />
                           </td>
                           <td className="px-2 py-2.5">
-                            <div className="flex items-center justify-center gap-0.5">
+                            <div className="flex items-center justify-center gap-1">
                               <input
                                 type="number" min={0} max={100}
                                 value={item.discountRate}
                                 onChange={(e) => {
                                   const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                  const da = item.price * item.quantity * (r / 100);
-                                updateItem(item.productId, { discountRate: r, discountAmount: da });
+                                  updateItem(item.productId, { discountRate: r });
                                 }}
-                                className="w-9 h-6 px-1 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-center text-xs font-medium outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
+                                className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-rose-50 border border-transparent hover:border-rose-200 focus:bg-white focus:border-rose-400 rounded-md text-center text-sm font-semibold text-rose-800 outline-none focus:ring-2 focus:ring-rose-100 transition-colors"
                               />
-                              <span className="text-slate-400 text-[10px]">%</span>
+                              <span className="text-rose-500 text-xs font-semibold">%</span>
                             </div>
                           </td>
                           <td className="px-3 py-2.5 text-right">
@@ -1108,7 +1238,7 @@ export function OrderForm() {
                           <td className="px-3 py-2.5">
                             <div className="flex flex-col items-center gap-0.5">
                               <>
-                                <div className="flex items-center gap-0.5 justify-center">
+                                <div className="flex items-center gap-1 justify-center">
                                   <input
                                     type="number" min={0} max={100}
                                     value={item.commissionRate}
@@ -1116,9 +1246,9 @@ export function OrderForm() {
                                       const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                                       updateItem(item.productId, { commissionRate: r });
                                     }}
-                                    className="w-9 h-5 px-1 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded text-center text-xs font-semibold text-green-700 outline-none focus:ring-1 focus:ring-green-100 transition-colors"
+                                    className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded-md text-center text-sm font-semibold text-green-700 outline-none focus:ring-2 focus:ring-green-100 transition-colors"
                                   />
-                                  <span className="text-green-600 text-[10px] font-semibold">%</span>
+                                  <span className="text-green-600 text-xs font-semibold">%</span>
                                 </div>
                                 <span className="text-green-600 text-[10px] font-medium">{formatCurrency(item.commissionAmount)}</span>
                               </>
@@ -1139,7 +1269,7 @@ export function OrderForm() {
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-50 border-t border-slate-100 text-xs">
-                      <td className="px-4 py-2 text-slate-500 font-medium">Tổng cộng ({items.length} SP)</td>
+                      <td className="px-4 py-2 text-slate-500 font-medium">Giá trị đơn ({items.length} SP)</td>
                       <td className="px-3 py-2 text-center font-medium text-slate-700">
                         {items.reduce((s, i) => s + i.quantity, 0).toFixed(1).replace(/\.0$/, '')}
                       </td>
@@ -1178,34 +1308,69 @@ export function OrderForm() {
             </div>
             <div className="space-y-1">
               <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">Tạm tính</span>
-                <span className="font-medium text-slate-700">{formatCurrency(subtotal)}</span>
+                <span className="text-slate-400">Tổng CK</span>
+                <span className="font-medium text-red-600">
+                  {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <div>
+                  <span className="text-sm font-semibold text-slate-700">Giá trị đơn</span>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Tổng sau chiết khấu dòng</p>
+                </div>
+                <span className="text-xl font-semibold text-red-600 tabular-nums">{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
+                <span className="text-slate-400 shrink-0">Phí vận chuyển</span>
+                <MoneyAmountField value={shippingFee} onChange={setShippingFee} className="text-sm" />
+              </div>
+              <div className="py-1.5 border-b border-slate-50">
+                <span className="text-slate-400 text-sm block mb-1.5">Phí ship do</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShipPayer("shop")}
+                    className={cn(
+                      "py-2 rounded-lg text-xs font-medium border transition-colors",
+                      shipPayer === "shop"
+                        ? "border-amber-400 bg-amber-50 text-amber-900"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+                    )}
+                  >
+                    Shop trả
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShipPayer("customer")}
+                    className={cn(
+                      "py-2 rounded-lg text-xs font-medium border transition-colors",
+                      shipPayer === "customer"
+                        ? "border-amber-400 bg-amber-50 text-amber-900"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+                    )}
+                  >
+                    Khách trả
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
+                <span className="text-slate-400 shrink-0">Đặt cọc</span>
+                <MoneyAmountField value={deposit} onChange={setDeposit} className="text-sm" />
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
+                <div className="min-w-0 pr-2">
+                  <span className="text-slate-400">Tiền NV chịu</span>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">NV tự bỏ ra, trừ HH sau</p>
+                </div>
+                <MoneyAmountField value={salespersonAbsorbedAmount} onChange={setSalespersonAbsorbedAmount} className="text-sm" />
               </div>
               <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">VAT 10%</span>
-                <span className="font-medium text-slate-700">{formatCurrency(tax)}</span>
+                <span className="text-slate-400">Thu khách</span>
+                <span className="font-medium text-slate-800">{formatCurrency(customerCollect)}</span>
               </div>
               <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">Phí vận chuyển</span>
-                <input
-                  type="number" min="0"
-                  value={shippingFee}
-                  onChange={(e) => setShippingFee(Number(e.target.value) || 0)}
-                  className="w-24 px-2 py-0.5 border border-slate-200 rounded text-right text-sm font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100 transition-colors"
-                />
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">Giảm giá</span>
-                <input
-                  type="number" min="0"
-                  value={orderDiscount}
-                  onChange={(e) => setOrderDiscount(Number(e.target.value) || 0)}
-                  className="w-24 px-2 py-0.5 border border-slate-200 rounded text-right text-sm font-medium text-red-500 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100 transition-colors"
-                />
-              </div>
-              <div className="flex items-center justify-between pt-3 mt-1">
-                <span className="text-sm font-semibold text-slate-700">Tổng cộng</span>
-                <span className="text-xl font-semibold text-red-600">{formatCurrency(total)}</span>
+                <span className="text-slate-400">Shop thu</span>
+                <span className="font-medium text-indigo-700">{formatCurrency(shopCollect)}</span>
               </div>
             </div>
             <div className="mt-3 flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg">
@@ -1268,12 +1433,13 @@ export function OrderForm() {
             <div>
               <label className="text-[11px] text-slate-400 mb-1.5 block">Nhân viên phụ trách</label>
               <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-semibold text-blue-600 flex-shrink-0">AD</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800">Admin</p>
-                  <p className="text-[10px] text-slate-400">Quản trị viên</p>
+                <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-semibold text-blue-600 flex-shrink-0">
+                  {responsibleSalesInitials}
                 </div>
-                <button type="button" className="text-[11px] text-blue-600 font-medium hover:underline flex-shrink-0">Đổi</button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{responsibleSalesDisplay}</p>
+                  <p className="text-[10px] text-slate-400">Nhân viên bán hàng (sales) — người lên đơn</p>
+                </div>
               </div>
             </div>
 
@@ -1307,33 +1473,146 @@ export function OrderForm() {
         </div>
       </div>
 
-      {/* Mobile sticky action bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden">
+      {/* Mobile sticky: mặc định 1 dòng — bấm mở mới thấy đủ ship/cọc/NV chịu (tránh khối lớn như popup khi load) */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden pb-[env(safe-area-inset-bottom,0px)]">
         <div className="mx-auto max-w-6xl px-3 pb-3">
-          <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur shadow-lg">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
-              <div>
-                <p className="text-[10px] text-slate-500">Tổng cộng</p>
-                <p className="text-base font-semibold text-red-600">{formatCurrency(total)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-slate-500">Hoa hồng</p>
-                <p className="text-sm font-semibold text-green-700">
-                  {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
-                </p>
-              </div>
-            </div>
-            <div className="p-3">
+          {!mobileSummaryExpanded ? (
+            <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur shadow-md flex items-stretch gap-2 px-2 py-2">
+              <button
+                type="button"
+                onClick={() => setMobileSummaryExpanded(true)}
+                className="flex-1 min-w-0 text-left pl-1 py-0.5 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <div className="text-[10px] text-slate-500">Thu khách</div>
+                <div className="text-base font-semibold text-slate-900 tabular-nums leading-tight">
+                  {formatCurrency(customerCollect)}
+                </div>
+                <div className="text-[9px] text-slate-400 mt-0.5">Chạm để xem phí ship, cọc, HH…</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileSummaryExpanded(true)}
+                className="shrink-0 w-10 flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                aria-label="Mở tổng kết chi tiết"
+              >
+                <ChevronUp className="w-5 h-5" />
+              </button>
               <button
                 type="button"
                 onClick={submitOrder}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-all"
+                className="shrink-0 flex flex-col items-center justify-center gap-0.5 px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-all min-w-[5.5rem]"
               >
                 <Save className="w-4 h-4" />
-                {isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}
+                {isEdit ? "Lưu" : "Lưu đơn"}
               </button>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur shadow-lg max-h-[min(70vh,520px)] overflow-y-auto">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50/80">
+                <span className="text-xs font-semibold text-slate-600">Tổng kết đơn</span>
+                <button
+                  type="button"
+                  onClick={() => setMobileSummaryExpanded(false)}
+                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800 py-1 px-2 rounded-lg hover:bg-slate-100"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                  Thu gọn
+                </button>
+              </div>
+              <div className="px-3 py-2 border-b border-slate-100 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-500">Tổng CK</span>
+                  <span className="font-medium text-red-600">
+                    {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-0.5 border-b border-slate-50 pb-1.5">
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-700">Giá trị đơn</span>
+                    <p className="text-[9px] text-slate-400">Sau CK dòng</p>
+                  </div>
+                  <span className="text-base font-semibold text-red-600 tabular-nums">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className="text-slate-500 shrink-0">Phí ship</span>
+                  <MoneyAmountField
+                    value={shippingFee}
+                    onChange={setShippingFee}
+                    className="text-[11px]"
+                    inputClassName="text-[11px] py-1"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShipPayer("shop")}
+                    className={cn(
+                      "py-1.5 rounded-lg text-[10px] font-medium border",
+                      shipPayer === "shop"
+                        ? "border-amber-400 bg-amber-50 text-amber-900"
+                        : "border-slate-200 bg-slate-50 text-slate-600"
+                    )}
+                  >
+                    Shop trả ship
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShipPayer("customer")}
+                    className={cn(
+                      "py-1.5 rounded-lg text-[10px] font-medium border",
+                      shipPayer === "customer"
+                        ? "border-amber-400 bg-amber-50 text-amber-900"
+                        : "border-slate-200 bg-slate-50 text-slate-600"
+                    )}
+                  >
+                    Khách trả ship
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className="text-slate-500 shrink-0">Đặt cọc</span>
+                  <MoneyAmountField
+                    value={deposit}
+                    onChange={setDeposit}
+                    className="text-[11px]"
+                    inputClassName="text-[11px] py-1"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className="text-slate-500 shrink-0">Tiền NV chịu</span>
+                  <MoneyAmountField
+                    value={salespersonAbsorbedAmount}
+                    onChange={setSalespersonAbsorbedAmount}
+                    className="text-[11px]"
+                    inputClassName="text-[11px] py-1"
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-500">Thu khách</span>
+                  <span className="font-semibold text-slate-800">{formatCurrency(customerCollect)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-500">Shop thu</span>
+                  <span className="font-semibold text-indigo-700">{formatCurrency(shopCollect)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] pb-0.5">
+                  <span className="text-slate-500">Hoa hồng</span>
+                  <span className="font-semibold text-green-700">
+                    {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
+                  </span>
+                </div>
+              </div>
+              <div className="p-3">
+                <button
+                  type="button"
+                  onClick={submitOrder}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-all"
+                >
+                  <Save className="w-4 h-4" />
+                  {isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

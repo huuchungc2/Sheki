@@ -64,6 +64,36 @@
 - `stock_qty = available_stock + reserved_stock`
 - Validate: số lượng nhập <= available_stock
 
+### Phí vận chuyển, cọc, thu khách, shop thu (bắt buộc mỗi đơn)
+
+**Ký hiệu:**
+- **Tạm tính** = **Giá trị đơn** (cùng một số trên UI) = tổng tiền hàng **sau chiết khấu dòng** (`orders.subtotal` — chưa gồm ship). Không dùng nhãn “Giá trị đơn” cho thu khách hay tổng thanh toán.
+- **ship** = số tiền phí vận chuyển (luôn nhập / lưu để đối soát).
+- **cọc** = tiền đặt cọc khách đã trả trước (trừ vào số phải thu).
+
+**Ai trả phí ship:** mỗi đơn phải chọn một trong hai (mặc định **khách trả**):
+| Chế độ | Thu khách | Shop thu |
+|--------|-----------|----------|
+| **Shop trả ship** | Tạm tính − ship − cọc | Tạm tính − ship − cọc |
+| **Khách trả ship** (mặc định) | Tạm tính + ship − cọc | Tạm tính − cọc |
+
+- Khi **shop trả ship**: số **thu khách** và **shop thu** trùng nhau (cùng công thức): đã trừ ship (shop gánh) và trừ cọc.
+- Khi **khách trả ship**: khách trả thêm ship nên **thu khách** = tạm tính + ship − cọc; **shop thu** chỉ phản ánh phần hàng (tạm tính − cọc), không cộng ship vào doanh thu shop nếu ship là thu hộ chuyển đi.
+
+**UI / lưu trữ:** Form đơn cần: chọn shop trả / khách trả ship; nhập phí ship; nhập cọc; hiển thị (hoặc lưu) **Thu khách** và **Shop thu** theo bảng trên — không tự đoán công thức khác.
+
+### Tiền NV chịu (chênh lệch thu — trừ HH sau)
+
+Trường hợp: theo đơn, **số phải thu từ khách** (ví dụ sau ship/cọc — cùng logic **Thu khách**) là **1.000.000đ**, nhưng **thực tế khách chỉ trả 900.000đ**; **100.000đ** còn lại do **nhân viên bán hàng tự chịu** (bù để chốt đơn).
+
+- **Tên gọi trên UI (đề xuất):** **Tiền NV chịu** (hoặc *Chênh lệch NV chịu* nếu cần nhấn mạnh phần “thiếu thu”).
+- **Ý nghĩa:** khoản NV **tự bỏ ra** tương ứng phần **khách không trả đủ** so với số thu lý thuyết; **không** gọi là “giảm giá đơn” thuần túy nếu mục đích là bù từ phía NV.
+- **Xử lý sau:** số **Tiền NV chịu** (theo đơn) **cộng dồi để trừ vào tổng hoa hồng** NV ở kỳ quyết toán (báo cáo HH / settlement — triển khai riêng).
+- **Lưu DB:** `orders.salesperson_absorbed_amount` — **không** làm đổi công thức **Thu khách** / **Shop thu** / `total_amount` (thu khách).
+- **Danh sách đơn — cột Lương (theo đơn):** `Hoa hồng (HH direct trên đơn) + (KH trả phí ship) − Tiền NV chịu`. **KH trả phí ship** = `shipping_fee` khi `ship_payer` = khách, = **0** khi shop trả ship.
+- **Báo cáo hoa hồng — bảng chi tiết theo đơn:** cột **Lương** cùng công thức trên **theo từng dòng** (dòng HH + phần ship/NV chỉ tính ở **một dòng đầu** mỗi `order_id` để không nhân đôi ship/NV). **Tổng lượng (kỳ)** = tổng tiền HH các dòng + tổng phí ship KH trả − tổng NV chịu, với **ship và NV cộng một lần theo mỗi đơn** trong phạm vi lọc.
+- **Admin — bảng Hoa hồng nhân viên (`/reports/salary`):** **Phí ship KH trả** và **Tiền NV chịu** chỉ cộng theo các đơn mà NV đó là **`orders.salesperson_id`** (người lên đơn / phụ trách đơn). Người chỉ nhận **HH override** (ví dụ quản lý) **không** nhận ship/NV của đơn CTV — **Tổng lượng** = Tổng HH (direct + override) + ship − NV chịu (ship/NV theo đơn của mình).
+
 ---
 
 ## 4. HOA HỒNG
@@ -72,6 +102,7 @@
 ```
 Tiền HH = (tổng tiền sau chiết khấu) × commission_rate
 ```
+- **Quyết toán:** khi đơn có **Tiền NV chịu** (phần khách không trả đủ, NV tự bỏ ra), kỳ quyết toán **trừ tổng HH khả dụng** tương ứng (theo quy tắc công ty — chi tiết khi làm module trừ HH).
 
 ### Hoa hồng CTV
 - Sale A có CTV là B

@@ -10,7 +10,7 @@ const { getPool } = require('../config/db');
 router.get('/', auth, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, department, role, scoped, page = 1, limit = 20 } = req.query;
+    const { search, department, role, scoped, page = 1, limit = 20, active_only } = req.query;
     const offset = (page - 1) * limit;
 
     let query = `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, u.role_id,
@@ -18,6 +18,14 @@ router.get('/', auth, authorize('admin'), async (req, res, next) => {
       FROM users u JOIN roles r ON u.role_id = r.id WHERE 1=1`;
     let countQuery = 'SELECT COUNT(*) as total FROM users u JOIN roles r ON u.role_id = r.id WHERE 1=1';
     const params = [];
+
+    if (active_only === '1') {
+      query += ' AND u.is_active = 1';
+      countQuery += ' AND u.is_active = 1';
+    } else if (active_only === '0') {
+      query += ' AND u.is_active = 0';
+      countQuery += ' AND u.is_active = 0';
+    }
 
     if (search) {
       query += ' AND (u.full_name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)';

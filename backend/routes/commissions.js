@@ -165,16 +165,20 @@ router.get('/orders', auth, async (req, res, next) => {
     `;
 
     const [rows] = await pool.query(`
-      SELECT
-        t.id, t.commission_amount, t.type, t.ctv_user_id, t.entry_kind,
-        ctv.full_name as ctv_name,
-        o.id as order_id, o.code as order_code,
-        o.total_amount, o.status, t.entry_date as order_date,
-        o.group_id, g.name as group_name,
-        cu.name as customer_name
-      ${baseFrom}
-      ${whereClause}
-      ORDER BY t.entry_date DESC
+      SELECT * FROM (
+        SELECT
+          t.id, t.commission_amount, t.type, t.ctv_user_id, t.entry_kind,
+          ctv.full_name as ctv_name,
+          o.id as order_id, o.code as order_code,
+          o.total_amount, o.status, t.entry_date as order_date,
+          o.group_id, g.name as group_name,
+          cu.name as customer_name,
+          o.shipping_fee, o.ship_payer, o.salesperson_absorbed_amount,
+          ROW_NUMBER() OVER (PARTITION BY t.order_id ORDER BY t.id) AS _ord_rn
+        ${baseFrom}
+        ${whereClause}
+      ) z
+      ORDER BY z.order_date DESC
       LIMIT ? OFFSET ?
     `, [...baseParams, parseInt(limit), offset]);
 
@@ -195,21 +199,60 @@ router.get('/orders', auth, async (req, res, next) => {
     `, baseParams);
 
     const s = summaryRows[0];
+
+    const [orderAggRows] = await pool.query(
+      `
+      SELECT
+        COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+        COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+      FROM orders o
+      WHERE o.id IN (
+        SELECT DISTINCT t.order_id
+        ${baseFrom}
+        ${whereClause}
+      )
+    `,
+      baseParams
+    );
+    const oa = orderAggRows[0] || {};
+    const totalKhachShip = parseFloat(oa.total_khach_ship) || 0;
+    const totalNvChiu = parseFloat(oa.total_nv_chiu) || 0;
+    const totalCommission = parseFloat(s.total_commission) || 0;
+    const totalLuong = totalCommission + totalKhachShip - totalNvChiu;
+
     res.json({
-      data: rows.map(row => ({
-        ...row,
-        commission_amount: parseFloat(row.commission_amount) || 0,
-        total_amount:      parseFloat(row.total_amount) || 0,
-      })),
-      total:   countRows[0].total,
-      page:    parseInt(page),
-      limit:   parseInt(limit),
+      data: rows.map(row => {
+        const comm = parseFloat(row.commission_amount) || 0;
+        const khach =
+          row.ship_payer === 'shop' ? 0 : parseFloat(row.shipping_fee) || 0;
+        const nv = parseFloat(row.salesperson_absorbed_amount) || 0;
+        const ordRn = parseInt(row._ord_rn, 10) || 1;
+        const luong = ordRn === 1 ? comm + khach - nv : comm;
+        const { _ord_rn, ...rest } = row;
+        return {
+          ...rest,
+          commission_amount: comm,
+          total_amount: parseFloat(row.total_amount) || 0,
+          shipping_fee: parseFloat(row.shipping_fee) || 0,
+          ship_payer: row.ship_payer === 'shop' ? 'shop' : 'customer',
+          salesperson_absorbed_amount: nv,
+          khach_tra_ship: ordRn === 1 ? khach : 0,
+          nv_chiu_display: ordRn === 1 ? nv : 0,
+          luong,
+        };
+      }),
+      total: countRows[0].total,
+      page: parseInt(page),
+      limit: parseInt(limit),
       summary: {
-        direct_commission:   parseFloat(s.direct_commission)   || 0,
+        direct_commission: parseFloat(s.direct_commission) || 0,
         override_commission: parseFloat(s.override_commission) || 0,
-        total_commission:    parseFloat(s.total_commission)    || 0,
-        total_orders:        parseInt(s.total_orders)          || 0,
-      }
+        total_commission: totalCommission,
+        total_orders: parseInt(s.total_orders) || 0,
+        total_khach_ship: totalKhachShip,
+        total_nv_chiu: totalNvChiu,
+        total_luong: totalLuong,
+      },
     });
   } catch (err) {
     next(err);

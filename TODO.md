@@ -63,6 +63,34 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Danh sách SP & nhân viên: xóa/vô hiệu + hiển thị đúng** — `DELETE` SP, `active_only` API + UI, sửa PUT product partial — Files: `backend/routes/products.js`, `backend/routes/users.js`, `src/pages/ProductList.tsx`, `src/pages/EmployeeList.tsx`
+
+- [x] **Báo cáo hoa hồng: cột Lương + Tổng lượng** — Cùng công thức danh sách đơn; tổng kỳ = tổng HH + ship KH trả − NV chịu (ship/NV một lần/đơn) — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`
+
+- [x] **Báo cáo HH: KPI Phí ship KH + Tiền NV chịu** — Hai thẻ thống kê cả kỳ lọc — Files: `src/pages/CommissionReport.tsx`
+
+- [x] **Admin — bảng Hoa hồng NV: cột Phí ship KH, NV chịu, Tổng lượng** — API `/reports/salary` + Excel — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`
+
+- [x] **Fix ship/NV bảng HH NV** — Chỉ theo `salesperson_id` đơn, không gán ship/NV của đơn Lan cho Minh (override) — Files: `backend/routes/reports.js`, `LOGIC_BUSINESS.md`
+
+- [x] **Danh sách đơn: mobile không cuộn ngang** — Thẻ dọc đủ cột — Files: `src/pages/OrderList.tsx`
+
+- [x] **Danh sách đơn: tiêu đề cột Lương gọn** — Chỉ chữ «Lương» — Files: `src/pages/OrderList.tsx`
+
+- [x] **Danh sách đơn: mobile = bảng đủ cột như laptop** — Cuộn ngang — Files: `src/pages/OrderList.tsx`
+
+- [x] **Danh sách đơn: cột Lương** — HH + KH trả ship − NV chịu — Files: `src/pages/OrderList.tsx`, `LOGIC_BUSINESS.md`
+
+- [x] **OrderForm: NV phụ trách hiển thị sales đúng** — Không còn placeholder Admin; load `salesperson_name` / user hiện tại — Files: `src/pages/OrderForm.tsx`
+
+- [x] **Danh sách đơn: icon Sửa/Xóa trên mobile** — Bỏ ẩn theo hover — Files: `src/pages/OrderList.tsx`
+
+- [x] **Danh sách đơn: cột Ship + NV chịu** — `OrderList` hiển thị ai trả phí ship và tiền NV chịu — Files: `src/pages/OrderList.tsx`
+
+- [x] **OrderForm mobile: tổng kết thu gọn mặc định** — Thanh dưới không mở full như popup khi load; chạm “Thu gọn” / vùng Thu khách để mở chi tiết — Files: `src/pages/OrderForm.tsx`
+
+- [x] **Đơn hàng: Tiền NV chịu (`orders.salesperson_absorbed_amount`)** — NV tự bỏ ra (ghi nhận, trừ HH sau); **không** đổi công thức Thu khách / Shop thu / `total_amount` — Files: migrations `013` + `014`, `backend/routes/orders.js`, `src/pages/OrderForm.tsx`, `schema.sql`, `LOGIC_BUSINESS.md`
+
 - [x] **Orders: thiết kế lại màn hình lên đơn trên mobile web**
   - OrderForm responsive: layout 1 cột trên mobile + sticky bar “Tổng cộng / Lưu đơn”
   - Cải thiện picker sản phẩm trên mobile: 1 hàng ngang (ô tìm + nút thao tác)
