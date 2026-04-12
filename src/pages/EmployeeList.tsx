@@ -19,31 +19,79 @@ import {
   AlertCircle,
   Shield
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { cn, formatDate } from "../lib/utils";
+import { parseListPage, getVisiblePageNumbers } from "../lib/listUrl";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
   "/api";
 
+type StatusFilter = "active" | "all" | "inactive";
+
+function readEmployeeListParams(sp: URLSearchParams) {
+  const raw = sp.get("status") || "active";
+  const status: StatusFilter = ["active", "all", "inactive"].includes(raw) ? (raw as StatusFilter) : "active";
+  return {
+    page: parseListPage(sp),
+    q: sp.get("q") ?? "",
+    department: sp.get("department") ?? "",
+    roleCode: sp.get("role") ?? "",
+    statusFilter: status,
+  };
+}
+
 export function EmployeeList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const employeesListReturn = `${location.pathname}${location.search}`;
+
+  const { page, q, department, roleCode, statusFilter } = React.useMemo(
+    () => readEmployeeListParams(searchParams),
+    [searchParams.toString()]
+  );
+
   const [employees, setEmployees] = React.useState<any[]>([]);
   const [roles, setRoles] = React.useState<{ id: number; code: string; name: string }[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchInput, setSearchInput] = React.useState("");
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const [department, setDepartment] = React.useState("");
-  const [roleCode, setRoleCode] = React.useState("");
-  const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const limit = 20;
-  /** active_only API: mặc định chỉ NV đang làm — sau khi "xóa" (vô hiệu) sẽ biến khỏi danh sách */
-  const [statusFilter, setStatusFilter] = React.useState<"active" | "all" | "inactive">("active");
-  // Bulk select + bulk role
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [bulkRoleId, setBulkRoleId] = React.useState<number | "">("");
   const [bulkLoading, setBulkLoading] = React.useState(false);
+
+  const patchListParams = React.useCallback(
+    (patch: Record<string, string | null | undefined>, opts?: { resetPage?: boolean }) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === undefined || v === "") next.delete(k);
+            else next.set(k, v);
+          }
+          if (opts?.resetPage) next.set("page", "1");
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const setPage = React.useCallback(
+    (p: number | ((prev: number) => number)) => {
+      const current = parseListPage(searchParams);
+      const nextPage = typeof p === "function" ? p(current) : p;
+      patchListParams({ page: String(Math.max(1, nextPage)) });
+    },
+    [searchParams, patchListParams]
+  );
+
+  React.useEffect(() => {
+    setSearchInput(q);
+  }, [q]);
 
   const currentUser = React.useMemo(() => {
     const u = localStorage.getItem("user");
@@ -60,7 +108,9 @@ export function EmployeeList() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
   }, [employees]);
 
-  const hasAnyFilter = Boolean(searchInput.trim() || department || roleCode || statusFilter !== "active");
+  const hasAnyFilter = Boolean(
+    searchInput.trim() || department || roleCode || statusFilter !== "active" || page > 1
+  );
 
   React.useEffect(() => {
     const fetchRoles = async () => {
@@ -80,42 +130,53 @@ export function EmployeeList() {
     fetchRoles();
   }, []);
 
-  // Debounce search input (tránh gọi API mỗi ký tự)
+  // Debounce ô tìm → ghi URL `q` (đồng bộ với các danh sách khác)
   React.useEffect(() => {
-    const t = setTimeout(() => {
-      setSearchTerm(searchInput.trim());
-      setPage(1);
+    const t = window.setTimeout(() => {
+      const next = searchInput.trim();
+      if (next === q) return;
+      patchListParams({ q: next || null }, { resetPage: true });
     }, 350);
-    return () => clearTimeout(t);
-  }, [searchInput]);
+    return () => window.clearTimeout(t);
+  }, [searchInput, q, patchListParams]);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = React.useCallback(async () => {
+    const { page: p, q: searchTerm, department: dep, roleCode: role, statusFilter: st } =
+      readEmployeeListParams(searchParams);
     try {
       setLoading(true);
+      setError(null);
       const token = localStorage.getItem("token");
-      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      const params = new URLSearchParams({ page: String(p), limit: String(limit) });
       if (searchTerm) params.set("search", searchTerm);
-      if (department) params.set("department", department);
-      if (roleCode) params.set("role", roleCode);
-      if (statusFilter === "active") params.set("active_only", "1");
-      else if (statusFilter === "inactive") params.set("active_only", "0");
-      else if (statusFilter === "all") params.set("active_only", "all");
+      if (dep) params.set("department", dep);
+      if (role) params.set("role", role);
+      if (st === "active") params.set("active_only", "1");
+      else if (st === "inactive") params.set("active_only", "0");
+      else if (st === "all") params.set("active_only", "all");
       const res = await fetch(`${API_URL}/users?${params}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Không thể tải dữ liệu");
       const json = await res.json();
-      setEmployees(json.data);
-      setTotal(json.total);
+      const newTotal = json.total ?? 0;
+      setEmployees(Array.isArray(json.data) ? json.data : []);
+      setTotal(newTotal);
       setSelected(new Set());
+      const totalPages = Math.ceil(newTotal / limit) || 1;
+      if (totalPages > 0 && p > totalPages) {
+        patchListParams({ page: String(totalPages) });
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchParams.toString(), patchListParams]);
 
-  React.useEffect(() => { fetchEmployees(); }, [page, searchTerm, department, roleCode, statusFilter]);
+  React.useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
 
   const handleExport = async (entity: string) => {
     try {
@@ -194,7 +255,7 @@ export function EmployeeList() {
     }
   };
 
-  if (loading) {
+  if (loading && employees.length === 0 && !error) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -202,13 +263,13 @@ export function EmployeeList() {
     );
   }
 
-  if (error) {
+  if (error && employees.length === 0) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 mx-auto text-red-400 mb-4" />
           <p className="text-red-500 font-medium">{error}</p>
-          <button onClick={fetchEmployees} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm">Thử lại</button>
+          <button onClick={() => fetchEmployees()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm">Thử lại</button>
         </div>
       </div>
     );
@@ -216,6 +277,20 @@ export function EmployeeList() {
 
   return (
     <div className="space-y-6">
+      {error && employees.length > 0 && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex flex-wrap items-center justify-between gap-2">
+          <span>{error}</span>
+          <button type="button" onClick={() => fetchEmployees()} className="text-xs font-semibold underline hover:no-underline">
+            Thử lại
+          </button>
+        </div>
+      )}
+      {loading && employees.length > 0 && (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+          Đang cập nhật…
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Danh sách nhân viên</h1>
@@ -228,7 +303,7 @@ export function EmployeeList() {
           <Link to="/employees/import" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
             <Upload className="w-4 h-4" /> Nhập hàng loạt
           </Link>
-          <Link to="/employees/new" className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
+          <Link to="/employees/new" state={{ employeesListReturn }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
             <Plus className="w-4 h-4" /> Thêm nhân viên
           </Link>
         </div>
@@ -294,7 +369,7 @@ export function EmployeeList() {
               <Filter className="w-4 h-4 text-slate-400" />
               <select
                 value={department}
-                onChange={(e) => { setDepartment(e.target.value); setPage(1); }}
+                onChange={(e) => { patchListParams({ department: e.target.value || null }, { resetPage: true }); }}
                 className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer"
               >
                 <option value="">Tất cả phòng ban</option>
@@ -305,7 +380,7 @@ export function EmployeeList() {
               <div className="w-px h-5 bg-slate-200" />
               <select
                 value={roleCode}
-                onChange={(e) => { setRoleCode(e.target.value); setPage(1); }}
+                onChange={(e) => { patchListParams({ role: e.target.value || null }, { resetPage: true }); }}
                 className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer"
               >
                 <option value="">Tất cả vai trò</option>
@@ -319,8 +394,7 @@ export function EmployeeList() {
               <select
                 value={statusFilter}
                 onChange={(e) => {
-                  setStatusFilter(e.target.value as "active" | "all" | "inactive");
-                  setPage(1);
+                  patchListParams({ status: e.target.value }, { resetPage: true });
                 }}
                 className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer"
                 title="Trạng thái làm việc"
@@ -333,7 +407,10 @@ export function EmployeeList() {
 
             {hasAnyFilter && (
               <button
-                onClick={() => { setSearchInput(""); setDepartment(""); setRoleCode(""); setStatusFilter("active"); setPage(1); }}
+                onClick={() => {
+                  setSearchInput("");
+                  setSearchParams(new URLSearchParams(), { replace: true });
+                }}
                 className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-500 hover:text-blue-600 hover:border-blue-200 transition-all"
               >
                 Xóa lọc
@@ -426,10 +503,10 @@ export function EmployeeList() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">
-                          {employee.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                          {(String(employee.full_name || "?").trim().split(/\s+/).filter(Boolean).map((n: string) => n[0]).join("") || "?").slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <Link to={`/employees/${employee.id}`} className="text-sm font-bold text-slate-900 hover:text-blue-600 transition-colors">{employee.full_name}</Link>
+                          <Link to={`/employees/${employee.id}`} state={{ employeesListReturn }} className="text-sm font-bold text-slate-900 hover:text-blue-600 transition-colors">{employee.full_name}</Link>
                           <p className="text-xs text-slate-600 font-mono">{employee.username}</p>
                           <p className="text-xs text-slate-500 font-mono uppercase">{employee.role_name || employee.role}</p>
                         </div>
@@ -467,7 +544,7 @@ export function EmployeeList() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link to={`/employees/edit/${employee.id}`} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all" title="Chỉnh sửa">
+                        <Link to={`/employees/edit/${employee.id}`} state={{ employeesListReturn }} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all" title="Chỉnh sửa">
                           <Edit2 className="w-4 h-4" />
                         </Link>
                         {(currentUser?.can_access_admin || currentUser?.role === "admin") && (
@@ -495,9 +572,9 @@ export function EmployeeList() {
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-2 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg text-slate-400 disabled:opacity-50 transition-all">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            {Array.from({ length: Math.min(5, Math.ceil(total / limit)) }, (_, i) => (
-              <button key={i} onClick={() => setPage(i + 1)} className={cn("w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-all", page === i + 1 ? "bg-blue-600 text-white shadow-sm" : "hover:bg-white border border-transparent hover:border-slate-200 text-slate-600")}>
-                {i + 1}
+            {getVisiblePageNumbers(page, Math.max(1, Math.ceil(total / limit)), 5).map((pn) => (
+              <button key={pn} onClick={() => setPage(pn)} className={cn("w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-all", page === pn ? "bg-blue-600 text-white shadow-sm" : "hover:bg-white border border-transparent hover:border-slate-200 text-slate-600")}>
+                {pn}
               </button>
             ))}
             <button onClick={() => setPage(p => Math.min(Math.ceil(total / limit), p + 1))} disabled={page >= Math.ceil(total / limit)} className="p-2 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg text-slate-400 disabled:opacity-50 transition-all">

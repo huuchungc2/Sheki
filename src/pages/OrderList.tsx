@@ -5,8 +5,9 @@ import {
   Edit2, Trash2, CheckCircle2, Clock, XCircle,
   Wallet, ArrowRight, Loader2, ChevronDown, X
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
+import { parseListPage, getVisiblePageNumbers } from "../lib/listUrl";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -63,8 +64,29 @@ function getPresetRange(preset: DatePreset): { from: string; to: string } {
   return { from: "", to: "" };
 }
 
+/** Đọc bộ lọc + trang từ URL — quay lại từ sửa đơn vẫn giữ nguyên */
+function readListParams(sp: URLSearchParams) {
+  const today = toDateStr(new Date());
+  const page = parseListPage(sp);
+  const search = sp.get("q") ?? "";
+  const status = sp.get("status") ?? "";
+  const groupId = sp.get("group") ?? "";
+  const employeeId = sp.get("employee") ?? "";
+  const rawPreset = sp.get("preset") as DatePreset | null;
+  const datePreset: DatePreset =
+    rawPreset && ["today", "week", "month", "last_month", "last_year", "custom", ""].includes(rawPreset)
+      ? rawPreset || "today"
+      : "today";
+  const dateFrom = sp.get("from") ?? today;
+  const dateTo = sp.get("to") ?? today;
+  return { page, search, status, groupId, employeeId, dateFrom, dateTo, datePreset };
+}
+
 export function OrderList() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ordersListReturn = `${location.pathname}${location.search}`;
 
   // Lấy role từ localStorage
   const currentUser = React.useMemo(() => {
@@ -74,22 +96,56 @@ export function OrderList() {
   const isAdmin =
     currentUser?.can_access_admin === true || currentUser?.role === "admin";
 
+  const todayStr = toDateStr(new Date());
+  const { page, search, status, groupId, employeeId, dateFrom, dateTo, datePreset } = React.useMemo(
+    () => readListParams(searchParams),
+    [searchParams.toString()]
+  );
+  const hasActiveFilters =
+    Boolean(search) ||
+    Boolean(status) ||
+    Boolean(groupId) ||
+    Boolean(employeeId) ||
+    datePreset !== "today" ||
+    dateFrom !== todayStr ||
+    dateTo !== todayStr ||
+    page > 1;
+
   const [orders, setOrders]         = React.useState<any[]>([]);
   const [loading, setLoading]       = React.useState(true);
   const [error, setError]           = React.useState<string | null>(null);
-  const [search, setSearch]         = React.useState("");
-  const [status, setStatus]         = React.useState("");
-  const [groupId, setGroupId]       = React.useState("");
   const [groups, setGroups]         = React.useState<any[]>([]);
-  const [employeeId, setEmployeeId] = React.useState("");  // chỉ admin dùng
   const [employees, setEmployees]   = React.useState<any[]>([]);
-  const [dateFrom, setDateFrom]     = React.useState(toDateStr(new Date()));
-  const [dateTo, setDateTo]         = React.useState(toDateStr(new Date()));
-  const [datePreset, setDatePreset] = React.useState<DatePreset>("today");
   const [showDateMenu, setShowDateMenu] = React.useState(false);
-  const [page, setPage]             = React.useState(1);
   const [total, setTotal]           = React.useState(0);
   const [deleting, setDeleting]     = React.useState<string | null>(null);
+
+  const patchListParams = React.useCallback(
+    (patch: Record<string, string | null | undefined>, opts?: { resetPage?: boolean }) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === undefined || v === "") next.delete(k);
+            else next.set(k, v);
+          }
+          if (opts?.resetPage) next.set("page", "1");
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const setPage = React.useCallback(
+    (p: number | ((prev: number) => number)) => {
+      const current = parseListPage(searchParams);
+      const nextPage = typeof p === "function" ? p(current) : p;
+      patchListParams({ page: String(Math.max(1, nextPage)) });
+    },
+    [searchParams, patchListParams]
+  );
 
   // Bulk select
   const [selected, setSelected]     = React.useState<Set<number>>(new Set());
@@ -119,46 +175,56 @@ export function OrderList() {
   }, [isAdmin]);
 
   const fetchOrders = React.useCallback(async () => {
+    const { page: p, search: q, status: st, groupId: gid, employeeId: eid, dateFrom: df, dateTo: dt } =
+      readListParams(searchParams);
     try {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({
-        search, status,
-        page: String(page),
+        search: q,
+        status: st,
+        page: String(p),
         limit: String(limit),
-        ...(dateFrom   && { date_from: dateFrom }),
-        ...(dateTo     && { date_to:   dateTo }),
-        ...(employeeId && { employee:  employeeId }),
-        ...(groupId    && { group_id:  groupId }),
+        ...(df && { date_from: df }),
+        ...(dt && { date_to: dt }),
+        ...(eid && { employee: eid }),
+        ...(gid && { group_id: gid }),
       });
       const res = await fetch(`${API_URL}/orders?${params}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Không thể tải danh sách đơn hàng");
       const json = await res.json();
+      const newTotal = json.total || 0;
       setOrders(json.data);
-      setTotal(json.total || 0);
+      setTotal(newTotal);
       setSelected(new Set());
+      const totalPages = Math.ceil(newTotal / limit);
+      if (totalPages > 0 && p > totalPages) {
+        patchListParams({ page: String(totalPages) });
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [search, status, groupId, employeeId, dateFrom, dateTo, page]);
+  }, [searchParams.toString(), patchListParams]);
 
   React.useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   // Apply preset
   const applyPreset = (preset: DatePreset) => {
-    setDatePreset(preset);
     if (preset !== "custom") {
       const { from, to } = getPresetRange(preset);
-      setDateFrom(from);
-      setDateTo(to);
+      patchListParams(
+        { preset, from, to, page: "1" },
+        {}
+      );
+    } else {
+      patchListParams({ preset: "custom", page: "1" });
     }
     if (preset !== "custom") setShowDateMenu(false);
-    setPage(1);
   };
 
   const handleDelete = async (id: string) => {
@@ -220,7 +286,7 @@ export function OrderList() {
           <h1 className="text-2xl font-bold text-slate-900">Quản lý đơn hàng</h1>
           <p className="text-slate-500 text-sm mt-0.5">Theo dõi và quản lý các giao dịch bán hàng.</p>
         </div>
-        <Link to="/orders/new" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
+        <Link to="/orders/new" state={{ ordersListReturn }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
           <Plus className="w-3.5 h-3.5 shrink-0" />
           Thêm đơn
         </Link>
@@ -234,7 +300,7 @@ export function OrderList() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text" value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => { patchListParams({ q: e.target.value || null }, { resetPage: true }); }}
               placeholder="Mã đơn, tên khách, SĐT..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none transition-all"
             />
@@ -243,7 +309,7 @@ export function OrderList() {
           {/* Trạng thái */}
           <select
             value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            onChange={(e) => { patchListParams({ status: e.target.value || null }, { resetPage: true }); }}
             className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[140px]"
           >
             <option value="">Tất cả trạng thái</option>
@@ -256,7 +322,7 @@ export function OrderList() {
           {/* Nhóm bán hàng */}
           <select
             value={groupId}
-            onChange={(e) => { setGroupId(e.target.value); setPage(1); }}
+            onChange={(e) => { patchListParams({ group: e.target.value || null }, { resetPage: true }); }}
             className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[140px]"
           >
             <option value="">Tất cả nhóm</option>
@@ -269,7 +335,7 @@ export function OrderList() {
           {isAdmin && (
             <select
               value={employeeId}
-              onChange={(e) => { setEmployeeId(e.target.value); setPage(1); }}
+              onChange={(e) => { patchListParams({ employee: e.target.value || null }, { resetPage: true }); }}
               className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[160px]"
             >
               <option value="">Tất cả nhân viên</option>
@@ -307,21 +373,21 @@ export function OrderList() {
           {datePreset === "custom" && (
             <div className="flex items-center gap-2">
               <input type="date" value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                onChange={(e) => { patchListParams({ from: e.target.value, preset: "custom" }, { resetPage: true }); }}
                 className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-100"
               />
               <span className="text-slate-400 text-xs">–</span>
               <input type="date" value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                onChange={(e) => { patchListParams({ to: e.target.value, preset: "custom" }, { resetPage: true }); }}
                 className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-100"
               />
             </div>
           )}
 
           {/* Xóa lọc */}
-          {(search || status || groupId || employeeId || datePreset) && (
+          {hasActiveFilters && (
             <button
-              onClick={() => { setSearch(""); setStatus(""); setGroupId(""); setEmployeeId(""); setDateFrom(""); setDateTo(""); setDatePreset(""); setPage(1); }}
+              onClick={() => { setSearchParams(new URLSearchParams(), { replace: true }); }}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-xl hover:text-red-600 hover:border-red-200 transition-all"
             >
               <X className="w-3.5 h-3.5" />
@@ -429,7 +495,7 @@ export function OrderList() {
                       className={cn("group transition-colors cursor-pointer",
                         isSelected ? "bg-blue-50/60" : "hover:bg-slate-50/60"
                       )}
-                      onClick={() => navigate(`/orders/edit/${order.id}`)}
+                      onClick={() => navigate(`/orders/edit/${order.id}`, { state: { ordersListReturn } })}
                     >
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox"
@@ -516,7 +582,7 @@ export function OrderList() {
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         {/* Luôn hiện: mobile/touch không có hover → trước đây opacity-0 khiến mất icon */}
                         <div className="flex items-center justify-end gap-1">
-                          <Link to={`/orders/edit/${order.id}`}
+                          <Link to={`/orders/edit/${order.id}`} state={{ ordersListReturn }}
                             className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-all"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -548,7 +614,7 @@ export function OrderList() {
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-30 transition-all">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map(p => (
+                {getVisiblePageNumbers(page, totalPages, 5).map((p) => (
                   <button key={p} onClick={() => setPage(p)}
                     className={cn("w-8 h-8 rounded-lg text-xs font-bold transition-all",
                       page === p ? "bg-red-600 text-white shadow-lg shadow-red-600/20" : "hover:bg-slate-100 text-slate-600"

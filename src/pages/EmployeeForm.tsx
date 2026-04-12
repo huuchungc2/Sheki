@@ -3,7 +3,7 @@ import {
   ArrowLeft, Save, User, Mail, Phone, Briefcase, Calendar,
   CreditCard, MapPin, Shield, Loader2, AlertCircle, CheckCircle2, Users, AtSign
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 
 const API_URL =
@@ -12,6 +12,7 @@ const API_URL =
 
 export function EmployeeForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const isEdit = Boolean(id);
 
@@ -249,7 +250,9 @@ export function EmployeeForm() {
       }
       
       setSuccess(true);
-      setTimeout(() => navigate("/employees"), 1000);
+      const back =
+        (location.state as { employeesListReturn?: string } | null)?.employeesListReturn || "/employees";
+      setTimeout(() => navigate(back), 1000);
     } catch (err: any) {
       setError(err.message);
     } finally {

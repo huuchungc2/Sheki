@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [12/04/2026] - EmployeeList: URL + fix crash + EmployeeForm quay lại danh sách
+### Fixed
+- **EmployeeList** — Đồng bộ `page`, `q`, `department`, `role`, `status` trên URL; không full-screen loading mỗi lần đổi trang; `json.data` an toàn; chữ ký tên không crash khi `full_name` rỗng; phân trang `getVisiblePageNumbers`; nhắc lỗi / «Đang cập nhật» khi có dữ liệu cũ — Files: `src/pages/EmployeeList.tsx`
+- **EmployeeForm** — Sau lưu về `employeesListReturn` nếu có — Files: `src/pages/EmployeeForm.tsx`
+
+## [12/04/2026] - Danh sách: giữ trang/lọc qua URL + quay lại đúng sau sửa/lưu
+### Added
+- **`src/lib/listUrl.ts`** — `parseListPage`, `getVisiblePageNumbers` (phân trang quanh trang hiện tại)
+### Changed
+- **OrderList** — `page`, `q`, `status`, `group`, `employee`, `from`/`to`, `preset` trên query string; nút «Xóa lọc» chỉ khi thực sự lệch mặc định hoặc `page>1`; phân trang số trang động; sau xóa đơn tự hạ trang nếu vượt tổng — Files: `src/pages/OrderList.tsx`
+- **CustomerList / ProductList** — cùng kiểu URL (`q`, `tier` / `category`, `warehouse`, `page`); link tới form kèm `state` quay lại — Files: `src/pages/CustomerList.tsx`, `src/pages/ProductList.tsx`
+- **CustomerForm / ProductForm** — sau lưu thành công điều hướng về URL danh sách đã lưu trong `state` (nếu có) — Files: `src/pages/CustomerForm.tsx`, `src/pages/ProductForm.tsx`
+- **OrderForm** — (đã có) lưu đơn xong về `ordersListReturn` khi có
+
 ## [12/04/2026] - OrderList: thu nhỏ nút «Thêm đơn mới»
 ### Changed
 - Giảm padding, `text-xs`, icon nhỏ hơn; nhãn rút thành «Thêm đơn» — Files: `src/pages/OrderList.tsx`

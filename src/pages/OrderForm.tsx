@@ -18,7 +18,7 @@ import {
   ChevronUp,
   ChevronDown
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn, formatCurrency, isAdminUser } from "../lib/utils";
 import { api } from "../lib/api";
 import type { OrderItem } from "../types";
@@ -88,6 +88,7 @@ function MoneyAmountField({
 
 export function OrderForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const [isEdit] = React.useState(!!id);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -505,10 +506,13 @@ export function OrderForm() {
       } else {
         res = await api.post('/orders', payload);
       }
-      if (res?.id) {
-        navigate(`/orders/edit/${res.id}`);
+      const listReturn = (location.state as { ordersListReturn?: string } | null)?.ordersListReturn;
+      if (res?.id && !id) {
+        navigate(`/orders/edit/${res.id}`, { state: location.state });
+      } else if (id && listReturn) {
+        navigate(listReturn);
       } else {
-        navigate('/orders');
+        navigate("/orders");
       }
     } catch (e: any) {
       setFormError(e?.message || 'Lỗi khi lưu đơn hàng. Vui lòng thử lại.');

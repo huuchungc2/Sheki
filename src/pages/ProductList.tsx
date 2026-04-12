@@ -4,8 +4,9 @@ import {
   Package, Tag, AlertCircle, MoreVertical, Edit2, Trash2,
   BarChart2, Upload, Loader2
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { cn, formatCurrency } from "../lib/utils";
+import { parseListPage, getVisiblePageNumbers } from "../lib/listUrl";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -46,28 +47,70 @@ function getStatusClass(status: string): string {
   }
 }
 
+function readProductListParams(sp: URLSearchParams) {
+  return {
+    page: parseListPage(sp),
+    search: sp.get("q") ?? "",
+    category: sp.get("category") ?? "",
+    warehouseId: sp.get("warehouse") ?? "",
+  };
+}
+
 export function ProductList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const productsListReturn = `${location.pathname}${location.search}`;
+
+  const { page, search, category, warehouseId } = React.useMemo(
+    () => readProductListParams(searchParams),
+    [searchParams.toString()]
+  );
+
   const [products, setProducts] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [search, setSearch] = React.useState("");
-  const [category, setCategory] = React.useState("");
   const [categories, setCategories] = React.useState<any[]>([]);
-  const [warehouseId, setWarehouseId] = React.useState("");
   const [warehouses, setWarehouses] = React.useState<any[]>([]);
-  const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const limit = 20;
 
+  const patchListParams = React.useCallback(
+    (patch: Record<string, string | null | undefined>, opts?: { resetPage?: boolean }) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === undefined || v === "") next.delete(k);
+            else next.set(k, v);
+          }
+          if (opts?.resetPage) next.set("page", "1");
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const setPage = React.useCallback(
+    (p: number | ((prev: number) => number)) => {
+      const current = parseListPage(searchParams);
+      const nextPage = typeof p === "function" ? p(current) : p;
+      patchListParams({ page: String(Math.max(1, nextPage)) });
+    },
+    [searchParams, patchListParams]
+  );
+
   const fetchProducts = React.useCallback(async () => {
+    const { page: p, search: q, category: cat, warehouseId: wh } = readProductListParams(searchParams);
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
       const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (category) params.set("category", category);
-      if (warehouseId) params.set("warehouse_id", warehouseId);
-      params.set("page", String(page));
+      if (q) params.set("search", q);
+      if (cat) params.set("category", cat);
+      if (wh) params.set("warehouse_id", wh);
+      params.set("page", String(p));
       params.set("limit", String(limit));
       params.set("active_only", "1");
       const res = await fetch(`${API_URL}/products?${params}`, {
@@ -75,14 +118,19 @@ export function ProductList() {
       });
       if (!res.ok) throw new Error("Không thể tải danh sách sản phẩm");
       const json = await res.json();
+      const newTotal = json.total || 0;
       setProducts(json.data);
-      setTotal(json.total || 0);
+      setTotal(newTotal);
+      const totalPages = Math.ceil(newTotal / limit);
+      if (totalPages > 0 && p > totalPages) {
+        patchListParams({ page: String(totalPages) });
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [search, category, warehouseId, page]);
+  }, [searchParams.toString(), patchListParams]);
 
   React.useEffect(() => {
     fetchProducts();
@@ -194,7 +242,7 @@ export function ProductList() {
             <Upload className="w-4 h-4" />
             Nhập hàng loạt
           </Link>
-          <Link to="/products/new" className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
+          <Link to="/products/new" state={{ productsListReturn }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
             <Plus className="w-4 h-4" />
             Thêm sản phẩm
           </Link>
@@ -232,7 +280,7 @@ export function ProductList() {
           <input 
             type="text" 
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { patchListParams({ q: e.target.value || null }, { resetPage: true }); }}
             placeholder="Tìm theo tên, SKU, danh mục..." 
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
           />
@@ -240,7 +288,7 @@ export function ProductList() {
         <div className="flex items-center gap-2 w-full md:w-auto">
           <select 
             value={category}
-            onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+            onChange={(e) => { patchListParams({ category: e.target.value || null }, { resetPage: true }); }}
             className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             <option value="">Tất cả danh mục</option>
@@ -250,7 +298,7 @@ export function ProductList() {
           </select>
           <select
             value={warehouseId}
-            onChange={(e) => { setWarehouseId(e.target.value); setPage(1); }}
+            onChange={(e) => { patchListParams({ warehouse: e.target.value || null }, { resetPage: true }); }}
             className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             <option value="">Tất cả kho</option>
@@ -349,7 +397,7 @@ export function ProductList() {
                           <button className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-400 transition-all">
                             <BarChart2 className="w-4 h-4" />
                           </button>
-                          <Link to={`/products/edit/${product.id}`} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
+                          <Link to={`/products/edit/${product.id}`} state={{ productsListReturn }} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
                             <Edit2 className="w-4 h-4" />
                           </Link>
                           {canAdmin && (
@@ -382,21 +430,18 @@ export function ProductList() {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const p = i + 1;
-                  return (
-                    <button 
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={cn(
-                        "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
-                        page === p ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "hover:bg-slate-100 text-slate-600"
-                      )}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
+                {getVisiblePageNumbers(page, totalPages, 5).map((pn) => (
+                  <button
+                    key={pn}
+                    onClick={() => setPage(pn)}
+                    className={cn(
+                      "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
+                      page === pn ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "hover:bg-slate-100 text-slate-600"
+                    )}
+                  >
+                    {pn}
+                  </button>
+                ))}
                 <button 
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}

@@ -3,7 +3,7 @@ import {
   ArrowLeft, Save, Package, Image as ImageIcon, Plus, Trash2,
   Tag, DollarSign, Box, Truck, Info, Loader2, X, AlertCircle, CheckCircle2
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 
 const API_URL =
@@ -12,6 +12,7 @@ const API_URL =
 
 export function ProductForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const isEdit = Boolean(id);
 
@@ -295,7 +296,9 @@ export function ProductForm() {
         }
       } catch {}
       setSuccess(true);
-      setTimeout(() => navigate("/products"), 1000);
+      const back =
+        (location.state as { productsListReturn?: string } | null)?.productsListReturn || "/products";
+      setTimeout(() => navigate(back), 1000);
     } catch (err: any) {
       setError(err.message);
     } finally {

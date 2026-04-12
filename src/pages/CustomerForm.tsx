@@ -3,7 +3,7 @@ import {
   ArrowLeft, Save, User, Phone, Mail, MapPin, Calendar, Star,
   Info, CreditCard, History, Loader2, AlertTriangle, CheckCircle, ShoppingCart
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 import locationsData from "../lib/vietnam-locations-simple.json";
 
@@ -73,6 +73,7 @@ function getAuthToken(): string | null {
 
 export function CustomerForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const isEdit = Boolean(id);
 
@@ -263,7 +264,9 @@ export function CustomerForm() {
         throw new Error(err.error || "Thao tác thất bại");
       }
       setSuccess(true);
-      setTimeout(() => navigate("/customers"), 1200);
+      const back =
+        (location.state as { customersListReturn?: string } | null)?.customersListReturn || "/customers";
+      setTimeout(() => navigate(back), 1200);
     } catch (err: any) {
       setError(err.message);
     } finally {

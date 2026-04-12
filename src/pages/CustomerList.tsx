@@ -20,8 +20,9 @@ import {
   AlertTriangle,
   RefreshCw
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
+import { parseListPage, getVisiblePageNumbers } from "../lib/listUrl";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -47,27 +48,69 @@ function isAdmin(): boolean {
   }
 }
 
+function readCustomerListParams(sp: URLSearchParams) {
+  return {
+    page: parseListPage(sp),
+    search: sp.get("q") ?? "",
+    tier: sp.get("tier") ?? "",
+  };
+}
+
 export function CustomerList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const customersListReturn = `${location.pathname}${location.search}`;
+
+  const { page, search, tier } = React.useMemo(
+    () => readCustomerListParams(searchParams),
+    [searchParams.toString()]
+  );
+
   const [customers, setCustomers] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [search, setSearch] = React.useState("");
-  const [tier, setTier] = React.useState("");
-  const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const limit = 20;
   const admin = isAdmin();
 
+  const patchListParams = React.useCallback(
+    (patch: Record<string, string | null | undefined>, opts?: { resetPage?: boolean }) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === undefined || v === "") next.delete(k);
+            else next.set(k, v);
+          }
+          if (opts?.resetPage) next.set("page", "1");
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const setPage = React.useCallback(
+    (p: number | ((prev: number) => number)) => {
+      const current = parseListPage(searchParams);
+      const nextPage = typeof p === "function" ? p(current) : p;
+      patchListParams({ page: String(Math.max(1, nextPage)) });
+    },
+    [searchParams, patchListParams]
+  );
+
   const fetchCustomers = React.useCallback(async () => {
+    const { page: p, search: q, tier: t } = readCustomerListParams(searchParams);
     try {
       setLoading(true);
       setError(null);
       const token = getAuthToken();
       const params = new URLSearchParams({
-        search,
-        tier,
-        page: String(page),
+        search: q,
+        tier: t,
+        page: String(p),
         limit: String(limit),
       });
       const res = await fetch(`${API_URL}/customers?${params}`, {
@@ -79,8 +122,13 @@ export function CustomerList() {
         throw new Error("Không thể tải danh sách khách hàng");
       }
       const json = await res.json();
+      const newTotal = json.total || 0;
       setCustomers(json.data || []);
-      setTotal(json.total || 0);
+      setTotal(newTotal);
+      const totalPages = Math.ceil(newTotal / limit);
+      if (totalPages > 0 && p > totalPages) {
+        patchListParams({ page: String(totalPages) });
+      }
     } catch (err: any) {
       setError(err.message);
       setCustomers([]);
@@ -88,7 +136,7 @@ export function CustomerList() {
     } finally {
       setLoading(false);
     }
-  }, [search, tier, page]);
+  }, [searchParams.toString(), patchListParams]);
 
   React.useEffect(() => {
     fetchCustomers();
@@ -143,90 +191,6 @@ export function CustomerList() {
 
   const totalPages = Math.ceil(total / limit);
 
-  const renderPaginationButtons = () => {
-    const buttons: React.ReactNode[] = [];
-    const maxVisible = 5;
-
-    if (totalPages <= maxVisible) {
-      for (let i = 1; i <= totalPages; i++) {
-        buttons.push(
-          <button
-            key={i}
-            onClick={() => setPage(i)}
-            className={cn(
-              "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
-              page === i
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                : "hover:bg-slate-100 text-slate-600"
-            )}
-          >
-            {i}
-          </button>
-        );
-      }
-    } else {
-      buttons.push(
-        <button
-          key={1}
-          onClick={() => setPage(1)}
-          className={cn(
-            "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
-            page === 1
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-              : "hover:bg-slate-100 text-slate-600"
-          )}
-        >
-          1
-        </button>
-      );
-
-      if (page > 3) {
-        buttons.push(<span key="start-ellipsis" className="text-slate-400 text-xs px-1">...</span>);
-      }
-
-      const start = Math.max(2, page - 1);
-      const end = Math.min(totalPages - 1, page + 1);
-
-      for (let i = start; i <= end; i++) {
-        buttons.push(
-          <button
-            key={i}
-            onClick={() => setPage(i)}
-            className={cn(
-              "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
-              page === i
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                : "hover:bg-slate-100 text-slate-600"
-            )}
-          >
-            {i}
-          </button>
-        );
-      }
-
-      if (page < totalPages - 2) {
-        buttons.push(<span key="end-ellipsis" className="text-slate-400 text-xs px-1">...</span>);
-      }
-
-      buttons.push(
-        <button
-          key={totalPages}
-          onClick={() => setPage(totalPages)}
-          className={cn(
-            "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
-            page === totalPages
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-              : "hover:bg-slate-100 text-slate-600"
-          )}
-        >
-          {totalPages}
-        </button>
-      );
-    }
-
-    return buttons;
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -243,7 +207,7 @@ export function CustomerList() {
             <Upload className="w-4 h-4" />
             Nhập hàng loạt
           </Link>
-          <Link to="/customers/new" className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
+          <Link to="/customers/new" state={{ customersListReturn }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
             <Plus className="w-4 h-4" />
             Thêm khách hàng
           </Link>
@@ -275,7 +239,7 @@ export function CustomerList() {
           <input
             type="text"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { patchListParams({ q: e.target.value || null }, { resetPage: true }); }}
             placeholder="Tìm theo tên, SĐT, email..."
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
           />
@@ -287,7 +251,7 @@ export function CustomerList() {
           </button>
           <select
             value={tier}
-            onChange={(e) => { setTier(e.target.value); setPage(1); }}
+            onChange={(e) => { patchListParams({ tier: e.target.value || null }, { resetPage: true }); }}
             className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             <option value="">Tất cả hạng</option>
@@ -387,7 +351,7 @@ export function CustomerList() {
                             <button className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-400 transition-all">
                               <History className="w-4 h-4" />
                             </button>
-                            <Link to={`/customers/edit/${customer.id}`} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
+                            <Link to={`/customers/edit/${customer.id}`} state={{ customersListReturn }} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
                               <Edit2 className="w-4 h-4" />
                             </Link>
                             {admin && (
@@ -426,7 +390,20 @@ export function CustomerList() {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                {renderPaginationButtons()}
+                {getVisiblePageNumbers(page, totalPages, 5).map((pn) => (
+                  <button
+                    key={pn}
+                    onClick={() => setPage(pn)}
+                    className={cn(
+                      "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
+                      page === pn
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                        : "hover:bg-slate-100 text-slate-600"
+                    )}
+                  >
+                    {pn}
+                  </button>
+                ))}
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
