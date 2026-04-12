@@ -57,7 +57,7 @@ export function Register() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       window.dispatchEvent(new Event('auth-change'));
-      navigate("/");
+      setTimeout(() => navigate("/", { replace: true }), 0);
     } catch (err: any) {
       logger.error('Register exception', err);
       setError("Lỗi kết nối server");

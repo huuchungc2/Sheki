@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [12/04/2026] - OrderList: thu nhỏ nút «Thêm đơn mới»
+### Changed
+- Giảm padding, `text-xs`, icon nhỏ hơn; nhãn rút thành «Thêm đơn» — Files: `src/pages/OrderList.tsx`
+
+## [12/04/2026] - Danh sách đơn: mobile cùng bảng như desktop (cuộn ngang)
+### Changed
+- **OrderList** — Bỏ layout thẻ riêng cho mobile; dùng một bảng cho mọi breakpoint, `overflow-x-auto` + `min-w-[980px]`; gợi ý «Vuốt ngang» trên mobile — Files: `src/pages/OrderList.tsx`
+
+## [12/04/2026] - Nhập/xuất kho: sửa URL API + redirect sau lưu
+### Fixed
+- **InventoryImport / InventoryExport** — Dùng biến `API_URL` (trước đó gọi `API_BASE` không tồn tại → fetch `undefined/...`); sau thành công chuyển tới `/inventory` thay vì `/inventory/history` (không có route) — Files: `src/pages/InventoryImport.tsx`, `src/pages/InventoryExport.tsx`
+
+## [12/04/2026] - Login/Register: tránh vòng redirect sau đăng nhập
+### Fixed
+- Sau khi lưu token, hoãn `navigate("/")` một tick để `App` kịp cập nhật `isAuthenticated` trước khi Router render route bảo vệ — Files: `src/pages/Login.tsx`, `src/pages/Register.tsx`
+
 ## [11/04/2026] - RevenueReport: biểu đồ xếp hạng — hẹp khoảng cách hàng
 ### Fixed
 - **Xếp hạng doanh số** — Chiều cao biểu đồ tính theo số NV (`~32px`/hàng), bỏ `min-h` cố định; cột mảnh hơn, `barCategoryGap` 4%, tooltip/cursor nhạt — Files: `src/pages/RevenueReport.tsx`

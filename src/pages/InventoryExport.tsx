@@ -94,7 +94,7 @@ export function InventoryExport() {
       setDataError(null);
       try {
         const [whRes] = await Promise.all([
-          fetch(`${API_BASE}/warehouses`, { headers: getAuthHeaders() }),
+          fetch(`${API_URL}/warehouses`, { headers: getAuthHeaders() }),
         ]);
         if (!whRes.ok) throw new Error("Failed to load data");
         const whJson = await whRes.json();
@@ -124,7 +124,7 @@ export function InventoryExport() {
           ...(warehouseId ? { warehouse_id: warehouseId } : {}),
           ...(warehouseId ? { available_only: "1" } : {}),
         });
-        const res = await fetch(`${API_BASE}/products?${params.toString()}`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_URL}/products?${params.toString()}`, { headers: getAuthHeaders() });
         if (!res.ok) return;
         const json = await res.json();
         const data = Array.isArray(json?.data) ? json.data : [];
@@ -216,7 +216,7 @@ export function InventoryExport() {
         reason: reason,
         status,
       };
-      const res = await fetch(`${API_BASE}/inventory/export`, {
+      const res = await fetch(`${API_URL}/inventory/export`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(body),
@@ -226,7 +226,7 @@ export function InventoryExport() {
         throw new Error(err.error || "Failed to create export receipt");
       }
       setSuccess(true);
-      setTimeout(() => navigate("/inventory/history"), 1500);
+      setTimeout(() => navigate("/inventory"), 1500);
     } catch (e: any) {
       alert(e.message);
     } finally {

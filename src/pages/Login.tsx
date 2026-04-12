@@ -47,10 +47,10 @@ export function Login() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       
-      // Notify App component about auth change
+      // Notify App — then navigate on next macrotask so `isAuthenticated` commits
+      // before Router renders `/` (avoids brief `/` → redirect `/login` loop or flash).
       window.dispatchEvent(new Event('auth-change'));
-      
-      navigate("/");
+      setTimeout(() => navigate("/", { replace: true }), 0);
     } catch (err: any) {
       logger.error('Login exception', err);
       setError("Lỗi kết nối server: " + err.message);
