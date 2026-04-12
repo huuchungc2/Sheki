@@ -23,7 +23,6 @@ import { InventoryImport } from "./pages/InventoryImport";
 import { InventoryExport } from "./pages/InventoryExport";
 import { Warehouses } from "./pages/Warehouses";
 import { ActivityLog } from "./pages/ActivityLog";
-import { CommissionDetail } from "./pages/CommissionDetail";
 import { OrderCommissionDetail } from "./pages/OrderCommissionDetail";
 import { RevenueReport } from "./pages/RevenueReport";
 import { CommissionReport } from "./pages/CommissionReport";
@@ -135,7 +134,7 @@ export default function App() {
                   <Route path="/reports/revenue" element={<AdminRoute><RevenueReport /></AdminRoute>} />
                   <Route path="/reports/commissions" element={<CommissionReport />} />
                   <Route path="/reports/commissions/ctv" element={<CtvCommissionRoute />} />
-                  <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionDetail /></AdminRoute>} />
+                  <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionReport /></AdminRoute>} />
                   <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
                   <Route path="/cash-transactions" element={<AdminRoute><CashTransactions /></AdminRoute>} />

@@ -170,7 +170,7 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
                 <Truck className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wide">Phí ship KH trả</p>
+              <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wide">Ship KH Trả</p>
               <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
               <p className="text-xs text-slate-500 mt-0.5">Tháng này (theo đơn)</p>
             </div>
@@ -186,9 +186,9 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
                 <Wallet className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lượng</p>
+              <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lương</p>
               <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_luong || 0)}</p>
-              <p className="text-xs text-slate-500 mt-0.5">Tổng HH + ship KH − NV chịu</p>
+              <p className="text-xs text-slate-500 mt-0.5">Tổng HH + Ship KH Trả − tiền NV chịu</p>
             </div>
           </div>
 
@@ -351,8 +351,8 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH từ CTV</p>
               <p className="text-xl font-bold text-purple-700 mt-1">{formatCurrency(commission.override || 0)}</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Tổng: {formatCurrency(commission.total || 0)}
+              <p className="text-xs text-slate-400 mt-1 leading-snug" title="Override cho quản lý khi CTV lên đơn ghi nhận quản lý. Nếu bạn chỉ là CTV, thường = 0; HH của bạn nằm ở «HH bán hàng».">
+                Tổng HH: {formatCurrency(commission.total || 0)}
               </p>
             </div>
 
@@ -372,7 +372,7 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
                 <Truck className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wide">Phí ship KH trả</p>
+              <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wide">Ship KH Trả</p>
               <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
               <p className="text-xs text-slate-500 mt-0.5">Đơn bạn phụ trách — tháng này</p>
             </div>
@@ -388,9 +388,9 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
                 <Wallet className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lượng</p>
+              <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lương</p>
               <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_luong || 0)}</p>
-              <p className="text-xs text-slate-500 mt-0.5">Tổng HH + ship KH − NV chịu</p>
+              <p className="text-xs text-slate-500 mt-0.5">Tổng HH + Ship KH Trả − tiền NV chịu</p>
             </div>
           </div>
 

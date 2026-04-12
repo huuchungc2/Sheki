@@ -27,7 +27,7 @@ export function exportSalesCommission(opts: {
     [`BÁO CÁO HOA HỒNG — ${userName.toUpperCase()}`],
     [`Kỳ: Tháng ${parseInt(month)}/${year}${groupName ? ` — Nhóm: ${groupName}` : ""}`],
     [],
-    ["Mã đơn", "Ngày", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng bán hàng", "Lương", "Trạng thái"],
+    ["Mã đơn", "Ngày", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng bán hàng", "Ship KH Trả", "Tiền NV chịu", "Lương", "Trạng thái"],
   ];
   orders.forEach(o => {
     detailRows.push([
@@ -37,6 +37,8 @@ export function exportSalesCommission(opts: {
       o.group_name || "—",
       o.total_amount,
       o.commission_amount,
+      Number(o.khach_tra_ship) || 0,
+      Number(o.nv_chiu_display) || 0,
       Number(o.luong) || 0,
       o.status === "pending" ? "Chờ duyệt" :
       o.status === "shipping" ? "Đang giao" :
@@ -50,6 +52,8 @@ export function exportSalesCommission(opts: {
     "TỔNG CỘNG", "", "", "",
     orders.reduce((s, o) => s + o.total_amount, 0),
     orders.reduce((s, o) => s + o.commission_amount, 0),
+    orders.reduce((s, o) => s + Number(o.khach_tra_ship || 0), 0),
+    orders.reduce((s, o) => s + Number(o.nv_chiu_display || 0), 0),
     orders.reduce((s, o) => s + Number(o.luong || 0), 0),
     "",
   ]);
@@ -63,9 +67,9 @@ export function exportSalesCommission(opts: {
     ["HH bán hàng (tự bán)", summary.direct_commission],
     ["HH từ CTV (override)", summary.override_commission],
     ["Tổng hoa hồng", summary.direct_commission + summary.override_commission],
-    ["Phí ship KH trả (cả kỳ)", summary.total_khach_ship ?? 0],
+    ["Ship KH Trả (cả kỳ)", summary.total_khach_ship ?? 0],
     ["Tiền NV chịu (cả kỳ)", summary.total_nv_chiu ?? 0],
-    ["Tổng lượng (HH + ship KH − NV)", summary.total_luong ?? 0],
+    ["Tổng lương (Tổng HH + Ship KH Trả − NV)", summary.total_luong ?? 0],
     ["Số đơn", summary.total_orders],
   ];
 
@@ -73,7 +77,7 @@ export function exportSalesCommission(opts: {
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
 
   // Style cột rộng
-  wsDetail["!cols"]  = [{ wch: 20 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 12 }];
+  wsDetail["!cols"]  = [{ wch: 20 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 12 }];
   wsSummary["!cols"] = [{ wch: 30 }, { wch: 20 }];
 
   XLSX.utils.book_append_sheet(wb, wsDetail,  "Chi tiết đơn");
@@ -102,7 +106,7 @@ export function exportAdminCommission(opts: {
     ["BÁO CÁO HOA HỒNG TOÀN BỘ NHÂN VIÊN"],
     [`Kỳ: ${period}`],
     [],
-    ["Nhân viên", "Số đơn", "Doanh số", "HH bán hàng", "HH từ CTV", "Tổng HH", "Phí ship KH trả", "Tiền NV chịu", "Tổng lượng"],
+    ["Nhân viên", "Số đơn", "Doanh số", "HH bán hàng", "HH từ CTV", "Tổng HH", "Ship KH Trả", "Tiền NV chịu", "Tổng lương"],
   ];
   salesData.forEach(s => {
     const totalHh = (s.total_commission || 0) + (s.override_commission || 0);
@@ -136,7 +140,7 @@ export function exportAdminCommission(opts: {
     ["CHI TIẾT HOA HỒNG THEO ĐƠN HÀNG"],
     [`Kỳ: ${period}`],
     [],
-    ["Mã đơn", "Ngày", "Nhân viên", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng", "Lương", "Trạng thái"],
+    ["Mã đơn", "Ngày", "Nhân viên", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng", "Ship KH Trả", "Tiền NV chịu", "Lương", "Trạng thái"],
   ];
   orderCommissions.forEach(o => {
     orderRows.push([
@@ -147,6 +151,8 @@ export function exportAdminCommission(opts: {
       o.group_name || "—",
       o.total_amount,
       o.commission_amount,
+      Number(o.khach_tra_ship) || 0,
+      Number(o.nv_chiu_display) || 0,
       Number(o.luong) || 0,
       o.status === "pending" ? "Chờ duyệt" :
       o.status === "shipping" ? "Đang giao" :
@@ -159,13 +165,15 @@ export function exportAdminCommission(opts: {
     "TỔNG CỘNG", "", "", "", "",
     orderCommissions.reduce((s, o) => s + o.total_amount, 0),
     orderCommissions.reduce((s, o) => s + o.commission_amount, 0),
+    orderCommissions.reduce((s, o) => s + Number(o.khach_tra_ship || 0), 0),
+    orderCommissions.reduce((s, o) => s + Number(o.nv_chiu_display || 0), 0),
     orderCommissions.reduce((s, o) => s + Number(o.luong || 0), 0),
     "",
   ]);
   if (periodSummary && (periodSummary.total_luong != null || periodSummary.total_khach_ship != null)) {
     orderRows.push([]);
     orderRows.push([
-      "Tổng lượng (cả kỳ lọc)", "", "", "", "", "", "",
+      "Tổng lương (cả kỳ lọc)", "", "", "", "", "", "", "", "",
       periodSummary.total_luong ?? "",
       "",
     ]);

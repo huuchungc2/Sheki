@@ -119,21 +119,31 @@ router.get('/summary', auth, async (req, res, next) => {
 router.get('/orders', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { month, year, group_id, page = 1, limit = 20 } = req.query;
+    const { month, year, group_id, page = 1, limit = 20, user_id } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const conditions = ['1=1'];
     const baseParams = [];
 
-    // Sales chỉ thấy direct commissions của chính mình (không hiển thị override/adjustment ở bảng này)
+    // Sales: HH bán hàng (direct) + HH từ CTV (override cho user_id = mình). Không gồm adjustment ở bảng này.
     if (req.user.scope_own_data) {
       conditions.push('t.user_id = ?');
-      conditions.push("t.type = 'direct'");
+      conditions.push("(t.type = 'direct' OR t.type = 'override')");
       conditions.push("t.entry_kind = 'commission'");
       baseParams.push(req.user.id);
+    } else if (user_id != null && String(user_id).trim() !== '') {
+      // Admin: xem 1 nhân viên — cùng bộ lọc như «Hoa hồng của tôi» (bỏ qua nếu Sales gửi nhầm)
+      const uid = parseInt(String(user_id), 10);
+      if (!Number.isNaN(uid)) {
+        conditions.push('t.user_id = ?');
+        conditions.push("(t.type = 'direct' OR t.type = 'override')");
+        conditions.push("t.entry_kind = 'commission'");
+        baseParams.push(uid);
+      }
     }
-    if (month)    { conditions.push('MONTH(t.entry_date) = ?'); baseParams.push(parseInt(month)); }
-    if (year)     { conditions.push('YEAR(t.entry_date) = ?');  baseParams.push(parseInt(year)); }
+    // Cùng nghĩa Dashboard / Employee overview: kỳ lọc theo **tháng tạo đơn** (o.created_at), không theo thời điểm ghi commission
+    if (month)    { conditions.push('MONTH(o.created_at) = ?'); baseParams.push(parseInt(month)); }
+    if (year)     { conditions.push('YEAR(o.created_at) = ?');  baseParams.push(parseInt(year)); }
     if (group_id) { conditions.push('o.group_id = ?');          baseParams.push(parseInt(group_id)); }
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
@@ -167,14 +177,15 @@ router.get('/orders', auth, async (req, res, next) => {
     const [rows] = await pool.query(`
       SELECT * FROM (
         SELECT
-          t.id, t.commission_amount, t.type, t.ctv_user_id, t.entry_kind,
+          t.id, t.user_id AS commission_user_id, t.commission_amount, t.type, t.ctv_user_id, t.entry_kind,
           ctv.full_name as ctv_name,
           o.id as order_id, o.code as order_code,
+          o.salesperson_id AS order_salesperson_id,
           o.total_amount, o.status, t.entry_date as order_date,
           o.group_id, g.name as group_name,
           cu.name as customer_name,
           o.shipping_fee, o.ship_payer, o.salesperson_absorbed_amount,
-          ROW_NUMBER() OVER (PARTITION BY t.order_id ORDER BY t.id) AS _ord_rn
+          ROW_NUMBER() OVER (PARTITION BY t.order_id, t.user_id ORDER BY t.id) AS _user_ord_rn
         ${baseFrom}
         ${whereClause}
       ) z
@@ -188,7 +199,72 @@ router.get('/orders', auth, async (req, res, next) => {
       ${whereClause}
     `, baseParams);
 
-    const [summaryRows] = await pool.query(`
+    // Sales: tổng HH (direct / override) lấy trực tiếp từ `commissions` + `orders` — trùng GET /reports/dashboard.
+    // Tránh SUM trên subquery UNION + JOIN (MySQL có thể làm sai phân nhánh override).
+    let s;
+    const parsedQueryUid = user_id != null && String(user_id).trim() !== ''
+      ? parseInt(String(user_id), 10)
+      : NaN;
+    const adminEmployeeUid =
+      !req.user.scope_own_data && !Number.isNaN(parsedQueryUid) ? parsedQueryUid : null;
+
+    if (req.user.scope_own_data) {
+      const summaryConds = ['c.user_id = ?'];
+      const summaryParams = [req.user.id];
+      if (month) {
+        summaryConds.push('MONTH(o.created_at) = ?');
+        summaryParams.push(parseInt(month, 10));
+      }
+      if (year) {
+        summaryConds.push('YEAR(o.created_at) = ?');
+        summaryParams.push(parseInt(year, 10));
+      }
+      if (group_id) {
+        summaryConds.push('o.group_id = ?');
+        summaryParams.push(parseInt(group_id, 10));
+      }
+      const [summaryRows] = await pool.query(
+        `SELECT
+          COALESCE(SUM(CASE WHEN c.type = 'direct'   THEN c.commission_amount ELSE 0 END), 0) AS direct_commission,
+          COALESCE(SUM(CASE WHEN c.type = 'override' THEN c.commission_amount ELSE 0 END), 0) AS override_commission,
+          COALESCE(SUM(c.commission_amount), 0) AS total_commission,
+          COUNT(DISTINCT CASE WHEN c.type = 'direct' THEN c.order_id END) AS total_orders
+         FROM commissions c
+         INNER JOIN orders o ON c.order_id = o.id
+         WHERE ${summaryConds.join(' AND ')}`,
+        summaryParams
+      );
+      s = summaryRows[0];
+    } else if (adminEmployeeUid != null) {
+      const summaryConds = ['c.user_id = ?'];
+      const summaryParams = [adminEmployeeUid];
+      if (month) {
+        summaryConds.push('MONTH(o.created_at) = ?');
+        summaryParams.push(parseInt(month, 10));
+      }
+      if (year) {
+        summaryConds.push('YEAR(o.created_at) = ?');
+        summaryParams.push(parseInt(year, 10));
+      }
+      if (group_id) {
+        summaryConds.push('o.group_id = ?');
+        summaryParams.push(parseInt(group_id, 10));
+      }
+      const [summaryRows] = await pool.query(
+        `SELECT
+          COALESCE(SUM(CASE WHEN c.type = 'direct'   THEN c.commission_amount ELSE 0 END), 0) AS direct_commission,
+          COALESCE(SUM(CASE WHEN c.type = 'override' THEN c.commission_amount ELSE 0 END), 0) AS override_commission,
+          COALESCE(SUM(c.commission_amount), 0) AS total_commission,
+          COUNT(DISTINCT CASE WHEN c.type = 'direct' THEN c.order_id END) AS total_orders
+         FROM commissions c
+         INNER JOIN orders o ON c.order_id = o.id
+         WHERE ${summaryConds.join(' AND ')}`,
+        summaryParams
+      );
+      s = summaryRows[0];
+    } else {
+      const [summaryRows] = await pool.query(
+        `
       SELECT
         COALESCE(SUM(CASE WHEN t.type = 'direct'   THEN t.commission_amount ELSE 0 END), 0) as direct_commission,
         COALESCE(SUM(CASE WHEN t.type = 'override' THEN t.commission_amount ELSE 0 END), 0) as override_commission,
@@ -196,29 +272,83 @@ router.get('/orders', auth, async (req, res, next) => {
         COUNT(DISTINCT CASE WHEN t.type = 'direct' AND t.entry_kind='commission' THEN t.order_id END) as total_orders
       ${baseFrom}
       ${whereClause}
-    `, baseParams);
-
-    const s = summaryRows[0];
-
-    const [orderAggRows] = await pool.query(
-      `
-      SELECT
-        COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
-        COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
-      FROM orders o
-      WHERE o.id IN (
-        SELECT DISTINCT t.order_id
-        ${baseFrom}
-        ${whereClause}
-      )
     `,
-      baseParams
-    );
-    const oa = orderAggRows[0] || {};
-    const totalKhachShip = parseFloat(oa.total_khach_ship) || 0;
-    const totalNvChiu = parseFloat(oa.total_nv_chiu) || 0;
-    const totalCommission = parseFloat(s.total_commission) || 0;
-    const totalLuong = totalCommission + totalKhachShip - totalNvChiu;
+        baseParams
+      );
+      s = summaryRows[0];
+    }
+
+    let totalKhachShip = 0;
+    let totalNvChiu = 0;
+    if (req.user.scope_own_data && month && year) {
+      // Ship / NV chỉ theo đơn mình là salesperson (giống GET /reports/dashboard — không lấy ship đơn của CTV khi chỉ có override)
+      const shipConds = [
+        'MONTH(o.created_at) = ?',
+        'YEAR(o.created_at) = ?',
+        'o.salesperson_id = ?',
+        "o.status <> 'cancelled'",
+      ];
+      const shipParams = [parseInt(month), parseInt(year), req.user.id];
+      if (group_id) {
+        shipConds.push('o.group_id = ?');
+        shipParams.push(parseInt(group_id));
+      }
+      const [shipRows] = await pool.query(
+        `SELECT
+          COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+          COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+        FROM orders o
+        WHERE ${shipConds.join(' AND ')}`,
+        shipParams
+      );
+      totalKhachShip = parseFloat(shipRows[0]?.total_khach_ship) || 0;
+      totalNvChiu = parseFloat(shipRows[0]?.total_nv_chiu) || 0;
+    } else if (adminEmployeeUid != null && month && year) {
+      const shipConds = [
+        'MONTH(o.created_at) = ?',
+        'YEAR(o.created_at) = ?',
+        'o.salesperson_id = ?',
+        "o.status <> 'cancelled'",
+      ];
+      const shipParams = [parseInt(month, 10), parseInt(year, 10), adminEmployeeUid];
+      if (group_id) {
+        shipConds.push('o.group_id = ?');
+        shipParams.push(parseInt(group_id, 10));
+      }
+      const [shipRows] = await pool.query(
+        `SELECT
+          COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+          COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+        FROM orders o
+        WHERE ${shipConds.join(' AND ')}`,
+        shipParams
+      );
+      totalKhachShip = parseFloat(shipRows[0]?.total_khach_ship) || 0;
+      totalNvChiu = parseFloat(shipRows[0]?.total_nv_chiu) || 0;
+    } else {
+      const [orderAggRows] = await pool.query(
+        `
+        SELECT
+          COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+          COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+        FROM orders o
+        WHERE o.id IN (
+          SELECT DISTINCT t.order_id
+          ${baseFrom}
+          ${whereClause}
+        )
+      `,
+        baseParams
+      );
+      const oa = orderAggRows[0] || {};
+      totalKhachShip = parseFloat(oa.total_khach_ship) || 0;
+      totalNvChiu = parseFloat(oa.total_nv_chiu) || 0;
+    }
+
+    const directComm = parseFloat(s.direct_commission) || 0;
+    const overrideComm = parseFloat(s.override_commission) || 0;
+    const totalCommissionAll = parseFloat(s.total_commission) || 0;
+    const totalLuong = totalCommissionAll + totalKhachShip - totalNvChiu;
 
     res.json({
       data: rows.map(row => {
@@ -226,9 +356,16 @@ router.get('/orders', auth, async (req, res, next) => {
         const khach =
           row.ship_payer === 'shop' ? 0 : parseFloat(row.shipping_fee) || 0;
         const nv = parseFloat(row.salesperson_absorbed_amount) || 0;
-        const ordRn = parseInt(row._ord_rn, 10) || 1;
-        const luong = ordRn === 1 ? comm + khach - nv : comm;
-        const { _ord_rn, ...rest } = row;
+        const userOrdRn = parseInt(row._user_ord_rn, 10) || 1;
+        const uid = parseInt(row.commission_user_id, 10);
+        const spId = parseInt(row.order_salesperson_id, 10);
+        const isPhuTrachDon = uid === spId;
+        const applyShipNv =
+          isPhuTrachDon &&
+          userOrdRn === 1 &&
+          String(row.entry_kind) === 'commission';
+        const luong = applyShipNv ? comm + khach - nv : comm;
+        const { _user_ord_rn, commission_user_id, order_salesperson_id, ...rest } = row;
         return {
           ...rest,
           commission_amount: comm,
@@ -236,8 +373,8 @@ router.get('/orders', auth, async (req, res, next) => {
           shipping_fee: parseFloat(row.shipping_fee) || 0,
           ship_payer: row.ship_payer === 'shop' ? 'shop' : 'customer',
           salesperson_absorbed_amount: nv,
-          khach_tra_ship: ordRn === 1 ? khach : 0,
-          nv_chiu_display: ordRn === 1 ? nv : 0,
+          khach_tra_ship: applyShipNv ? khach : 0,
+          nv_chiu_display: applyShipNv ? nv : 0,
           luong,
         };
       }),
@@ -245,9 +382,9 @@ router.get('/orders', auth, async (req, res, next) => {
       page: parseInt(page),
       limit: parseInt(limit),
       summary: {
-        direct_commission: parseFloat(s.direct_commission) || 0,
-        override_commission: parseFloat(s.override_commission) || 0,
-        total_commission: totalCommission,
+        direct_commission: directComm,
+        override_commission: overrideComm,
+        total_commission: totalCommissionAll,
         total_orders: parseInt(s.total_orders) || 0,
         total_khach_ship: totalKhachShip,
         total_nv_chiu: totalNvChiu,

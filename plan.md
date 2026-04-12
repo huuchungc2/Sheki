@@ -92,7 +92,7 @@ Hệ thống quản lý bán hàng nội bộ cho công ty Velocity.
 | 14 | InventoryExport | /inventory/export | Admin only |
 | 15 | BulkImport | /{entity}/import | Admin only |
 | 16 | SalaryReport | /reports | Admin+Sales |
-| 17 | CommissionDetail | /reports/commissions/:userId | Admin only |
+| 17 | CommissionReport (drilldown NV) | /reports/commissions/:userId | Admin only — cùng UI «Hoa hồng của tôi», `user_id` query |
 | 18 | ActivityLog | /logs | Admin only |
 | 19 | ChangePassword | /change-password | All |
 | 20 | Settings | /settings | Admin only |
@@ -174,7 +174,7 @@ src/
 │   ├── InventoryExport.tsx   # Admin, decimal qty
 │   ├── BulkImport.tsx        # Excel upload with template download
 │   ├── SalaryReport.tsx      # Admin: all employees, Sales: own
-│   ├── CommissionDetail.tsx  # Admin: detail per employee
+│   ├── (drilldown) CommissionReport @ /reports/commissions/:userId
 │   ├── ActivityLog.tsx       # Admin: activity log with detail modal
 │   ├── ChangePassword.tsx    # All users
 │   └── Settings.tsx          # Admin: role permissions grid

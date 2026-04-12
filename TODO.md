@@ -7,15 +7,11 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **Deploy production (chạy trên VPS)**
-  - Chạy `deploy.sh` trên VPS CentOS 7.9
-  - Cấu hình DOMAIN/SSL + kiểm tra Nginx/PM2
+- [ ] **Đa shop (multi-tenant)** — Đọc `FEATURE_MULTI_SHOP.md`; triển khai theo giai đoạn: DB `shops` + `user_shops` + `shop_id` → auth/switch-shop → middleware từng route → FE chọn shop → UI admin gán user
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
-
-- [ ] **Đa shop (multi-tenant)** — Đọc `FEATURE_MULTI_SHOP.md`; triển khai theo giai đoạn: DB `shops` + `user_shops` + `shop_id` → auth/switch-shop → middleware từng route → FE chọn shop → UI admin gán user
 
 - [x] **Reset mật khẩu Admin = comiumauden1234**
   - Thêm migration reset role admin + cập nhật CLAUDE.md
@@ -63,9 +59,31 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Deploy production (website)** — Triển khai VPS / domain / SSL (hoàn tất ngoài repo)
+
+- [x] **Đổi nhãn Phí ship KH → Ship KH Trả** — Dashboard, CommissionReport, OrderList, Excel, LOGIC, CLAUDE — Files: `src/pages/Dashboard.tsx`, `src/pages/CommissionReport.tsx`, `src/pages/OrderList.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`, `CLAUDE.md`, `CHANGELOG.md`
+
+- [x] **Admin HH: danh sách NV chỉ khi có doanh thu kỳ** — `GET /reports/salary` — Files: `backend/routes/reports.js`, `LOGIC_BUSINESS.md`
+
+- [x] **Admin chi tiết NV: cùng UI «Hoa hồng của tôi»** — Route `/reports/commissions/:userId` → CommissionReport + `GET /commissions/orders?user_id=` — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`, `src/App.tsx`, `plan.md`
+
+- [x] **Fix summary Sales: ô «HH từ CTV» = 0** — Tổng HH từ query `commissions`+`orders` (khớp Dashboard) — Files: `backend/routes/commissions.js`, `CHANGELOG.md`
+
+- [x] **Báo cáo HH Sales: HH từ CTV (override) trong bảng + ship/NV đúng** — API `commissions/orders` + cột Loại HH — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`, `LOGIC_BUSINESS.md`
+
+- [x] **Chính tả Tổng lương** — Nhãn đúng «lương» không phải «lượng» — Files: `src/pages/CommissionReport.tsx`, `src/pages/Dashboard.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`, `CLAUDE.md`, `CHANGELOG.md`
+
+- [x] **Nhãn «Tổng lương»** — Thay «Tổng lương cho toàn bộ» trên UI / Excel / LOGIC / CLAUDE — Files: `src/pages/CommissionReport.tsx`, `src/pages/Dashboard.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`, `CLAUDE.md`
+
+- [x] **Hoa hồng của tôi: cột Phí ship KH + NV chịu (trước Lương)** — Bảng chi tiết + Excel — Files: `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`
+
+- [x] **Giải thích «HH từ CTV» = override quản lý** — Chú thích UI + FAQ `LOGIC_BUSINESS.md` (CTV thường thấy 0; HH nằm ở HH bán hàng) — Files: `src/pages/CommissionReport.tsx`, `src/pages/Dashboard.tsx`, `LOGIC_BUSINESS.md`, `CHANGELOG.md`
+
+- [x] **Lương / Tổng lương — công thức & nhãn** — HH + HH CTV + ship KH − NV; UI «Tổng lương»; API Sales cộng override; ship/NV đúng theo `salesperson_id` — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`, `src/pages/Dashboard.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`, `CLAUDE.md`
+
 - [x] **Admin: Thu chi** — Chọn NV, loại Thu/Chi, nhóm bán hàng (theo `user_groups`), ghi chú, số tiền; danh sách + lọc + xóa — Files: `migrations/015_cash_transactions.sql`, `schema.sql`, `backend/routes/cash-transactions.js`, `backend/server.js`, `src/pages/CashTransactions.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
 
-- [x] **Dashboard: Tổng lượng + ship KH + NV chịu (tháng)** — API + UI — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`, `LOGIC_BUSINESS.md`
+- [x] **Dashboard: Tổng lương + ship KH + NV chịu (tháng)** — API + UI — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`, `LOGIC_BUSINESS.md`
 
 - [x] **API default active_only + EmployeeList «Tất cả»** — GET products/users mặc định chỉ active; `active_only=all` — Files: `backend/routes/products.js`, `backend/routes/users.js`, `src/pages/EmployeeList.tsx`
 
@@ -73,11 +91,11 @@
 
 - [x] **Danh sách SP & nhân viên: xóa/vô hiệu + hiển thị đúng** — `DELETE` SP, `active_only` API + UI, sửa PUT product partial — Files: `backend/routes/products.js`, `backend/routes/users.js`, `src/pages/ProductList.tsx`, `src/pages/EmployeeList.tsx`
 
-- [x] **Báo cáo hoa hồng: cột Lương + Tổng lượng** — Cùng công thức danh sách đơn; tổng kỳ = tổng HH + ship KH trả − NV chịu (ship/NV một lần/đơn) — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`
+- [x] **Báo cáo hoa hồng: cột Lương + Tổng lương** — Cùng công thức danh sách đơn; tổng kỳ = tổng HH + ship KH trả − NV chịu (ship/NV một lần/đơn) — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`
 
 - [x] **Báo cáo HH: KPI Phí ship KH + Tiền NV chịu** — Hai thẻ thống kê cả kỳ lọc — Files: `src/pages/CommissionReport.tsx`
 
-- [x] **Admin — bảng Hoa hồng NV: cột Phí ship KH, NV chịu, Tổng lượng** — API `/reports/salary` + Excel — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`
+- [x] **Admin — bảng Hoa hồng NV: cột Phí ship KH, NV chịu, Tổng lương** — API `/reports/salary` + Excel — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`
 
 - [x] **Fix ship/NV bảng HH NV** — Chỉ theo `salesperson_id` đơn, không gán ship/NV của đơn Lan cho Minh (override) — Files: `backend/routes/reports.js`, `LOGIC_BUSINESS.md`
 

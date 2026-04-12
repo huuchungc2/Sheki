@@ -1,5 +1,60 @@
 # CHANGELOG
 
+## [12/04/2026] - TODO: Deploy production — hoàn tất (ghi nhận)
+### Changed
+- **TODO.md** — Gỡ mục «Deploy production» khỏi ĐANG LÀM; chuyển **Đa shop** lên ĐANG LÀM
+
+## [12/04/2026] - Đổi nhãn «Phí ship KH» → «Ship KH Trả» (UI + Excel + tài liệu)
+### Changed
+- **Dashboard**, **CommissionReport**, **OrderList**, **exportExcel**, **LOGIC_BUSINESS.md**, **CLAUDE.md** — Nhãn cột/KPI/mô tả: **Ship KH Trả** (thay «Phí ship KH» / «Phí ship KH trả»)
+
+## [12/04/2026] - Admin báo cáo HH: chỉ NV có phát sinh doanh thu kỳ
+### Changed
+- **GET /reports/salary** — Danh sách nhân viên (tab Hoa hồng Admin) chỉ gồm Sales có **doanh số** trong tháng/năm (và nhóm nếu chọn) **> 0** — Files: `backend/routes/reports.js`, `LOGIC_BUSINESS.md`
+
+## [12/04/2026] - Admin «Chi tiết» NV = cùng màn «Hoa hồng của tôi» + API `user_id`
+### Changed
+- **`GET /api/commissions/orders?user_id=`** — Admin lọc 1 nhân viên: cùng bộ lọc direct/override + summary/ship/NV như Sales — Files: `backend/routes/commissions.js`
+### Changed
+- **`/reports/commissions/:userId`** — Dùng **CommissionReport** (KPI + bảng đơn như NV), nút quay lại báo cáo toàn bộ; bỏ `CommissionDetail.tsx` — Files: `src/pages/CommissionReport.tsx`, `src/App.tsx`, `plan.md`
+
+## [12/04/2026] - Fix: «HH từ CTV» trên Hoa hồng của tôi = 0 (summary Sales)
+### Fixed
+- **GET /api/commissions/orders** — Với Sales, tổng **direct / override / total_commission** tính trực tiếp `commissions` + `orders` (cùng logic Dashboard); tránh SUM trên subquery UNION+JOIN làm **override_commission** sai — Files: `backend/routes/commissions.js`
+
+## [12/04/2026] - Báo cáo HH Sales: hiển thị HH từ CTV (override), ship/NV đúng
+### Fixed
+- **GET /api/commissions/orders** — Sales: danh sách gồm cả `type=override` (trước đây chỉ `direct` nên không thấy HH từ CTV trên đơn CTV). Tổng **ship KH / NV chịu** chỉ theo đơn `salesperson_id` = mình (không lấy từ đơn chỉ có override). Summary dùng `total_commission` từ cùng bộ lọc — Files: `backend/routes/commissions.js`
+### Changed
+- **CommissionReport** — Cột **Loại HH** cho mọi user; badge **HH từ CTV (tên CTV)**; cột Hoa hồng màu xanh cho override — Files: `src/pages/CommissionReport.tsx`
+- **LOGIC_BUSINESS.md** — Mô tả bảng chi tiết Sales
+
+## [12/04/2026] - Chính tả: **Tổng lương** (tiền lương), không dùng «Tổng lượng»
+### Changed
+- **CommissionReport**, **Dashboard**, **exportExcel**, **LOGIC_BUSINESS.md**, **CLAUDE.md**, **TODO.md**, **CHANGELOG** (mục liên quan) — Đổi nhãn **Tổng lượng** → **Tổng lương**; API vẫn dùng `total_luong`
+
+## [12/04/2026] - Đổi nhãn «Tổng lương cho toàn bộ» → «Tổng lương»
+### Changed
+- **CommissionReport**, **Dashboard**, **exportExcel**, **LOGIC_BUSINESS.md**, **CLAUDE.md** — Nhãn KPI / cột / Excel / tài liệu dùng **Tổng lương** (công thức không đổi)
+
+## [12/04/2026] - Báo cáo HH: cột Phí ship KH & NV chịu (trước Lương)
+### Changed
+- **CommissionReport** — Bảng chi tiết theo đơn: thêm **Phí ship KH**, **NV chịu** (trước **Lương**); tổng trang — Files: `src/pages/CommissionReport.tsx`
+- **exportExcel** — Xuất Excel chi tiết đơn (Sales + Admin sheet đơn) cùng hai cột — Files: `src/lib/exportExcel.ts`
+
+## [12/04/2026] - Giải thích «HH từ CTV» (override quản lý) + gợi ý UI
+### Changed
+- **CommissionReport**, **Dashboard (Sales)** — Chú thích: ô «HH từ CTV» là tiền **quản lý** nhận (override) từ đơn để CTV lên; nếu chỉ là CTV thì thường **0**, HH nằm ở «HH bán hàng» — Files: `src/pages/CommissionReport.tsx`, `src/pages/Dashboard.tsx`
+- **LOGIC_BUSINESS.md** — Đoạn FAQ vì sao có thể = 0
+
+## [12/04/2026] - Lương: công thức HH+CTV+ship−NV; nhãn «Tổng lương cho toàn bộ»
+### Changed
+- **LOGIC_BUSINESS.md**, **CLAUDE.md** — Mô tả **Lương** / **Tổng lương cho toàn bộ** = tổng HH (direct + HH từ CTV) + phí ship KH − NV; ship/NV chỉ theo `salesperson_id` (không gán vào dòng HH override quản lý trên đơn CTV).
+### Fixed
+- **GET /api/commissions/orders** — Sales: cộng **HH từ CTV** (override) vào `summary.total_commission` / `total_luong`; cột **Lương** từng dòng: ship/NV chỉ khi `user_id` = `orders.salesperson_id` và dòng commission gốc đầu tiên của user trên đơn — Files: `backend/routes/commissions.js`
+### Changed
+- **CommissionReport**, **Dashboard**, **exportExcel** — Nhãn **Tổng lương cho toàn bộ**, mô tả phụ «Tổng HH + phí ship KH − tiền NV chịu» — Files: `src/pages/CommissionReport.tsx`, `src/pages/Dashboard.tsx`, `src/lib/exportExcel.ts`
+
 ## [12/04/2026] - EmployeeList: URL + fix crash + EmployeeForm quay lại danh sách
 ### Fixed
 - **EmployeeList** — Đồng bộ `page`, `q`, `department`, `role`, `status` trên URL; không full-screen loading mỗi lần đổi trang; `json.data` an toàn; chữ ký tên không crash khi `full_name` rỗng; phân trang `getVisiblePageNumbers`; nhắc lỗi / «Đang cập nhật» khi có dữ liệu cũ — Files: `src/pages/EmployeeList.tsx`
@@ -68,7 +123,7 @@
 - **API** — `GET/POST/DELETE /api/cash-transactions` (Admin) — Files: `backend/routes/cash-transactions.js`, `backend/server.js`
 - **FE** — `/cash-transactions`: form + danh sách, lọc NV/loại/ngày — Files: `src/pages/CashTransactions.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
 
-## [11/04/2026] - Dashboard: Phí ship KH, NV chịu, Tổng lượng (tháng)
+## [11/04/2026] - Dashboard: Phí ship KH, NV chịu, Tổng lương (tháng)
 ### Added
 - **GET /reports/dashboard** — `luongMonth`: `total_khach_ship`, `total_nv_chiu`, `total_luong` (tháng hiện tại; đơn không hủy) — Files: `backend/routes/reports.js`
 - **Dashboard** — 3 thẻ KPI (Admin + Sales) — Files: `src/pages/Dashboard.tsx`, `LOGIC_BUSINESS.md`
@@ -96,7 +151,7 @@
 ### Fixed
 - **`GET /reports/salary`** — Phí ship KH + Tiền NV chịu chỉ từ đơn mà NV là **salesperson_id**; người chỉ có HH override không bị cộng ship/NV của đơn người khác — Files: `backend/routes/reports.js`, `LOGIC_BUSINESS.md`
 
-## [11/04/2026] - Admin: bảng Hoa hồng NV + 3 cột ship / NV chịu / Tổng lượng
+## [11/04/2026] - Admin: bảng Hoa hồng NV + 3 cột ship / NV chịu / Tổng lương
 ### Added
 - **GET /reports/salary** — `total_khach_ship`, `total_nv_chiu`, `total_luong` theo từng sales (đơn × NV distinct) — Files: `backend/routes/reports.js`
 - **CommissionReport** tab Hoa hồng nhân viên + **exportExcel** sheet Tổng hợp NV — Files: `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`
@@ -105,12 +160,12 @@
 ### Changed
 - **CommissionReport** — KPI hiển thị **Tổng phí ship KH trả** và **Tổng tiền NV chịu** (cả kỳ), grid 7 cột — Files: `src/pages/CommissionReport.tsx`
 
-## [11/04/2026] - Báo cáo hoa hồng: cột Lương + Tổng lượng
+## [11/04/2026] - Báo cáo hoa hồng: cột Lương + Tổng lương
 ### Added
 - **GET /api/commissions/orders** — `luong`, `khach_tra_ship`, `nv_chiu_display`, `summary.total_khach_ship`, `summary.total_nv_chiu`, `summary.total_luong` (ship/NV một lần theo đơn; `ROW_NUMBER` cho nhiều dòng cùng đơn) — Files: `backend/routes/commissions.js`
-- **CommissionReport** — cột **Lương**, thẻ **Tổng lượng**, dòng tổng kỳ dưới bảng — Files: `src/pages/CommissionReport.tsx`
+- **CommissionReport** — cột **Lương**, thẻ **Tổng lương**, dòng tổng kỳ dưới bảng — Files: `src/pages/CommissionReport.tsx`
 - **exportExcel** — cột Lương + chỉ số kỳ trong export Sales/Admin — Files: `src/lib/exportExcel.ts`
-- **LOGIC_BUSINESS.md** — mô tả Lương / Tổng lượng trên báo cáo HH
+- **LOGIC_BUSINESS.md** — mô tả Lương / Tổng lương trên báo cáo HH
 
 ## [11/04/2026] - Danh sách đơn: mobile thẻ dọc (không cuộn ngang)
 ### Changed

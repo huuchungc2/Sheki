@@ -1,8 +1,8 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   DollarSign, TrendingUp, Users, Download,
-  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign
+  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign, ArrowLeft
 } from "lucide-react";
 import { formatCurrency, formatDate, cn } from "../lib/utils";
 import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel";
@@ -19,11 +19,32 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export function CommissionReport() {
+  const { userId: userIdFromRoute } = useParams();
+  const subjectUserId = React.useMemo(() => {
+    if (!userIdFromRoute || !/^\d+$/.test(String(userIdFromRoute))) return undefined;
+    return parseInt(String(userIdFromRoute), 10);
+  }, [userIdFromRoute]);
+
   const currentUser = React.useMemo(() => {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
   }, []);
   const isAdmin = currentUser?.can_access_admin === true || currentUser?.role === "admin";
+  /** Admin xem 1 NV: cùng UI/công thức «Hoa hồng của tôi», lọc theo user_id trên URL (không dùng id đăng nhập) */
+  const employeeDrilldown = Boolean(isAdmin && subjectUserId != null);
+  const [subjectUserName, setSubjectUserName] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!employeeDrilldown || subjectUserId == null) {
+      setSubjectUserName(null);
+      return;
+    }
+    const token = localStorage.getItem("token");
+    fetch(`${API_URL}/users/${subjectUserId}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => setSubjectUserName(j?.data?.full_name || null))
+      .catch(() => setSubjectUserName(null));
+  }, [employeeDrilldown, subjectUserId]);
 
   const [loading, setLoading]   = React.useState(true);
   const [error, setError]       = React.useState<string | null>(null);
@@ -88,8 +109,9 @@ export function CommissionReport() {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({ month, year, page: String(commPage), limit: String(commLimit) });
       if (groupId) params.set("group_id", groupId);
+      if (employeeDrilldown && subjectUserId != null) params.set("user_id", String(subjectUserId));
 
-      // 1. Fetch đơn hàng trực tiếp (type=direct)
+      // 1. Chi tiết theo đơn (cùng API «Hoa hồng của tôi»; Admin + user_id = 1 NV)
       const orderRes = await fetch(`${API_URL}/commissions/orders?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -99,39 +121,25 @@ export function CommissionReport() {
       setCommTotal(orderJson.total || 0);
       const s = orderJson.summary;
       const directCommission = parseFloat(s?.direct_commission) || 0;
+      const overrideCommission = parseFloat(s?.override_commission) || 0;
       const totalOrders = parseInt(s?.total_orders) || 0;
       const totalKhachShip = parseFloat(s?.total_khach_ship) || 0;
       const totalNvChiu = parseFloat(s?.total_nv_chiu) || 0;
       const totalLuongApi = parseFloat(s?.total_luong) || 0;
-
-      // 2. Sales: lấy thêm HH từ CTV (override) để hiển thị đúng stat cards
-      let overrideCommission = 0;
-      if (isAdmin) {
-        // Admin: /commissions/orders trả về cả direct + override toàn hệ thống
-        overrideCommission = parseFloat(s?.override_commission) || 0;
-      } else if (currentUser?.id) {
-        const ctvRes = await fetch(
-          `${API_URL}/users/${currentUser.id}/collaborators/commissions?month=${month}&year=${year}${groupId ? `&group_id=${groupId}` : ''}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (ctvRes.ok) {
-          const ctvJson = await ctvRes.json();
-          overrideCommission = parseFloat(ctvJson.data?.totals?.total_override_commission) || 0;
-        }
-      }
+      const totalCommApi = parseFloat(s?.total_commission) || 0;
 
       setSummary({
         direct_commission: directCommission,
         override_commission: overrideCommission,
-        total_commission: directCommission + overrideCommission,
+        total_commission: totalCommApi || directCommission + overrideCommission,
         total_orders: totalOrders,
         total_khach_ship: totalKhachShip,
         total_nv_chiu: totalNvChiu,
         total_luong: totalLuongApi,
       });
 
-      // 3. Admin: fetch salary + CTV commissions
-      if (isAdmin) {
+      // 3. Admin (bảng tổng toàn hệ thống): không gọi khi đang xem 1 NV — tránh nhầm với dữ liệu cá nhân
+      if (isAdmin && !employeeDrilldown) {
         const salaryParams = new URLSearchParams({ month, year });
         if (groupId) salaryParams.set("group_id", groupId);
 
@@ -150,16 +158,21 @@ export function CommissionReport() {
           setCtvOrders(j.data?.orders || []);
           setCtvTotals(j.data?.totals || {});
         }
+      } else if (employeeDrilldown) {
+        setSalesData([]);
+        setCtvPairs([]);
+        setCtvOrders([]);
+        setCtvTotals({});
       }
     } catch (err: any) {
       setError(err.message || "Đã xảy ra lỗi");
     } finally {
       setLoading(false);
     }
-  }, [month, year, groupId, commPage, commLimit, isAdmin, currentUser?.id]);
+  }, [month, year, groupId, commPage, commLimit, isAdmin, currentUser?.id, employeeDrilldown, subjectUserId]);
 
-  // Reset page khi filter hoặc limit thay đổi
-  React.useEffect(() => { setCommPage(1); }, [month, year, groupId, commLimit]);
+  // Reset page khi filter hoặc limit / NV thay đổi
+  React.useEffect(() => { setCommPage(1); }, [month, year, groupId, commLimit, subjectUserId]);
 
   React.useEffect(() => { fetchReport(); }, [fetchReport]);
 
@@ -189,6 +202,7 @@ export function CommissionReport() {
       // Fetch toàn bộ data (limit=9999, không phân trang)
       const allParams = new URLSearchParams({ month, year, page: "1", limit: "9999" });
       if (groupId) allParams.set("group_id", groupId);
+      if (employeeDrilldown && subjectUserId != null) allParams.set("user_id", String(subjectUserId));
       const allRes = await fetch(`${API_URL}/commissions/orders?${allParams}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -196,7 +210,7 @@ export function CommissionReport() {
       const allOrders = allJson.data || [];
       const periodSummary = { ...summary, ...(allJson.summary || {}) };
 
-      if (isAdmin) {
+      if (isAdmin && !employeeDrilldown) {
         exportAdminCommission({
           salesData,
           orderCommissions: allOrders,
@@ -211,7 +225,7 @@ export function CommissionReport() {
         exportSalesCommission({
           orders: allOrders,
           summary: periodSummary,
-          userName: currentUser?.full_name || "NhanVien",
+          userName: employeeDrilldown ? (subjectUserName || `NV #${subjectUserId}`) : (currentUser?.full_name || "NhanVien"),
           month,
           year,
           groupName,
@@ -246,13 +260,32 @@ export function CommissionReport() {
     <div className="space-y-6">
       {/* Header + Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            {isAdmin ? "Báo cáo hoa hồng toàn bộ" : "Hoa hồng của tôi"}
-          </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            {isAdmin ? "Tổng hợp hoa hồng tất cả nhân viên." : "Xem chi tiết hoa hồng theo từng đơn hàng."}
-          </p>
+        <div className="flex items-start gap-3">
+          {employeeDrilldown && (
+            <Link
+              to="/reports/commissions"
+              className="mt-1 p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
+              title="Về báo cáo toàn bộ"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              {employeeDrilldown
+                ? `Hoa hồng: ${subjectUserName || `Nhân viên #${subjectUserId}`}`
+                : isAdmin
+                  ? "Báo cáo hoa hồng toàn bộ"
+                  : "Hoa hồng của tôi"}
+            </h1>
+            <p className="text-slate-500 text-sm mt-0.5">
+              {employeeDrilldown
+                ? "Cùng cột KPI và bảng đơn như «Hoa hồng của tôi» — theo nhân viên đã chọn (lọc theo user_id trên URL)."
+                : isAdmin
+                  ? "Tổng hợp hoa hồng tất cả nhân viên."
+                  : "Xem chi tiết hoa hồng theo từng đơn hàng."}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Filter nhóm */}
@@ -283,7 +316,7 @@ export function CommissionReport() {
         </div>
       </div>
 
-      {/* Stat cards — HH → ship KH → NV chịu → tổng lượng */}
+      {/* Stat cards — HH → Ship KH Trả → NV chịu → Tổng lương */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
         {/* Tổng HH bán hàng (direct) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -295,14 +328,18 @@ export function CommissionReport() {
           <p className="text-xs text-slate-400 mt-0.5">Từ đơn tự bán</p>
         </div>
 
-        {/* HH từ CTV (override) */}
+        {/* HH override: quản lý nhận từ đơn do CTV lên (không phải HH của CTV) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 mb-3">
             <Users className="w-4 h-4" />
           </div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">HH từ CTV</p>
           <p className="text-xl font-bold text-blue-700 mt-1">{formatCurrency(summary.override_commission || 0)}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Từ đơn của CTV</p>
+          <p className="text-xs text-slate-400 mt-0.5 leading-snug" title="Chỉ khi bạn là quản lý nhận override; đơn ghi nhận quản lý + cặp collaborators + tier. Nếu bạn chỉ là người lên đơn (CTV), HH nằm ở «HH bán hàng».">
+            {employeeDrilldown || !isAdmin
+              ? "Tiền quản lý nhận từ đơn CTV — nếu chỉ là CTV, thường = 0"
+              : "Override quản lý trên đơn CTV"}
+          </p>
         </div>
 
         {/* Tổng HH = direct + override */}
@@ -317,12 +354,12 @@ export function CommissionReport() {
           <p className="text-xs text-slate-400 mt-0.5">Bán hàng + CTV</p>
         </div>
 
-        {/* Phí ship khách trả (cả kỳ, mỗi đơn 1 lần) */}
+        {/* Ship KH Trả (cả kỳ, mỗi đơn 1 lần) */}
         <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80">
           <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
             <Truck className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wider">Phí ship KH trả</p>
+          <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wider">Ship KH Trả</p>
           <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums">{formatCurrency(summary.total_khach_ship || 0)}</p>
           <p className="text-xs text-slate-500 mt-0.5">Tổng (theo đơn trong kỳ)</p>
         </div>
@@ -337,14 +374,14 @@ export function CommissionReport() {
           <p className="text-xs text-slate-500 mt-0.5">Tổng (theo đơn trong kỳ)</p>
         </div>
 
-        {/* Tổng lượng */}
+        {/* Tổng lương (kỳ) = tổng HH + Ship KH Trả − NV; nhãn: Tổng lương */}
         <div className="bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80 xl:ring-2 xl:ring-violet-200/60">
           <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
             <Wallet className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wider">Tổng lượng</p>
+          <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wider">Tổng lương</p>
           <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums">{formatCurrency(summary.total_luong || 0)}</p>
-          <p className="text-xs text-slate-500 mt-0.5">HH + ship KH − NV chịu</p>
+          <p className="text-xs text-slate-500 mt-0.5">Tổng HH + Ship KH Trả − tiền NV chịu</p>
         </div>
 
         {/* Số đơn */}
@@ -358,8 +395,8 @@ export function CommissionReport() {
         </div>
       </div>
 
-      {/* Admin: tabs Hoa hồng NV / Hoa hồng CTV */}
-      {isAdmin && (
+      {/* Admin: tabs Hoa hồng NV / Hoa hồng CTV — ẩn khi xem 1 NV (đã có bảng chi tiết đơn giống Sales) */}
+      {isAdmin && !employeeDrilldown && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Tab header */}
           <div className="flex border-b border-slate-100">
@@ -406,9 +443,9 @@ export function CommissionReport() {
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">HH bán hàng</th>
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">HH từ CTV</th>
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng HH</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-sky-600 uppercase tracking-wide text-right whitespace-nowrap">Phí ship KH</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-sky-600 uppercase tracking-wide text-right whitespace-nowrap">Ship KH Trả</th>
                       <th className="px-5 py-3 text-xs font-semibold text-rose-600 uppercase tracking-wide text-right whitespace-nowrap">NV chịu</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-violet-600 uppercase tracking-wide text-right whitespace-nowrap">Tổng lượng</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-violet-600 uppercase tracking-wide text-right whitespace-nowrap">Tổng lương</th>
                       <th className="px-5 py-3 w-8"></th>
                     </tr>
                   </thead>
@@ -629,12 +666,14 @@ export function CommissionReport() {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>
-                {isAdmin && <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Loại HH</th>}
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Loại HH</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ngày</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Khách hàng</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhóm BH</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng tiền</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
+                <th className="px-5 py-3 text-xs font-semibold text-sky-600 uppercase tracking-wide text-right whitespace-nowrap">Ship KH Trả</th>
+                <th className="px-5 py-3 text-xs font-semibold text-rose-600 uppercase tracking-wide text-right whitespace-nowrap">NV chịu</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Trạng thái</th>
               </tr>
@@ -642,7 +681,7 @@ export function CommissionReport() {
             <tbody className="divide-y divide-slate-50">
               {orderCommissions.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8} className="px-5 py-12 text-center text-slate-400">
+                  <td colSpan={11} className="px-5 py-12 text-center text-slate-400">
                     Chưa có hoa hồng trong tháng {month}/{year}
                     {groupId ? ` — nhóm đã chọn` : ""}
                   </td>
@@ -656,16 +695,14 @@ export function CommissionReport() {
                     <td className="px-5 py-3">
                       <span className="font-bold text-blue-600 font-mono">{item.order_code}</span>
                     </td>
-                    {isAdmin && (
-                      <td className="px-5 py-3">
-                        {String(item.entry_kind) === "adjustment"
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">Điều chỉnh</span>
-                          : item.type === "direct"
-                            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Bán hàng</span>
-                            : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">CTV: {item.ctv_name || "?"}</span>
-                        }
-                      </td>
-                    )}
+                    <td className="px-5 py-3">
+                      {String(item.entry_kind) === "adjustment"
+                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">Điều chỉnh</span>
+                        : item.type === "direct"
+                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Bán hàng</span>
+                          : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">HH từ CTV{item.ctv_name ? ` (${item.ctv_name})` : ""}</span>
+                      }
+                    </td>
                     <td className="px-5 py-3 text-slate-500">{formatDate(item.order_date)}</td>
                     <td className="px-5 py-3 text-slate-700">{item.customer_name || "—"}</td>
                     <td className="px-5 py-3">
@@ -679,8 +716,22 @@ export function CommissionReport() {
                       "px-5 py-3 text-right font-bold",
                       String(item.entry_kind) === "adjustment"
                         ? (Number(item.commission_amount) < 0 ? "text-rose-600" : "text-emerald-600")
-                        : "text-emerald-600"
+                        : item.type === "override"
+                          ? "text-blue-700"
+                          : "text-emerald-600"
                     )}>{formatCurrency(item.commission_amount)}</td>
+                    <td className={cn(
+                      "px-5 py-3 text-right font-semibold tabular-nums",
+                      Number(item.khach_tra_ship) > 0 ? "text-sky-800" : "text-slate-300"
+                    )}>
+                      {formatCurrency(Number(item.khach_tra_ship) || 0)}
+                    </td>
+                    <td className={cn(
+                      "px-5 py-3 text-right font-semibold tabular-nums",
+                      Number(item.nv_chiu_display) > 0 ? "text-rose-700" : "text-slate-300"
+                    )}>
+                      {formatCurrency(Number(item.nv_chiu_display) || 0)}
+                    </td>
                     <td className={cn(
                       "px-5 py-3 text-right font-bold",
                       Number(item.luong) < 0 ? "text-red-600" : "text-violet-800"
@@ -699,7 +750,7 @@ export function CommissionReport() {
             {orderCommissions.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-800 text-white text-sm font-bold">
-                  <td className="px-5 py-3" colSpan={isAdmin ? 5 : 4}>
+                  <td className="px-5 py-3" colSpan={5}>
                     Trang {commPage} — {commTotal} dòng
                   </td>
                   <td className="px-5 py-3 text-right">
@@ -708,14 +759,20 @@ export function CommissionReport() {
                   <td className="px-5 py-3 text-right text-emerald-400">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.commission_amount, 0))}
                   </td>
+                  <td className="px-5 py-3 text-right text-sky-300 tabular-nums">
+                    {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.khach_tra_ship || 0), 0))}
+                  </td>
+                  <td className="px-5 py-3 text-right text-rose-300 tabular-nums">
+                    {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.nv_chiu_display || 0), 0))}
+                  </td>
                   <td className="px-5 py-3 text-right text-violet-300">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.luong || 0), 0))}
                   </td>
                   <td className="px-5 py-3"></td>
                 </tr>
                 <tr className="bg-slate-100 border-t border-slate-200 text-xs text-slate-600">
-                  <td className="px-5 py-2 text-right font-medium" colSpan={isAdmin ? 9 : 8}>
-                    Tổng lượng (cả kỳ lọc):{' '}
+                  <td className="px-5 py-2 text-right font-medium" colSpan={11}>
+                    Tổng lương (cả kỳ lọc):{' '}
                     <span className="font-bold text-violet-700">{formatCurrency(summary.total_luong || 0)}</span>
                   </td>
                 </tr>

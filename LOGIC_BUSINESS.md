@@ -90,10 +90,12 @@ Trường hợp: theo đơn, **số phải thu từ khách** (ví dụ sau ship/
 - **Ý nghĩa:** khoản NV **tự bỏ ra** tương ứng phần **khách không trả đủ** so với số thu lý thuyết; **không** gọi là “giảm giá đơn” thuần túy nếu mục đích là bù từ phía NV.
 - **Xử lý sau:** số **Tiền NV chịu** (theo đơn) **cộng dồi để trừ vào tổng hoa hồng** NV ở kỳ quyết toán (báo cáo HH / settlement — triển khai riêng).
 - **Lưu DB:** `orders.salesperson_absorbed_amount` — **không** làm đổi công thức **Thu khách** / **Shop thu** / `total_amount` (thu khách).
-- **Danh sách đơn — cột Lương (theo đơn):** `Hoa hồng (HH direct trên đơn) + (KH trả phí ship) − Tiền NV chịu`. **KH trả phí ship** = `shipping_fee` khi `ship_payer` = khách, = **0** khi shop trả ship.
-- **Báo cáo hoa hồng — bảng chi tiết theo đơn:** cột **Lương** cùng công thức trên **theo từng dòng** (dòng HH + phần ship/NV chỉ tính ở **một dòng đầu** mỗi `order_id` để không nhân đôi ship/NV). **Tổng lượng (kỳ)** = tổng tiền HH các dòng + tổng phí ship KH trả − tổng NV chịu, với **ship và NV cộng một lần theo mỗi đơn** trong phạm vi lọc.
-- **Admin — bảng Hoa hồng nhân viên (`/reports/salary`):** **Phí ship KH trả** và **Tiền NV chịu** chỉ cộng theo các đơn mà NV đó là **`orders.salesperson_id`** (người lên đơn / phụ trách đơn). Người chỉ nhận **HH override** (ví dụ quản lý) **không** nhận ship/NV của đơn CTV — **Tổng lượng** = Tổng HH (direct + override) + ship − NV chịu (ship/NV theo đơn của mình).
-- **Tổng quan (`/reports/dashboard`):** Tháng hiện tại — **Phí ship KH trả**, **Tiền NV chịu**, **Tổng lượng** (tổng HH tháng + ship − NV); Admin = toàn hệ thống; Sales = đơn `salesperson_id` = mình; đơn `cancelled` không tính ship/NV.
+- **Danh sách đơn — cột Lương (theo đơn, NV phụ trách):** `Hoa hồng direct trên đơn (người bán) + Ship KH Trả − Tiền NV chịu`. **Ship KH Trả** = `shipping_fee` khi `ship_payer` = khách, = **0** khi shop trả ship. (HH quản lý từ đơn CTV nằm ở dòng HH override trên báo cáo, không cộng vào cột này của đơn CTV.)
+- **Admin xem 1 nhân viên:** `/reports/commissions/{user_id}` — cùng KPI + bảng đơn như «Hoa hồng của tôi»; API `GET /commissions/orders?user_id=` (không dùng id đăng nhập Admin).
+- **Báo cáo hoa hồng Admin — danh sách nhân viên:** `GET /reports/salary` chỉ trả về NV có **doanh số kỳ** (`SUM(total_amount)` đơn làm `salesperson` trong tháng/năm, theo nhóm nếu lọc) **> 0** — không liệt kê toàn bộ Sales không phát sinh đơn.
+- **Báo cáo hoa hồng — bảng chi tiết theo đơn:** Sales thấy cả dòng **direct** (đơn mình bán) và **override** (HH từ CTV — đơn do CTV lên, quản lý nhận HH). Cột **Lương** = **tiền HH của dòng đó** + **một lần** (Ship KH Trả − tiền NV chịu của đơn) **chỉ khi** `commissions.user_id` = `orders.salesperson_id` và là **dòng commission gốc** đầu tiên của **người đó** trên đơn (không áp ship/NV cho dòng HH override của quản lý trên đơn CTV). **Tổng Ship KH Trả / NV chịu** (kỳ) với Sales chỉ cộng các đơn mà NV là **`salesperson_id`** (giống Dashboard), không lấy ship/NV từ đơn chỉ có override. **Tổng lương (kỳ)** = **tổng hoa hồng** (HH bán hàng + HH từ CTV / override) + **tổng** Ship KH Trả − **tổng** tiền NV chịu.
+- **Admin — bảng Hoa hồng nhân viên (`/reports/salary`):** **Ship KH Trả** và **Tiền NV chịu** chỉ cộng theo các đơn mà NV đó là **`orders.salesperson_id`**. Người chỉ nhận **HH override** (quản lý) **không** nhận ship/NV của đơn CTV — **Tổng lương** = Tổng HH (direct + HH từ CTV) + Ship KH Trả − NV chịu (theo đơn mình phụ trách).
+- **Tổng quan (`/reports/dashboard`):** Tháng hiện tại — **Ship KH Trả**, **Tiền NV chịu**, **Tổng lương** (tổng HH tháng + Ship KH Trả − NV); Admin = toàn hệ thống; Sales = đơn `salesperson_id` = mình; đơn `cancelled` không tính ship/NV.
 
 ---
 
@@ -122,11 +124,18 @@ A được thêm: 1,000,000 × 3% = 30,000đ
 ### Hoa hồng Quản lý (override) — ĐÃ TẮT
 - Theo rule hiện tại: **không chọn quản lý → chỉ A**, **chọn quản lý → chỉ quản lý** ⇒ **không dùng** cơ chế “override quản lý” nữa.
 
-### Tổng lương nhân viên
+### Lương / Tổng lương (kỳ)
 ```
-Lương = Hoa hồng bản thân (tổng từng đơn)
-      + Hoa hồng từ CTV (nếu có cấu hình riêng)
+Lương (theo nhân viên, kỳ) = Tổng HH bán hàng (direct)
+                           + Tổng HH từ CTV (override từ đơn CTV)
+                           + Tổng Ship KH Trả (theo đơn mình là salesperson_id)
+                           − Tổng tiền NV chịu (theo đơn mình là salesperson_id)
+
+Tổng lương (cùng công thức tổng kỳ) = Tổng hoa hồng + Tổng Ship KH Trả − Tổng tiền NV chịu
 ```
+(trong đó **tổng hoa hồng** = direct + HH từ CTV; ship/NV chỉ gắn đơn phụ trách, không gắn vào tiền override của quản lý trên đơn CTV.)
+
+**Vì sao «HH từ CTV» có thể = 0?** — Trên UI đây là **hoa hồng override** dành cho **quản lý** (`commissions.type = 'override'`) khi CTV lên đơn **ghi nhận quản lý** và hệ thống tạo được dòng override (cặp `collaborators` sales↔CTV, quản lý cùng nhóm đơn, có tier trong `commission_tiers`). Tiền hoa hồng của **chính CTV** khi bán nằm ở **HH bán hàng** (direct), không nằm ở ô «HH từ CTV». Tài khoản chỉ là CTV (không nhận override) thì ô này **0** là đúng.
 
 ---
 

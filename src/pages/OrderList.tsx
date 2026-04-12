@@ -472,7 +472,7 @@ export function OrderList() {
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Thời gian</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng tiền</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">
-                    KH Trả Ship
+                    Ship KH Trả
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">NV chịu</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
@@ -562,7 +562,7 @@ export function OrderList() {
                             "text-sm font-semibold tabular-nums",
                             luongDon < 0 ? "text-red-600" : "text-violet-800"
                           )}
-                          title="HH + KH ship − NV chịu"
+                          title="HH + Ship KH Trả − NV chịu"
                         >
                           {formatCurrency(luongDon)}
                         </span>

@@ -269,6 +269,7 @@ router.get('/salary', auth, async (req, res, next) => {
        ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE r.code = 'sales' AND u.is_active = 1
        ${ordersExistsCond}
+       AND COALESCE(o_stats.total_sales, 0) > 0
        ORDER BY total_sales DESC`,
       [
         // o_stats
