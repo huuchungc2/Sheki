@@ -4,7 +4,7 @@ import {
   DollarSign, TrendingUp, Users, Download,
   Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign, ArrowLeft
 } from "lucide-react";
-import { formatCurrency, formatDate, cn } from "../lib/utils";
+import { formatCurrency, formatDate, cn, isAdminUser } from "../lib/utils";
 import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel";
 
 const API_URL =
@@ -25,11 +25,27 @@ export function CommissionReport() {
     return parseInt(String(userIdFromRoute), 10);
   }, [userIdFromRoute]);
 
-  const currentUser = React.useMemo(() => {
+  const [currentUser, setCurrentUser] = React.useState<any>(() => {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
+  });
+  React.useEffect(() => {
+    const syncFromStorage = () => {
+      const u = localStorage.getItem("user");
+      setCurrentUser(u ? JSON.parse(u) : null);
+    };
+    const onAuthChange = () => syncFromStorage();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "user" || e.key === "token") syncFromStorage();
+    };
+    window.addEventListener("auth-change", onAuthChange as any);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("auth-change", onAuthChange as any);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
-  const isAdmin = currentUser?.can_access_admin === true || currentUser?.role === "admin";
+  const isAdmin = isAdminUser(currentUser);
   /** Admin xem 1 NV: cùng UI/công thức «Hoa hồng của tôi», lọc theo user_id trên URL (không dùng id đăng nhập) */
   const employeeDrilldown = Boolean(isAdmin && subjectUserId != null);
   const [subjectUserName, setSubjectUserName] = React.useState<string | null>(null);

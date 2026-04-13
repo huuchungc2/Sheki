@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [13/04/2026] - Admin: tab “Hoa hồng nhân viên” trống
+### Fixed
+- **Reports/Salary** — Fix lỗi runtime do biến `ordersExistsCond` chưa khai báo làm API `/reports/salary` không trả dữ liệu → tab “Hoa hồng nhân viên” rỗng — Files: `backend/routes/reports.js`
+- **Frontend** — Làm ổn định nhận diện Admin (fallback role_name/chuỗi) và đồng bộ user state trong `CommissionReport` để UI không bị lệch quyền sau refresh `/auth/me` — Files: `src/lib/utils.ts`, `src/pages/CommissionReport.tsx`
+
 ## [13/04/2026] - Hoàn hàng: gỡ màn Admin `/returns/admin`
 ### Removed
 - **AdminReturns (FE)** — Gỡ route/menu/page `/returns/admin` (thừa), giữ màn `/returns` — Files: `src/App.tsx`, `src/components/Layout.tsx`, `src/pages/AdminReturns.tsx` (deleted)

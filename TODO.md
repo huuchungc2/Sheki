@@ -59,6 +59,8 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Admin: tab “Hoa hồng nhân viên” bị trống** — Fix API `/reports/salary` lỗi biến undefined khiến không trả dữ liệu; FE nhận diện Admin ổn định hơn — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`, `src/lib/utils.ts`
+
 - [x] **Dashboard Admin/Sales: doanh thu = tổng tạm tính (subtotal), không phải thu khách** — API `reports/dashboard` + UI gợi ý + đơn gần đây
 
 - [x] **Quy tắc hoàn/trả hàng: chỉ điều chỉnh hoa hồng (không đụng Ship/NV chịu)** — Update tài liệu nghiệp vụ (LOGIC_BUSINESS)

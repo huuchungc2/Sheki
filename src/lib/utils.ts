@@ -46,9 +46,32 @@ export function composeIsoDate(y: string, m: string, d: string): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 }
 
-/** Quyền giao diện / API quản trị (JWT có can_access_admin; token cũ fallback role === admin) */
-export function isAdminUser(user: { can_access_admin?: boolean; role?: string } | null | undefined): boolean {
+/** Quyền giao diện / API quản trị.
+ * - Ưu tiên cờ `can_access_admin` (có thể là boolean/number/string tuỳ nguồn localStorage/token cũ).
+ * - Fallback theo `role`/`role_name` (case-insensitive) để tránh UI bị ẩn khi dữ liệu role viết hoa.
+ */
+export function isAdminUser(
+  user:
+    | { can_access_admin?: any; role?: any; role_name?: any }
+    | null
+    | undefined
+): boolean {
   if (!user) return false;
-  if (typeof user.can_access_admin === "boolean") return user.can_access_admin;
-  return user.role === "admin";
+
+  const flag = (user as any).can_access_admin;
+  if (typeof flag === "boolean") return flag;
+  if (flag != null) {
+    const s = String(flag).trim().toLowerCase();
+    if (s === "1" || s === "true" || s === "yes") return true;
+    if (s === "0" || s === "false" || s === "no") return false;
+    // fallback: JS truthy
+    return Boolean(flag);
+  }
+
+  const role = String((user as any).role || "").trim().toLowerCase();
+  if (role === "admin") return true;
+  const roleName = String((user as any).role_name || "").trim().toLowerCase();
+  if (roleName === "admin") return true;
+
+  return false;
 }
