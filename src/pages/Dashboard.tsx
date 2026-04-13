@@ -125,6 +125,7 @@ export function Dashboard() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Doanh thu tháng này</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{formatCurrency(thisMonth.revenue || 0)}</p>
               <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(today.revenue || 0)}</p>
+              <p className="text-[11px] text-slate-400 mt-1 leading-snug">Tổng tạm tính (sau CK dòng), không gồm đơn hủy</p>
             </div>
 
             {/* Tổng đơn tháng */}
@@ -164,8 +165,8 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Lương / ship / NV chịu — tháng này */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Lương / ship / NV chịu — cùng lưới 2 cột mobile như hàng KPI */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80">
               <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
                 <Truck className="w-4 h-4" />
@@ -182,7 +183,7 @@ export function Dashboard() {
               <p className="text-xl font-bold text-rose-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
               <p className="text-xs text-slate-500 mt-0.5">Tháng này (theo đơn)</p>
             </div>
-            <div className="bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80">
+            <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80">
               <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
                 <Wallet className="w-4 h-4" />
               </div>
@@ -279,7 +280,7 @@ export function Dashboard() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
-                        <p className="text-xs font-bold text-slate-900">{formatCurrency(o.total_amount)}</p>
+                        <p className="text-xs font-bold text-slate-900">{formatCurrency(o.subtotal ?? o.total_amount)}</p>
                         <span className={cn("text-[10px] font-semibold", st.color)}>{st.label}</span>
                       </div>
                     </Link>
@@ -334,6 +335,7 @@ export function Dashboard() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Doanh thu tháng</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{formatCurrency(thisMonth.revenue || 0)}</p>
               <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(today.revenue || 0)}</p>
+              <p className="text-[11px] text-slate-400 mt-1 leading-snug">Tổng tạm tính (sau CK dòng), không gồm đơn hủy</p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -366,8 +368,8 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Lương / ship / NV chịu — tháng này (của bạn) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Lương / ship / NV — cùng lưới 2 cột mobile như hàng KPI */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80">
               <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
                 <Truck className="w-4 h-4" />
@@ -384,7 +386,7 @@ export function Dashboard() {
               <p className="text-xl font-bold text-rose-800 mt-1 tabular-nums">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
               <p className="text-xs text-slate-500 mt-0.5">Đơn bạn phụ trách — tháng này</p>
             </div>
-            <div className="bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80">
+            <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80">
               <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
                 <Wallet className="w-4 h-4" />
               </div>
@@ -463,7 +465,7 @@ export function Dashboard() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
-                        <p className="text-xs font-bold text-slate-900">{formatCurrency(o.total_amount)}</p>
+                        <p className="text-xs font-bold text-slate-900">{formatCurrency(o.subtotal ?? o.total_amount)}</p>
                         <span className={cn("text-[10px] font-semibold", st.color)}>{st.label}</span>
                       </div>
                     </Link>

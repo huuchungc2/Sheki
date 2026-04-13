@@ -346,7 +346,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className={cn(
-        "flex-1 transition-all duration-300 min-h-screen flex flex-col",
+        "flex-1 min-w-0 transition-all duration-300 min-h-screen flex flex-col",
         isMobile ? "ml-0" : (isSidebarOpen ? "ml-64" : "ml-20")
       )}>
         {/* TopBar */}
@@ -483,8 +483,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content */}
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-          <div key={location.pathname}>
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
+          <div key={location.pathname} className="min-w-0">
             {children}
           </div>
         </div>

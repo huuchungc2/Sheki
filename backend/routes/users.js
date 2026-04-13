@@ -7,10 +7,17 @@ const { getPool } = require('../config/db');
 
 
 
-router.get('/', auth, authorize('admin'), async (req, res, next) => {
+// Admin: toàn bộ NV. Sales (scope_own_data): cần dropdown NV phụ trách ở form KH — không chỉ admin.
+router.get('/', auth, (req, res, next) => {
+  if (req.user.can_access_admin || req.user.scope_own_data) return next();
+  return res.status(403).json({ error: 'Không có quyền truy cập' });
+}, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, department, role, scoped, page = 1, limit = 20, active_only } = req.query;
+    // Sales không được xem toàn bộ user (admin); luôn lọc scope_own_data như dropdown form KH
+    const scopedEffective =
+      !req.user.can_access_admin && req.user.scope_own_data ? '1' : scoped;
     const offset = (page - 1) * limit;
 
     let query = `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, u.role_id,
@@ -49,7 +56,7 @@ router.get('/', auth, authorize('admin'), async (req, res, next) => {
       params.push(role);
     }
 
-    if (scoped === '1' || scoped === 'true') {
+    if (scopedEffective === '1' || scopedEffective === 'true') {
       query += ' AND r.scope_own_data = 1';
       countQuery += ' AND r.scope_own_data = 1';
     }

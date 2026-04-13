@@ -256,11 +256,13 @@ export function CommissionReport() {
     );
   }
 
+  const isSalesMyCommission = !isAdmin && !employeeDrilldown;
+
   return (
-    <div className="space-y-6">
-      {/* Header + Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-3">
+    <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
+      {/* Header + Filter — lọc + Xuất Excel luôn 1 hàng (overflow-x-auto khi màn hẹp) */}
+      <div className="flex flex-col gap-4 min-w-0 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3 min-w-0 sm:min-w-[12rem] sm:flex-1">
           {employeeDrilldown && (
             <Link
               to="/reports/commissions"
@@ -270,15 +272,15 @@ export function CommissionReport() {
               <ArrowLeft className="w-5 h-5" />
             </Link>
           )}
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-slate-900 break-words">
               {employeeDrilldown
                 ? `Hoa hồng: ${subjectUserName || `Nhân viên #${subjectUserId}`}`
                 : isAdmin
                   ? "Báo cáo hoa hồng toàn bộ"
                   : "Hoa hồng của tôi"}
             </h1>
-            <p className="text-slate-500 text-sm mt-0.5">
+            <p className="text-slate-500 text-sm mt-0.5 break-words">
               {employeeDrilldown
                 ? "Cùng cột KPI và bảng đơn như «Hoa hồng của tôi» — theo nhân viên đã chọn (lọc theo user_id trên URL)."
                 : isAdmin
@@ -287,27 +289,26 @@ export function CommissionReport() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Filter nhóm */}
+        <div className="flex flex-nowrap items-center justify-start sm:justify-end gap-2 w-full min-w-0 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
           <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
+            className="shrink-0 min-w-[7.5rem] max-w-[46vw] sm:max-w-none sm:min-w-[9rem] px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
             <option value="">Tất cả nhóm</option>
             {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
           <select value={month} onChange={(e) => setMonth(e.target.value)}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
+            className="shrink-0 min-w-[5.5rem] px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={String(i + 1).padStart(2, "0")}>Tháng {i + 1}</option>
             ))}
           </select>
           <select value={year} onChange={(e) => setYear(e.target.value)}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
+            className="shrink-0 min-w-[4.25rem] px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <button
             onClick={handleExport}
             disabled={loading || exporting}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50">
+            className="inline-flex shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50">
             {exporting
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang xuất...</>
               : <><Download className="w-4 h-4" /> Xuất Excel</>
@@ -316,88 +317,93 @@ export function CommissionReport() {
         </div>
       </div>
 
-      {/* Stat cards — HH → Ship KH Trả → NV chịu → Tổng lương */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-        {/* Tổng HH bán hàng (direct) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      {/* KPI — cùng Dashboard; [&>*]:min-w-0 tránh grid làm tràn ngang (min-width: auto mặc định) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full min-w-0 [&>*]:min-w-0">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-0">
           <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-3">
-            <DollarSign className="w-4 h-4" />
-          </div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">HH bán hàng</p>
-          <p className="text-xl font-bold text-emerald-700 mt-1">{formatCurrency(summary.direct_commission || 0)}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Từ đơn tự bán</p>
-        </div>
-
-        {/* HH override: quản lý nhận từ đơn do CTV lên (không phải HH của CTV) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 mb-3">
-            <Users className="w-4 h-4" />
-          </div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">HH từ CTV</p>
-          <p className="text-xl font-bold text-blue-700 mt-1">{formatCurrency(summary.override_commission || 0)}</p>
-          <p className="text-xs text-slate-400 mt-0.5 leading-snug" title="Chỉ khi bạn là quản lý nhận override; đơn ghi nhận quản lý + cặp collaborators + tier. Nếu bạn chỉ là người lên đơn (CTV), HH nằm ở «HH bán hàng».">
-            {employeeDrilldown || !isAdmin
-              ? "Tiền quản lý nhận từ đơn CTV — nếu chỉ là CTV, thường = 0"
-              : "Override quản lý trên đơn CTV"}
-          </p>
-        </div>
-
-        {/* Tổng HH = direct + override */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3">
             <TrendingUp className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tổng hoa hồng</p>
-          <p className="text-xl font-bold text-purple-700 mt-1">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH bán hàng</p>
+          <p className="text-xl font-bold text-emerald-700 mt-1 break-words tabular-nums">{formatCurrency(summary.direct_commission || 0)}</p>
+          <p className="text-xs text-slate-400 mt-1 break-words">Từ đơn tự bán</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-0">
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${isSalesMyCommission ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>
+            <Users className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH từ CTV</p>
+          <p className={`text-xl font-bold mt-1 break-words tabular-nums ${isSalesMyCommission ? "text-purple-700" : "text-blue-700"}`}>
+            {formatCurrency(summary.override_commission || 0)}
+          </p>
+          {isSalesMyCommission ? (
+            <p className="text-xs text-slate-400 mt-1 leading-snug break-words" title="Override cho quản lý khi CTV lên đơn ghi nhận quản lý. Nếu bạn chỉ là CTV, thường = 0; HH của bạn nằm ở «HH bán hàng».">
+              Tổng HH: {formatCurrency(summary.total_commission || 0)}
+            </p>
+          ) : (
+            <p className="text-xs text-slate-400 mt-1 leading-snug line-clamp-3 break-words" title="Chỉ khi bạn là quản lý nhận override; đơn ghi nhận quản lý + cặp collaborators + tier. Nếu bạn chỉ là người lên đơn (CTV), HH nằm ở «HH bán hàng».">
+              {employeeDrilldown
+                ? "Tiền quản lý nhận từ đơn CTV — nếu chỉ là CTV, thường = 0"
+                : "Override quản lý trên đơn CTV"}
+            </p>
+          )}
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3">
+            <DollarSign className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng hoa hồng</p>
+          <p className="text-xl font-bold text-purple-700 mt-1 break-words tabular-nums">
             {formatCurrency((summary.direct_commission || 0) + (summary.override_commission || 0))}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">Bán hàng + CTV</p>
+          <p className="text-xs text-slate-400 mt-1 break-words">Bán hàng + CTV</p>
         </div>
 
-        {/* Ship KH Trả (cả kỳ, mỗi đơn 1 lần) */}
-        <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80">
-          <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
-            <Truck className="w-4 h-4" />
-          </div>
-          <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wider">Ship KH Trả</p>
-          <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums">{formatCurrency(summary.total_khach_ship || 0)}</p>
-          <p className="text-xs text-slate-500 mt-0.5">Tổng (theo đơn trong kỳ)</p>
-        </div>
-
-        {/* Tiền NV chịu */}
-        <div className="bg-gradient-to-br from-rose-50 to-white p-5 rounded-2xl border border-rose-100 shadow-sm ring-1 ring-rose-100/80">
-          <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 mb-3">
-            <CircleDollarSign className="w-4 h-4" />
-          </div>
-          <p className="text-xs font-semibold text-rose-600/90 uppercase tracking-wider">Tiền NV chịu</p>
-          <p className="text-xl font-bold text-rose-800 mt-1 tabular-nums">{formatCurrency(summary.total_nv_chiu || 0)}</p>
-          <p className="text-xs text-slate-500 mt-0.5">Tổng (theo đơn trong kỳ)</p>
-        </div>
-
-        {/* Tổng lương (kỳ) = tổng HH + Ship KH Trả − NV; nhãn: Tổng lương */}
-        <div className="bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80 xl:ring-2 xl:ring-violet-200/60">
-          <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
-            <Wallet className="w-4 h-4" />
-          </div>
-          <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wider">Tổng lương</p>
-          <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums">{formatCurrency(summary.total_luong || 0)}</p>
-          <p className="text-xs text-slate-500 mt-0.5">Tổng HH + Ship KH Trả − tiền NV chịu</p>
-        </div>
-
-        {/* Số đơn */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-0">
           <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 mb-3">
             <ShoppingCart className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Số đơn hàng</p>
-          <p className="text-xl font-bold text-slate-900 mt-1">{summary.total_orders || 0}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Trong tháng {month}/{year}</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Số đơn hàng</p>
+          <p className="text-xl font-bold text-slate-900 mt-1 tabular-nums">{summary.total_orders || 0}</p>
+          <p className="text-xs text-slate-400 mt-1 break-words">Tháng {month}/{year}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 w-full min-w-0 [&>*]:min-w-0">
+        <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
+            <Truck className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wide">Ship KH Trả</p>
+          <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums break-words">{formatCurrency(summary.total_khach_ship || 0)}</p>
+          <p className="text-xs text-slate-500 mt-0.5 break-words leading-snug">
+            {isSalesMyCommission ? "Đơn bạn phụ trách — tháng này" : "Tháng này (theo đơn)"}
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-rose-50 to-white p-5 rounded-2xl border border-rose-100 shadow-sm ring-1 ring-rose-100/80 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 mb-3">
+            <CircleDollarSign className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-rose-600/90 uppercase tracking-wide">Tiền NV chịu</p>
+          <p className="text-xl font-bold text-rose-800 mt-1 tabular-nums break-words">{formatCurrency(summary.total_nv_chiu || 0)}</p>
+          <p className="text-xs text-slate-500 mt-0.5 break-words leading-snug">
+            {isSalesMyCommission ? "Đơn bạn phụ trách — tháng này" : "Tháng này (theo đơn)"}
+          </p>
+        </div>
+        <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-violet-50 to-white p-5 rounded-2xl border border-violet-100 shadow-sm ring-1 ring-violet-100/80 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
+            <Wallet className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lương</p>
+          <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums break-words">{formatCurrency(summary.total_luong || 0)}</p>
+          <p className="text-xs text-slate-500 mt-0.5 break-words leading-snug">Tổng HH + Ship KH Trả − tiền NV chịu</p>
         </div>
       </div>
 
       {/* Admin: tabs Hoa hồng NV / Hoa hồng CTV — ẩn khi xem 1 NV (đã có bảng chi tiết đơn giống Sales) */}
       {isAdmin && !employeeDrilldown && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
           {/* Tab header */}
           <div className="flex border-b border-slate-100">
             <button
@@ -433,8 +439,8 @@ export function CommissionReport() {
             salesData.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-sm">Chưa có dữ liệu trong tháng này</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
+              <div className="min-w-0 overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm min-w-[640px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
@@ -640,7 +646,7 @@ export function CommissionReport() {
       )}
 
       {/* Bảng chi tiết hoa hồng theo đơn (cả sales lẫn admin đều thấy) */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-700">
             Chi tiết hoa hồng theo đơn hàng
@@ -661,8 +667,8 @@ export function CommissionReport() {
             <span>dòng/trang</span>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
+        <div className="min-w-0 overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm min-w-[720px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>

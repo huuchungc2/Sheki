@@ -4,6 +4,7 @@ const XLSX = require('xlsx');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
+const { normalizeCustomerBirthday } = require('../utils/customerBirthday');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -302,7 +303,7 @@ async function importCustomer(pool, row, userId) {
   const district = row.district || '';
   const ward = row.ward || '';
   const source = row.source || 'store';
-  const birthday = row.birthday || '';
+  const birthday = normalizeCustomerBirthday(row.birthday);
 
   if (!name) {
     throw new Error('Thiếu tên khách hàng');

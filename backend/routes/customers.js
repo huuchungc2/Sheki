@@ -3,6 +3,16 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
+const { normalizeCustomerBirthday } = require('../utils/customerBirthday');
+
+/** Chỉ gán NV khi tồn tại trong users — tránh ER_NO_REFERENCED_ROW_2 (id lỗi / localStorage cũ) */
+async function resolveAssignedEmployeeId(pool, raw) {
+  if (raw == null || raw === '') return null;
+  const id = parseInt(String(raw), 10);
+  if (Number.isNaN(id) || id < 1) return null;
+  const [rows] = await pool.query('SELECT id FROM users WHERE id = ? LIMIT 1', [id]);
+  return rows.length ? id : null;
+}
 
 router.get('/', auth, async (req, res, next) => {
   try {
@@ -116,9 +126,19 @@ router.post('/', auth, async (req, res, next) => {
 
     const pool = await getPool();
 
+    const [[creatorRow]] = await pool.query('SELECT id FROM users WHERE id = ? LIMIT 1', [req.user.id]);
+    if (!creatorRow) {
+      return res.status(401).json({
+        error: 'Tài khoản đăng nhập không còn trong hệ thống (created_by). Đăng xuất và đăng nhập lại.',
+      });
+    }
+
+    const birthdayDb = normalizeCustomerBirthday(birthday);
+    const assignDb = await resolveAssignedEmployeeId(pool, assigned_employee_id);
+
     const [result] = await pool.query(
       'INSERT INTO customers (name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, cleanedPhone, email, address, city, district, ward, birthday, tier || 'new', source, assigned_employee_id, note, req.user.id]
+      [name, cleanedPhone, email || null, address, city, district, ward, birthdayDb, tier || 'new', source || null, assignDb, note != null ? note : null, req.user.id]
     );
 
     res.status(201).json({ id: result.insertId, message: 'Tạo khách hàng thành công' });
@@ -153,9 +173,12 @@ router.put('/:id', auth, async (req, res, next) => {
       return res.status(400).json({ error: 'Địa chỉ phải đầy đủ: Tỉnh/TP, Quận/Huyện, Phường/Xã, Số nhà/Đường' });
     }
 
+    const birthdayDb = normalizeCustomerBirthday(birthday);
+    const assignDb = await resolveAssignedEmployeeId(pool, assigned_employee_id);
+
     await pool.query(
       'UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, city = ?, district = ?, ward = ?, birthday = ?, tier = ?, source = ?, assigned_employee_id = ?, note = ? WHERE id = ?',
-      [name, cleanedPhone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note, req.params.id]
+      [name, cleanedPhone, email || null, address, city, district, ward, birthdayDb, tier, source || null, assignDb, note != null ? note : null, req.params.id]
     );
 
     res.json({ message: 'Cập nhật khách hàng thành công' });

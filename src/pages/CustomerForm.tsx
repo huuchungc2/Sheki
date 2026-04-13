@@ -12,6 +12,53 @@ const API_URL =
   "/api";
 const LOCATIONS = locationsData as any;
 
+/** DB/API → yyyy-mm-dd */
+function birthdayToInputValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return String(iso).split("T")[0].trim().slice(0, 10);
+}
+
+function splitBirthday(iso: string): { y: string; m: string; d: string } {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { y: "", m: "", d: "" };
+  const [y, m, d] = iso.split("-");
+  return { y, m: String(Number(m)), d: String(Number(d)) };
+}
+
+/** Đủ ngày/tháng/năm → yyyy-mm-dd (dương lịch); thiếu → "" */
+function composeBirthday(y: string, m: string, d: string): string {
+  if (!y || !m || !d) return "";
+  const yi = parseInt(y, 10);
+  const mi = parseInt(m, 10);
+  const di = parseInt(d, 10);
+  if (Number.isNaN(yi) || Number.isNaN(mi) || Number.isNaN(di) || mi < 1 || mi > 12 || di < 1) return "";
+  const maxD = new Date(yi, mi, 0).getDate();
+  const day = Math.min(di, maxD);
+  const dt = new Date(yi, mi - 1, day);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function getDefaultCustomerForm() {
+  let uid = "";
+  try {
+    const raw = localStorage.getItem("user");
+    if (raw) uid = String(JSON.parse(raw).id ?? "");
+  } catch { /* ignore */ }
+  return {
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "",
+    district: "",
+    ward: "",
+    birthday: "",
+    tier: "new",
+    source: "zalo",
+    assigned_employee_id: uid,
+    note: "",
+  };
+}
+
 // Parse old address string to extract city/district/ward
 function parseAddress(fullAddress: string): { city?: string; district?: string; ward?: string; street?: string } {
   const result: { city?: string; district?: string; ward?: string; street?: string } = {};
@@ -77,21 +124,9 @@ export function CustomerForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
 
-  const [formData, setFormData] = React.useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-    city: "",
-    district: "",
-    ward: "",
-    birthday: "",
-    tier: "new",
-    source: "",
-    assigned_employee_id: "",
-    note: "",
-  });
+  const [formData, setFormData] = React.useState(getDefaultCustomerForm);
   const [employees, setEmployees] = React.useState<any[]>([]);
+  const [birthParts, setBirthParts] = React.useState({ y: "", m: "", d: "" });
   const [isLoading, setIsLoading] = React.useState(false);
   const [fetchLoading, setFetchLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -110,6 +145,18 @@ export function CustomerForm() {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
   }, []);
+
+  /** Đảm bảo NV đang đăng nhập có trong dropdown (scoped list đôi khi không gồm admin) */
+  const employeeOptions = React.useMemo(() => {
+    const list = [...employees];
+    if (currentUser?.id != null && !list.some((e: any) => Number(e.id) === Number(currentUser.id))) {
+      list.unshift({
+        id: currentUser.id,
+        full_name: currentUser.full_name || `Nhân viên #${currentUser.id}`,
+      });
+    }
+    return list;
+  }, [employees, currentUser]);
 
   React.useEffect(() => {
     const fetchEmployees = async () => {
@@ -162,6 +209,7 @@ export function CustomerForm() {
             if (loc.street && !address) address = loc.street;
           }
           
+          const bIso = birthdayToInputValue(c.birthday);
           setFormData({
             name: c.name || "",
             phone: c.phone || "",
@@ -170,12 +218,13 @@ export function CustomerForm() {
             city: city,
             district: district,
             ward: ward,
-            birthday: c.birthday ? c.birthday.split('T')[0] : "",
+            birthday: bIso,
             tier: c.tier || "new",
-            source: c.source || "",
-            assigned_employee_id: c.assigned_employee_id || "",
+            source: c.source || "zalo",
+            assigned_employee_id: c.assigned_employee_id != null ? String(c.assigned_employee_id) : "",
             note: c.note || "",
           });
+          setBirthParts(splitBirthday(bIso));
         } catch (err: any) {
           setError(err.message);
         } finally {
@@ -194,6 +243,15 @@ export function CustomerForm() {
     if (errors[field as keyof typeof errors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  const setBirthPart = (key: "y" | "m" | "d", val: string) => {
+    setBirthParts(prev => {
+      const next = { ...prev, [key]: val };
+      const iso = composeBirthday(next.y, next.m, next.d);
+      setFormData(f => ({ ...f, birthday: iso }));
+      return next;
+    });
   };
 
   const validateForm = (): boolean => {
@@ -244,10 +302,15 @@ export function CustomerForm() {
       const token = getAuthToken();
       const method = isEdit ? "PUT" : "POST";
       const url = isEdit ? `${API_URL}/customers/${id}` : `${API_URL}/customers`;
+      const rawAssign = formData.assigned_employee_id?.trim();
+      const parsedAssign = rawAssign ? parseInt(rawAssign, 10) : null;
       const body = {
         ...formData,
         phone: formData.phone.replace(/\D/g, ''),
-        assigned_employee_id: formData.assigned_employee_id ? parseInt(formData.assigned_employee_id) : null,
+        assigned_employee_id: parsedAssign != null && !Number.isNaN(parsedAssign) ? parsedAssign : null,
+        birthday: formData.birthday.trim() ? formData.birthday.trim() : null,
+        email: formData.email.trim() || null,
+        note: formData.note.trim() || null,
       };
       const res = await fetch(url, {
         method,
@@ -261,18 +324,46 @@ export function CustomerForm() {
         const err = await res.json().catch(() => ({}));
         if (res.status === 401) throw new Error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
         if (res.status === 403) throw new Error("Bạn không có quyền thực hiện thao tác này.");
-        throw new Error(err.error || "Thao tác thất bại");
+        const msg =
+          typeof err.error === "string"
+            ? err.error
+            : err.message || "Thao tác thất bại";
+        throw new Error(msg);
       }
       setSuccess(true);
       const back =
         (location.state as { customersListReturn?: string } | null)?.customersListReturn || "/customers";
       setTimeout(() => navigate(back), 1200);
     } catch (err: any) {
-      setError(err.message);
+      const m = err?.message || String(err);
+      setError(
+        m === "Failed to fetch" || m.includes("NetworkError")
+          ? "Không kết nối được máy chủ API. Hãy chạy backend (node backend, cổng 3000) và thử lại."
+          : m
+      );
     } finally {
       setIsLoading(false);
     }
   };
+
+  /** Phải gọi trước mọi return — không đặt useMemo sau `if (fetchLoading) return` (Rules of Hooks) */
+  const birthYearOptions = React.useMemo(() => {
+    const cy = new Date().getFullYear();
+    const out: number[] = [];
+    for (let y = cy; y >= 1920; y--) out.push(y);
+    return out;
+  }, []);
+
+  const maxBirthDay = React.useMemo(() => {
+    const y = parseInt(birthParts.y, 10);
+    const m = parseInt(birthParts.m, 10);
+    if (!y || !m || m < 1 || m > 12) return 31;
+    return new Date(y, m, 0).getDate();
+  }, [birthParts.y, birthParts.m]);
+
+  const cities = Object.keys(LOCATIONS);
+  const districts = formData.city ? Object.keys(LOCATIONS[formData.city] || {}) : [];
+  const wards = formData.city && formData.district ? (LOCATIONS[formData.city]?.[formData.district] || []) : [];
 
   if (fetchLoading) {
     return (
@@ -281,10 +372,6 @@ export function CustomerForm() {
       </div>
     );
   }
-
-  const cities = Object.keys(LOCATIONS);
-  const districts = formData.city ? Object.keys(LOCATIONS[formData.city] || {}) : [];
-  const wards = formData.city && formData.district ? (LOCATIONS[formData.city]?.[formData.district] || []) : [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -404,9 +491,40 @@ export function CustomerForm() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Ngày sinh</label>
-                  <div className="relative">
-                    <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="date" value={formData.birthday} onChange={(e) => handleChange("birthday", e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-[1]" />
+                      <select
+                        value={birthParts.d}
+                        onChange={(e) => setBirthPart("d", e.target.value)}
+                        className="w-full pl-9 pr-2 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none appearance-none"
+                      >
+                        <option value="">Ngày</option>
+                        {Array.from({ length: maxBirthDay }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={String(n)}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <select
+                      value={birthParts.m}
+                      onChange={(e) => setBirthPart("m", e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none"
+                    >
+                      <option value="">Tháng</option>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={String(n)}>Tháng {n}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={birthParts.y}
+                      onChange={(e) => setBirthPart("y", e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none"
+                    >
+                      <option value="">Năm</option>
+                      {birthYearOptions.map((y) => (
+                        <option key={y} value={String(y)}>{y}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -449,9 +567,10 @@ export function CustomerForm() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">Nhân viên phụ trách</label>
+                    <p className="text-[11px] text-slate-400 -mt-0.5 mb-1">Mặc định là bạn khi thêm mới; có thể đổi.</p>
                     <select value={formData.assigned_employee_id} onChange={(e) => handleChange("assigned_employee_id", e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none">
-                      <option value="">Không có</option>
-                      {employees.map((emp: any) => (
+                      <option value="">Không gán</option>
+                      {employeeOptions.map((emp: any) => (
                         <option key={emp.id} value={emp.id}>{emp.full_name}</option>
                       ))}
                     </select>
@@ -459,7 +578,7 @@ export function CustomerForm() {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">Nguồn khách hàng</label>
                     <select value={formData.source} onChange={(e) => handleChange("source", e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none">
-                      <option value="">Chọn nguồn</option>
+                      <option value="zalo">Zalo</option>
                       <option value="store">Tại cửa hàng</option>
                       <option value="facebook">Facebook</option>
                       <option value="website">Website</option>

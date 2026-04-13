@@ -99,7 +99,7 @@ CREATE TABLE `customers` (
   `tier` ENUM('new', 'silver', 'gold', 'platinum', 'diamond') NOT NULL DEFAULT 'new',
   `total_spent` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `points_balance` INT NOT NULL DEFAULT 0 COMMENT 'Điểm tích lũy',
-  `source` VARCHAR(50) DEFAULT NULL COMMENT 'store/facebook/website/referral',
+  `source` VARCHAR(50) DEFAULT NULL COMMENT 'zalo/store/facebook/website/referral',
   `assigned_employee_id` INT UNSIGNED DEFAULT NULL COMMENT 'Nhân viên phụ trách',
   `note` TEXT DEFAULT NULL COMMENT 'Ghi chú đặc biệt',
   `created_by` INT UNSIGNED NOT NULL COMMENT 'Người tạo',

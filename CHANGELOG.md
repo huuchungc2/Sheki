@@ -1,5 +1,126 @@
 # CHANGELOG
 
+## [13/04/2026] - Lịch sử nhập xuất: popup lọc thời gian hiển thị đúng (portal + fixed)
+### Fixed
+- **InventoryHistory** — Popup lọc ngày render qua `createPortal` → `document.body`, `position: fixed` + `z-index: 200`, căn theo nút + cập nhật khi scroll/resize; đóng khi bấm ngoài (kèm `touchstart`) — tránh bị thanh header `z-40` hoặc stacking context che — File: `src/pages/InventoryHistory.tsx`
+
+## [13/04/2026] - Lịch sử nhập xuất: popup lọc thời gian gọn hơn
+### Changed
+- **InventoryHistory** — Thu nhỏ panel lọc (max ~260px, `p-3`, một cột, nút/ô `text-xs`) — File: `src/pages/InventoryHistory.tsx`
+- **GregorianDateSelect** — `stacked`: khoảng cách dọc `gap-1` — File: `src/components/GregorianDateSelect.tsx`
+
+## [13/04/2026] - Lịch sử nhập xuất: popup lọc thời gian không tràn màn hình
+### Fixed
+- **InventoryHistory** — Popover lọc ngày căn giữa theo nút trên mobile, `max-w` theo viewport; hàng filter `flex-wrap` + `min-w-0`; chọn ngày dạng xếp dọc (`stacked`) + tháng dạng số — File: `src/pages/InventoryHistory.tsx`
+- **GregorianDateSelect** — Thêm `stacked`, `monthNumericOptions`, wrapper `min-w-0 max-w-full` — File: `src/components/GregorianDateSelect.tsx`
+
+## [13/04/2026] - CustomerForm: bỏ gợi ý dài dưới Ngày sinh
+### Changed
+- **CustomerForm** — Xóa đoạn mô tả Phật lịch/popup dưới ô ngày sinh — File: `src/pages/CustomerForm.tsx`
+
+## [13/04/2026] - CustomerForm: Hooks + GET /users cho Sales (403)
+### Fixed
+- **CustomerForm** — Di chuyển `birthYearOptions` / `maxBirthDay` `useMemo` lên trước `if (fetchLoading) return` — File: `src/pages/CustomerForm.tsx`
+- **`backend/routes/users.js`** — `GET /api/users`: cho phép `scope_own_data` (Sales); ép `scoped` khi không phải admin — File: `backend/routes/users.js`
+
+## [13/04/2026] - Thêm KH: kiểm tra user tồn tại (created_by) + script SQL verify bảng customers
+### Added
+- **`migrations/017_customers_verify_optional.sql`** — SHOW COLUMNS / FK (đối chiếu khi DB cũ thiếu cột)
+### Fixed
+- **`backend/routes/customers.js`** — POST: nếu `req.user.id` không còn trong `users` → 401 + hướng dẫn đăng nhập lại
+
+## [13/04/2026] - Thêm/sửa KH: chuẩn hóa NV phụ trách (FK) + lỗi API rõ ràng
+### Fixed
+- **`backend/routes/customers.js`** — `assigned_employee_id` chỉ lưu khi tồn tại trong `users` (tránh lỗi khóa ngoại khi id không hợp lệ); `email`/`source` rỗng → `null`
+- **CustomerForm** — `assigned_employee_id` parse an toàn; `email`/`note` gửi null khi trống; thông báo khi `Failed to fetch` (backend chưa chạy) — File: `src/pages/CustomerForm.tsx`
+
+## [13/04/2026] - Vite: host 0.0.0.0 + HMR tùy chọn IP LAN (VITE_DEV_HMR_HOST)
+### Changed
+- **`vite.config.ts`** — `server.host: '0.0.0.0'`, `strictPort`; HMR qua `VITE_DEV_HMR_HOST` khi mở bằng IP Wi‑Fi — File: `vite.config.ts`
+- **`.env.example`** — Gợi ý biến `VITE_DEV_HMR_HOST`
+
+## [13/04/2026] - Form KH: ngày sinh 3 dropdown (tránh popup Phật lịch 2569 BE)
+### Changed
+- **CustomerForm** — Bỏ `input type="date"` (một số WebView/Android hiển thị lịch Phật lịch / năm BE như 2569). Thay bằng chọn **Ngày / Tháng / Năm** dương lịch; gửi API `yyyy-mm-dd` hoặc null — File: `src/pages/CustomerForm.tsx`
+
+## [13/04/2026] - Form KH: ngày sinh chọn lịch; NV phụ trách = người thêm; nguồn mặc định Zalo
+### Changed
+- **CustomerForm** — `input type="date"` (chọn ngày), gửi `yyyy-mm-dd` hoặc null; thêm mới: `assigned_employee_id` = user hiện tại, `source` = `zalo`; dropdown NV luôn gồm user hiện tại nếu thiếu trong API; nguồn có option Zalo — File: `src/pages/CustomerForm.tsx`
+- **`schema.sql`** — Comment cột `customers.source` thêm `zalo`
+
+## [13/04/2026] - Khách hàng: ngày sinh dd/mm/yyyy; rỗng → NULL (fix lỗi MySQL birthday)
+### Added
+- **`backend/utils/customerBirthday.js`** — `normalizeCustomerBirthday`: `''` / không hợp lệ → `null`; nhận `yyyy-mm-dd` hoặc `dd/mm/yyyy`
+### Fixed
+- **`backend/routes/customers.js`** — INSERT/UPDATE dùng `normalizeCustomerBirthday` thay vì gửi `''` vào cột DATE
+- **`backend/routes/import.js`** — Import khách: birthday qua cùng helper
+- **CustomerForm** — Ô ngày sinh `type="text"` placeholder `dd/mm/yyyy`, load từ API hiển thị đúng format, submit gửi `yyyy-mm-dd` hoặc `null` — File: `src/pages/CustomerForm.tsx`
+
+## [13/04/2026] - CommissionReport: lọc + Xuất Excel một hàng (flex-nowrap, scroll ngang khi cần)
+### Changed
+- **CommissionReport** — Khối lọc dùng `flex-nowrap` + `overflow-x-auto`; select/nút `shrink-0` — File: `src/pages/CommissionReport.tsx`
+
+## [13/04/2026] - Fix tràn ngang: Layout min-w-0 + CommissionReport KPI/bảng/lọc
+### Fixed
+- **`Layout.tsx`** — `main` và khung nội dung trang thêm `min-w-0` để flex không kéo chiều ngang toàn trang khi bảng/chữ dài — File: `src/components/Layout.tsx`
+- **CommissionReport** — Header mô tả `break-words`; hàng lọc full width trên mobile (`w-full sm:w-auto`); lưới KPI `[&>*]:min-w-0` + `break-words`/`tabular-nums` số tiền; khối `overflow-x-auto` bọc bảng thêm `min-w-0`, bảng `min-w-[640px]`/`min-w-[720px]` để cuộn ngang **trong** khối — File: `src/pages/CommissionReport.tsx`
+
+## [13/04/2026] - CommissionReport: KPI dùng đúng bố cục Dashboard (bỏ commission-kpi-*)
+### Changed
+- **CommissionReport** — Hai lưới KPI copy cùng class Tailwind với `Dashboard.tsx` (Sales): `grid grid-cols-2 lg:grid-cols-4 gap-4`, `grid grid-cols-2 lg:grid-cols-3 gap-4`, `col-span-2 lg:col-span-1` cho Tổng lương; dòng phụ Ship/NV giống Dashboard (Sales vs Admin) — File: `src/pages/CommissionReport.tsx`
+### Removed
+- **`index.css`** — Xóa toàn bộ `@layer` `.commission-kpi-grid-*` / `.commission-kpi-span-2` (không còn dùng; tránh lệch với Dashboard)
+
+## [13/04/2026] - CommissionReport KPI: cùng kích thước thẻ với Dashboard (bỏ ép nhỏ mobile)
+### Changed
+- **`index.css`** — Bỏ `@media (max-width: 1023px)` thu nhỏ `.commission-kpi-card` / `.kpi-*` (trước đó làm ô «HH bán hàng» nhỏ hơn Dashboard). Giữ lưới `commission-kpi-grid-*` + `gap: 1rem` như `gap-4` trên Dashboard — File: `src/index.css`
+
+## [13/04/2026] - CommissionReport: KPI gắn class commission-kpi-* (khớp index.css WebView + compact)
+### Fixed
+- **CommissionReport** — Khối 7 KPI dùng `commission-kpi-grid-4` / `commission-kpi-grid-3`, `commission-kpi-card`, `kpi-icon` / `kpi-label` / `kpi-value` / `kpi-sub`; ô Tổng lương `commission-kpi-span-2`; phụ đề mobile «HH + Ship − NV», desktop giữ câu đầy đủ — File: `src/pages/CommissionReport.tsx`
+
+## [13/04/2026] - Hoa hồng của tôi: KPI trùng markup Dashboard (bỏ lưới CSS riêng)
+### Changed
+- **CommissionReport** — Khối 7 KPI dùng **cùng class** với `Dashboard.tsx` (Sales): `grid grid-cols-2 lg:grid-cols-4 gap-4` + hàng Ship/NV/Lương `grid-cols-2 lg:grid-cols-3`, `p-5`, `text-xl`, `col-span-2 lg:col-span-1` cho Tổng lương; header/lọc trả về layout chuẩn — File: `src/pages/CommissionReport.tsx`
+### Removed
+- **`index.css`** — Xóa `.commission-kpi-grid-*` (không còn dùng)
+
+## [13/04/2026] - Hoa hồng của tôi: KPI ép lưới CSS + gọn mobile (thấy đủ 7 ô như Dashboard)
+### Added
+- **`index.css`** — `.commission-kpi-grid-4` / `.commission-kpi-grid-3` / `.commission-kpi-span-2` dùng `grid-template-columns` tường minh (tránh WebView bỏ `grid-cols-2`)
+### Changed
+- **CommissionReport** — Mobile: padding/chữ/icon nhỏ hơn (`p-2.5`, `text-sm`/`text-[10px]`), `space-y-3`, header Sales gọn (ẩn mô tả, lọc 2 cột, nút Excel full width); dòng phụ Ship/NV rút gọn — File: `src/pages/CommissionReport.tsx`
+
+## [13/04/2026] - Hoa hồng của tôi: KPI trùng class Dashboard (gap-4, p-5, text-xl, icon)
+### Changed
+- **CommissionReport** — 7 ô KPI dùng cùng lưới/spacing/typography như Dashboard Sales: `gap-4`, `p-5`, `text-xl`; HH bán = `TrendingUp`; Tổng HH = `DollarSign`; Ship/NV dòng phụ «Đơn bạn phụ trách — tháng này» (Sales) — File: `src/pages/CommissionReport.tsx`
+
+## [13/04/2026] - CommissionReport: bỏ overflow-x-hidden root; đồng bộ wrapper với màn HH CTV
+### Changed
+- **CommissionReport** — Root chỉ còn `min-w-0 max-w-full` (bỏ `overflow-x-hidden` để tránh khác hành vi cuộn với bảng). **CollaboratorsCommissionReport** + **CollaboratorsCommissionsReport** — thêm `min-w-0 max-w-full` cho đồng bộ — Files: `src/pages/CommissionReport.tsx`, `CollaboratorsCommissionReport.tsx`, `CollaboratorsCommissionsReport.tsx`
+
+## [13/04/2026] - Hoa hồng của tôi: KPI gọn như Dashboard, không tràn ngang
+### Changed
+- **CommissionReport** — Trang Sales: `min-w-0` / `overflow-x-hidden`, lưới KPI `gap-3 sm:gap-4`, `p-4 sm:p-5`, `space-y-6` giữa 2 hàng; ô «HH từ CTV» giống Dashboard (tím + «Tổng HH»); Ship/NV ghi chú «Đơn bạn phụ trách»; số tiền `text-lg sm:text-xl` — File: `src/pages/CommissionReport.tsx`
+
+## [13/04/2026] - CommissionReport: KPI 2 hàng như Dashboard (không còn 1 hàng 7 ô)
+### Changed
+- **CommissionReport** — Hàng 1: HH bán / HH CTV / Tổng HH / Số đơn (`grid-cols-2 lg:grid-cols-4`); Hàng 2: Ship KH Trả / NV chịu / Tổng lương (`grid-cols-2 lg:grid-cols-3`, Tổng lương full width mobile) — giống bố cục Dashboard — File: `src/pages/CommissionReport.tsx`
+
+## [13/04/2026] - Hoa hồng CTV (trang riêng): KPI mobile 2 cột
+### Changed
+- **CollaboratorsCommissionsReport**, **CollaboratorsCommissionReport** — 3 thẻ KPI: `grid-cols-2 lg:grid-cols-3`, ô thứ 3 full width mobile — Files: `src/pages/CollaboratorsCommissionsReport.tsx`, `src/pages/CollaboratorsCommissionReport.tsx`
+
+## [13/04/2026] - Dashboard mobile: lưới Ship / NV / Tổng lương giống hàng KPI
+### Changed
+- **Dashboard** — Khối Ship KH Trả, Tiền NV chịu, Tổng lương: `grid-cols-2` trên mobile (như Doanh thu / HH / Đơn); `lg:grid-cols-3`; ô Tổng lương `col-span-2` trên mobile — Files: `src/pages/Dashboard.tsx`
+
+## [13/04/2026] - Dashboard: doanh thu = tổng tạm tính bán hàng (subtotal)
+### Changed
+- **GET /api/reports/dashboard** — Doanh thu tháng/trước/hôm nay, Top NV, và % so tháng trước dùng `SUM(orders.subtotal)` (tổng tiền bán sau CK dòng), không dùng `total_amount` (thu khách); không cộng đơn `cancelled`. Đơn gần đây trả thêm `subtotal` — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`
+### Changed
+- **Dashboard** — Gợi ý nhỏ dưới KPI doanh thu; cột tiền ở «Đơn gần đây» hiển thị tạm tính đơn
+
 ## [12/04/2026] - TODO: Deploy production — hoàn tất (ghi nhận)
 ### Changed
 - **TODO.md** — Gỡ mục «Deploy production» khỏi ĐANG LÀM; chuyển **Đa shop** lên ĐANG LÀM

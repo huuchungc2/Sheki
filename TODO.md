@@ -59,6 +59,46 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Dashboard Admin/Sales: doanh thu = tổng tạm tính (subtotal), không phải thu khách** — API `reports/dashboard` + UI gợi ý + đơn gần đây
+
+- [x] **Dashboard mobile: bố cục Ship / NV / Tổng lương 2 cột như hàng KPI**
+
+- [x] **CommissionReport + màn HH CTV: KPI mobile 2 cột (đồng bộ Dashboard)**
+
+- [x] **CommissionReport: KPI 2 hàng (4+3) như Dashboard — bỏ 1 hàng 7 ô**
+
+- [x] **CommissionReport: KPI class-by-class giống Dashboard (gap/p/text/icon)**
+
+- [x] **Hoa hồng của tôi: KPI ép lưới CSS + compact mobile (đủ 7 ô trên màn)**
+
+- [x] **CommissionReport: JSX gắn `commission-kpi-*` + `kpi-*` (CSS compact/WebView có hiệu lực)**
+
+- [x] **KPI Hoa hồng của tôi: kích thước thẻ = Dashboard (bỏ CSS ép nhỏ trên mobile)**
+
+- [x] **CommissionReport KPI: cùng markup/grid Tailwind với Dashboard (không class commission-kpi riêng)**
+
+- [x] **Fix tràn ngang trang Hoa hồng (Layout min-w-0 + KPI/bảng/lọc)**
+
+- [x] **Hoa hồng: filter + Xuất Excel luôn 1 hàng**
+
+- [x] **Khách hàng: ngày sinh dd/mm/yyyy + birthday rỗng → NULL**
+
+- [x] **Form KH: date picker ngày sinh + NV phụ trách mặc định + nguồn Zalo**
+
+- [x] **Form KH: ngày sinh 3 dropdown (không popup lịch BE 2569)**
+
+- [x] **Vite: cấu hình truy cập IP LAN + HMR (VITE_DEV_HMR_HOST)**
+
+- [x] **Thêm KH: fix FK assigned_employee_id + thông báo lỗi API**
+
+- [x] **Migration tùy chọn verify customers + check created_by**
+
+- [x] **CustomerForm: Rules of Hooks (useMemo sau fetchLoading)**
+
+- [x] **GET /api/users cho Sales (form KH) — tránh 403**
+
+- [x] **CustomerForm: bỏ text gợi ý ngày sinh (Phật lịch)**
+
 - [x] **Deploy production (website)** — Triển khai VPS / domain / SSL (hoàn tất ngoài repo)
 
 - [x] **Đổi nhãn Phí ship KH → Ship KH Trả** — Dashboard, CommissionReport, OrderList, Excel, LOGIC, CLAUDE — Files: `src/pages/Dashboard.tsx`, `src/pages/CommissionReport.tsx`, `src/pages/OrderList.tsx`, `src/lib/exportExcel.ts`, `LOGIC_BUSINESS.md`, `CLAUDE.md`, `CHANGELOG.md`

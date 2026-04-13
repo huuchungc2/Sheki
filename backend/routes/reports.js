@@ -19,25 +19,28 @@ router.get('/dashboard', auth, async (req, res, next) => {
     const spFilter = isSales ? ' AND salesperson_id = ?' : '';
     const spParam  = isSales ? [uid] : [];
 
+    // Doanh thu = tổng tiền bán hàng (orders.subtotal / Tạm tính), không dùng total_amount (thu khách).
+    // Không cộng đơn đã hủy.
     // ── Tháng này ──
     const [thisMonth] = await pool.query(
       `SELECT COUNT(*) as total_orders,
-              COALESCE(SUM(total_amount),0) as revenue,
-              COALESCE(SUM(CASE WHEN status='completed' THEN total_amount END),0) as completed_revenue
+              COALESCE(SUM(CASE WHEN status != 'cancelled' THEN subtotal ELSE 0 END),0) as revenue,
+              COALESCE(SUM(CASE WHEN status='completed' THEN subtotal END),0) as completed_revenue
        FROM orders WHERE created_at >= ? AND created_at < ?${spFilter}`,
       [firstDayThisMonth, new Date(y, m+1, 1), ...spParam]
     );
 
     // ── Tháng trước ──
     const [lastMonth] = await pool.query(
-      `SELECT COALESCE(SUM(total_amount),0) as revenue
+      `SELECT COALESCE(SUM(CASE WHEN status != 'cancelled' THEN subtotal ELSE 0 END),0) as revenue
        FROM orders WHERE created_at >= ? AND created_at <= ?${spFilter}`,
       [firstDayLastMonth, lastDayLastMonth, ...spParam]
     );
 
     // ── Hôm nay ──
     const [today] = await pool.query(
-      `SELECT COUNT(*) as total_orders, COALESCE(SUM(total_amount),0) as revenue
+      `SELECT COUNT(*) as total_orders,
+              COALESCE(SUM(CASE WHEN status != 'cancelled' THEN subtotal ELSE 0 END),0) as revenue
        FROM orders WHERE created_at >= ?${spFilter}`,
       [todayStart, ...spParam]
     );
@@ -98,7 +101,7 @@ router.get('/dashboard', auth, async (req, res, next) => {
 
     // ── Đơn gần đây ──
     const [recentOrders] = await pool.query(
-      `SELECT o.id, o.code, o.total_amount, o.status, o.created_at,
+      `SELECT o.id, o.code, o.total_amount, o.subtotal, o.status, o.created_at,
               c.name as customer_name, u.full_name as salesperson_name
        FROM orders o
        LEFT JOIN customers c ON o.customer_id = c.id
@@ -125,8 +128,8 @@ router.get('/dashboard', auth, async (req, res, next) => {
     if (!isSales) {
       const [rows] = await pool.query(
         `SELECT u.id, u.full_name,
-                COUNT(DISTINCT o.id) as total_orders,
-                COALESCE(SUM(o.total_amount),0) as revenue,
+                COUNT(DISTINCT CASE WHEN o.status != 'cancelled' THEN o.id END) as total_orders,
+                COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.subtotal ELSE 0 END),0) as revenue,
                 COALESCE(SUM(CASE WHEN c.type='direct' THEN c.commission_amount END),0) as direct_comm,
                 COALESCE(SUM(CASE WHEN c.type='override' THEN c.commission_amount END),0) as override_comm
          FROM users u
@@ -181,7 +184,9 @@ router.get('/dashboard', auth, async (req, res, next) => {
         },
         products: { total: parseInt(products[0].total) || 0 },
         recentOrders: recentOrders.map(o => ({
-          ...o, total_amount: parseFloat(o.total_amount) || 0
+          ...o,
+          total_amount: parseFloat(o.total_amount) || 0,
+          subtotal: parseFloat(o.subtotal) || 0,
         })),
         topProducts: topProducts.map(p => ({
           ...p,

@@ -2,7 +2,6 @@ import * as React from "react";
 import { 
   Plus, 
   Search, 
-  Calendar, 
   Warehouse, 
   User, 
   Trash2, 
@@ -17,7 +16,8 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { cn, formatCurrency } from "../lib/utils";
+import { cn, formatCurrency, localTodayIsoDate } from "../lib/utils";
+import { GregorianDateSelect } from "../components/GregorianDateSelect";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -64,7 +64,7 @@ export function InventoryExport() {
 
   const [warehouseId, setWarehouseId] = React.useState("");
   const [toWarehouseId, setToWarehouseId] = React.useState("");
-  const [date, setDate] = React.useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = React.useState(localTodayIsoDate());
   const [reason, setReason] = React.useState("export_sale");
   const [note, setNote] = React.useState("");
   const [items, setItems] = React.useState<FormItem[]>([
@@ -517,15 +517,7 @@ export function InventoryExport() {
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ngày xuất</label>
-                <div className="relative">
-                  <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    type="date" 
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
-                  />
-                </div>
+                <GregorianDateSelect value={date} onChange={setDate} />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kho xuất</label>

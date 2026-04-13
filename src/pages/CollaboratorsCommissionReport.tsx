@@ -159,7 +159,7 @@ export function CollaboratorsCommissionReport() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       {/* Order detail modal */}
       {detailOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={closeOrderDetail}>
@@ -318,8 +318,8 @@ export function CollaboratorsCommissionReport() {
         )}
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Stat cards — mobile 2 cột như Dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-3">
             <DollarSign className="w-4 h-4" />
@@ -338,7 +338,7 @@ export function CollaboratorsCommissionReport() {
           </p>
           <p className="text-xs text-slate-400 mt-1">Trong tổng {summaryData.length} CTV</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="col-span-2 lg:col-span-1 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 mb-3">
             <ShoppingCart className="w-4 h-4" />
           </div>
