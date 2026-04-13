@@ -97,7 +97,7 @@ async function getOverrideTierRate(pool, ctvRate) {
 router.get('/', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { page = 1, limit = 50, q, date_from, date_to } = req.query;
+    const { page = 1, limit = 50, q, date_from, date_to, group_id } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const conds = ['1=1'];
@@ -118,6 +118,10 @@ router.get('/', auth, async (req, res, next) => {
     if (date_to) {
       conds.push('DATE(r.created_at) <= ?');
       params.push(String(date_to));
+    }
+    if (group_id != null && String(group_id).trim() !== '') {
+      conds.push('o.group_id = ?');
+      params.push(parseInt(String(group_id), 10));
     }
 
     const where = 'WHERE ' + conds.join(' AND ');
@@ -208,6 +212,79 @@ router.get('/', auth, async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+});
+
+// ADMIN: xóa đơn hoàn (rollback: kho + bút toán hoa hồng + trạng thái request nếu có)
+// DELETE /api/returns/:id
+router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
+  let conn;
+  try {
+    const pool = await getPool();
+    const returnId = parseInt(String(req.params.id), 10);
+    if (!Number.isFinite(returnId)) return res.status(400).json({ error: 'Return id không hợp lệ' });
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    const [[ret]] = await conn.query(
+      `SELECT id, order_id, return_request_id, warehouse_id
+       FROM returns
+       WHERE id = ?
+       FOR UPDATE`,
+      [returnId]
+    );
+    if (!ret) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Không tìm thấy đơn hoàn' });
+    }
+
+    const [items] = await conn.query(
+      'SELECT product_id, qty FROM return_items WHERE return_id = ?',
+      [returnId]
+    );
+
+    // 1) Rollback kho: trừ ngược số lượng đã nhập hoàn
+    for (const it of items) {
+      const qty = parseFloat(it.qty) || 0;
+      if (qty <= 0) continue;
+      await conn.query(
+        'UPDATE warehouse_stock SET stock_qty = GREATEST(0, stock_qty - ?) WHERE warehouse_id = ? AND product_id = ?',
+        [qty, ret.warehouse_id, it.product_id]
+      );
+    }
+
+    // 2) Xóa bút toán hoa hồng do return này tạo (direct + override)
+    await conn.query('DELETE FROM commission_adjustments WHERE return_id = ?', [returnId]);
+
+    // 3) Xóa return (return_items sẽ cascade)
+    await conn.query('DELETE FROM returns WHERE id = ?', [returnId]);
+
+    // 4) Nếu return tạo từ request đã duyệt → đưa request về pending để có thể duyệt lại
+    if (ret.return_request_id) {
+      await conn.query(
+        `UPDATE return_requests
+         SET status='pending', approved_by=NULL, approved_at=NULL, admin_note=NULL
+         WHERE id = ?`,
+        [ret.return_request_id]
+      );
+    }
+
+    await conn.commit();
+
+    // recalc stock sau commit (dùng pool riêng, không dùng conn)
+    for (const it of items) {
+      const qty = parseFloat(it.qty) || 0;
+      if (qty <= 0) continue;
+      await recalculateStock(it.product_id, ret.warehouse_id);
+    }
+
+    res.json({ message: 'Đã xóa đơn hoàn và cập nhật lại kho/hoa hồng' });
+  } catch (err) {
+    try { if (conn) await conn.rollback(); } catch (_) {}
+    next(err);
+  } finally {
+    try { if (conn) conn.release(); } catch (_) {}
   }
 });
 

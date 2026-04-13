@@ -150,6 +150,17 @@ Tổng lương (cùng công thức tổng kỳ) = Tổng hoa hồng + Tổng Shi
 
 ## 5. BÁO CÁO HOA HỒNG
 
+### Quy ước KPI (để tất cả màn khớp số)
+Các màn liên quan: Dashboard, Hoa hồng của tôi, Báo cáo hoa hồng Admin, Báo cáo HH từ CTV.
+
+- **Số đơn hàng**: **chỉ tính đơn bán** (đơn phát sinh commission), **KHÔNG cộng đơn hoàn**. Đơn `cancelled` không tính.
+- **Tổng đơn hoàn**: KPI riêng (đếm bảng `returns` theo kỳ lọc).
+- **HH bán hàng (direct)**: **gross** = tổng `commissions.type='direct'` theo kỳ phát sinh (`commissions.created_at`). **KHÔNG trừ** `commission_adjustments.type='direct'` trong KPI này.
+- **Tổng HH hoàn**: KPI riêng = tổng `commission_adjustments.type='direct'` (âm) theo kỳ phát sinh (`commission_adjustments.created_at`), và chỉ tính cho **salesperson** của đơn gốc.
+- **HH từ CTV (override)**: **net** = `commissions.type='override'` + `commission_adjustments.type='override'` (âm) theo kỳ phát sinh.
+- **Tổng HH**: = **HH bán hàng (gross)** + **HH từ CTV (net)**. (HH hoàn hiển thị KPI riêng; khi tính lương thì mới trừ HH hoàn theo công thức.)
+- **Ship KH Trả / Tiền NV chịu**: bám theo `orders` (theo `salesperson_id`), không cộng/trừ theo hoàn.
+
 ### Filter thời gian (áp dụng cho TẤT CẢ màn hình có tìm kiếm)
 - Mặc định: ngày hiện tại
 - Tùy chọn: tuần hiện tại, khoảng ngày tự chọn

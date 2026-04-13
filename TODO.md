@@ -13,6 +13,8 @@
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
+- [x] **Tài liệu: chuẩn hóa quy ước KPI hoa hồng** — Thêm mục KPI (Số đơn hàng chỉ đơn bán, HH bán gross, HH hoàn tách KPI, override net, tổng HH) để tránh lệch giữa các màn — Files: `CLAUDE.md`, `LOGIC_BUSINESS.md`
+
 - [x] **Reset mật khẩu Admin = comiumauden1234**
   - Thêm migration reset role admin + cập nhật CLAUDE.md
 
@@ -59,6 +61,26 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Báo cáo hoa hồng (Admin): tổng doanh số hoàn + tổng HH hoàn lọc theo nhóm** — KPI hoàn lọc theo `group_id` (khi chọn nhóm) để khớp bộ lọc báo cáo; fix API `/reports/returns-summary` join `orders` để filter nhóm cho cả doanh số hoàn và HH hoàn — Files: `backend/routes/reports.js`
+- [x] **Gom logic KPI hoàn dùng chung (Dashboard + Báo cáo hoa hồng)** — Tách helper tính doanh số hoàn / số đơn hoàn / HH hoàn để tránh lệch số giữa các màn — Files: `backend/services/returnMetrics.js`, `backend/routes/reports.js`
+- [x] **Quy tắc KPI HH hoàn: chỉ tính direct của sales lên đơn** — Tổng HH hoàn không cộng phần HH từ CTV/override (tránh trùng report CTV); áp dụng cho Dashboard + Hoa hồng của tôi + Báo cáo hoa hồng — Files: `backend/services/returnMetrics.js`, `backend/routes/reports.js`, `backend/routes/commissions.js`
+- [x] **HH từ CTV: “Số đơn” không cộng đơn hoàn** — Báo cáo CTV chỉ đếm đơn bán (commission), không đếm adjustment; tổng tiền override vẫn tự trừ bằng amount âm — Files: `backend/routes/collaborators.js`, `backend/routes/users.js`
+- [x] **reports/commissions/ctv: filter theo nhóm hoạt động đúng** — Ràng buộc group filter vào transactions để tổng hợp/summary không “lọt” ngoài nhóm — Files: `backend/routes/collaborators.js`, `backend/routes/users.js`
+- [x] **Đơn hoàn: filter theo nhóm** — Màn `/returns` thêm dropdown nhóm và API `/returns` hỗ trợ `group_id` lọc theo `orders.group_id` — Files: `backend/routes/returns.js`, `src/pages/SalesReturnsList.tsx`
+- [x] **HH từ CTV: Dashboard/Hoa hồng của tôi khớp màn CTV** — KPI “HH từ CTV” tính net (commissions override + adjustment override âm) theo kỳ phát sinh — Files: `backend/routes/reports.js`, `backend/routes/commissions.js`
+- [x] **Hoa hồng: làm rõ tổng theo trang vs cả kỳ** — Footer bảng chi tiết đổi nhãn “Tổng (trang X)” để tránh hiểu nhầm lệch với KPI tổng kỳ — File: `src/pages/CommissionReport.tsx`
+- [x] **Hoa hồng: Ship/NV không bị mất khi có hoàn** — Sắp xếp ROW_NUMBER ưu tiên dòng commission trước adjustment để hiển thị Ship KH Trả/NV chịu 1 lần/đơn đúng — File: `backend/routes/commissions.js`
+- [x] **Hoa hồng: dòng Hoàn hiển thị “—” cho Ship/NV** — UI tránh hiểu nhầm ship/NV bị thiếu; ship/NV chỉ áp cho dòng bán — File: `src/pages/CommissionReport.tsx`
+- [x] **Admin: Hoa hồng nhân viên đúng HH hoàn direct** — Salary report chỉ cộng direct adjustment khi user_id trùng salesperson_id — File: `backend/routes/reports.js`
+- [x] **Admin: Tổng Ship KH Trả / NV chịu đúng (loại đơn hủy)** — Salary report `ship_nv` loại `cancelled` để tổng không bị đội — File: `backend/routes/reports.js`
+- [x] **Admin: Tổng lương bảng NV khớp chi tiết** — Salary report lọc commission theo `commissions.created_at` (entry_date) để không lệch với chi tiết theo đơn — File: `backend/routes/reports.js`
+- [x] **Admin: KPI báo cáo hoa hồng khớp bảng NV** — CommissionReport Admin lấy KPI Ship/NV/Tổng lương theo tổng bảng “Hoa hồng nhân viên” — File: `src/pages/CommissionReport.tsx`
+- [x] **Dashboard Admin: KPI Ship/NV/Tổng lương khớp báo cáo** — Đồng bộ cách tính tháng (active sales scope, override net) — File: `backend/routes/reports.js`
+- [x] **Dashboard Admin: Tổng hoa hồng tháng + Top hoa hồng đúng** — Tổng HH (direct gross + override net) và top ranking lọc theo kỳ phát sinh dòng HH (`commissions.created_at`), override net trừ hoàn bằng adjustments — File: `backend/routes/reports.js`
+- [x] **Báo cáo hoa hồng Admin: HH bán hàng không trừ hoàn** — Admin view dùng `direct_commission` gross (không trừ direct_adjustment); HH hoàn tách KPI riêng để khớp chi tiết từng NV — File: `src/pages/CommissionReport.tsx`
+- [x] **Báo cáo hoa hồng Admin: Số đơn hàng khớp Dashboard/Doanh thu** — Salary report lọc nhân viên theo `total_orders > 0` (đơn bán) thay vì doanh số net \(bán − hoàn\) để không bị lệch KPI số đơn. — File: `backend/routes/reports.js`
+- [x] **Admin: KPI Số đơn hàng khớp Dashboard** — `/reports/salary` trả `summary.totalOrdersAll` (COUNT orders không hủy), CommissionReport Admin dùng số này để không lệch do filter user active/role. — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`
+
 - [x] **Admin: tab “Hoa hồng nhân viên” bị trống** — Fix API `/reports/salary` lỗi biến undefined khiến không trả dữ liệu; FE nhận diện Admin ổn định hơn — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`, `src/lib/utils.ts`
 
 - [x] **Dashboard Admin/Sales: doanh thu = tổng tạm tính (subtotal), không phải thu khách** — API `reports/dashboard` + UI gợi ý + đơn gần đây
@@ -79,7 +101,7 @@
 
 - [x] **Hoa hồng của tôi: thêm KPI hoàn như Dashboard** — Tổng doanh số hoàn / Tổng HH hoàn / Tổng đơn hoàn theo kỳ lọc — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`
 
-- [x] **Hoa hồng của tôi: tổng số đơn gồm đơn hoàn** — KPI “Số đơn hàng” cộng thêm số đơn hoàn — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`
+- [x] **Hoa hồng của tôi: Số đơn hàng chỉ tính đơn bán** — KPI “Số đơn hàng” chỉ tính đơn bán (commission), không cộng đơn hoàn (returns). — Files: `src/pages/CommissionReport.tsx`
 
 - [x] **Hoa hồng của tôi: HH bán hàng khớp Dashboard** — Direct gross (không trừ hoàn), override net — File: `backend/routes/commissions.js`
 
@@ -111,6 +133,7 @@
 - [x] **Báo cáo doanh thu (Admin): bỏ KPI Tổng hoa hồng** — Gỡ thẻ KPI theo yêu cầu — File: `src/pages/RevenueReport.tsx`
 
 - [x] **Đơn hoàn (Sales): thêm filter như quản lý đơn hàng** — Search + preset ngày + khoảng ngày + phân trang theo URL
+- [x] **Đơn hoàn: xóa đơn hoàn (rollback kho + hoa hồng)** — Admin có thể xóa `returns`; hệ thống trừ kho ngược, xóa `commission_adjustments` theo `return_id`, đưa `return_requests` về `pending` (nếu có) — Files: `backend/routes/returns.js`, `src/pages/SalesReturnsList.tsx`
 
 - [x] **Quản lý đơn hàng: KPI Tổng doanh thu + Tổng hoa hồng** — Theo bộ lọc hiện tại (không chỉ 1 trang)
 

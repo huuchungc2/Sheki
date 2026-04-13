@@ -185,7 +185,14 @@ router.get('/orders', auth, async (req, res, next) => {
           o.group_id, g.name as group_name,
           cu.name as customer_name,
           o.shipping_fee, o.ship_payer, o.salesperson_absorbed_amount,
-          ROW_NUMBER() OVER (PARTITION BY t.order_id, t.user_id ORDER BY t.id) AS _user_ord_rn
+          -- Ship/NV chỉ hiển thị 1 lần/đơn (ở dòng commission), nên phải đảm bảo dòng commission được xếp trước adjustment.
+          ROW_NUMBER() OVER (
+            PARTITION BY t.order_id, t.user_id
+            ORDER BY
+              CASE WHEN t.entry_kind = 'commission' THEN 0 ELSE 1 END,
+              t.entry_date ASC,
+              t.id ASC
+          ) AS _user_ord_rn
         ${baseFrom}
         ${whereClause}
       ) z
@@ -227,8 +234,14 @@ router.get('/orders', auth, async (req, res, next) => {
         `SELECT
           -- Tổng HH = direct gross + override gross (chỉ commissions)
           COALESCE(SUM(CASE WHEN t.type = 'direct'   AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) AS direct_commission,
-          COALESCE(SUM(CASE WHEN t.type = 'override' AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) AS override_commission,
-          COALESCE(SUM(CASE WHEN t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) AS total_commission,
+          -- HH từ CTV = override commissions + override adjustments (net, có trừ hoàn)
+          COALESCE(SUM(CASE
+            WHEN t.type = 'override' AND t.entry_kind='commission' THEN t.commission_amount
+            WHEN t.type = 'override' AND t.entry_kind='adjustment' THEN t.commission_amount
+            ELSE 0 END), 0) AS override_commission,
+          -- Tổng HH = direct gross + override net
+          COALESCE(SUM(CASE WHEN t.type='direct' AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END),0)
+            + COALESCE(SUM(CASE WHEN t.type='override' THEN t.commission_amount ELSE 0 END),0) AS total_commission,
           COUNT(DISTINCT CASE WHEN t.type = 'direct' AND t.entry_kind='commission' THEN t.order_id END) AS total_orders
          ${baseFrom}
          WHERE ${summaryConds.join(' AND ')}`,
@@ -253,8 +266,12 @@ router.get('/orders', auth, async (req, res, next) => {
       const [summaryRows] = await pool.query(
         `SELECT
           COALESCE(SUM(CASE WHEN t.type = 'direct'   AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) AS direct_commission,
-          COALESCE(SUM(CASE WHEN t.type = 'override' AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) AS override_commission,
-          COALESCE(SUM(CASE WHEN t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) AS total_commission,
+          COALESCE(SUM(CASE
+            WHEN t.type = 'override' AND t.entry_kind='commission' THEN t.commission_amount
+            WHEN t.type = 'override' AND t.entry_kind='adjustment' THEN t.commission_amount
+            ELSE 0 END), 0) AS override_commission,
+          COALESCE(SUM(CASE WHEN t.type='direct' AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END),0)
+            + COALESCE(SUM(CASE WHEN t.type='override' THEN t.commission_amount ELSE 0 END),0) AS total_commission,
           COUNT(DISTINCT CASE WHEN t.type = 'direct' AND t.entry_kind='commission' THEN t.order_id END) AS total_orders
          ${baseFrom}
          WHERE ${summaryConds.join(' AND ')}`,
@@ -266,8 +283,12 @@ router.get('/orders', auth, async (req, res, next) => {
         `
       SELECT
         COALESCE(SUM(CASE WHEN t.type = 'direct'   AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) as direct_commission,
-        COALESCE(SUM(CASE WHEN t.type = 'override' AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) as override_commission,
-        COALESCE(SUM(CASE WHEN t.entry_kind='commission' THEN t.commission_amount ELSE 0 END), 0) as total_commission,
+        COALESCE(SUM(CASE
+          WHEN t.type = 'override' AND t.entry_kind='commission' THEN t.commission_amount
+          WHEN t.type = 'override' AND t.entry_kind='adjustment' THEN t.commission_amount
+          ELSE 0 END), 0) as override_commission,
+        COALESCE(SUM(CASE WHEN t.type='direct' AND t.entry_kind='commission' THEN t.commission_amount ELSE 0 END),0)
+          + COALESCE(SUM(CASE WHEN t.type='override' THEN t.commission_amount ELSE 0 END),0) as total_commission,
         COUNT(DISTINCT CASE WHEN t.type = 'direct' AND t.entry_kind='commission' THEN t.order_id END) as total_orders
       ${baseFrom}
       ${whereClause}
@@ -348,14 +369,17 @@ router.get('/orders', auth, async (req, res, next) => {
     const overrideComm = parseFloat(s.override_commission) || 0;
     const totalCommissionAll = parseFloat(s.total_commission) || 0;
 
-    // Tổng HH hoàn (âm) — tính theo kỳ phát sinh adjustment (created_at) và lọc group theo order
-    const retCommConds = ['MONTH(ca.created_at) = ?', 'YEAR(ca.created_at) = ?'];
+    // Tổng HH hoàn (âm) — CHỈ tính phần sale lên đơn trực tiếp:
+    // - ca.type='direct'
+    // - ca.user_id = o.salesperson_id
+    // - lọc theo kỳ phát sinh adjustment (ca.created_at)
+    const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'MONTH(ca.created_at) = ?', 'YEAR(ca.created_at) = ?'];
     const retCommParams = [parseInt(month, 10), parseInt(year, 10)];
     if (req.user.scope_own_data) {
-      retCommConds.push('ca.user_id = ?');
+      retCommConds.push('o.salesperson_id = ?');
       retCommParams.push(req.user.id);
     } else if (adminEmployeeUid != null) {
-      retCommConds.push('ca.user_id = ?');
+      retCommConds.push('o.salesperson_id = ?');
       retCommParams.push(adminEmployeeUid);
     }
     if (group_id) {

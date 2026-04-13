@@ -477,6 +477,12 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
     if (group_id) { orderFilterConds.push('o.group_id = ?'); orderFilterParams.push(parseInt(group_id)); }
     const orderExtra = orderFilterConds.length ? ' AND ' + orderFilterConds.join(' AND ') : '';
 
+    // IMPORTANT: group filter must constrain transactions (t) too, not only the joined order row.
+    // Use a different alias than the outer query to avoid confusion.
+    const txJoinOrders = orderFilterConds.length ? ' JOIN orders o_tx ON o_tx.id = t.order_id' : '';
+    const txOrderExtra = orderFilterConds.length ? ' AND o_tx.group_id = ?' : '';
+    const groupIdInt = group_id ? parseInt(group_id) : null;
+
     const txFrom = `
       FROM (
         SELECT id AS tx_id, order_id, NULL AS return_id, user_id, type, ctv_user_id, commission_amount AS amount, created_at AS entry_date, 'commission' AS entry_kind
@@ -496,20 +502,31 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
         col.full_name as collaborator_name,
         col.commission_rate as collaborator_rate,
         COALESCE(SUM(t.amount), 0) as total_override_commission,
-        COALESCE(COUNT(t.order_id), 0) as total_orders,
+        -- Số đơn: chỉ đếm giao dịch bán (commission), không cộng đơn hoàn (adjustment)
+        COALESCE(COUNT(DISTINCT CASE WHEN t.entry_kind = 'commission' THEN t.order_id END), 0) as total_orders,
         COALESCE(SUM(DISTINCT o.total_amount), 0) as total_revenue
       FROM collaborators cr
       JOIN users col ON cr.ctv_id = col.id
       LEFT JOIN (
-        SELECT t.tx_id, t.order_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date
+        SELECT t.tx_id, t.order_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date, t.entry_kind
         ${txFrom}
-        WHERE 1=1 ${txExtra}
+        ${txJoinOrders}
+        WHERE 1=1 ${txExtra}${txOrderExtra}
       ) t ON t.user_id = ? AND t.type = 'override' AND t.ctv_user_id = col.id
       LEFT JOIN orders o ON o.id = t.order_id AND o.salesperson_id = col.id ${orderExtra}
       WHERE cr.sales_id = ?
       GROUP BY col.id, col.full_name, col.commission_rate
       ORDER BY total_override_commission DESC
-    `, [...txFilterParams, ...orderFilterParams, targetUserId, targetUserId]);
+    `, [
+      ...txFilterParams,
+      // txOrderExtra (if any) — must come BEFORE ON t.user_id placeholder
+      ...(groupIdInt != null ? [groupIdInt] : []),
+      targetUserId,
+      // orderExtra (if any)
+      ...(groupIdInt != null ? [groupIdInt] : []),
+      // WHERE cr.sales_id
+      targetUserId,
+    ]);
 
     // Chi tiết từng đơn
     // Trả theo từng giao dịch HH (commission/adjustment) để “Số đơn” khớp (đơn hoàn = 1 dòng riêng).
@@ -535,7 +552,8 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
       JOIN (
         SELECT t.tx_id, t.order_id, t.return_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date, t.entry_kind
         ${txFrom}
-        WHERE 1=1 ${txExtra}
+        ${txJoinOrders}
+        WHERE 1=1 ${txExtra}${txOrderExtra}
       ) t ON t.user_id = ? AND t.type = 'override' AND t.ctv_user_id = col.id
       JOIN orders o ON o.id = t.order_id AND o.salesperson_id = col.id ${orderExtra}
       LEFT JOIN commissions c ON c.order_id = o.id
@@ -568,7 +586,18 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
       LEFT JOIN customers cu ON o.customer_id = cu.id
       WHERE cr.sales_id = ?
       ORDER BY col.full_name, t.entry_date DESC
-    `, [...txFilterParams, ...orderFilterParams, targetUserId, targetUserId, targetUserId]);
+    `, [
+      ...txFilterParams,
+      ...(groupIdInt != null ? [groupIdInt] : []),
+      // ON t.user_id
+      targetUserId,
+      // orderExtra in JOIN orders o
+      ...(groupIdInt != null ? [groupIdInt] : []),
+      // LEFT JOIN commissions c.user_id
+      targetUserId,
+      // WHERE cr.sales_id
+      targetUserId,
+    ]);
 
     // Summary tổng
     const totalOverride = summary.reduce((s, r) => s + parseFloat(r.total_override_commission), 0);

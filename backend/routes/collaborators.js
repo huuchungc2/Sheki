@@ -207,6 +207,11 @@ router.get('/commissions/all', auth, async (req, res, next) => {
     const orderFilterParams = [];
     if (group_id) { orderFilterConds.push('o.group_id = ?'); orderFilterParams.push(parseInt(group_id)); }
     const orderWhereExtra = orderFilterConds.length ? ' AND ' + orderFilterConds.join(' AND ') : '';
+
+    // IMPORTANT: group filter must constrain transactions (t) too.
+    // If we only filter the joined `orders o` in an ON clause, SUM(t.amount) still includes out-of-group rows.
+    const txJoinOrders = orderFilterConds.length ? ' JOIN orders o_tx ON o_tx.id = t.order_id' : '';
+    const txOrderWhereExtra = orderFilterConds.length ? ' AND o_tx.group_id = ?' : '';
     const salesFilter = sales_id ? ' AND cr.sales_id = ?' : '';
     const salesParam  = sales_id ? [parseInt(sales_id)] : [];
 
@@ -230,21 +235,30 @@ router.get('/commissions/all', auth, async (req, res, next) => {
         ctv.id as ctv_id, ctv.full_name as ctv_name,
         ctv.commission_rate as ctv_rate,
         COALESCE(SUM(t.amount), 0) as override_commission,
-        COALESCE(COUNT(t.order_id), 0) as total_orders,
+        -- Số đơn: chỉ đếm giao dịch bán (commission), không cộng đơn hoàn (adjustment)
+        COALESCE(COUNT(DISTINCT CASE WHEN t.entry_kind = 'commission' THEN t.order_id END), 0) as total_orders,
         COALESCE(SUM(DISTINCT o.total_amount), 0) as total_revenue
       FROM collaborators cr
       JOIN users sal ON cr.sales_id = sal.id
       JOIN users ctv ON cr.ctv_id = ctv.id
       LEFT JOIN (
-        SELECT t.tx_id, t.order_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date
+        SELECT t.tx_id, t.order_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date, t.entry_kind
         ${txFrom}
-        WHERE 1=1 ${txWhereExtra}
+        ${txJoinOrders}
+        WHERE 1=1 ${txWhereExtra}${txOrderWhereExtra}
       ) t ON t.user_id = sal.id AND t.type = 'override' AND t.ctv_user_id = ctv.id
       LEFT JOIN orders o ON o.id = t.order_id AND o.salesperson_id = ctv.id ${orderWhereExtra}
       WHERE 1=1 ${salesFilter}
       GROUP BY sal.id, sal.full_name, ctv.id, ctv.full_name, ctv.commission_rate
       ORDER BY sal.full_name, override_commission DESC
-    `, [...txFilterParams, ...orderFilterParams, ...salesParam]);
+    `, [
+      ...txFilterParams,
+      // txOrderWhereExtra (if any)
+      ...(orderFilterParams.length ? orderFilterParams : []),
+      // orderWhereExtra (if any)
+      ...(orderFilterParams.length ? orderFilterParams : []),
+      ...salesParam,
+    ]);
 
     // Chi tiết đơn
     // Trả theo từng giao dịch HH (commission/adjustment) để “Số đơn” khớp (đơn hoàn = 1 dòng riêng).

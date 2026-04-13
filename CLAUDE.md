@@ -75,6 +75,16 @@ project/
 
 ---
 
+## 📊 Quy ước KPI báo cáo (để tránh lệch số)
+- **Số đơn hàng**: chỉ tính **đơn bán** (không hủy), **KHÔNG** cộng đơn hoàn.
+- **Tổng đơn hoàn**: KPI riêng.
+- **HH bán hàng (direct)**: **gross** = tổng `commissions.type='direct'` theo kỳ phát sinh (`commissions.created_at`) — **không trừ** hoàn trong KPI này.
+- **Tổng HH hoàn**: KPI riêng = tổng `commission_adjustments.type='direct'` (âm) theo kỳ phát sinh (`commission_adjustments.created_at`), chỉ tính cho **salesperson** của đơn gốc.
+- **HH từ CTV (override)**: **net** = `commissions.type='override'` + `commission_adjustments.type='override'` (âm).
+- **Tổng HH**: = HH bán hàng (gross) + HH từ CTV (net). (Khi tính lương kỳ thì mới trừ HH hoàn.)
+
+---
+
 ## 🤖 QUY TẮC BẮT BUỘC SAU MỖI TASK HOÀN THÀNH
 
 Mày PHẢI tự động làm 3 việc sau — KHÔNG được bỏ qua:

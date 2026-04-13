@@ -84,6 +84,7 @@ function readListParams(sp: URLSearchParams) {
   const today = toDateStr(new Date());
   const page = parseListPage(sp);
   const search = sp.get("q") ?? "";
+  const groupId = sp.get("group_id") ?? "";
   const rawPreset = sp.get("preset") as DatePreset | null;
   const datePreset: DatePreset =
     rawPreset && ["today", "week", "month", "last_month", "last_year", "custom", ""].includes(rawPreset)
@@ -91,7 +92,7 @@ function readListParams(sp: URLSearchParams) {
       : "today";
   const dateFrom = sp.get("from") ?? today;
   const dateTo = sp.get("to") ?? today;
-  return { page, search, dateFrom, dateTo, datePreset };
+  return { page, search, groupId, dateFrom, dateTo, datePreset };
 }
 
 export function SalesReturnsList() {
@@ -107,6 +108,7 @@ export function SalesReturnsList() {
   const [rows, setRows] = React.useState<ReturnRow[]>([]);
   const [total, setTotal] = React.useState(0);
   const [showDateMenu, setShowDateMenu] = React.useState(false);
+  const [groups, setGroups] = React.useState<any[]>([]);
 
   const [tab, setTab] = React.useState<"returns" | "requests">("returns");
 
@@ -115,6 +117,7 @@ export function SalesReturnsList() {
   const [reqError, setReqError] = React.useState<string | null>(null);
   const [requests, setRequests] = React.useState<ReturnRequestRow[]>([]);
   const [reqActionId, setReqActionId] = React.useState<number | null>(null);
+  const [deleteId, setDeleteId] = React.useState<number | null>(null);
 
   const [creating, setCreating] = React.useState(false);
   const [orderId, setOrderId] = React.useState("");
@@ -125,12 +128,13 @@ export function SalesReturnsList() {
 
   const limit = 20;
   const todayStr = toDateStr(new Date());
-  const { page, search, dateFrom, dateTo, datePreset } = React.useMemo(
+  const { page, search, groupId, dateFrom, dateTo, datePreset } = React.useMemo(
     () => readListParams(searchParams),
     [searchParams.toString()]
   );
   const hasActiveFilters =
     Boolean(search) ||
+    Boolean(groupId) ||
     datePreset !== "today" ||
     dateFrom !== todayStr ||
     dateTo !== todayStr ||
@@ -196,17 +200,28 @@ export function SalesReturnsList() {
     }
   }, [isAdmin]);
 
+  // Fetch groups for filter
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    const endpoint = isAdmin ? "/groups" : `/groups/user/${currentUser?.id}`;
+    fetch(`/api${endpoint}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(j => setGroups(j.data || []))
+      .catch(() => {});
+  }, [isAdmin, currentUser?.id]);
+
   const fetchData = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { page: p, search: q, dateFrom: df, dateTo: dt } = readListParams(searchParams);
+      const { page: p, search: q, groupId: gid, dateFrom: df, dateTo: dt } = readListParams(searchParams);
       const qs = new URLSearchParams({
         page: String(p),
         limit: String(limit),
         ...(q ? { q } : {}),
         ...(df ? { date_from: df } : {}),
         ...(dt ? { date_to: dt } : {}),
+        ...(gid ? { group_id: gid } : {}),
       });
       const res: any = await api.get(`/returns?${qs.toString()}`);
       setRows(res?.data ?? []);
@@ -219,6 +234,25 @@ export function SalesReturnsList() {
       setLoading(false);
     }
   }, [searchParams.toString(), patchListParams]);
+
+  const deleteReturn = React.useCallback(
+    async (id: number) => {
+      if (!isAdmin) return;
+      const ok = window.confirm(`Xóa đơn hoàn #${id}? Hệ thống sẽ hoàn lại kho và khôi phục hoa hồng đã trừ.`);
+      if (!ok) return;
+      setDeleteId(id);
+      try {
+        await api.delete(`/returns/${id}`);
+        await fetchData();
+        if (tab === "requests") await fetchRequests();
+      } catch (e: any) {
+        alert(e?.message || "Xóa đơn hoàn thất bại");
+      } finally {
+        setDeleteId(null);
+      }
+    },
+    [isAdmin, fetchData, tab, fetchRequests]
+  );
 
   React.useEffect(() => {
     fetchData();
@@ -651,6 +685,20 @@ export function SalesReturnsList() {
             )}
           </div>
 
+          {/* Group filter */}
+          <select
+            value={groupId}
+            onChange={(e) => patchListParams({ group_id: e.target.value || null }, { resetPage: true })}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 hover:border-red-300 rounded-xl text-sm font-medium text-slate-700 transition-all min-w-[140px]"
+          >
+            <option value="">Tất cả nhóm</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+
           {/* Custom date range — chỉ hiện khi preset = custom */}
           {datePreset === "custom" && (
             <div className="flex items-center gap-2">
@@ -777,12 +825,30 @@ export function SalesReturnsList() {
                       <p className="text-xs text-slate-500 mt-1">Ghi chú: {r.note}</p>
                     )}
                   </div>
-                  <Link
-                    to={`/orders/edit/${r.order_id}`}
-                    className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1 shrink-0"
-                  >
-                    Xem đơn gốc <ArrowRight className="w-3 h-3" />
-                  </Link>
+                  <div className="flex items-center gap-2 justify-end">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        disabled={deleteId === r.id}
+                        onClick={() => deleteReturn(r.id)}
+                        className={cn(
+                          "text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all",
+                          deleteId === r.id
+                            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                            : "bg-white text-rose-700 border-rose-200 hover:bg-rose-50"
+                        )}
+                        title="Xóa đơn hoàn (rollback kho + hoa hồng)"
+                      >
+                        {deleteId === r.id ? "Đang xóa..." : "Xóa"}
+                      </button>
+                    )}
+                    <Link
+                      to={`/orders/edit/${r.order_id}`}
+                      className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1 shrink-0"
+                    >
+                      Xem đơn gốc <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
                 </div>
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
                   {(r.items || []).map((it, idx) => (

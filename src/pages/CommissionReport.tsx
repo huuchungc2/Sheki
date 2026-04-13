@@ -184,7 +184,32 @@ export function CommissionReport() {
 
         if (salaryRes.ok) {
           const j = await salaryRes.json();
-          setSalesData(j.data?.salesData || []);
+          const sd = j.data?.salesData || [];
+          setSalesData(sd);
+
+          // IMPORTANT: Với Admin view (tổng toàn hệ thống), các KPI “Ship KH Trả / NV chịu / Tổng lương”
+          // phải khớp với bảng “Hoa hồng nhân viên”. Nếu dùng summary từ `/commissions/orders` sẽ dễ lệch
+          // vì endpoint đó có thể bao gồm các dòng không nằm trong bảng salary (inactive/không phải sales/khác điều kiện).
+          // HH bán hàng: gross (chỉ commissions direct). HH hoàn tách KPI riêng từ returns-summary.
+          const sumDirect = sd.reduce((s: number, i: any) => s + (Number(i.direct_commission) || 0), 0);
+          // HH từ CTV: net (override + adjustments override âm đã nằm trong API salary)
+          const sumOverride = sd.reduce((s: number, i: any) => s + (Number(i.override_commission) || 0), 0);
+          const sumOrders = sd.reduce((s: number, i: any) => s + (Number(i.total_orders) || 0), 0);
+          const sumShip = sd.reduce((s: number, i: any) => s + (Number(i.total_khach_ship) || 0), 0);
+          const sumNv = sd.reduce((s: number, i: any) => s + (Number(i.total_nv_chiu) || 0), 0);
+          const sumLuong = sd.reduce((s: number, i: any) => s + (Number(i.total_luong) || 0), 0);
+          const ordersAll = Number(j.data?.summary?.totalOrdersAll) || 0;
+
+          setSummary((prev: any) => ({
+            ...prev,
+            direct_commission: sumDirect,
+            override_commission: sumOverride,
+            total_commission: sumDirect + sumOverride,
+            total_orders: ordersAll || sumOrders,
+            total_khach_ship: sumShip,
+            total_nv_chiu: sumNv,
+            total_luong: sumLuong,
+          }));
         }
         if (ctvRes.ok) {
           const j = await ctvRes.json();
@@ -291,8 +316,7 @@ export function CommissionReport() {
   }
 
   const isSalesMyCommission = !isAdmin && !employeeDrilldown;
-  const totalOrdersWithReturns =
-    (Number(summary.total_orders) || 0) + (Number(returnsSummary.return_orders) || 0);
+  const totalOrdersWithReturns = Number(summary.total_orders) || 0;
 
   return (
     <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
@@ -532,10 +556,10 @@ export function CommissionReport() {
                         </td>
                         <td className="px-5 py-3 text-center text-slate-700">{item.total_orders || 0}</td>
                         <td className="px-5 py-3 text-right text-slate-700">{formatCurrency(item.total_sales || 0)}</td>
-                        <td className="px-5 py-3 text-right font-semibold text-emerald-600">{formatCurrency(item.total_commission || 0)}</td>
+                        <td className="px-5 py-3 text-right font-semibold text-emerald-600">{formatCurrency(item.direct_commission || 0)}</td>
                         <td className="px-5 py-3 text-right font-semibold text-blue-600">{formatCurrency(item.override_commission || 0)}</td>
                         <td className="px-5 py-3 text-right font-bold text-slate-900">
-                          {formatCurrency((item.total_commission || 0) + (item.override_commission || 0))}
+                          {formatCurrency((item.direct_commission || 0) + (item.override_commission || 0))}
                         </td>
                         <td className="px-5 py-3 text-right font-semibold text-sky-800 tabular-nums">
                           {formatCurrency(item.total_khach_ship || 0)}
@@ -560,9 +584,9 @@ export function CommissionReport() {
                       <td className="px-5 py-3">Tổng cộng</td>
                       <td className="px-5 py-3 text-center">{salesData.reduce((s: number, i: any) => s + (i.total_orders || 0), 0)}</td>
                       <td className="px-5 py-3 text-right">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_sales || 0), 0))}</td>
-                      <td className="px-5 py-3 text-right text-emerald-400">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_commission || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right text-emerald-400">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.direct_commission || 0), 0))}</td>
                       <td className="px-5 py-3 text-right text-blue-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.override_commission || 0), 0))}</td>
-                      <td className="px-5 py-3 text-right">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_commission || 0) + (i.override_commission || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.direct_commission || 0) + (i.override_commission || 0), 0))}</td>
                       <td className="px-5 py-3 text-right text-sky-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_khach_ship || 0), 0))}</td>
                       <td className="px-5 py-3 text-right text-rose-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_nv_chiu || 0), 0))}</td>
                       <td className="px-5 py-3 text-right text-violet-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (Number(i.total_luong) || 0), 0))}</td>
@@ -796,15 +820,23 @@ export function CommissionReport() {
                     )}>{formatCurrency(item.commission_amount)}</td>
                     <td className={cn(
                       "px-5 py-3 text-right font-semibold tabular-nums",
-                      Number(item.khach_tra_ship) > 0 ? "text-sky-800" : "text-slate-300"
+                      String(item.entry_kind) === "adjustment"
+                        ? "text-slate-300"
+                        : (Number(item.khach_tra_ship) > 0 ? "text-sky-800" : "text-slate-300")
                     )}>
-                      {formatCurrency(Number(item.khach_tra_ship) || 0)}
+                      {String(item.entry_kind) === "adjustment"
+                        ? "—"
+                        : formatCurrency(Number(item.khach_tra_ship) || 0)}
                     </td>
                     <td className={cn(
                       "px-5 py-3 text-right font-semibold tabular-nums",
-                      Number(item.nv_chiu_display) > 0 ? "text-rose-700" : "text-slate-300"
+                      String(item.entry_kind) === "adjustment"
+                        ? "text-slate-300"
+                        : (Number(item.nv_chiu_display) > 0 ? "text-rose-700" : "text-slate-300")
                     )}>
-                      {formatCurrency(Number(item.nv_chiu_display) || 0)}
+                      {String(item.entry_kind) === "adjustment"
+                        ? "—"
+                        : formatCurrency(Number(item.nv_chiu_display) || 0)}
                     </td>
                     <td className={cn(
                       "px-5 py-3 text-right font-bold",
@@ -825,7 +857,7 @@ export function CommissionReport() {
               <tfoot>
                 <tr className="bg-slate-800 text-white text-sm font-bold">
                   <td className="px-5 py-3" colSpan={5}>
-                    Trang {commPage} — {commTotal} dòng
+                    Tổng (trang {commPage}) — {commTotal} dòng
                   </td>
                   <td className="px-5 py-3 text-right">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.total_amount, 0))}

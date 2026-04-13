@@ -2,6 +2,13 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { getPool } = require('../config/db');
+const {
+  getReturnRevenueAndOrdersByMonthYear,
+  getReturnRevenueByRange,
+  getReturnOrdersCountByRange,
+  getReturnCommissionByMonthYear,
+  getReturnCommissionByRange,
+} = require('../services/returnMetrics');
 
 router.get('/dashboard', auth, async (req, res, next) => {
   try {
@@ -21,27 +28,7 @@ router.get('/dashboard', auth, async (req, res, next) => {
     const spFilterOrdersAlias = isSales ? ' AND o.salesperson_id = ?' : '';
     const spFilterOrdersAliasParam = isSales ? [uid] : [];
 
-    const returnValueSelect = `
-      SELECT COALESCE(SUM(ri.qty * ((oi.gross_total - oi.discount_total) / NULLIF(oi.qty_total, 0))), 0) AS return_revenue
-      FROM returns r
-      JOIN orders o ON r.order_id = o.id
-      JOIN return_items ri ON ri.return_id = r.id
-      JOIN (
-        SELECT order_id, product_id,
-               SUM(qty) AS qty_total,
-               SUM(unit_price * qty) AS gross_total,
-               SUM(discount_amount) AS discount_total
-        FROM order_items
-        GROUP BY order_id, product_id
-      ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
-      WHERE r.created_at >= ? AND r.created_at < ?${spFilterOrdersAlias}
-    `;
-    const returnCountSelect = `
-      SELECT COUNT(*) AS return_orders
-      FROM returns r
-      JOIN orders o ON r.order_id = o.id
-      WHERE r.created_at >= ? AND r.created_at < ?${spFilterOrdersAlias}
-    `;
+    const salespersonIdForScope = isSales ? uid : null;
 
     // Doanh thu = tổng tiền bán hàng (orders.subtotal / Tạm tính), không dùng total_amount (thu khách).
     // Không cộng đơn đã hủy.
@@ -53,16 +40,16 @@ router.get('/dashboard', auth, async (req, res, next) => {
        FROM orders WHERE created_at >= ? AND created_at < ?${spFilter}`,
       [firstDayThisMonth, new Date(y, m+1, 1), ...spParam]
     );
-    const [thisMonthReturns] = await pool.query(returnValueSelect, [
-      firstDayThisMonth,
-      new Date(y, m + 1, 1),
-      ...spFilterOrdersAliasParam,
-    ]);
-    const [thisMonthReturnCount] = await pool.query(returnCountSelect, [
-      firstDayThisMonth,
-      new Date(y, m + 1, 1),
-      ...spFilterOrdersAliasParam,
-    ]);
+    const revReturns = await getReturnRevenueByRange(pool, {
+      from: firstDayThisMonth,
+      to: new Date(y, m + 1, 1),
+      salespersonId: salespersonIdForScope,
+    });
+    const returnOrdersThisMonth = await getReturnOrdersCountByRange(pool, {
+      from: firstDayThisMonth,
+      to: new Date(y, m + 1, 1),
+      salespersonId: salespersonIdForScope,
+    });
 
     // ── Tháng trước ──
     const [lastMonth] = await pool.query(
@@ -70,10 +57,12 @@ router.get('/dashboard', auth, async (req, res, next) => {
        FROM orders WHERE created_at >= ? AND created_at <= ?${spFilter}`,
       [firstDayLastMonth, lastDayLastMonth, ...spParam]
     );
-    const [lastMonthReturns] = await pool.query(
-      returnValueSelect.replace('r.created_at < ?', 'r.created_at <= ?'),
-      [firstDayLastMonth, lastDayLastMonth, ...spFilterOrdersAliasParam]
-    );
+    // last month: inclusive end in old code — keep behavior by using < firstDayThisMonth
+    const revLastReturns = await getReturnRevenueByRange(pool, {
+      from: firstDayLastMonth,
+      to: firstDayThisMonth,
+      salespersonId: salespersonIdForScope,
+    });
 
     // ── Hôm nay ──
     const [today] = await pool.query(
@@ -82,31 +71,16 @@ router.get('/dashboard', auth, async (req, res, next) => {
        FROM orders WHERE created_at >= ?${spFilter}`,
       [todayStart, ...spParam]
     );
-    const [todayReturns] = await pool.query(
-      `
-      SELECT COALESCE(SUM(ri.qty * ((oi.gross_total - oi.discount_total) / NULLIF(oi.qty_total, 0))), 0) AS return_revenue
-      FROM returns r
-      JOIN orders o ON r.order_id = o.id
-      JOIN return_items ri ON ri.return_id = r.id
-      JOIN (
-        SELECT order_id, product_id,
-               SUM(qty) AS qty_total,
-               SUM(unit_price * qty) AS gross_total,
-               SUM(discount_amount) AS discount_total
-        FROM order_items
-        GROUP BY order_id, product_id
-      ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
-      WHERE r.created_at >= ?${spFilterOrdersAlias}
-      `,
-      [todayStart, ...spFilterOrdersAliasParam]
-    );
-    const [todayReturnCount] = await pool.query(
-      `SELECT COUNT(*) AS return_orders
-       FROM returns r
-       JOIN orders o ON r.order_id = o.id
-       WHERE r.created_at >= ?${spFilterOrdersAlias}`,
-      [todayStart, ...spFilterOrdersAliasParam]
-    );
+    const revTodayReturns = await getReturnRevenueByRange(pool, {
+      from: todayStart,
+      to: null,
+      salespersonId: salespersonIdForScope,
+    });
+    const returnOrdersToday = await getReturnOrdersCountByRange(pool, {
+      from: todayStart,
+      to: null,
+      salespersonId: salespersonIdForScope,
+    });
 
     // ── Đơn theo trạng thái (tháng này) ──
     const [statusStats] = await pool.query(
@@ -132,48 +106,167 @@ router.get('/dashboard', auth, async (req, res, next) => {
       [m + 1, y, ...(isSales ? [uid] : [])]
     );
 
-    // ── Hoa hồng hoàn (commission_adjustments) ──
-    const adjSpFilter = isSales ? ' AND user_id = ?' : '';
-    const [adjThisMonth] = await pool.query(
-      `SELECT
-         COALESCE(SUM(amount), 0) as return_commission,
-         COALESCE(SUM(CASE WHEN type='direct'   THEN amount ELSE 0 END), 0) as return_commission_direct,
-         COALESCE(SUM(CASE WHEN type='override' THEN amount ELSE 0 END), 0) as return_commission_override
-       FROM commission_adjustments
-       WHERE created_at >= ? AND created_at < ?${adjSpFilter}`,
+    // HH từ CTV (override) phải trừ đơn hoàn: cộng thêm override adjustments (âm) theo kỳ phát sinh adjustment.
+    const overrideAdjFilter = isSales ? ' AND ca.user_id = ?' : '';
+    const [overrideAdjThis] = await pool.query(
+      `SELECT COALESCE(SUM(ca.amount), 0) AS override_adj
+       FROM commission_adjustments ca
+       WHERE ca.type='override'
+         AND ca.created_at >= ? AND ca.created_at < ?${overrideAdjFilter}`,
       [firstDayThisMonth, new Date(y, m + 1, 1), ...(isSales ? [uid] : [])]
     );
-    const [adjToday] = await pool.query(
-      `SELECT
-         COALESCE(SUM(amount), 0) as return_commission,
-         COALESCE(SUM(CASE WHEN type='direct'   THEN amount ELSE 0 END), 0) as return_commission_direct,
-         COALESCE(SUM(CASE WHEN type='override' THEN amount ELSE 0 END), 0) as return_commission_override
-       FROM commission_adjustments
-       WHERE created_at >= ?${adjSpFilter}`,
-      [todayStart, ...(isSales ? [uid] : [])]
-    );
 
-    // ── Ship KH trả + NV chịu (theo đơn tháng này; sales = chỉ đơn của mình) — cùng logic báo cáo HH ──
-    const orderMonthSpFilter = isSales ? ' AND o.salesperson_id = ?' : '';
-    const [shipNvMonth] = await pool.query(
-      `SELECT
-         COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
-         COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
-       FROM orders o
-       WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
-         AND o.status != 'cancelled'${orderMonthSpFilter}`,
-      [m + 1, y, ...(isSales ? [uid] : [])]
-    );
-    const totalCommGrossMonth =
-      (parseFloat(commThis[0].direct_commission) || 0) + (parseFloat(commThis[0].override_commission) || 0);
-    const totalKhachShip = parseFloat(shipNvMonth[0].total_khach_ship) || 0;
-    const totalNvChiu = parseFloat(shipNvMonth[0].total_nv_chiu) || 0;
-    const totalReturnCommMonth = parseFloat(adjThisMonth[0].return_commission) || 0; // negative
+    // ── Hoa hồng hoàn (commission_adjustments) ──
+    const returnCommissionThisMonth = await getReturnCommissionByRange(pool, {
+      from: firstDayThisMonth,
+      to: new Date(y, m + 1, 1),
+      userId: isSales ? uid : null,
+    });
+    const returnCommissionToday = await getReturnCommissionByRange(pool, {
+      from: todayStart,
+      to: null,
+      userId: isSales ? uid : null,
+    });
 
-    // Tổng HH = HH bán hàng + HH từ CTV (gross, chỉ commissions).
+    // ── Ship KH trả + NV chịu + Tổng lương (tháng) ──
+    // Sales: theo đơn mình phụ trách.
+    // Admin: theo phạm vi "nhân viên sales đang hoạt động" để đồng bộ với báo cáo hoa hồng nhân viên.
+    let totalKhachShip = 0;
+    let totalNvChiu = 0;
+    // commission cards (Dashboard): admin muốn nhìn tổng toàn hệ thống; sales nhìn của mình
+    let overrideNetMonth = 0;
+    let directGrossMonth = 0;
+    let totalCommGrossMonth = 0;
+    // lương scope: admin = tổng theo sales active (khớp /reports/salary); sales = của mình
+    let overrideNetForLuongMonth = 0;
+    let directGrossForLuongMonth = 0;
+    let totalCommGrossForLuongMonth = 0;
+    const totalReturnCommMonth = returnCommissionThisMonth || 0; // negative
+
+    if (isSales) {
+      const [shipNvMonth] = await pool.query(
+        `SELECT
+           COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+           COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+         FROM orders o
+         WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
+           AND o.status != 'cancelled'
+           AND o.salesperson_id = ?`,
+        [m + 1, y, uid]
+      );
+      totalKhachShip = parseFloat(shipNvMonth[0].total_khach_ship) || 0;
+      totalNvChiu = parseFloat(shipNvMonth[0].total_nv_chiu) || 0;
+      const overrideAdjMonth = parseFloat(overrideAdjThis?.[0]?.override_adj) || 0; // negative
+      directGrossMonth = (parseFloat(commThis[0].direct_commission) || 0);
+      overrideNetMonth = (parseFloat(commThis[0].override_commission) || 0) + overrideAdjMonth;
+      totalCommGrossMonth = directGrossMonth + overrideNetMonth;
+      directGrossForLuongMonth = directGrossMonth;
+      overrideNetForLuongMonth = overrideNetMonth;
+      totalCommGrossForLuongMonth = totalCommGrossMonth;
+    } else {
+      // Admin dashboard commission cards: tổng toàn hệ thống theo kỳ phát sinh HH (created_at)
+      const [[directAllAgg]] = await pool.query(
+        `SELECT COALESCE(SUM(c.commission_amount),0) AS direct_commission
+         FROM commissions c
+         JOIN orders o ON c.order_id = o.id
+         WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
+           AND c.type='direct'
+           AND o.status!='cancelled'`,
+        [m + 1, y]
+      );
+      const [[overrideAllAgg]] = await pool.query(
+        `SELECT COALESCE(SUM(c.commission_amount),0) AS override_commission
+         FROM commissions c
+         JOIN orders o ON c.order_id = o.id
+         WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
+           AND c.type='override'
+           AND o.status!='cancelled'`,
+        [m + 1, y]
+      );
+      const [[overrideAdjAllAgg]] = await pool.query(
+        `SELECT COALESCE(SUM(ca.amount),0) AS override_adj
+         FROM commission_adjustments ca
+         JOIN orders o ON ca.order_id = o.id
+         WHERE MONTH(ca.created_at)=? AND YEAR(ca.created_at)=?
+           AND ca.type='override'
+           AND o.status!='cancelled'`,
+        [m + 1, y]
+      );
+      directGrossMonth = parseFloat(directAllAgg?.direct_commission) || 0;
+      overrideNetMonth =
+        (parseFloat(overrideAllAgg?.override_commission) || 0) + (parseFloat(overrideAdjAllAgg?.override_adj) || 0);
+      totalCommGrossMonth = directGrossMonth + overrideNetMonth;
+
+      const [salesIdsRows] = await pool.query(
+        `SELECT u.id
+         FROM users u
+         JOIN roles r ON u.role_id = r.id
+         WHERE r.code='sales' AND u.is_active=1`
+      );
+      const salesIds = (salesIdsRows || [])
+        .map(r => parseInt(r.id, 10))
+        .filter(n => Number.isFinite(n));
+      if (salesIds.length) {
+        const inSales = `IN (${salesIds.map(() => '?').join(',')})`;
+
+        const [[shipAgg]] = await pool.query(
+          `SELECT
+             COALESCE(SUM(CASE WHEN o.ship_payer='shop' THEN 0 ELSE o.shipping_fee END),0) AS total_khach_ship,
+             COALESCE(SUM(o.salesperson_absorbed_amount),0) AS total_nv_chiu
+           FROM orders o
+           WHERE MONTH(o.created_at)=? AND YEAR(o.created_at)=?
+             AND o.status!='cancelled'
+             AND o.salesperson_id ${inSales}`,
+          [m + 1, y, ...salesIds]
+        );
+        totalKhachShip = parseFloat(shipAgg?.total_khach_ship) || 0;
+        totalNvChiu = parseFloat(shipAgg?.total_nv_chiu) || 0;
+
+        const [[directAgg]] = await pool.query(
+          `SELECT COALESCE(SUM(c.commission_amount),0) AS direct_commission
+           FROM commissions c
+           JOIN orders o ON c.order_id = o.id
+           WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
+             AND c.type='direct'
+             AND o.status!='cancelled'
+             AND c.user_id ${inSales}`,
+          [m + 1, y, ...salesIds]
+        );
+        directGrossForLuongMonth = parseFloat(directAgg?.direct_commission) || 0;
+        const [[overrideCommAgg]] = await pool.query(
+          `SELECT COALESCE(SUM(c.commission_amount),0) AS override_commission
+           FROM commissions c
+           JOIN orders o ON c.order_id = o.id
+           WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
+             AND c.type='override'
+             AND o.status!='cancelled'
+             AND c.user_id ${inSales}`,
+          [m + 1, y, ...salesIds]
+        );
+        const [[overrideAdjAgg]] = await pool.query(
+          `SELECT COALESCE(SUM(ca.amount),0) AS override_adj
+           FROM commission_adjustments ca
+           JOIN orders o ON ca.order_id = o.id
+           WHERE MONTH(ca.created_at)=? AND YEAR(ca.created_at)=?
+             AND ca.type='override'
+             AND ca.user_id ${inSales}`,
+          [m + 1, y, ...salesIds]
+        );
+        overrideNetForLuongMonth =
+          (parseFloat(overrideCommAgg?.override_commission) || 0) + (parseFloat(overrideAdjAgg?.override_adj) || 0);
+        totalCommGrossForLuongMonth = directGrossForLuongMonth + overrideNetForLuongMonth;
+      } else {
+        totalKhachShip = 0;
+        totalNvChiu = 0;
+        overrideNetForLuongMonth = 0;
+        directGrossForLuongMonth = 0;
+        totalCommGrossForLuongMonth = 0;
+      }
+    }
+
     // Tổng lương = Tổng HH − Tổng HH hoàn + Ship KH Trả − NV chịu
     const totalLuongMonth =
-      totalCommGrossMonth - Math.abs(totalReturnCommMonth) + totalKhachShip - totalNvChiu;
+      (isSales ? totalCommGrossMonth : totalCommGrossForLuongMonth) - Math.abs(totalReturnCommMonth) + totalKhachShip - totalNvChiu;
 
     // ── Khách hàng ──
     const custFilter = isSales ? ' AND created_by = ?' : '';
@@ -219,34 +312,63 @@ router.get('/dashboard', auth, async (req, res, next) => {
     let topSales = [];
     if (!isSales) {
       const [rows] = await pool.query(
-        `SELECT u.id, u.full_name,
-                COUNT(DISTINCT CASE WHEN o.status != 'cancelled' THEN o.id END) as total_orders,
-                COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.subtotal ELSE 0 END),0) as revenue,
-                COALESCE(SUM(CASE WHEN c.type='direct' THEN c.commission_amount END),0) as direct_comm,
-                COALESCE(SUM(CASE WHEN c.type='override' THEN c.commission_amount END),0) as override_comm
+        `SELECT
+           u.id, u.full_name,
+           COALESCE(o_stats.total_orders, 0) AS total_orders,
+           COALESCE(o_stats.revenue, 0) AS revenue,
+           COALESCE(d_comm.direct_comm, 0) AS direct_comm,
+           COALESCE(o_comm.override_comm, 0) + COALESCE(o_adj.override_adj, 0) AS override_comm,
+           COALESCE(d_comm.direct_comm, 0) + (COALESCE(o_comm.override_comm, 0) + COALESCE(o_adj.override_adj, 0)) AS total_comm
          FROM users u
          JOIN roles r ON u.role_id = r.id
-         LEFT JOIN orders o ON o.salesperson_id = u.id AND MONTH(o.created_at)=? AND YEAR(o.created_at)=?
-         LEFT JOIN commissions c ON c.order_id = o.id AND c.user_id = u.id
+         LEFT JOIN (
+           SELECT salesperson_id,
+                  COUNT(*) AS total_orders,
+                  COALESCE(SUM(subtotal), 0) AS revenue
+           FROM orders
+           WHERE MONTH(created_at)=? AND YEAR(created_at)=?
+             AND status != 'cancelled'
+           GROUP BY salesperson_id
+         ) o_stats ON o_stats.salesperson_id = u.id
+         LEFT JOIN (
+           SELECT c.user_id, COALESCE(SUM(c.commission_amount), 0) AS direct_comm
+           FROM commissions c
+           JOIN orders o ON c.order_id = o.id
+           WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
+             AND c.type='direct' AND o.status != 'cancelled'
+           GROUP BY c.user_id
+         ) d_comm ON d_comm.user_id = u.id
+         LEFT JOIN (
+           SELECT c.user_id, COALESCE(SUM(c.commission_amount), 0) AS override_comm
+           FROM commissions c
+           JOIN orders o ON c.order_id = o.id
+           WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
+             AND c.type='override' AND o.status != 'cancelled'
+           GROUP BY c.user_id
+         ) o_comm ON o_comm.user_id = u.id
+         LEFT JOIN (
+           SELECT ca.user_id, COALESCE(SUM(ca.amount), 0) AS override_adj
+           FROM commission_adjustments ca
+           WHERE MONTH(ca.created_at)=? AND YEAR(ca.created_at)=?
+             AND ca.type='override'
+           GROUP BY ca.user_id
+         ) o_adj ON o_adj.user_id = u.id
          WHERE r.code='sales' AND u.is_active=1
-         GROUP BY u.id, u.full_name
-         ORDER BY revenue DESC LIMIT 5`,
-        [m+1, y]
+         ORDER BY total_comm DESC
+         LIMIT 5`,
+        [m + 1, y, m + 1, y, m + 1, y, m + 1, y]
       );
       topSales = rows.map(r => ({
         ...r,
-        total_orders:    parseInt(r.total_orders) || 0,
-        revenue:         parseFloat(r.revenue) || 0,
-        direct_comm:     parseFloat(r.direct_comm) || 0,
-        override_comm:   parseFloat(r.override_comm) || 0,
+        total_orders:  parseInt(r.total_orders) || 0,
+        revenue:       parseFloat(r.revenue) || 0,
+        direct_comm:   parseFloat(r.direct_comm) || 0,
+        override_comm: parseFloat(r.override_comm) || 0,
+        total_comm:    parseFloat(r.total_comm) || 0,
       }));
     }
 
-    const revReturns = parseFloat(thisMonthReturns[0].return_revenue) || 0;
-    const revLastReturns = parseFloat(lastMonthReturns[0].return_revenue) || 0;
-    const revTodayReturns = parseFloat(todayReturns[0].return_revenue) || 0;
-    const returnOrdersThisMonth = parseInt(thisMonthReturnCount[0]?.return_orders) || 0;
-    const returnOrdersToday = parseInt(todayReturnCount[0]?.return_orders) || 0;
+    // values computed above via shared helper
 
     // Dashboard: hiển thị doanh thu bán hàng (gross). Hoàn hàng hiển thị KPI riêng.
     const rev      = (parseFloat(thisMonth[0].revenue) || 0);
@@ -261,7 +383,7 @@ router.get('/dashboard', auth, async (req, res, next) => {
           total_orders:      parseInt(thisMonth[0].total_orders) || 0,
           revenue_change:    revChange,
           return_revenue:    revReturns,
-          return_commission: parseFloat(adjThisMonth[0].return_commission) || 0,
+          return_commission: returnCommissionThisMonth || 0,
           return_orders:     returnOrdersThisMonth,
         },
         lastMonth: { revenue: revLast },
@@ -269,14 +391,14 @@ router.get('/dashboard', auth, async (req, res, next) => {
           revenue:      (parseFloat(today[0].revenue) || 0),
           total_orders: parseInt(today[0].total_orders) || 0,
           return_revenue:    revTodayReturns,
-          return_commission: parseFloat(adjToday[0].return_commission) || 0,
+          return_commission: returnCommissionToday || 0,
           return_orders:     returnOrdersToday,
         },
         byStatus,
         commission: {
-          direct:   parseFloat(commThis[0].direct_commission) || 0,
-          override: parseFloat(commThis[0].override_commission) || 0,
-          total:    totalCommGrossMonth,
+          direct:   isSales ? (parseFloat(commThis[0].direct_commission) || 0) : directGrossForLuongMonth,
+          override: isSales ? overrideNetMonth : overrideNetForLuongMonth,
+          total:    isSales ? totalCommGrossMonth : totalCommGrossForLuongMonth,
         },
         luongMonth: {
           total_khach_ship: totalKhachShip,
@@ -331,6 +453,8 @@ router.get('/salary', auth, async (req, res, next) => {
         u.salary,
         COALESCE(o_stats.total_orders, 0) as total_orders,
         COALESCE(o_stats.total_sales, 0) - COALESCE(r_stats.total_returns, 0) as total_sales,
+        COALESCE(c_direct.direct_commission, 0) as direct_commission,
+        COALESCE(a_direct.direct_adjustment, 0) as direct_adjustment,
         COALESCE(c_direct.direct_commission, 0) + COALESCE(a_direct.direct_adjustment, 0) as total_commission,
         COALESCE(c_override.override_commission, 0) + COALESCE(a_override.override_adjustment, 0) as override_commission,
         COALESCE(c_direct.direct_commission, 0) + COALESCE(a_direct.direct_adjustment, 0)
@@ -374,8 +498,8 @@ router.get('/salary', auth, async (req, res, next) => {
          SELECT c.user_id, SUM(c.commission_amount) as direct_commission
          FROM commissions c
          JOIN orders o ON c.order_id = o.id
-         WHERE MONTH(o.created_at) = ?
-           AND YEAR(o.created_at) = ?
+         WHERE MONTH(c.created_at) = ?
+           AND YEAR(c.created_at) = ?
            AND c.type = 'direct'
            ${orderGroupCond}
          GROUP BY c.user_id
@@ -387,6 +511,7 @@ router.get('/salary', auth, async (req, res, next) => {
          WHERE MONTH(ca.created_at) = ?
            AND YEAR(ca.created_at) = ?
            AND ca.type = 'direct'
+           AND ca.user_id = o.salesperson_id
            ${orderGroupCond}
          GROUP BY ca.user_id
        ) a_direct ON u.id = a_direct.user_id
@@ -394,8 +519,8 @@ router.get('/salary', auth, async (req, res, next) => {
          SELECT c.user_id, SUM(c.commission_amount) as override_commission
          FROM commissions c
          JOIN orders o ON c.order_id = o.id
-         WHERE MONTH(o.created_at) = ?
-           AND YEAR(o.created_at) = ?
+         WHERE MONTH(c.created_at) = ?
+           AND YEAR(c.created_at) = ?
            AND c.type = 'override'
            ${orderGroupCond}
          GROUP BY c.user_id
@@ -417,12 +542,13 @@ router.get('/salary', auth, async (req, res, next) => {
          FROM orders
          WHERE MONTH(created_at) = ?
            AND YEAR(created_at) = ?
+           AND status != 'cancelled'
            ${groupId ? ' AND group_id = ?' : ''}
          GROUP BY salesperson_id
        ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE r.code = 'sales' AND u.is_active = 1
        ${ordersExistsCond}
-       AND (COALESCE(o_stats.total_sales, 0) - COALESCE(r_stats.total_returns, 0)) > 0
+       AND COALESCE(o_stats.total_orders, 0) > 0
        ORDER BY total_sales DESC`,
       [
         // o_stats
@@ -444,6 +570,17 @@ router.get('/salary', auth, async (req, res, next) => {
       ]
     );
 
+    // KPI “Số đơn hàng” (Admin): đếm theo orders, không phụ thuộc user active/role
+    const [[ordersAll]] = await pool.query(
+      `SELECT COUNT(*) AS total_orders
+       FROM orders o
+       WHERE MONTH(o.created_at) = ?
+         AND YEAR(o.created_at) = ?
+         AND o.status != 'cancelled'
+         ${groupId ? ' AND o.group_id = ?' : ''}`,
+      [currentMonth, currentYear, ...(groupId ? [groupId] : [])]
+    );
+
     // Convert DECIMAL strings to numbers
     const formattedSalesData = salesData.map(s => {
       const totalAll = parseFloat(s.total_all_commission) || 0;
@@ -453,6 +590,8 @@ router.get('/salary', auth, async (req, res, next) => {
         ...s,
         total_orders: parseInt(s.total_orders) || 0,
         total_sales: parseFloat(s.total_sales) || 0,
+        direct_commission: parseFloat(s.direct_commission) || 0,
+        direct_adjustment: parseFloat(s.direct_adjustment) || 0,
         total_commission: parseFloat(s.total_commission) || 0,
         override_commission: parseFloat(s.override_commission) || 0,
         total_all_commission: totalAll,
@@ -473,6 +612,7 @@ router.get('/salary', auth, async (req, res, next) => {
         summary: {
           totalSales,
           totalCommission,
+          totalOrdersAll: parseInt(ordersAll?.total_orders) || 0,
           totalEmployees: formattedSalesData.length
         }
       }
@@ -686,52 +826,24 @@ router.get('/returns-summary', auth, async (req, res, next) => {
       isSales ? req.user.id : (user_id != null && String(user_id).trim() !== '' ? parseInt(String(user_id), 10) : null);
 
     if (!m || !y) return res.status(400).json({ error: 'Thiếu month/year' });
-
-    const returnsConds = ['MONTH(r.created_at) = ?', 'YEAR(r.created_at) = ?'];
-    const returnsParams = [m, y];
-    if (targetUserId != null) { returnsConds.push('o.salesperson_id = ?'); returnsParams.push(targetUserId); }
-    if (groupId != null) { returnsConds.push('o.group_id = ?'); returnsParams.push(groupId); }
-
-    const [retRows] = await pool.query(
-      `
-      SELECT
-        COUNT(DISTINCT r.id) AS return_orders,
-        COALESCE(SUM(ri.qty * ((oi.gross_total - oi.discount_total) / NULLIF(oi.qty_total, 0))), 0) AS return_revenue
-      FROM returns r
-      JOIN orders o ON r.order_id = o.id
-      JOIN return_items ri ON ri.return_id = r.id
-      JOIN (
-        SELECT order_id, product_id,
-               SUM(qty) AS qty_total,
-               SUM(unit_price * qty) AS gross_total,
-               SUM(discount_amount) AS discount_total
-        FROM order_items
-        GROUP BY order_id, product_id
-      ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
-      WHERE ${returnsConds.join(' AND ')}
-      `,
-      returnsParams
-    );
-
-    const adjConds = ['MONTH(created_at) = ?', 'YEAR(created_at) = ?'];
-    const adjParams = [m, y];
-    if (targetUserId != null) { adjConds.push('user_id = ?'); adjParams.push(targetUserId); }
-
-    const [adjRows] = await pool.query(
-      `
-      SELECT
-        COALESCE(SUM(amount), 0) AS return_commission
-      FROM commission_adjustments
-      WHERE ${adjConds.join(' AND ')}
-      `,
-      adjParams
-    );
+    const ret = await getReturnRevenueAndOrdersByMonthYear(pool, {
+      month: m,
+      year: y,
+      salespersonId: targetUserId,
+      groupId,
+    });
+    const returnCommission = await getReturnCommissionByMonthYear(pool, {
+      month: m,
+      year: y,
+      userId: targetUserId,
+      groupId,
+    });
 
     res.json({
       data: {
-        return_orders: parseInt(retRows[0]?.return_orders) || 0,
-        return_revenue: parseFloat(retRows[0]?.return_revenue) || 0,
-        return_commission: parseFloat(adjRows[0]?.return_commission) || 0,
+        return_orders: ret.return_orders,
+        return_revenue: ret.return_revenue,
+        return_commission: returnCommission,
       }
     });
   } catch (err) {
