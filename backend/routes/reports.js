@@ -442,9 +442,10 @@ router.get('/salary', auth, async (req, res, next) => {
     const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
     // Khi lọc theo nhóm: chỉ lấy NV có đơn thuộc nhóm trong kỳ (tránh lẫn NV không liên quan).
     // (Giữ behavior cũ: danh sách NV chỉ hiện khi có doanh số kỳ.)
-    const ordersExistsCond = groupId
-      ? ' AND EXISTS (SELECT 1 FROM orders o2 WHERE o2.salesperson_id = u.id AND MONTH(o2.created_at) = ? AND YEAR(o2.created_at) = ? AND o2.group_id = ?)'
-      : '';
+    const ordersExistsCond =
+      groupId != null
+        ? ' AND EXISTS (SELECT 1 FROM orders o2 WHERE o2.salesperson_id = u.id AND MONTH(o2.created_at) = ? AND YEAR(o2.created_at) = ? AND o2.group_id = ?)'
+        : '';
     const [salesData] = await pool.query(
       `SELECT
         u.id,
@@ -634,9 +635,10 @@ router.get('/revenue', auth, async (req, res, next) => {
 
     const groupId = group_id ? parseInt(group_id) : null;
     const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
-    const ordersExistsCond = groupId
-      ? ' AND EXISTS (SELECT 1 FROM orders o2 WHERE o2.salesperson_id = u.id AND MONTH(o2.created_at) = ? AND YEAR(o2.created_at) = ? AND o2.group_id = ?)'
-      : '';
+    const ordersExistsCond =
+      groupId != null
+        ? ' AND EXISTS (SELECT 1 FROM orders o2 WHERE o2.salesperson_id = u.id AND MONTH(o2.created_at) = ? AND YEAR(o2.created_at) = ? AND o2.group_id = ?)'
+        : '';
 
     const [salesData] = await pool.query(
       `SELECT
