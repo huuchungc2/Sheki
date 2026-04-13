@@ -118,6 +118,11 @@ export function OrderList() {
   const [employees, setEmployees]   = React.useState<any[]>([]);
   const [showDateMenu, setShowDateMenu] = React.useState(false);
   const [total, setTotal]           = React.useState(0);
+  const [summary, setSummary]       = React.useState<{ total_orders: number; total_revenue: number; total_commission: number }>({
+    total_orders: 0,
+    total_revenue: 0,
+    total_commission: 0,
+  });
   const [deleting, setDeleting]     = React.useState<string | null>(null);
 
   const patchListParams = React.useCallback(
@@ -199,6 +204,11 @@ export function OrderList() {
       const newTotal = json.total || 0;
       setOrders(json.data);
       setTotal(newTotal);
+      setSummary({
+        total_orders: Number(json?.summary?.total_orders) || 0,
+        total_revenue: Number(json?.summary?.total_revenue) || 0,
+        total_commission: Number(json?.summary?.total_commission) || 0,
+      });
       setSelected(new Set());
       const totalPages = Math.ceil(newTotal / limit);
       if (totalPages > 0 && p > totalPages) {
@@ -402,6 +412,46 @@ export function OrderList() {
             Đang lọc: <span className="font-semibold text-slate-600">{dateFrom || "..."} → {dateTo || "..."}</span>
           </p>
         )}
+      </div>
+
+      {/* KPI totals (theo bộ lọc hiện tại) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500">Tổng đơn hàng</p>
+            <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+              <ShoppingCart className="w-5 h-5 text-amber-600" />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">
+            {summary.total_orders || 0}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Tổng đơn (không gồm đơn hủy) theo bộ lọc.</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500">Tổng doanh thu</p>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">
+            {formatCurrency(summary.total_revenue)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Tổng tạm tính (subtotal) theo bộ lọc.</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-500">Tổng hoa hồng</p>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            </div>
+          </div>
+          <p className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">
+            {formatCurrency(summary.total_commission)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Tổng hoa hồng direct theo đơn.</p>
+        </div>
       </div>
 
       {/* Bulk action bar */}

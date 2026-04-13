@@ -165,6 +165,34 @@ export function Dashboard() {
             </div>
           </div>
 
+          {/* Return KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng doanh số hoàn</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-(thisMonth.return_revenue || 0))}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-(today.return_revenue || 0))}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng HH hoàn</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-Math.abs(thisMonth.return_commission || 0))}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission || 0))}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+                <ShoppingCart className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng đơn hoàn</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{thisMonth.return_orders || 0}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {today.return_orders || 0} đơn</p>
+            </div>
+          </div>
+
           {/* Lương / ship / NV chịu — cùng lưới 2 cột mobile như hàng KPI */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-sky-50 to-white p-5 rounded-2xl border border-sky-100 shadow-sm ring-1 ring-sky-100/80">
@@ -365,6 +393,34 @@ export function Dashboard() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Đơn hàng tháng</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{thisMonth.total_orders || 0}</p>
               <p className="text-xs text-slate-400 mt-1">Hôm nay: {today.total_orders || 0} đơn</p>
+            </div>
+          </div>
+
+          {/* Return KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng doanh số hoàn</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-(thisMonth.return_revenue || 0))}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-(today.return_revenue || 0))}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng HH hoàn</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-Math.abs(thisMonth.return_commission || 0))}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission || 0))}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+                <ShoppingCart className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng đơn hoàn</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{thisMonth.return_orders || 0}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {today.return_orders || 0} đơn</p>
             </div>
           </div>
 

@@ -195,60 +195,113 @@ router.get('/commissions/all', auth, async (req, res, next) => {
     const pool = await getPool();
     const { month, year, group_id, sales_id } = req.query;
 
-    // filterParams: chỉ cho date/group (dùng trong JOIN ON và WHERE)
-    const filterConds = [];
-    const filterParams = [];
-    if (month)    { filterConds.push('MONTH(o.created_at) = ?'); filterParams.push(parseInt(month)); }
-    if (year)     { filterConds.push('YEAR(o.created_at) = ?');  filterParams.push(parseInt(year)); }
-    if (group_id) { filterConds.push('o.group_id = ?');          filterParams.push(parseInt(group_id)); }
-    const joinExtra  = filterConds.length ? ' AND ' + filterConds.join(' AND ') : '';
-    const whereExtra = filterConds.length ? ' AND ' + filterConds.join(' AND ') : '';
+    // Filter theo kỳ phát sinh dòng HH/điều chỉnh (created_at của commission/adjustment)
+    // để hoàn hàng (commission_adjustments) nằm đúng kỳ duyệt hoàn.
+    const txFilterConds = [];
+    const txFilterParams = [];
+    if (month) { txFilterConds.push('MONTH(t.entry_date) = ?'); txFilterParams.push(parseInt(month)); }
+    if (year)  { txFilterConds.push('YEAR(t.entry_date) = ?');  txFilterParams.push(parseInt(year)); }
+    const txWhereExtra = txFilterConds.length ? ' AND ' + txFilterConds.join(' AND ') : '';
+
+    const orderFilterConds = [];
+    const orderFilterParams = [];
+    if (group_id) { orderFilterConds.push('o.group_id = ?'); orderFilterParams.push(parseInt(group_id)); }
+    const orderWhereExtra = orderFilterConds.length ? ' AND ' + orderFilterConds.join(' AND ') : '';
     const salesFilter = sales_id ? ' AND cr.sales_id = ?' : '';
     const salesParam  = sales_id ? [parseInt(sales_id)] : [];
 
+    const txFrom = `
+      FROM (
+        SELECT id AS tx_id, order_id, NULL AS return_id, user_id, type, ctv_user_id, commission_amount AS amount, created_at AS entry_date, 'commission' AS entry_kind
+        FROM commissions
+        UNION ALL
+        SELECT id AS tx_id, order_id, return_id, user_id, type, ctv_user_id, amount, created_at AS entry_date, 'adjustment' AS entry_kind
+        FROM commission_adjustments
+      ) t
+    `;
+
     // Tổng hợp: mỗi cặp Sales-CTV
-    // Params: [...filterParams(JOIN ON), ...salesParam(WHERE)]
+    // total_orders: số giao dịch HH (đơn bán + đơn hoàn), tức đếm cả commissions + commission_adjustments.
+    // total_revenue: tổng doanh thu theo đơn (không nhân đôi theo số dòng HH).
+    // Params: [...txFilterParams, ...orderFilterParams, ...salesParam]
     const [pairs] = await pool.query(`
       SELECT
         sal.id as sales_id, sal.full_name as sales_name,
         ctv.id as ctv_id, ctv.full_name as ctv_name,
         ctv.commission_rate as ctv_rate,
-        COALESCE(SUM(c.commission_amount), 0) as override_commission,
-        COALESCE(COUNT(DISTINCT o.id), 0) as total_orders,
-        COALESCE(SUM(o.total_amount), 0) as total_revenue
+        COALESCE(SUM(t.amount), 0) as override_commission,
+        COALESCE(COUNT(t.order_id), 0) as total_orders,
+        COALESCE(SUM(DISTINCT o.total_amount), 0) as total_revenue
       FROM collaborators cr
       JOIN users sal ON cr.sales_id = sal.id
       JOIN users ctv ON cr.ctv_id = ctv.id
-      LEFT JOIN orders o ON o.salesperson_id = ctv.id ${joinExtra}
-      LEFT JOIN commissions c ON c.order_id = o.id
-        AND c.user_id = sal.id AND c.type = 'override' AND c.ctv_user_id = ctv.id
+      LEFT JOIN (
+        SELECT t.tx_id, t.order_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date
+        ${txFrom}
+        WHERE 1=1 ${txWhereExtra}
+      ) t ON t.user_id = sal.id AND t.type = 'override' AND t.ctv_user_id = ctv.id
+      LEFT JOIN orders o ON o.id = t.order_id AND o.salesperson_id = ctv.id ${orderWhereExtra}
       WHERE 1=1 ${salesFilter}
       GROUP BY sal.id, sal.full_name, ctv.id, ctv.full_name, ctv.commission_rate
       ORDER BY sal.full_name, override_commission DESC
-    `, [...filterParams, ...salesParam]);
+    `, [...txFilterParams, ...orderFilterParams, ...salesParam]);
 
     // Chi tiết đơn
-    // Params: [...filterParams(WHERE), ...salesParam(WHERE)]
+    // Trả theo từng giao dịch HH (commission/adjustment) để “Số đơn” khớp (đơn hoàn = 1 dòng riêng).
+    // Params: [...txFilterParams, ...orderFilterParams, ...salesParam]
     const [orders] = await pool.query(`
       SELECT
         sal.id as sales_id, sal.full_name as sales_name,
         ctv.id as ctv_id, ctv.full_name as ctv_name,
+        t.tx_id,
         o.id as order_id, o.code as order_code,
-        o.created_at as order_date, o.total_amount, o.status,
+        t.entry_date as order_date, o.total_amount, o.status,
         g.name as group_name, cu.name as customer_name,
-        c.commission_amount as override_commission,
-        c.override_rate as override_rate
+        t.amount as override_commission,
+        CASE
+          WHEN t.entry_kind = 'adjustment' THEN adj_rates.override_rate
+          ELSE c.override_rate
+        END as override_rate,
+        t.entry_kind
       FROM collaborators cr
       JOIN users sal ON cr.sales_id = sal.id
       JOIN users ctv ON cr.ctv_id = ctv.id
-      JOIN orders o ON o.salesperson_id = ctv.id
-      JOIN commissions c ON c.order_id = o.id
-        AND c.user_id = sal.id AND c.type = 'override' AND c.ctv_user_id = ctv.id
+      JOIN (
+        SELECT t.tx_id, t.order_id, t.return_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date, t.entry_kind
+        ${txFrom}
+        WHERE 1=1 ${txWhereExtra}
+      ) t ON t.user_id = sal.id AND t.type = 'override' AND t.ctv_user_id = ctv.id
+      JOIN orders o ON o.id = t.order_id AND o.salesperson_id = ctv.id ${orderWhereExtra}
+      LEFT JOIN commissions c ON c.order_id = o.id AND c.user_id = sal.id AND c.type = 'override' AND c.ctv_user_id = ctv.id
+      LEFT JOIN (
+        SELECT
+          ca.id AS tx_id,
+          CASE WHEN COUNT(DISTINCT r1.override_rate) = 1 THEN MAX(r1.override_rate) ELSE NULL END AS override_rate
+        FROM commission_adjustments ca
+        JOIN returns r ON r.id = ca.return_id
+        JOIN return_items ri ON ri.return_id = r.id
+        JOIN order_items oi ON oi.order_id = ca.order_id AND oi.product_id = ri.product_id
+        LEFT JOIN (
+          SELECT
+            oi2.order_id,
+            oi2.product_id,
+            (
+              SELECT ct.sales_override_rate
+              FROM commission_tiers ct
+              WHERE ct.ctv_rate_min <= oi2.commission_rate
+                AND (ct.ctv_rate_max IS NULL OR ct.ctv_rate_max >= oi2.commission_rate)
+              ORDER BY ct.ctv_rate_min DESC
+              LIMIT 1
+            ) AS override_rate
+          FROM order_items oi2
+        ) r1 ON r1.order_id = oi.order_id AND r1.product_id = oi.product_id
+        GROUP BY ca.id
+      ) adj_rates ON adj_rates.tx_id = t.tx_id
       LEFT JOIN groups g ON o.group_id = g.id
       LEFT JOIN customers cu ON o.customer_id = cu.id
-      WHERE 1=1 ${whereExtra} ${salesFilter}
-      ORDER BY sal.full_name, ctv.full_name, o.created_at DESC
-    `, [...filterParams, ...salesParam]);
+      WHERE 1=1 ${salesFilter}
+      ORDER BY sal.full_name, ctv.full_name, t.entry_date DESC
+    `, [...txFilterParams, ...orderFilterParams, ...salesParam]);
 
     res.json({
       data: {

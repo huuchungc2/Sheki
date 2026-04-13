@@ -30,7 +30,6 @@ import CommissionRules from "./pages/CommissionRules";
 import CollaboratorsCommissionsReportPage from "./pages/CollaboratorsCommissionsReport";
 import { ChangePassword } from "./pages/ChangePassword";
 import { SalesReturnsList } from "./pages/SalesReturnsList";
-import { AdminReturns } from "./pages/AdminReturns";
 import { RolesPage } from "./pages/RolesPage";
 import { CashTransactions } from "./pages/CashTransactions";
 import { isAdminUser } from "./lib/utils";
@@ -140,7 +139,6 @@ export default function App() {
                   <Route path="/cash-transactions" element={<AdminRoute><CashTransactions /></AdminRoute>} />
                   <Route path="/roles" element={<AdminRoute><RolesPage /></AdminRoute>} />
                   <Route path="/returns" element={<SalesReturnsList />} />
-                  <Route path="/returns/admin" element={<AdminRoute><AdminReturns /></AdminRoute>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

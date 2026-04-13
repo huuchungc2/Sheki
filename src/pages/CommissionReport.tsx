@@ -66,6 +66,11 @@ export function CommissionReport() {
     total_nv_chiu: 0,
     total_luong: 0,
   });
+  const [returnsSummary, setReturnsSummary] = React.useState<any>({
+    return_orders: 0,
+    return_revenue: 0,
+    return_commission: 0,
+  });
 
   // Admin view data
   const [salesData, setSalesData]   = React.useState<any[]>([]);
@@ -105,6 +110,7 @@ export function CommissionReport() {
       total_luong: 0,
     });
     setOrderCommissions([]);
+    setReturnsSummary({ return_orders: 0, return_revenue: 0, return_commission: 0 });
     try {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({ month, year, page: String(commPage), limit: String(commLimit) });
@@ -112,9 +118,10 @@ export function CommissionReport() {
       if (employeeDrilldown && subjectUserId != null) params.set("user_id", String(subjectUserId));
 
       // 1. Chi tiết theo đơn (cùng API «Hoa hồng của tôi»; Admin + user_id = 1 NV)
-      const orderRes = await fetch(`${API_URL}/commissions/orders?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [orderRes, returnsRes] = await Promise.all([
+        fetch(`${API_URL}/commissions/orders?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/reports/returns-summary?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
       if (!orderRes.ok) throw new Error("Không thể tải báo cáo hoa hồng");
       const orderJson = await orderRes.json();
       setOrderCommissions(orderJson.data || []);
@@ -127,6 +134,7 @@ export function CommissionReport() {
       const totalNvChiu = parseFloat(s?.total_nv_chiu) || 0;
       const totalLuongApi = parseFloat(s?.total_luong) || 0;
       const totalCommApi = parseFloat(s?.total_commission) || 0;
+      const totalReturnCommAbs = parseFloat(s?.total_return_commission_abs) || 0;
 
       setSummary({
         direct_commission: directCommission,
@@ -135,8 +143,18 @@ export function CommissionReport() {
         total_orders: totalOrders,
         total_khach_ship: totalKhachShip,
         total_nv_chiu: totalNvChiu,
+        total_return_commission_abs: totalReturnCommAbs,
         total_luong: totalLuongApi,
       });
+
+      if (returnsRes.ok) {
+        const rj = await returnsRes.json();
+        setReturnsSummary({
+          return_orders: Number(rj?.data?.return_orders) || 0,
+          return_revenue: Number(rj?.data?.return_revenue) || 0,
+          return_commission: Number(rj?.data?.return_commission) || 0,
+        });
+      }
 
       // 3. Admin (bảng tổng toàn hệ thống): không gọi khi đang xem 1 NV — tránh nhầm với dữ liệu cá nhân
       if (isAdmin && !employeeDrilldown) {
@@ -257,6 +275,8 @@ export function CommissionReport() {
   }
 
   const isSalesMyCommission = !isAdmin && !employeeDrilldown;
+  const totalOrdersWithReturns =
+    (Number(summary.total_orders) || 0) + (Number(returnsSummary.return_orders) || 0);
 
   return (
     <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
@@ -365,7 +385,39 @@ export function CommissionReport() {
             <ShoppingCart className="w-4 h-4" />
           </div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Số đơn hàng</p>
-          <p className="text-xl font-bold text-slate-900 mt-1 tabular-nums">{summary.total_orders || 0}</p>
+          <p className="text-xl font-bold text-slate-900 mt-1 tabular-nums">{totalOrdersWithReturns}</p>
+          <p className="text-xs text-slate-400 mt-1 break-words">Tháng {month}/{year}</p>
+        </div>
+      </div>
+
+      {/* Return KPIs — giống Dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full min-w-0 [&>*]:min-w-0">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+            <DollarSign className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng doanh số hoàn</p>
+          <p className="text-xl font-bold text-red-600 mt-1 break-words tabular-nums">
+            {formatCurrency(-(returnsSummary.return_revenue || 0))}
+          </p>
+          <p className="text-xs text-slate-400 mt-1 break-words">Tháng {month}/{year}</p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+            <TrendingUp className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng HH hoàn</p>
+          <p className="text-xl font-bold text-red-600 mt-1 break-words tabular-nums">
+            {formatCurrency(returnsSummary.return_commission || 0)}
+          </p>
+          <p className="text-xs text-slate-400 mt-1 break-words">Tháng {month}/{year}</p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+            <ShoppingCart className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng đơn hoàn</p>
+          <p className="text-xl font-bold text-red-600 mt-1 tabular-nums">{returnsSummary.return_orders || 0}</p>
           <p className="text-xs text-slate-400 mt-1 break-words">Tháng {month}/{year}</p>
         </div>
       </div>

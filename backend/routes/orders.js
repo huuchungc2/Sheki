@@ -41,55 +41,86 @@ router.get('/', auth, async (req, res, next) => {
       WHERE 1=1
     `;
     let countQuery = 'SELECT COUNT(*) as total FROM orders WHERE 1=1';
+    let summaryQuery = `
+      SELECT
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS total_orders,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.subtotal ELSE 0 END), 0) AS total_revenue,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN (
+          SELECT commission_amount
+          FROM commissions
+          WHERE order_id = o.id AND user_id = o.salesperson_id AND type = 'direct'
+          LIMIT 1
+        ) ELSE 0 END), 0) AS total_commission
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE 1=1
+    `;
     const params = [];
+    const summaryParams = [];
 
     if (req.user.scope_own_data) {
       // Sales "Đơn hàng của tôi": CHỈ các đơn mình bán
       query += ' AND o.salesperson_id = ?';
       countQuery += ' AND salesperson_id = ?';
+      summaryQuery += ' AND o.salesperson_id = ?';
       params.push(req.user.id);
+      summaryParams.push(req.user.id);
     }
 
     if (search) {
       query += ' AND (o.code LIKE ? OR c.name LIKE ?)';
       countQuery += ' AND code LIKE ?';
+      summaryQuery += ' AND (o.code LIKE ? OR c.name LIKE ?)';
       const like = `%${search}%`;
       params.push(like, like);
+      summaryParams.push(like, like);
     }
 
     if (status) {
       query += ' AND o.status = ?';
       countQuery += ' AND status = ?';
+      summaryQuery += ' AND o.status = ?';
       params.push(status);
+      summaryParams.push(status);
     }
 
     if (employee) {
       query += ' AND o.salesperson_id = ?';
       countQuery += ' AND salesperson_id = ?';
+      summaryQuery += ' AND o.salesperson_id = ?';
       params.push(employee);
+      summaryParams.push(employee);
     }
 
     if (warehouse) {
       query += ' AND o.warehouse_id = ?';
       countQuery += ' AND warehouse_id = ?';
+      summaryQuery += ' AND o.warehouse_id = ?';
       params.push(warehouse);
+      summaryParams.push(warehouse);
     }
 
     if (date_from) {
       query += ' AND DATE(o.created_at) >= ?';
       countQuery += ' AND DATE(created_at) >= ?';
       params.push(date_from);
+      summaryQuery += ' AND DATE(o.created_at) >= ?';
+      summaryParams.push(date_from);
     }
     if (date_to) {
       query += ' AND DATE(o.created_at) <= ?';
       countQuery += ' AND DATE(created_at) <= ?';
       params.push(date_to);
+      summaryQuery += ' AND DATE(o.created_at) <= ?';
+      summaryParams.push(date_to);
     }
 
     if (group_id) {
       query += ' AND o.group_id = ?';
       countQuery += ' AND group_id = ?';
+      summaryQuery += ' AND o.group_id = ?';
       params.push(parseInt(group_id));
+      summaryParams.push(parseInt(group_id));
     }
 
     query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
@@ -97,6 +128,7 @@ router.get('/', auth, async (req, res, next) => {
 
     const [rows] = await pool.query(query, params);
     const [countRows] = await pool.query(countQuery, params.slice(0, -2));
+    const [[summary]] = await pool.query(summaryQuery, summaryParams);
 
     // Convert DECIMAL strings to numbers and compute commission
     const formattedRows = rows.map(row => {
@@ -117,7 +149,17 @@ router.get('/', auth, async (req, res, next) => {
       };
     });
 
-    res.json({ data: formattedRows, total: countRows[0].total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({
+      data: formattedRows,
+      total: countRows[0].total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      summary: {
+        total_orders: parseInt(summary?.total_orders) || 0,
+        total_revenue: parseFloat(summary?.total_revenue) || 0,
+        total_commission: parseFloat(summary?.total_commission) || 0,
+      },
+    });
   } catch (err) {
     next(err);
   }

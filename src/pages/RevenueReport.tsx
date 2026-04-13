@@ -82,7 +82,7 @@ export function RevenueReport() {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({ month, year });
       if (groupId) params.set("group_id", groupId);
-      const res = await fetch(`${API_URL}/reports/salary?${params}`, {
+      const res = await fetch(`${API_URL}/reports/revenue?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Không thể tải báo cáo");
@@ -277,19 +277,6 @@ export function RevenueReport() {
           <p className="mt-1 truncate text-lg font-bold tabular-nums text-slate-900 md:text-xl">
             {formatCurrency(summary?.totalSales || 0)}
           </p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <DollarSign className="h-5 w-5" />
-            </div>
-          </div>
-          <p className="text-xs font-medium text-slate-500">Tổng hoa hồng</p>
-          <p className="mt-1 truncate text-lg font-bold tabular-nums text-slate-900 md:text-xl">
-            {formatCurrency(summary?.totalCommission || 0)}
-          </p>
-          <p className="mt-1 text-[11px] text-slate-400">HH bán hàng + HH CTV</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">

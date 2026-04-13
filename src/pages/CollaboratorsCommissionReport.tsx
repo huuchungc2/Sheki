@@ -263,8 +263,8 @@ export function CollaboratorsCommissionReport() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all">
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -284,18 +284,18 @@ export function CollaboratorsCommissionReport() {
             period: periodLabel,
           })}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50">
+          className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50 w-full sm:w-auto">
           <Download className="w-4 h-4" /> Xuất Excel
         </button>
       </div>
 
       {/* Filter */}
-      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex flex-wrap gap-3 items-center">
+      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex flex-wrap gap-3 items-center min-w-0">
         {/* Preset buttons */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 overflow-x-auto max-w-full pr-1">
           {PRESETS.map(p => (
             <button key={p.key} onClick={() => setPreset(p.key)}
-              className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+              className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex-shrink-0",
                 preset === p.key ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               )}>
               {p.label}
@@ -393,66 +393,79 @@ export function CollaboratorsCommissionReport() {
                     {ctvOrders.length === 0 ? (
                       <div className="px-5 py-6 text-center text-slate-400 text-sm">Không có đơn trong kỳ này</div>
                     ) : (
-                      <table className="w-full text-sm border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-100">
-                            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-left">Mã đơn</th>
-                            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-left">Ngày</th>
-                            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-left">Khách hàng</th>
-                            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-left">Nhóm BH</th>
-                            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Tổng tiền</th>
-                            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-center">Tỷ lệ</th>
-                            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">HH nhận</th>
-                            <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-center">Trạng thái</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                          {ctvOrders.map((o: any) => {
-                            const st = STATUS_CFG[o.status] || { label: o.status, color: "bg-slate-100 text-slate-600" };
-                            return (
-                              <tr key={o.order_id} className="hover:bg-slate-50/60 transition-colors">
-                                <td className="px-5 py-2.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => openOrderDetail(Number(o.order_id))}
-                                    className="font-bold text-blue-600 hover:underline font-mono text-xs"
-                                  >
-                                    {o.order_code}
-                                  </button>
-                                </td>
-                                <td className="px-5 py-2.5 text-slate-500 text-xs">{formatDate(o.order_date)}</td>
-                                <td className="px-5 py-2.5 text-slate-700">{o.customer_name || "—"}</td>
-                                <td className="px-5 py-2.5">
-                                  {o.group_name
-                                    ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">{o.group_name}</span>
-                                    : <span className="text-slate-300">—</span>}
-                                </td>
-                                <td className="px-5 py-2.5 text-right font-semibold text-slate-900">{formatCurrency(o.total_amount)}</td>
-                                 <td className="px-5 py-2.5 text-center">
-                                   <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                    {o.override_rate != null
-                                      ? `${o.override_rate}%`
-                                      : "Nhiều mức"}
-                                   </span>
-                                 </td>
-                                <td className="px-5 py-2.5 text-right font-bold text-emerald-600">{formatCurrency(o.override_commission)}</td>
-                                <td className="px-5 py-2.5 text-center">
-                                  <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", st.color)}>{st.label}</span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-slate-800 text-white text-xs font-bold">
-                            <td className="px-5 py-2.5" colSpan={4}>Tổng ({ctvOrders.length} đơn)</td>
-                            <td className="px-5 py-2.5 text-right">{formatCurrency(ctvOrders.reduce((s: number, o: any) => s + o.total_amount, 0))}</td>
-                            <td className="px-5 py-2.5"></td>
-                            <td className="px-5 py-2.5 text-right text-emerald-400">{formatCurrency(ctvOrders.reduce((s: number, o: any) => s + o.override_commission, 0))}</td>
-                            <td className="px-5 py-2.5"></td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-[860px] w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-100">
+                              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-left">Mã đơn</th>
+                              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-left">Ngày</th>
+                              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-left">Khách hàng</th>
+                              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-left">Nhóm BH</th>
+                              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">Tổng tiền</th>
+                              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-center">Tỷ lệ</th>
+                              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-right">HH nhận</th>
+                              <th className="px-5 py-2.5 text-xs font-semibold text-slate-500 text-center">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {ctvOrders.map((o: any) => {
+                              const st = STATUS_CFG[o.status] || { label: o.status, color: "bg-slate-100 text-slate-600" };
+                              const isAdjustment = String(o.entry_kind) === "adjustment";
+                              return (
+                                <tr key={`${o.entry_kind || "tx"}-${o.tx_id || o.order_id}-${o.order_date || ""}`} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="px-5 py-2.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => openOrderDetail(Number(o.order_id))}
+                                      className="font-bold text-blue-600 hover:underline font-mono text-xs"
+                                    >
+                                      {o.order_code}
+                                    </button>
+                                    {isAdjustment && (
+                                      <span className="ml-2 inline-flex items-center rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-[11px] font-bold">
+                                        Hoàn
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-5 py-2.5 text-slate-500 text-xs">{formatDate(o.order_date)}</td>
+                                  <td className="px-5 py-2.5 text-slate-700">{o.customer_name || "—"}</td>
+                                  <td className="px-5 py-2.5">
+                                    {o.group_name
+                                      ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">{o.group_name}</span>
+                                      : <span className="text-slate-300">—</span>}
+                                  </td>
+                                  <td className="px-5 py-2.5 text-right font-semibold text-slate-900">{formatCurrency(o.total_amount)}</td>
+                                   <td className="px-5 py-2.5 text-center">
+                                     <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                      {o.override_rate != null
+                                        ? `${o.override_rate}%`
+                                        : "Nhiều mức"}
+                                     </span>
+                                   </td>
+                                  <td className={cn(
+                                    "px-5 py-2.5 text-right font-bold",
+                                    isAdjustment ? "text-red-600" : "text-emerald-600"
+                                  )}>
+                                    {formatCurrency(o.override_commission)}
+                                  </td>
+                                  <td className="px-5 py-2.5 text-center">
+                                    <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold", st.color)}>{st.label}</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-slate-800 text-white text-xs font-bold">
+                              <td className="px-5 py-2.5" colSpan={4}>Tổng ({ctvOrders.length} đơn)</td>
+                              <td className="px-5 py-2.5 text-right">{formatCurrency(ctvOrders.reduce((s: number, o: any) => s + o.total_amount, 0))}</td>
+                              <td className="px-5 py-2.5"></td>
+                              <td className="px-5 py-2.5 text-right text-emerald-400">{formatCurrency(ctvOrders.reduce((s: number, o: any) => s + o.override_commission, 0))}</td>
+                              <td className="px-5 py-2.5"></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
                     )}
                   </div>
                 )}

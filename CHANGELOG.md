@@ -1,5 +1,160 @@
 # CHANGELOG
 
+## [13/04/2026] - Hoàn hàng: gỡ màn Admin `/returns/admin`
+### Removed
+- **AdminReturns (FE)** — Gỡ route/menu/page `/returns/admin` (thừa), giữ màn `/returns` — Files: `src/App.tsx`, `src/components/Layout.tsx`, `src/pages/AdminReturns.tsx` (deleted)
+
+## [13/04/2026] - Hoàn hàng: Admin thao tác trong `/returns`
+### Added
+- **SalesReturnsList** — Với Admin: thêm tab “Yêu cầu hoàn” (tạo yêu cầu + duyệt/từ chối); Sales vẫn chỉ xem tab “Đơn hoàn” — File: `src/pages/SalesReturnsList.tsx`
+
+## [13/04/2026] - Sales: thấy đúng menu/màn Đơn hoàn (sync user permissions)
+### Fixed
+- **Layout** — Đồng bộ `currentUser` từ localStorage + refresh `/auth/me` để tránh nhận nhầm role/permission khiến Sales không thấy mục “Đơn hoàn” — File: `src/components/Layout.tsx`
+
+## [13/04/2026] - Sidebar: luôn có link Đơn hoàn
+### Fixed
+- **Layout** — Thêm mục “Đơn hoàn” vào submenu Bán hàng của Admin để đảm bảo luôn truy cập được `/returns` — File: `src/components/Layout.tsx`
+
+## [13/04/2026] - Doanh số: coi hoàn hàng như “đơn âm”
+### Changed
+- **Reports** — Dashboard/Salary trừ doanh số theo tháng bằng \(doanh số bán − giá trị hoàn\) (giá trị hoàn tính realtime từ `return_items` + `order_items`, không sửa schema) — File: `backend/routes/reports.js`
+
+## [13/04/2026] - Dashboard: giữ doanh thu bán + thêm KPI hoàn
+### Changed
+- **Reports/Dashboard** — Dashboard hiển thị doanh thu bán hàng (gross subtotal); thêm KPI Tổng doanh số hoàn + Tổng HH hoàn theo cùng kỳ (tháng/hôm nay) — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`
+
+## [13/04/2026] - Dashboard: thêm KPI Tổng đơn hoàn + HH bán hàng không gồm CTV
+### Changed
+- **Reports/Dashboard** — Thêm KPI Tổng đơn hoàn (tháng/hôm nay). KPI “HH bán hàng” (Sales view) vẫn chỉ tính `commissions.type='direct'` (không gồm CTV/override), hoàn tách KPI riêng — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`
+
+## [13/04/2026] - Dashboard: HH từ CTV trừ đơn hoàn
+### Fixed
+- **Reports/Dashboard** — KPI “HH từ CTV” (override) giờ cộng thêm `commission_adjustments` type `override` (âm) để trừ hoàn; “HH bán hàng” (direct) giữ gross — File: `backend/routes/reports.js`
+
+## [13/04/2026] - Dashboard: hiển thị HH hoàn đúng dấu âm
+### Fixed
+- **Dashboard UI** — KPI “Tổng HH hoàn” luôn hiển thị số âm theo trị tuyệt đối (tránh lệch dấu khi dữ liệu/aggregate thay đổi) — File: `src/pages/Dashboard.tsx`
+
+## [13/04/2026] - Hoa hồng của tôi: thêm KPI hoàn như Dashboard
+### Added
+- **CommissionReport** — Thêm 3 KPI: Tổng doanh số hoàn / Tổng HH hoàn / Tổng đơn hoàn theo bộ lọc (tháng/năm/nhóm/NV) — File: `src/pages/CommissionReport.tsx`
+### Added
+- **Reports** — Thêm API `GET /reports/returns-summary` để trả số liệu hoàn theo kỳ lọc — File: `backend/routes/reports.js`
+
+## [13/04/2026] - Hoa hồng của tôi: tổng số đơn gồm đơn hoàn
+### Fixed
+- **CommissionReport** — KPI “Số đơn hàng” giờ = đơn bán (từ `/commissions/orders`) + đơn hoàn (từ `/reports/returns-summary`) — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`
+
+## [13/04/2026] - Hoa hồng của tôi: HH bán hàng khớp Dashboard
+### Fixed
+- **API commissions/orders** — KPI “HH bán hàng” (direct) giờ là gross (chỉ `commissions`, không trừ hoàn); “HH từ CTV” (override) vẫn net (có trừ adjustment) — File: `backend/routes/commissions.js`
+
+## [13/04/2026] - Hoa hồng: Tổng lương trừ HH hoàn (UI + Excel)
+### Fixed
+- **Commissions/Export** — Công thức Tổng lương cập nhật: Tổng HH + Ship KH Trả − tiền NV chịu − Tổng HH hoàn — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`
+
+## [13/04/2026] - Dashboard: Tổng lương khớp “Hoa hồng của tôi”
+### Fixed
+- **Reports/Dashboard** — Đồng bộ công thức lương tháng: Tổng HH (gross) + Ship KH Trả − NV chịu − HH hoàn (abs) — File: `backend/routes/reports.js`
+
+## [13/04/2026] - Fix Tổng lương: Tổng HH gross, HH hoàn tách riêng
+### Fixed
+- **Dashboard + Hoa hồng của tôi** — Chuẩn hóa:
+  - Tổng HH = HH bán hàng + HH từ CTV (gross, chỉ lấy từ `commissions`)
+  - Tổng lương = Tổng HH − Tổng HH hoàn + Ship KH Trả − NV chịu (HH hoàn lấy từ `commission_adjustments`)
+  - Không “trộn” adjustment vào KPI HH từ CTV nữa; adjustment chỉ dùng cho KPI HH hoàn và công thức lương — Files: `backend/routes/reports.js`, `backend/routes/commissions.js`
+
+## [13/04/2026] - Báo cáo doanh thu (Admin): tính đúng subtotal + trừ hoàn + trừ HH hoàn
+### Fixed
+- **Reports/Salary** — `total_sales` dùng `orders.subtotal` (không dùng `total_amount`), loại `cancelled`; hoa hồng cộng thêm `commission_adjustments` (âm) theo kỳ để trừ đơn hoàn đúng — File: `backend/routes/reports.js`
+
+## [13/04/2026] - Báo cáo doanh thu (Admin): hiển thị gross như Dashboard
+### Fixed
+- **RevenueReport** — Đổi sang API `/reports/revenue` để hiển thị doanh thu bán (gross) và hoa hồng gross như Dashboard; hoàn tách riêng (không trừ vào gross) — Files: `backend/routes/reports.js`, `src/pages/RevenueReport.tsx`
+### Fixed
+- **Reports/Revenue** — Không giới hạn theo role/active để tránh lệch doanh thu giữa Dashboard và báo cáo khi đơn gắn salesperson không thuộc role sales hoặc đã inactive — File: `backend/routes/reports.js`
+### Fixed
+- **Reports/Revenue** — `summary.totalCommission` giờ SUM trực tiếp từ `commissions` theo kỳ (khớp Dashboard), không phụ thuộc nhân viên có/không có doanh số trực tiếp — File: `backend/routes/reports.js`
+
+## [13/04/2026] - Báo cáo doanh thu (Admin): bỏ KPI Tổng hoa hồng
+### Removed
+- **RevenueReport** — Gỡ thẻ KPI “Tổng hoa hồng” theo yêu cầu — File: `src/pages/RevenueReport.tsx`
+
+## [13/04/2026] - Đơn hoàn (Sales): KPI tổng doanh số hoàn + tổng hoa hồng hoàn
+### Added
+- **SalesReturnsList** — Thêm 2 KPI và hiển thị “Doanh số hoàn / HH hoàn” dạng số âm theo từng đơn; backend `/returns` trả thêm `return_amount` (tính từ đơn gốc theo item hoàn) và `commission_return_amount` — Files: `src/pages/SalesReturnsList.tsx`, `backend/routes/returns.js`
+
+## [13/04/2026] - Đơn hoàn (Sales): KPI Tổng số đơn hoàn
+### Added
+- **SalesReturnsList** — Thêm KPI “Tổng số đơn hoàn” theo bộ lọc hiện tại (dựa trên `total` từ API) — File: `src/pages/SalesReturnsList.tsx`
+
+## [13/04/2026] - Đơn hoàn (Sales): tổng HH hoàn khớp “Hoa hồng của tôi”
+### Fixed
+- **GET /api/returns** — Sales chỉ SUM `commission_adjustments` theo `user_id` (không cộng phần của quản lý/CTV) để KPI “Tổng hoa hồng hoàn” không bị lệch — File: `backend/routes/returns.js`
+
+## [13/04/2026] - Đơn hoàn (Sales): include đơn hoàn trừ HH quản lý
+### Fixed
+- **GET /api/returns** — Sales (quản lý) thấy thêm các đơn hoàn có `commission_adjustments.return_id` trừ vào chính mình, để tổng HH hoàn khớp “Hoa hồng của tôi” — File: `backend/routes/returns.js`
+
+## [13/04/2026] - Đơn hoàn (Sales): không trộn đơn người khác
+### Fixed
+- **GET /api/returns** — Revert: Sales chỉ thấy đơn hoàn của đơn mình bán; không “dồn” đơn hoàn người khác vào danh sách — File: `backend/routes/returns.js`
+
+## [13/04/2026] - Đơn hoàn (Sales): filter giống quản lý đơn hàng
+### Added
+- **SalesReturnsList** — Filter search + preset ngày + khoảng ngày + phân trang sync URL — File: `src/pages/SalesReturnsList.tsx`
+### Changed
+- **GET /api/returns** — Hỗ trợ `q`, `date_from`, `date_to`, `page/limit` — File: `backend/routes/returns.js`
+
+## [13/04/2026] - Quản lý đơn hàng: KPI Tổng doanh thu + Tổng hoa hồng
+### Added
+- **OrderList** — Thêm 2 KPI theo bộ lọc hiện tại: Tổng doanh thu (subtotal) và Tổng hoa hồng (direct) — File: `src/pages/OrderList.tsx`
+### Changed
+- **GET /api/orders** — Trả thêm `summary.total_revenue` và `summary.total_commission` theo bộ lọc — File: `backend/routes/orders.js`
+
+## [13/04/2026] - Đơn hàng của tôi: KPI Tổng đơn hàng
+### Added
+- **OrderList** — Thêm KPI “Tổng đơn hàng” (không gồm đơn hủy) theo bộ lọc hiện tại — File: `src/pages/OrderList.tsx`
+### Changed
+- **GET /api/orders** — Trả thêm `summary.total_orders` theo bộ lọc — File: `backend/routes/orders.js`
+
+## [13/04/2026] - Hoàn hàng: trừ đúng “HH từ CTV” (override) trên Dashboard/Báo cáo HH
+### Fixed
+- **Dashboard/Commission Orders API** — KPI “HH từ CTV” giờ tính cả `commission_adjustments` (âm) khi duyệt hoàn; lọc kỳ theo thời điểm phát sinh dòng hoa hồng/điều chỉnh (`created_at` của commission/adjustment) — Files: `backend/routes/reports.js`, `backend/routes/commissions.js`
+
+## [13/04/2026] - Hoa hồng: “Số đơn” tính cả đơn hoàn
+### Changed
+- **CommissionReport / API** — “Số đơn hàng” giờ đếm theo số dòng phát sinh hoa hồng (đơn bán + đơn hoàn), tức tính cả `commissions` và `commission_adjustments` theo kỳ lọc — File: `backend/routes/commissions.js`
+
+## [13/04/2026] - Báo cáo HH từ CTV: “Số đơn” tính cả đơn hoàn
+### Fixed
+- **CTV report** — `/reports/commissions/ctv` giờ đếm “Số đơn từ CTV” theo số giao dịch hoa hồng (commission + adjustment), nên đơn hoàn cũng +1; đồng thời lọc kỳ theo thời điểm phát sinh dòng HH/điều chỉnh — File: `backend/routes/collaborators.js`
+
+## [13/04/2026] - Báo cáo HH từ CTV: hiển thị đủ dòng đơn hoàn
+### Fixed
+- **UI** — Bảng chi tiết `/reports/commissions/ctv` không còn bị “mất” dòng hoàn do trùng React key theo `order_id` (đơn bán + đơn hoàn cùng order_id). API trả thêm `tx_id` để key unique — Files: `backend/routes/collaborators.js`, `src/pages/CollaboratorsCommissionsReport.tsx`
+
+## [13/04/2026] - Hoa hồng từ CTV (màn Sales): tính & hiển thị đơn hoàn
+### Fixed
+- **User CTV report** — `GET /users/:id/collaborators/commissions` giờ tính cả `commission_adjustments` (đơn hoàn) và trả thêm `tx_id/entry_kind` để UI không bị mất dòng do trùng `order_id` — Files: `backend/routes/users.js`, `src/pages/CollaboratorsCommissionReport.tsx`
+
+## [13/04/2026] - Hoa hồng từ CTV: dòng hoàn màu đỏ + tỷ lệ đúng
+### Fixed
+- **UI/Reports** — Dòng hoàn (`entry_kind='adjustment'`) hiển thị badge “Hoàn” + số tiền màu đỏ; cột “Tỷ lệ” của dòng hoàn lấy `override_rate` từ đơn gốc (không còn hiện “Nhiều mức”) — Files: `backend/routes/users.js`, `backend/routes/collaborators.js`, `src/pages/CollaboratorsCommissionReport.tsx`, `src/pages/CollaboratorsCommissionsReport.tsx`
+
+## [13/04/2026] - Hoa hồng từ CTV: đơn hoàn lấy đúng rate theo sản phẩm hoàn
+### Fixed
+- **Reports** — Với dòng hoàn (adjustment), `override_rate` được tính từ sản phẩm bị hoàn (join `return_items` + `order_items` + `commission_tiers`); nếu hoàn nhiều sản phẩm khác tier sẽ trả `NULL` và UI hiện “Nhiều mức” — Files: `backend/routes/users.js`, `backend/routes/collaborators.js`
+
+## [13/04/2026] - Hoàn hàng: trừ hoa hồng đúng theo tier từng sản phẩm
+### Fixed
+- **Approve return** — Khi duyệt hoàn, `commission_adjustments` không còn trừ theo tỷ lệ \(giá trị hoàn / giá trị đơn\). Thay vào đó trừ theo từng sản phẩm hoàn: direct dùng `order_items.commission_rate`, override tra tier theo `commission_tiers` từ `order_items.commission_rate` (ctv_rate) — File: `backend/routes/returns.js`
+
+## [13/04/2026] - Quy tắc hoàn/trả hàng: chỉ điều chỉnh hoa hồng (không đụng Ship/NV chịu)
+### Changed
+- **LOGIC_BUSINESS** — Bổ sung quy tắc Return: khi duyệt hoàn chỉ tạo `commission_adjustments` (âm) để trừ hoa hồng theo tỷ lệ item hoàn; không tự động chỉnh `shipping_fee/ship_payer`, `deposit/customer_collect/shop_collect/total_amount`, và `salesperson_absorbed_amount` — File: `LOGIC_BUSINESS.md`
+
 ## [13/04/2026] - Lịch sử nhập xuất: popup lọc thời gian hiển thị đúng (portal + fixed)
 ### Fixed
 - **InventoryHistory** — Popup lọc ngày render qua `createPortal` → `document.body`, `position: fixed` + `z-index: 200`, căn theo nút + cập nhật khi scroll/resize; đóng khi bấm ngoài (kèm `touchstart`) — tránh bị thanh header `z-40` hoặc stacking context che — File: `src/pages/InventoryHistory.tsx`
@@ -561,15 +716,15 @@
 ### Changed
 - **Menu Admin** - Gom thành các nhóm có submenu: Bán hàng, Danh mục, Kho, Báo cáo & HH (gồm Quy tắc hoa hồng), Tra cứu đơn, Nhập Excel; bỏ trùng “Cài đặt” ở giữa danh sách; chỉnh padding/submenu cho gọn - Files: `src/components/Layout.tsx`
 
-## [08/04/2026] - Hoàn hàng: Sales chỉ xem, Admin xử lý
+## [08/04/2026] - Hoàn hàng: Sales xem đơn hoàn; Admin duyệt qua API
 ### Changed
-- **Phân tách màn hoàn** - Sales: menu “Đơn hoàn” → `/returns` chỉ danh sách đơn hoàn (đơn gốc do mình bán). Admin: “Hoàn hàng” → `/returns/admin` tạo yêu cầu hoàn, duyệt/từ chối - Files: `src/pages/SalesReturnsList.tsx`, `src/pages/AdminReturns.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
+- **Màn đơn hoàn** — Sales: menu “Đơn hoàn” → `/returns` chỉ danh sách đơn hoàn (đơn gốc do mình bán). (UI Admin `/returns/admin` đã gỡ về sau) — Files: `src/pages/SalesReturnsList.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
 ### Added
 - **API `GET /api/returns`** - Danh sách bảng `returns` (Sales lọc theo `salesperson_id`, Admin xem tất cả) - Files: `backend/routes/returns.js`
 ### Changed
 - **Quyền yêu cầu hoàn** - `POST /api/returns/requests` và `GET /api/returns/requests` chỉ Admin; xóa `ReturnRequests.tsx` - Files: `backend/routes/returns.js`, (removed) `src/pages/ReturnRequests.tsx`
 ### Changed
-- **Hoàn từng phần theo sản phẩm** — Admin tạo yêu cầu hoàn với qty từng item; backend chặn hoàn vượt số lượng còn lại; khi duyệt sẽ điều chỉnh hoa hồng theo tỷ lệ giá trị item hoàn (partial) thay vì trừ toàn bộ - Files: `backend/routes/returns.js`, `src/pages/AdminReturns.tsx`
+- **Hoàn từng phần theo sản phẩm** — Admin tạo yêu cầu hoàn với qty từng item; backend chặn hoàn vượt số lượng còn lại; khi duyệt sẽ điều chỉnh hoa hồng theo tỷ lệ giá trị item hoàn (partial) thay vì trừ toàn bộ - Files: `backend/routes/returns.js`
 
 ## [07/04/2026] - Fix filter nhóm báo cáo hoa hồng
 ### Fixed

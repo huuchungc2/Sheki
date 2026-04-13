@@ -21,6 +21,15 @@ export function exportSalesCommission(opts: {
 }) {
   const { orders, summary, userName, month, year, groupName } = opts;
   const wb = XLSX.utils.book_new();
+  const totalReturnCommAbs =
+    summary?.total_return_commission_abs != null
+      ? Number(summary.total_return_commission_abs) || 0
+      : Math.abs(Number(summary?.total_return_commission) || 0);
+  const totalLuong =
+    (Number(summary?.total_commission) || 0) +
+    (Number(summary?.total_khach_ship) || 0) -
+    (Number(summary?.total_nv_chiu) || 0) -
+    totalReturnCommAbs;
 
   // Sheet 1: Chi tiết đơn hàng
   const detailRows: any[][] = [
@@ -67,9 +76,10 @@ export function exportSalesCommission(opts: {
     ["HH bán hàng (tự bán)", summary.direct_commission],
     ["HH từ CTV (override)", summary.override_commission],
     ["Tổng hoa hồng", summary.direct_commission + summary.override_commission],
+    ["Tổng hoa hồng hoàn", totalReturnCommAbs],
     ["Ship KH Trả (cả kỳ)", summary.total_khach_ship ?? 0],
     ["Tiền NV chịu (cả kỳ)", summary.total_nv_chiu ?? 0],
-    ["Tổng lương (Tổng HH + Ship KH Trả − NV)", summary.total_luong ?? 0],
+    ["Tổng lương (Tổng HH + Ship KH Trả − NV − HH hoàn)", summary.total_luong ?? totalLuong],
     ["Số đơn", summary.total_orders],
   ];
 

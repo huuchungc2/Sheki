@@ -59,6 +59,15 @@
 - Hoa hồng đơn đó = 0 (trừ đi khỏi tổng)
 - Tính lại tổng hoa hồng của nhân viên
 
+### Hoàn hàng / Trả hàng (Return)
+- **Nguyên tắc quan trọng:** hoàn hàng **CHỈ** ảnh hưởng đến **hoa hồng** (và tồn kho khi nhập lại hàng). **KHÔNG** liên quan và **KHÔNG** được tự động điều chỉnh:
+  - `shipping_fee`, `ship_payer`
+  - `deposit`, `customer_collect`, `shop_collect`, `orders.total_amount`
+  - `orders.salesperson_absorbed_amount` (Tiền NV chịu)
+- **Cách hạch toán hoa hồng khi hoàn:** khi Admin duyệt hoàn, hệ thống tạo **bút toán điều chỉnh hoa hồng** (`commission_adjustments`) giá trị **âm**, tính theo **tỷ lệ giá trị item bị hoàn** (hoàn từng phần theo sản phẩm), để trừ lại phần hoa hồng của đơn gốc.
+- **Thời điểm ghi nhận:** điều chỉnh hoa hồng được ghi theo **ngày duyệt hoàn** (created_at của adjustment) để báo cáo hoa hồng kỳ hiện tại phản ánh đúng, **không “đập” lại kỳ cũ** của đơn gốc.
+- **Báo cáo Ship/NV chịu:** các KPI/cột **Ship KH Trả** và **Tiền NV chịu** vẫn bám theo **đơn bán** (`orders`) và chỉ tính theo `orders.salesperson_id` như quy tắc hiện tại; **không cộng/trừ lại** theo hoàn hàng.
+
 ### Số lượng
 - DECIMAL(10,3) — hỗ trợ 0.5kg, 1.25m
 - `stock_qty = available_stock + reserved_stock`

@@ -20,6 +20,7 @@ import {
   Upload,
 } from "lucide-react";
 import { cn, isAdminUser } from "../lib/utils";
+import { api } from "../lib/api";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -34,7 +35,7 @@ const navigationAdmin = [
     children: [
       { name: "Đơn hàng", href: "/orders" },
       { name: "Khách hàng", href: "/customers" },
-      { name: "Hoàn hàng", href: "/returns/admin" },
+      { name: "Đơn hoàn", href: "/returns" },
     ],
   },
   {
@@ -129,9 +130,45 @@ export function Layout({ children }: { children: React.ReactNode }) {
     navigate("/login");
   };
 
-  const currentUser = React.useMemo(() => {
+  const [currentUser, setCurrentUser] = React.useState<any>(() => {
     const userStr = localStorage.getItem("user");
     return userStr ? JSON.parse(userStr) : null;
+  });
+
+  // Keep user in sync (role/permissions changes, login/logout)
+  React.useEffect(() => {
+    const syncFromStorage = () => {
+      const userStr = localStorage.getItem("user");
+      setCurrentUser(userStr ? JSON.parse(userStr) : null);
+    };
+    const onAuthChange = () => syncFromStorage();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "user" || e.key === "token") syncFromStorage();
+    };
+    window.addEventListener("auth-change", onAuthChange as any);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("auth-change", onAuthChange as any);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  // Refresh user permissions from backend
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    (async () => {
+      try {
+        const res: any = await api.get("/auth/me");
+        const u = res?.data;
+        if (u && typeof u === "object") {
+          localStorage.setItem("user", JSON.stringify(u));
+          setCurrentUser(u);
+        }
+      } catch {
+        // ignore (token may be invalid; App will route to login on next auth-check)
+      }
+    })();
   }, []);
 
   React.useEffect(() => {

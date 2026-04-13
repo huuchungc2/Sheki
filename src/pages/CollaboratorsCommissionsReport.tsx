@@ -480,8 +480,9 @@ export default function CollaboratorsCommissionsReport() {
                                   <tbody className="divide-y divide-slate-50">
                                     {pairOrders.map((o: any) => {
                                       const st = STATUS_CFG[o.status] || { label: o.status, color: "bg-slate-100 text-slate-600" };
+                                      const isAdjustment = String(o.entry_kind) === "adjustment";
                                       return (
-                                        <tr key={o.order_id} className="hover:bg-slate-50/60">
+                                        <tr key={`${o.entry_kind || "tx"}-${o.tx_id || o.order_id}-${o.order_date || ""}`} className="hover:bg-slate-50/60">
                                           <td className="px-5 py-2">
                                             <button
                                               type="button"
@@ -490,6 +491,11 @@ export default function CollaboratorsCommissionsReport() {
                                             >
                                               {o.order_code}
                                             </button>
+                                            {isAdjustment && (
+                                              <span className="ml-2 inline-flex items-center rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-[11px] font-bold">
+                                                Hoàn
+                                              </span>
+                                            )}
                                           </td>
                                           <td className="px-5 py-2 text-slate-500">{formatDate(o.order_date)}</td>
                                           <td className="px-5 py-2 text-slate-700">{o.customer_name || "—"}</td>
@@ -504,7 +510,12 @@ export default function CollaboratorsCommissionsReport() {
                                               {o.override_rate != null ? `${o.override_rate}%` : "Nhiều mức"}
                                             </span>
                                           </td>
-                                          <td className="px-5 py-2 text-right font-bold text-emerald-600">{formatCurrency(o.override_commission)}</td>
+                                          <td className={cn(
+                                            "px-5 py-2 text-right font-bold",
+                                            isAdjustment ? "text-red-600" : "text-emerald-600"
+                                          )}>
+                                            {formatCurrency(o.override_commission)}
+                                          </td>
                                           <td className="px-5 py-2 text-center">
                                             <span className={cn("px-2 py-0.5 rounded-full font-semibold", st.color)}>{st.label}</span>
                                           </td>

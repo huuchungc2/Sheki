@@ -463,57 +463,112 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
     const targetUserId = parseInt(req.params.id);
     const { month, year, group_id } = req.query;
 
-    // Params cho filter ngày/nhóm (KHÔNG bao gồm targetUserId)
-    const filterConds = [];
-    const filterParams = [];
-    if (month)    { filterConds.push('MONTH(o.created_at) = ?'); filterParams.push(parseInt(month)); }
-    if (year)     { filterConds.push('YEAR(o.created_at) = ?');  filterParams.push(parseInt(year)); }
-    if (group_id) { filterConds.push('o.group_id = ?');          filterParams.push(parseInt(group_id)); }
-    const extra = filterConds.length ? ' AND ' + filterConds.join(' AND ') : '';
+    // Filter kỳ theo thời điểm phát sinh dòng HH/điều chỉnh (created_at của commission/adjustment)
+    // để đơn hoàn (commission_adjustments) nằm đúng kỳ duyệt hoàn.
+    const txFilterConds = [];
+    const txFilterParams = [];
+    if (month) { txFilterConds.push('MONTH(t.entry_date) = ?'); txFilterParams.push(parseInt(month)); }
+    if (year)  { txFilterConds.push('YEAR(t.entry_date) = ?');  txFilterParams.push(parseInt(year)); }
+    const txExtra = txFilterConds.length ? ' AND ' + txFilterConds.join(' AND ') : '';
+
+    // Group filter lấy theo order
+    const orderFilterConds = [];
+    const orderFilterParams = [];
+    if (group_id) { orderFilterConds.push('o.group_id = ?'); orderFilterParams.push(parseInt(group_id)); }
+    const orderExtra = orderFilterConds.length ? ' AND ' + orderFilterConds.join(' AND ') : '';
+
+    const txFrom = `
+      FROM (
+        SELECT id AS tx_id, order_id, NULL AS return_id, user_id, type, ctv_user_id, commission_amount AS amount, created_at AS entry_date, 'commission' AS entry_kind
+        FROM commissions
+        UNION ALL
+        SELECT id AS tx_id, order_id, return_id, user_id, type, ctv_user_id, amount, created_at AS entry_date, 'adjustment' AS entry_kind
+        FROM commission_adjustments
+      ) t
+    `;
 
     // Tổng hợp theo từng CTV
-    // Params: [filterParams...(cho JOIN ON), targetUserId(cho c.user_id), targetUserId(cho cr.sales_id)]
+    // total_orders: số giao dịch HH (đơn bán + đơn hoàn), tức tính cả commissions + adjustments.
+    // Params: [...txFilterParams, ...orderFilterParams, targetUserId, targetUserId]
     const [summary] = await pool.query(`
       SELECT
         col.id as collaborator_id,
         col.full_name as collaborator_name,
         col.commission_rate as collaborator_rate,
-        COALESCE(SUM(c.commission_amount), 0) as total_override_commission,
-        COALESCE(COUNT(DISTINCT c.order_id), 0) as total_orders,
-        COALESCE(SUM(CASE WHEN c.id IS NOT NULL THEN o.total_amount ELSE 0 END), 0) as total_revenue
+        COALESCE(SUM(t.amount), 0) as total_override_commission,
+        COALESCE(COUNT(t.order_id), 0) as total_orders,
+        COALESCE(SUM(DISTINCT o.total_amount), 0) as total_revenue
       FROM collaborators cr
       JOIN users col ON cr.ctv_id = col.id
-      LEFT JOIN orders o ON o.salesperson_id = col.id ${extra}
-      LEFT JOIN commissions c ON c.order_id = o.id
-        AND c.user_id = ? AND c.type = 'override' AND c.ctv_user_id = col.id
+      LEFT JOIN (
+        SELECT t.tx_id, t.order_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date
+        ${txFrom}
+        WHERE 1=1 ${txExtra}
+      ) t ON t.user_id = ? AND t.type = 'override' AND t.ctv_user_id = col.id
+      LEFT JOIN orders o ON o.id = t.order_id AND o.salesperson_id = col.id ${orderExtra}
       WHERE cr.sales_id = ?
       GROUP BY col.id, col.full_name, col.commission_rate
       ORDER BY total_override_commission DESC
-    `, [...filterParams, targetUserId, targetUserId]);
+    `, [...txFilterParams, ...orderFilterParams, targetUserId, targetUserId]);
 
     // Chi tiết từng đơn
-    // Params: [targetUserId(c.user_id), targetUserId(cr.sales_id), filterParams...(WHERE extra)]
+    // Trả theo từng giao dịch HH (commission/adjustment) để “Số đơn” khớp (đơn hoàn = 1 dòng riêng).
+    // Params: [...txFilterParams, ...orderFilterParams, targetUserId, targetUserId]
     const [orders] = await pool.query(`
       SELECT
         col.id as collaborator_id,
         col.full_name as collaborator_name,
+        t.tx_id,
         o.id as order_id, o.code as order_code,
-        o.created_at as order_date,
+        t.entry_date as order_date,
         o.total_amount, o.status,
         g.name as group_name,
         cu.name as customer_name,
-        c.commission_amount as override_commission,
-        c.override_rate as override_rate
+        t.amount as override_commission,
+        CASE
+          WHEN t.entry_kind = 'adjustment' THEN adj_rates.override_rate
+          ELSE c.override_rate
+        END as override_rate,
+        t.entry_kind
       FROM collaborators cr
       JOIN users col ON cr.ctv_id = col.id
-      JOIN orders o ON o.salesperson_id = col.id
-      JOIN commissions c ON c.order_id = o.id
+      JOIN (
+        SELECT t.tx_id, t.order_id, t.return_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date, t.entry_kind
+        ${txFrom}
+        WHERE 1=1 ${txExtra}
+      ) t ON t.user_id = ? AND t.type = 'override' AND t.ctv_user_id = col.id
+      JOIN orders o ON o.id = t.order_id AND o.salesperson_id = col.id ${orderExtra}
+      LEFT JOIN commissions c ON c.order_id = o.id
         AND c.user_id = ? AND c.type = 'override' AND c.ctv_user_id = col.id
+      LEFT JOIN (
+        SELECT
+          ca.id AS tx_id,
+          CASE WHEN COUNT(DISTINCT r1.override_rate) = 1 THEN MAX(r1.override_rate) ELSE NULL END AS override_rate
+        FROM commission_adjustments ca
+        JOIN returns r ON r.id = ca.return_id
+        JOIN return_items ri ON ri.return_id = r.id
+        JOIN order_items oi ON oi.order_id = ca.order_id AND oi.product_id = ri.product_id
+        LEFT JOIN (
+          SELECT
+            oi2.order_id,
+            oi2.product_id,
+            (
+              SELECT ct.sales_override_rate
+              FROM commission_tiers ct
+              WHERE ct.ctv_rate_min <= oi2.commission_rate
+                AND (ct.ctv_rate_max IS NULL OR ct.ctv_rate_max >= oi2.commission_rate)
+              ORDER BY ct.ctv_rate_min DESC
+              LIMIT 1
+            ) AS override_rate
+          FROM order_items oi2
+        ) r1 ON r1.order_id = oi.order_id AND r1.product_id = oi.product_id
+        GROUP BY ca.id
+      ) adj_rates ON adj_rates.tx_id = t.tx_id
       LEFT JOIN groups g ON o.group_id = g.id
       LEFT JOIN customers cu ON o.customer_id = cu.id
-      WHERE cr.sales_id = ? ${extra}
-      ORDER BY col.full_name, o.created_at DESC
-    `, [targetUserId, targetUserId, ...filterParams]);
+      WHERE cr.sales_id = ?
+      ORDER BY col.full_name, t.entry_date DESC
+    `, [...txFilterParams, ...orderFilterParams, targetUserId, targetUserId, targetUserId]);
 
     // Summary tổng
     const totalOverride = summary.reduce((s, r) => s + parseFloat(r.total_override_commission), 0);
