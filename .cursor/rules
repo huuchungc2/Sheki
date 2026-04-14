@@ -1,0 +1,12 @@
+Đọc các file sau trước khi làm bất cứ điều gì:
+- TODO.md → task đang làm
+- RULES.md → quy tắc code bắt buộc
+
+Stack: React 19 + Vite + TypeScript + Tailwind / Node.js + Express / MySQL db=erp port 3000/5173
+
+Sau mỗi task: update TODO.md + CHANGELOG.md, báo cáo files đã sửa.
+Không assume, không sửa file ngoài task, hỏi trước khi làm nếu không chắc.
+
+Khi làm UI → đọc thêm @UI_SPEC.md
+Khi làm hoa hồng/lương → đọc thêm @LOGIC_BUSINESS.md  
+Khi làm tính năng mới → đọc thêm @FEATURE_[tên].md

@@ -132,30 +132,20 @@ router.get('/dashboard', auth, async (req, res, next) => {
       totalKhachShip = parseFloat(shipNvMonth[0].total_khach_ship) || 0;
       totalNvChiu = parseFloat(shipNvMonth[0].total_nv_chiu) || 0;
     } else {
-      const [salesIdsRows] = await pool.query(
-        `SELECT u.id
-         FROM users u
-         JOIN roles r ON u.role_id = r.id
-         WHERE r.code='sales' AND u.is_active=1`
+      // Admin: role không ảnh hưởng KPI ship/NV; chỉ cần đơn không bị hủy và người bán còn active.
+      const [[shipAgg]] = await pool.query(
+        `SELECT
+           COALESCE(SUM(CASE WHEN o.ship_payer='shop' THEN 0 ELSE o.shipping_fee END),0) AS total_khach_ship,
+           COALESCE(SUM(o.salesperson_absorbed_amount),0) AS total_nv_chiu
+         FROM orders o
+         JOIN users u ON o.salesperson_id = u.id
+         WHERE MONTH(o.created_at)=? AND YEAR(o.created_at)=?
+           AND o.status!='cancelled'
+           AND u.is_active = 1`,
+        [m + 1, y]
       );
-      const salesIds = (salesIdsRows || [])
-        .map(r => parseInt(r.id, 10))
-        .filter(n => Number.isFinite(n));
-      if (salesIds.length) {
-        const inSales = `IN (${salesIds.map(() => '?').join(',')})`;
-        const [[shipAgg]] = await pool.query(
-          `SELECT
-             COALESCE(SUM(CASE WHEN o.ship_payer='shop' THEN 0 ELSE o.shipping_fee END),0) AS total_khach_ship,
-             COALESCE(SUM(o.salesperson_absorbed_amount),0) AS total_nv_chiu
-           FROM orders o
-           WHERE MONTH(o.created_at)=? AND YEAR(o.created_at)=?
-             AND o.status!='cancelled'
-             AND o.salesperson_id ${inSales}`,
-          [m + 1, y, ...salesIds]
-        );
-        totalKhachShip = parseFloat(shipAgg?.total_khach_ship) || 0;
-        totalNvChiu = parseFloat(shipAgg?.total_nv_chiu) || 0;
-      }
+      totalKhachShip = parseFloat(shipAgg?.total_khach_ship) || 0;
+      totalNvChiu = parseFloat(shipAgg?.total_nv_chiu) || 0;
     }
 
     // Tổng lương = Tổng HH − Tổng HH hoàn + Ship KH Trả − NV chịu (cùng nguồn HH với KPI thẻ)
@@ -214,7 +204,6 @@ router.get('/dashboard', auth, async (req, res, next) => {
            COALESCE(o_comm.override_comm, 0) + COALESCE(o_adj.override_adj, 0) AS override_comm,
            COALESCE(d_comm.direct_comm, 0) + (COALESCE(o_comm.override_comm, 0) + COALESCE(o_adj.override_adj, 0)) AS total_comm
          FROM users u
-         JOIN roles r ON u.role_id = r.id
          LEFT JOIN (
            SELECT salesperson_id,
                   COUNT(*) AS total_orders,
@@ -247,7 +236,7 @@ router.get('/dashboard', auth, async (req, res, next) => {
              AND ca.type='override'
            GROUP BY ca.user_id
          ) o_adj ON o_adj.user_id = u.id
-         WHERE r.code='sales' AND u.is_active=1
+         WHERE u.is_active=1
          ORDER BY total_comm DESC
          LIMIT 5`,
         [m + 1, y, m + 1, y, m + 1, y, m + 1, y]
@@ -351,7 +340,6 @@ router.get('/salary', auth, async (req, res, next) => {
         COALESCE(ship_nv.total_khach_ship, 0) as total_khach_ship,
         COALESCE(ship_nv.total_nv_chiu, 0) as total_nv_chiu
        FROM users u
-       JOIN roles r ON u.role_id = r.id
        LEFT JOIN (
          SELECT salesperson_id,
                 COUNT(*) as total_orders,
@@ -435,7 +423,7 @@ router.get('/salary', auth, async (req, res, next) => {
            ${groupId ? ' AND group_id = ?' : ''}
          GROUP BY salesperson_id
        ) ship_nv ON u.id = ship_nv.salesperson_id
-       WHERE r.code = 'sales' AND u.is_active = 1
+       WHERE u.is_active = 1
        ORDER BY total_sales DESC`,
       [
         // o_stats
@@ -537,11 +525,9 @@ router.get('/salary', auth, async (req, res, next) => {
         COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
       FROM orders o
       JOIN users u ON o.salesperson_id = u.id
-      JOIN roles r ON u.role_id = r.id
       WHERE MONTH(o.created_at) = ?
         AND YEAR(o.created_at) = ?
         AND o.status <> 'cancelled'
-        AND r.code = 'sales'
         AND u.is_active = 1
         ${groupId ? ' AND o.group_id = ?' : ''}
       `,

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [14/04/2026] - Báo cáo HH: bỏ lọc role 'sales' ở báo cáo
+### Changed
+- **Reports** — Gỡ hardcode `roles.code='sales'` khỏi Dashboard và `/reports/salary`; báo cáo/ KPI tính theo người phát sinh đơn (`orders.salesperson_id`) và phát sinh hoa hồng (`commissions`), không phụ thuộc role. — File: `backend/routes/reports.js`
+
 ## [14/04/2026] - Báo cáo HH: tổng “Hoa hồng nhân viên” khớp KPI Tổng lương
 ### Fixed
 - **reports/salary** — Bảng “Hoa hồng nhân viên” không còn bỏ sót NV chỉ phát sinh HH (override/adjustment) nhưng không có đơn bán trong kỳ; tổng cột “Tổng lương” trong bảng khớp KPI/Dashboard. — File: `backend/routes/reports.js`
