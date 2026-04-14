@@ -79,11 +79,23 @@ const navigationAdmin = [
 
 const navigationSales = [
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
-  { name: "Đơn hàng của tôi", href: "/orders", icon: ShoppingCart },
-  { name: "Khách hàng của tôi", href: "/customers", icon: UserCircle },
-  { name: "Hoa hồng của tôi", href: "/reports/commissions", icon: DollarSign },
-  { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv", icon: DollarSign },
-  { name: "Đơn hoàn", href: "/returns", icon: Package },
+  {
+    name: "Bán hàng",
+    icon: ShoppingCart,
+    children: [
+      { name: "Đơn hàng", href: "/orders" },
+      { name: "Khách hàng", href: "/customers" },
+      { name: "Đơn hoàn", href: "/returns" },
+    ],
+  },
+  {
+    name: "Hoa hồng",
+    icon: DollarSign,
+    children: [
+      { name: "Tổng quan hoa hồng", href: "/reports/commissions" },
+      { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv" },
+    ],
+  },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -253,10 +265,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       >
         <div className="p-6 flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
-            V
+            S
           </div>
           {isSidebarOpen && (
-            <span className="font-bold text-xl text-slate-900 tracking-tight">Velocity</span>
+            <span className="font-bold text-xl text-slate-900 tracking-tight">Sheki</span>
           )}
         </div>
 

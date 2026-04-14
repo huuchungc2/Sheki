@@ -72,10 +72,10 @@ export function Register() {
         <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="relative z-10">
             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-2xl font-black mb-8 shadow-lg shadow-blue-600/20">
-              V
+              S
             </div>
             <h1 className="text-4xl font-black tracking-tight mb-4">
-              Velocity <span className="text-blue-500">Retail</span>
+              Sheki <span className="text-blue-500">Retail</span>
             </h1>
             <p className="text-slate-400 font-medium text-lg leading-relaxed">
               Bắt đầu hành trình tối ưu hóa doanh nghiệp của bạn ngay hôm nay.
@@ -171,7 +171,7 @@ export function Register() {
             <div className="flex items-start gap-3 px-1 py-2">
               <input type="checkbox" required className="mt-1 w-4 h-4 rounded border-slate-200 text-blue-600 focus:ring-blue-500" />
               <p className="text-[10px] font-bold text-slate-400 leading-relaxed">
-                Tôi đồng ý với <span className="text-blue-600">Điều khoản dịch vụ</span> và <span className="text-blue-600">Chính sách bảo mật</span> của Velocity Retail.
+                Tôi đồng ý với <span className="text-blue-600">Điều khoản dịch vụ</span> và <span className="text-blue-600">Chính sách bảo mật</span> của Sheki Retail.
               </p>
             </div>
 

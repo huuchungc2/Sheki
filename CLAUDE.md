@@ -1,4 +1,4 @@
-# CLAUDE.md — ERP VELOCITY (ĐỌC FILE NÀY TRƯỚC KHI LÀM BẤT CỨ ĐIỀU GÌ)
+# CLAUDE.md — ERP SHEKI (ĐỌC FILE NÀY TRƯỚC KHI LÀM BẤT CỨ ĐIỀU GÌ)
 
 ## 📌 Đọc ngay các file sau theo thứ tự
 1. `TODO.md` → biết đang làm gì, task nào tiếp theo
@@ -12,7 +12,7 @@
 ---
 
 ## 🏢 Project
-**ERP quản lý bán hàng nội bộ — Công ty Velocity**
+**ERP quản lý bán hàng nội bộ — Công ty Sheki**
 
 ## ⚙️ Tech Stack
 | | |

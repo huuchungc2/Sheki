@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [14/04/2026] - Branding: Velocity → Sheki
+### Changed
+- **UI + docs** — Đổi tên hiển thị từ Velocity sang Sheki (sidebar, register, metadata, tài liệu). — Files: `src/components/Layout.tsx`, `src/pages/Register.tsx`, `src/pages/InventoryImport.tsx`, `src/pages/InventoryExport.tsx`, `metadata.json`, `CLAUDE.md`, `plan.md`, `deploy.sh`
+
 ## [14/04/2026] - Báo cáo HH: bỏ lọc role 'sales' ở báo cáo
 ### Changed
 - **Reports** — Gỡ hardcode `roles.code='sales'` khỏi Dashboard và `/reports/salary`; báo cáo/ KPI tính theo người phát sinh đơn (`orders.salesperson_id`) và phát sinh hoa hồng (`commissions`), không phụ thuộc role. — File: `backend/routes/reports.js`

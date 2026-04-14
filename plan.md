@@ -1,7 +1,7 @@
 # KẾ HOẠCH PHÁT TRIỂN ERP SYSTEM
 
 ## TỔNG QUAN
-Hệ thống quản lý bán hàng nội bộ cho công ty Velocity.
+Hệ thống quản lý bán hàng nội bộ cho công ty Sheki.
 - **Frontend:** React 19 + Vite + TypeScript + Tailwind CSS
 - **Backend:** Node.js + Express
 - **Database:** MySQL (kết nối trực tiếp localhost, user: root, pass: empty)

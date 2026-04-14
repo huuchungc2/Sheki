@@ -401,7 +401,7 @@ INSERT INTO `role_permissions` (`role`, `module`, `action`, `allowed`) VALUES
 
 -- Default admin user (password: admin123)
 INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `role_id`, `commission_rate`, `is_active`, `join_date`) VALUES
-('Admin Velocity', 'admin', 'admin@velocity.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 1, 0.00, 1, '2020-01-01');
+('Admin Sheki', 'admin', 'admin@velocity.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 1, 0.00, 1, '2020-01-01');
 
 -- Sales employees (password: abc123)
 INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `phone`, `role_id`, `commission_rate`, `is_active`, `join_date`) VALUES

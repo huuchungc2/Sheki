@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ERP Velocity deploy script (CentOS 7.9)
+# ERP Sheki deploy script (CentOS 7.9)
 # - Frontend: Vite build -> served by Nginx
 # - Backend: Node/Express on :3000 managed by PM2
 #

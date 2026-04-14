@@ -1,4 +1,4 @@
-# TODO — ERP VELOCITY
+# TODO — ERP SHEKI
 
 > **Quy tắc:** Chỉ 1 task trong mục ĐANG LÀM tại một thời điểm.
 > AI: Sau khi xong → tick [x], chuyển task tiếp lên ĐANG LÀM, update CHANGELOG.md
@@ -12,6 +12,8 @@
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
+
+- [ ] **Settings: phân quyền theo vai (role) đúng nghĩa** — Bỏ hardcode role ở UI, load roles từ DB; đổi `role_permissions` theo `role_id`; thêm middleware `requirePermission(module, action)` và áp dần vào routes (giữ `scope_own_data` để lọc dữ liệu). — Files: `backend/routes/settings.js`, `backend/middleware/authorize.js` (hoặc middleware mới), `backend/routes/*`, `src/pages/Settings.tsx`
 
 - [x] **Tài liệu: chuẩn hóa quy ước KPI hoa hồng** — Thêm mục KPI (Số đơn hàng chỉ đơn bán, HH bán gross, HH hoàn tách KPI, override net, tổng HH) để tránh lệch giữa các màn — Files: `CLAUDE.md`, `LOGIC_BUSINESS.md`
 

@@ -505,7 +505,7 @@ export function InventoryImport() {
                   <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input 
                     type="text" 
-                    value="Admin Velocity" 
+                    value="Admin Sheki" 
                     disabled
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-sm transition-all outline-none"
                   />
