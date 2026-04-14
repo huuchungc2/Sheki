@@ -450,7 +450,9 @@ export function OrderList() {
           <p className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">
             {formatCurrency(summary.total_commission)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Tổng hoa hồng direct theo đơn.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            HH bán hàng (direct gross). Tháng đủ ngày (1 → cuối tháng), không lọc thêm → cùng số với «HH bán hàng» báo cáo (cùng tháng/nhóm).
+          </p>
         </div>
       </div>
 

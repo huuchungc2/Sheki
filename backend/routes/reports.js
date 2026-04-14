@@ -9,6 +9,7 @@ const {
   getReturnCommissionByMonthYear,
   getReturnCommissionByRange,
 } = require('../services/returnMetrics');
+const { getCommissionMonthKpi } = require('../services/commissionKpi');
 
 router.get('/dashboard', auth, async (req, res, next) => {
   try {
@@ -91,30 +92,7 @@ router.get('/dashboard', auth, async (req, res, next) => {
     const byStatus = { pending:0, shipping:0, completed:0, cancelled:0 };
     statusStats.forEach(r => { if (byStatus[r.status] !== undefined) byStatus[r.status] = r.cnt; });
 
-    // ── Hoa hồng tháng này (gross) ──
-    // Yêu cầu: HH bán hàng/CTV hiển thị theo tổng hoa hồng bán (không trừ hoàn).
-    // Hoàn hàng được tách KPI riêng bằng `commission_adjustments`.
-    const commSpFilter = isSales ? ' AND c.user_id = ?' : '';
-    const [commThis] = await pool.query(
-      `SELECT
-         COALESCE(SUM(CASE WHEN c.type='direct'   THEN c.commission_amount END),0) as direct_commission,
-         COALESCE(SUM(CASE WHEN c.type='override' THEN c.commission_amount END),0) as override_commission
-       FROM commissions c
-       JOIN orders o ON c.order_id = o.id
-       WHERE MONTH(o.created_at)=? AND YEAR(o.created_at)=?
-         AND o.status != 'cancelled'${commSpFilter}`,
-      [m + 1, y, ...(isSales ? [uid] : [])]
-    );
-
-    // HH từ CTV (override) phải trừ đơn hoàn: cộng thêm override adjustments (âm) theo kỳ phát sinh adjustment.
-    const overrideAdjFilter = isSales ? ' AND ca.user_id = ?' : '';
-    const [overrideAdjThis] = await pool.query(
-      `SELECT COALESCE(SUM(ca.amount), 0) AS override_adj
-       FROM commission_adjustments ca
-       WHERE ca.type='override'
-         AND ca.created_at >= ? AND ca.created_at < ?${overrideAdjFilter}`,
-      [firstDayThisMonth, new Date(y, m + 1, 1), ...(isSales ? [uid] : [])]
-    );
+    // ── Hoa hồng tháng này — KPI thống nhất: phát sinh theo commissions.created_at (commissionKpi.js) ──
 
     // ── Hoa hồng hoàn (commission_adjustments) ──
     const returnCommissionThisMonth = await getReturnCommissionByRange(pool, {
@@ -129,19 +107,16 @@ router.get('/dashboard', auth, async (req, res, next) => {
     });
 
     // ── Ship KH trả + NV chịu + Tổng lương (tháng) ──
-    // Sales: theo đơn mình phụ trách.
-    // Admin: theo phạm vi "nhân viên sales đang hoạt động" để đồng bộ với báo cáo hoa hồng nhân viên.
     let totalKhachShip = 0;
     let totalNvChiu = 0;
-    // commission cards (Dashboard): admin muốn nhìn tổng toàn hệ thống; sales nhìn của mình
-    let overrideNetMonth = 0;
-    let directGrossMonth = 0;
-    let totalCommGrossMonth = 0;
-    // lương scope: admin = tổng theo sales active (khớp /reports/salary); sales = của mình
-    let overrideNetForLuongMonth = 0;
-    let directGrossForLuongMonth = 0;
-    let totalCommGrossForLuongMonth = 0;
     const totalReturnCommMonth = returnCommissionThisMonth || 0; // negative
+
+    const monthKpi = isSales
+      ? await getCommissionMonthKpi(pool, { month: m + 1, year: y, userId: uid })
+      : await getCommissionMonthKpi(pool, { month: m + 1, year: y });
+    const directGrossMonth = monthKpi.directGross;
+    const overrideNetMonth = monthKpi.overrideNet;
+    const totalCommGrossMonth = monthKpi.totalHH;
 
     if (isSales) {
       const [shipNvMonth] = await pool.query(
@@ -156,47 +131,7 @@ router.get('/dashboard', auth, async (req, res, next) => {
       );
       totalKhachShip = parseFloat(shipNvMonth[0].total_khach_ship) || 0;
       totalNvChiu = parseFloat(shipNvMonth[0].total_nv_chiu) || 0;
-      const overrideAdjMonth = parseFloat(overrideAdjThis?.[0]?.override_adj) || 0; // negative
-      directGrossMonth = (parseFloat(commThis[0].direct_commission) || 0);
-      overrideNetMonth = (parseFloat(commThis[0].override_commission) || 0) + overrideAdjMonth;
-      totalCommGrossMonth = directGrossMonth + overrideNetMonth;
-      directGrossForLuongMonth = directGrossMonth;
-      overrideNetForLuongMonth = overrideNetMonth;
-      totalCommGrossForLuongMonth = totalCommGrossMonth;
     } else {
-      // Admin dashboard commission cards: tổng toàn hệ thống theo kỳ phát sinh HH (created_at)
-      const [[directAllAgg]] = await pool.query(
-        `SELECT COALESCE(SUM(c.commission_amount),0) AS direct_commission
-         FROM commissions c
-         JOIN orders o ON c.order_id = o.id
-         WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
-           AND c.type='direct'
-           AND o.status!='cancelled'`,
-        [m + 1, y]
-      );
-      const [[overrideAllAgg]] = await pool.query(
-        `SELECT COALESCE(SUM(c.commission_amount),0) AS override_commission
-         FROM commissions c
-         JOIN orders o ON c.order_id = o.id
-         WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
-           AND c.type='override'
-           AND o.status!='cancelled'`,
-        [m + 1, y]
-      );
-      const [[overrideAdjAllAgg]] = await pool.query(
-        `SELECT COALESCE(SUM(ca.amount),0) AS override_adj
-         FROM commission_adjustments ca
-         JOIN orders o ON ca.order_id = o.id
-         WHERE MONTH(ca.created_at)=? AND YEAR(ca.created_at)=?
-           AND ca.type='override'
-           AND o.status!='cancelled'`,
-        [m + 1, y]
-      );
-      directGrossMonth = parseFloat(directAllAgg?.direct_commission) || 0;
-      overrideNetMonth =
-        (parseFloat(overrideAllAgg?.override_commission) || 0) + (parseFloat(overrideAdjAllAgg?.override_adj) || 0);
-      totalCommGrossMonth = directGrossMonth + overrideNetMonth;
-
       const [salesIdsRows] = await pool.query(
         `SELECT u.id
          FROM users u
@@ -208,7 +143,6 @@ router.get('/dashboard', auth, async (req, res, next) => {
         .filter(n => Number.isFinite(n));
       if (salesIds.length) {
         const inSales = `IN (${salesIds.map(() => '?').join(',')})`;
-
         const [[shipAgg]] = await pool.query(
           `SELECT
              COALESCE(SUM(CASE WHEN o.ship_payer='shop' THEN 0 ELSE o.shipping_fee END),0) AS total_khach_ship,
@@ -221,52 +155,12 @@ router.get('/dashboard', auth, async (req, res, next) => {
         );
         totalKhachShip = parseFloat(shipAgg?.total_khach_ship) || 0;
         totalNvChiu = parseFloat(shipAgg?.total_nv_chiu) || 0;
-
-        const [[directAgg]] = await pool.query(
-          `SELECT COALESCE(SUM(c.commission_amount),0) AS direct_commission
-           FROM commissions c
-           JOIN orders o ON c.order_id = o.id
-           WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
-             AND c.type='direct'
-             AND o.status!='cancelled'
-             AND c.user_id ${inSales}`,
-          [m + 1, y, ...salesIds]
-        );
-        directGrossForLuongMonth = parseFloat(directAgg?.direct_commission) || 0;
-        const [[overrideCommAgg]] = await pool.query(
-          `SELECT COALESCE(SUM(c.commission_amount),0) AS override_commission
-           FROM commissions c
-           JOIN orders o ON c.order_id = o.id
-           WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
-             AND c.type='override'
-             AND o.status!='cancelled'
-             AND c.user_id ${inSales}`,
-          [m + 1, y, ...salesIds]
-        );
-        const [[overrideAdjAgg]] = await pool.query(
-          `SELECT COALESCE(SUM(ca.amount),0) AS override_adj
-           FROM commission_adjustments ca
-           JOIN orders o ON ca.order_id = o.id
-           WHERE MONTH(ca.created_at)=? AND YEAR(ca.created_at)=?
-             AND ca.type='override'
-             AND ca.user_id ${inSales}`,
-          [m + 1, y, ...salesIds]
-        );
-        overrideNetForLuongMonth =
-          (parseFloat(overrideCommAgg?.override_commission) || 0) + (parseFloat(overrideAdjAgg?.override_adj) || 0);
-        totalCommGrossForLuongMonth = directGrossForLuongMonth + overrideNetForLuongMonth;
-      } else {
-        totalKhachShip = 0;
-        totalNvChiu = 0;
-        overrideNetForLuongMonth = 0;
-        directGrossForLuongMonth = 0;
-        totalCommGrossForLuongMonth = 0;
       }
     }
 
-    // Tổng lương = Tổng HH − Tổng HH hoàn + Ship KH Trả − NV chịu
+    // Tổng lương = Tổng HH − Tổng HH hoàn + Ship KH Trả − NV chịu (cùng nguồn HH với KPI thẻ)
     const totalLuongMonth =
-      (isSales ? totalCommGrossMonth : totalCommGrossForLuongMonth) - Math.abs(totalReturnCommMonth) + totalKhachShip - totalNvChiu;
+      totalCommGrossMonth - Math.abs(totalReturnCommMonth) + totalKhachShip - totalNvChiu;
 
     // ── Khách hàng ──
     const custFilter = isSales ? ' AND created_by = ?' : '';
@@ -396,9 +290,9 @@ router.get('/dashboard', auth, async (req, res, next) => {
         },
         byStatus,
         commission: {
-          direct:   isSales ? (parseFloat(commThis[0].direct_commission) || 0) : directGrossForLuongMonth,
-          override: isSales ? overrideNetMonth : overrideNetForLuongMonth,
-          total:    isSales ? totalCommGrossMonth : totalCommGrossForLuongMonth,
+          direct:   directGrossMonth,
+          override: overrideNetMonth,
+          total:    totalCommGrossMonth,
         },
         luongMonth: {
           total_khach_ship: totalKhachShip,
@@ -607,6 +501,14 @@ router.get('/salary', auth, async (req, res, next) => {
     const totalSales = formattedSalesData.reduce((sum, s) => sum + s.total_sales, 0);
     const totalCommission = formattedSalesData.reduce((sum, s) => sum + s.total_all_commission, 0);
 
+    const cm = parseInt(String(currentMonth), 10);
+    const cy = parseInt(String(currentYear), 10);
+    const kpiTotals = await getCommissionMonthKpi(pool, {
+      month: cm,
+      year: cy,
+      groupId: Number.isFinite(groupId) ? groupId : null,
+    });
+
     res.json({
       data: {
         salesData: formattedSalesData,
@@ -614,7 +516,10 @@ router.get('/salary', auth, async (req, res, next) => {
           totalSales,
           totalCommission,
           totalOrdersAll: parseInt(ordersAll?.total_orders) || 0,
-          totalEmployees: formattedSalesData.length
+          totalEmployees: formattedSalesData.length,
+          kpi_direct_gross: kpiTotals.directGross,
+          kpi_override_net: kpiTotals.overrideNet,
+          kpi_total_hh: kpiTotals.totalHH,
         }
       }
     });

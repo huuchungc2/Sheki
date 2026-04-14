@@ -187,24 +187,24 @@ export function CommissionReport() {
           const sd = j.data?.salesData || [];
           setSalesData(sd);
 
-          // IMPORTANT: Với Admin view (tổng toàn hệ thống), các KPI “Ship KH Trả / NV chịu / Tổng lương”
-          // phải khớp với bảng “Hoa hồng nhân viên”. Nếu dùng summary từ `/commissions/orders` sẽ dễ lệch
-          // vì endpoint đó có thể bao gồm các dòng không nằm trong bảng salary (inactive/không phải sales/khác điều kiện).
-          // HH bán hàng: gross (chỉ commissions direct). HH hoàn tách KPI riêng từ returns-summary.
-          const sumDirect = sd.reduce((s: number, i: any) => s + (Number(i.direct_commission) || 0), 0);
-          // HH từ CTV: net (override + adjustments override âm đã nằm trong API salary)
-          const sumOverride = sd.reduce((s: number, i: any) => s + (Number(i.override_commission) || 0), 0);
+          // KPI tổng (HH bán gross + CTV net) lấy từ `/reports/salary` — cùng nguồn với Dashboard (commissionKpi),
+          // không cộng từ từng dòng NV (tránh thiếu khi NV không có đơn trong tháng nhưng vẫn có phát sinh HH).
           const sumOrders = sd.reduce((s: number, i: any) => s + (Number(i.total_orders) || 0), 0);
           const sumShip = sd.reduce((s: number, i: any) => s + (Number(i.total_khach_ship) || 0), 0);
           const sumNv = sd.reduce((s: number, i: any) => s + (Number(i.total_nv_chiu) || 0), 0);
           const sumLuong = sd.reduce((s: number, i: any) => s + (Number(i.total_luong) || 0), 0);
           const ordersAll = Number(j.data?.summary?.totalOrdersAll) || 0;
+          const kpiD = Number(j.data?.summary?.kpi_direct_gross);
+          const kpiO = Number(j.data?.summary?.kpi_override_net);
+          const kpiT = Number(j.data?.summary?.kpi_total_hh);
+          const fallbackD = sd.reduce((s: number, i: any) => s + (Number(i.direct_commission) || 0), 0);
+          const fallbackO = sd.reduce((s: number, i: any) => s + (Number(i.override_commission) || 0), 0);
 
           setSummary((prev: any) => ({
             ...prev,
-            direct_commission: sumDirect,
-            override_commission: sumOverride,
-            total_commission: sumDirect + sumOverride,
+            direct_commission: Number.isFinite(kpiD) ? kpiD : fallbackD,
+            override_commission: Number.isFinite(kpiO) ? kpiO : fallbackO,
+            total_commission: Number.isFinite(kpiT) ? kpiT : fallbackD + fallbackO,
             total_orders: ordersAll || sumOrders,
             total_khach_ship: sumShip,
             total_nv_chiu: sumNv,
@@ -795,7 +795,7 @@ export function CommissionReport() {
                     </td>
                     <td className="px-5 py-3">
                       {String(item.entry_kind) === "adjustment"
-                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">Điều chỉnh</span>
+                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">Hoàn</span>
                         : item.type === "direct"
                           ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Bán hàng</span>
                           : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">HH từ CTV{item.ctv_name ? ` (${item.ctv_name})` : ""}</span>
@@ -856,31 +856,40 @@ export function CommissionReport() {
             {orderCommissions.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-800 text-white text-sm font-bold">
-                  <td className="px-5 py-3" colSpan={5}>
-                    Tổng (trang {commPage}) — {commTotal} dòng
+                  <td className="px-5 py-3 align-top" colSpan={5}>
+                    <span className="block">Tổng theo trang {commPage}</span>
+                    <span className="block text-xs font-normal text-slate-400 mt-1 leading-snug">
+                      Chỉ cộng các dòng đang hiển thị ({orderCommissions.length}/{commTotal} dòng trang này) — không phải tổng cả kỳ.
+                    </span>
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="px-5 py-3 text-right align-top">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.total_amount, 0))}
                   </td>
-                  <td className="px-5 py-3 text-right text-emerald-400">
+                  <td className="px-5 py-3 text-right text-emerald-400 align-top">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.commission_amount, 0))}
                   </td>
-                  <td className="px-5 py-3 text-right text-sky-300 tabular-nums">
+                  <td className="px-5 py-3 text-right text-sky-300 tabular-nums align-top">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.khach_tra_ship || 0), 0))}
                   </td>
-                  <td className="px-5 py-3 text-right text-rose-300 tabular-nums">
+                  <td className="px-5 py-3 text-right text-rose-300 tabular-nums align-top">
                     {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.nv_chiu_display || 0), 0))}
                   </td>
-                  <td className="px-5 py-3 text-right text-violet-300">
-                    {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.luong || 0), 0))}
+                  <td className="px-5 py-3 text-right text-violet-200 align-top">
+                    <div className="text-[11px] font-normal text-violet-300/90 mb-1">Lương chỉ trang này</div>
+                    <div className="text-white tabular-nums">
+                      {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.luong || 0), 0))}
+                    </div>
                   </td>
                   <td className="px-5 py-3"></td>
                 </tr>
-                <tr className="bg-slate-100 border-t border-slate-200 text-xs text-slate-600">
-                  <td className="px-5 py-2 text-right font-medium" colSpan={11}>
-                    Tổng lương (cả kỳ lọc):{' '}
-                    <span className="font-bold text-violet-700">{formatCurrency(summary.total_luong || 0)}</span>
+                <tr className="bg-violet-50 border-t border-violet-100 text-sm text-slate-800">
+                  <td className="px-5 py-3 font-semibold" colSpan={9}>
+                    Tổng lương cả kỳ (cùng số thẻ KPI phía trên — gồm mọi dòng, không phân trang)
                   </td>
+                  <td className="px-5 py-3 text-right font-bold text-violet-800 tabular-nums text-base">
+                    {formatCurrency(summary.total_luong || 0)}
+                  </td>
+                  <td className="px-5 py-3"></td>
                 </tr>
               </tfoot>
             )}

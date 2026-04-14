@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [14/04/2026] - Loại HH: «Điều chỉnh» → «Hoàn»
+### Changed
+- **CommissionReport + Excel** — Badge/ cột loại giao dịch từ điều chỉnh hoa hồng (hoàn hàng) hiển thị **Hoàn**; export thêm cột «Loại HH» (Bán hàng / HH từ CTV / Hoàn). — Files: `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`
+
+## [14/04/2026] - Báo cáo HH: phân biệt tổng trang vs Tổng lương cả kỳ
+### Changed
+- **CommissionReport** — Footer «Chi tiết theo đơn»: làm rõ hàng đen là **chỉ cộng dòng trang hiện tại**; thêm hàng **Tổng lương cả kỳ** khớp thẻ KPI (tránh nhầm số nhỏ hơn với tổng kỳ). — File: `src/pages/CommissionReport.tsx`
+
+## [14/04/2026] - KPI hoa hồng: một nguồn (khớp Dashboard / báo cáo / đơn)
+### Fixed
+- **GET /orders (tổng HH)** — Khi lọc đủ cả tháng (ngày 1 → cuối tháng) và không có search/status/NV/kho, tổng «HH bán hàng» dùng **cùng** `getCommissionMonthKpi` với báo cáo (tránh lệch nhỏ do `DATE(c.created_at)` vs `MONTH/YEAR`). — Files: `backend/services/commissionKpi.js`, `backend/routes/orders.js`
+- **commissionKpi** — Gom tính HH bán (direct gross) + HH CTV (override net) theo `commissions.created_at` / `commission_adjustments`; Dashboard và `/reports/salary` dùng chung; sửa lỗi Admin Dashboard trả nhầm tổng HH theo scope sales-only; Sales Dashboard trước đó lọc theo `orders.created_at` thay vì phát sinh HH.
+- **reports/salary** — Thêm `summary.kpi_direct_gross`, `kpi_override_net`, `kpi_total_hh` (tổng đủ, không cộng thiếu từ bảng NV khi NV không có đơn trong tháng nhưng vẫn có phát sinh HH).
+- **CommissionReport (Admin)** — KPI thẻ lấy các `kpi_*` từ salary thay vì SUM từng dòng NV.
+- **GET /orders** — KPI «Tổng hoa hồng» = tổng direct gross theo ngày phát sinh HH (cùng quy tắc báo cáo khi cùng khoảng ngày). — Files: `backend/services/commissionKpi.js`, `backend/routes/reports.js`, `backend/routes/orders.js`, `src/pages/CommissionReport.tsx`, `src/pages/OrderList.tsx`
+
 ## [13/04/2026] - Báo cáo hoa hồng: KPI hoàn lọc theo nhóm
 ### Fixed
 - **Reports/returns-summary** — “Tổng doanh số hoàn” và “Tổng HH hoàn” lọc theo `group_id` (khi chọn nhóm) để khớp bộ lọc báo cáo hoa hồng; fix lỗi SQL ambiguous column khi JOIN `orders` khiến KPI hoàn rơi về 0. — Files: `backend/routes/reports.js`

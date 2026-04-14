@@ -10,6 +10,14 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("vi-VN");
 }
 
+/** Khớp cột «Loại HH» trên CommissionReport */
+function hhKindLabel(o: { entry_kind?: string; type?: string }) {
+  if (String(o?.entry_kind) === "adjustment") return "Hoàn";
+  if (o?.type === "override") return "HH từ CTV";
+  if (o?.type === "direct") return "Bán hàng";
+  return "—";
+}
+
 // ─── Export hoa hồng Sales (danh sách đơn của mình) ───────────────────────
 export function exportSalesCommission(opts: {
   orders: any[];
@@ -36,11 +44,12 @@ export function exportSalesCommission(opts: {
     [`BÁO CÁO HOA HỒNG — ${userName.toUpperCase()}`],
     [`Kỳ: Tháng ${parseInt(month)}/${year}${groupName ? ` — Nhóm: ${groupName}` : ""}`],
     [],
-    ["Mã đơn", "Ngày", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng bán hàng", "Ship KH Trả", "Tiền NV chịu", "Lương", "Trạng thái"],
+    ["Mã đơn", "Loại HH", "Ngày", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng bán hàng", "Ship KH Trả", "Tiền NV chịu", "Lương", "Trạng thái"],
   ];
   orders.forEach(o => {
     detailRows.push([
       o.order_code,
+      hhKindLabel(o),
       fmtDate(o.order_date),
       o.customer_name || "—",
       o.group_name || "—",
@@ -58,7 +67,7 @@ export function exportSalesCommission(opts: {
   // Footer tổng
   detailRows.push([]);
   detailRows.push([
-    "TỔNG CỘNG", "", "", "",
+    "TỔNG CỘNG", "", "", "", "",
     orders.reduce((s, o) => s + o.total_amount, 0),
     orders.reduce((s, o) => s + o.commission_amount, 0),
     orders.reduce((s, o) => s + Number(o.khach_tra_ship || 0), 0),
@@ -87,7 +96,7 @@ export function exportSalesCommission(opts: {
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
 
   // Style cột rộng
-  wsDetail["!cols"]  = [{ wch: 20 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 12 }];
+  wsDetail["!cols"]  = [{ wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 12 }];
   wsSummary["!cols"] = [{ wch: 30 }, { wch: 20 }];
 
   XLSX.utils.book_append_sheet(wb, wsDetail,  "Chi tiết đơn");
@@ -150,11 +159,12 @@ export function exportAdminCommission(opts: {
     ["CHI TIẾT HOA HỒNG THEO ĐƠN HÀNG"],
     [`Kỳ: ${period}`],
     [],
-    ["Mã đơn", "Ngày", "Nhân viên", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng", "Ship KH Trả", "Tiền NV chịu", "Lương", "Trạng thái"],
+    ["Mã đơn", "Loại HH", "Ngày", "Nhân viên", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng", "Ship KH Trả", "Tiền NV chịu", "Lương", "Trạng thái"],
   ];
   orderCommissions.forEach(o => {
     orderRows.push([
       o.order_code,
+      hhKindLabel(o),
       fmtDate(o.order_date),
       o.salesperson_name || "—",
       o.customer_name || "—",
@@ -172,7 +182,7 @@ export function exportAdminCommission(opts: {
   });
   orderRows.push([]);
   orderRows.push([
-    "TỔNG CỘNG", "", "", "", "",
+    "TỔNG CỘNG", "", "", "", "", "",
     orderCommissions.reduce((s, o) => s + o.total_amount, 0),
     orderCommissions.reduce((s, o) => s + o.commission_amount, 0),
     orderCommissions.reduce((s, o) => s + Number(o.khach_tra_ship || 0), 0),
@@ -183,7 +193,16 @@ export function exportAdminCommission(opts: {
   if (periodSummary && (periodSummary.total_luong != null || periodSummary.total_khach_ship != null)) {
     orderRows.push([]);
     orderRows.push([
-      "Tổng lương (cả kỳ lọc)", "", "", "", "", "", "", "", "",
+      "Tổng lương (cả kỳ lọc)",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
       periodSummary.total_luong ?? "",
       "",
     ]);
@@ -222,7 +241,7 @@ export function exportAdminCommission(opts: {
   const wsCtv   = XLSX.utils.aoa_to_sheet(ctvRows);
 
   wsNV["!cols"]    = [{ wch: 24 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
-  wsOrder["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
+  wsOrder["!cols"] = [{ wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
   wsCtv["!cols"]   = [{ wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 18 }, { wch: 18 }];
 
   XLSX.utils.book_append_sheet(wb, wsNV,    "Tổng hợp NV");

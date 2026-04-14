@@ -16,6 +16,11 @@ const {
 } = require('../services/orderService');
 const { publishOrderEvent } = require('../services/notificationHub');
 const { computeOrderCollects, round2 } = require('../utils/orderCollect');
+const {
+  getCommissionMonthKpi,
+  sumDirectGrossAccrualForOrderFilters,
+  tryParseFullCalendarMonthFromRange,
+} = require('../services/commissionKpi');
 
 const DEFAULT_LINE_COMMISSION_RATE = 10;
 
@@ -44,13 +49,7 @@ router.get('/', auth, async (req, res, next) => {
     let summaryQuery = `
       SELECT
         COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS total_orders,
-        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.subtotal ELSE 0 END), 0) AS total_revenue,
-        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN (
-          SELECT commission_amount
-          FROM commissions
-          WHERE order_id = o.id AND user_id = o.salesperson_id AND type = 'direct'
-          LIMIT 1
-        ) ELSE 0 END), 0) AS total_commission
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.subtotal ELSE 0 END), 0) AS total_revenue
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE 1=1
@@ -130,6 +129,33 @@ router.get('/', auth, async (req, res, next) => {
     const [countRows] = await pool.query(countQuery, params.slice(0, -2));
     const [[summary]] = await pool.query(summaryQuery, summaryParams);
 
+    // Cùng tháng đủ ngày + không lọc hẹp → dùng đúng `getCommissionMonthKpi` như báo cáo HH (tránh lệch DATE vs MONTH/YEAR).
+    const fullMonth = tryParseFullCalendarMonthFromRange(date_from, date_to);
+    const narrowFilters =
+      !!(search || status || employee || warehouse);
+    let totalCommissionDirect;
+    if (fullMonth && !narrowFilters) {
+      const kpi = await getCommissionMonthKpi(pool, {
+        month: fullMonth.month,
+        year: fullMonth.year,
+        groupId: group_id ? parseInt(String(group_id), 10) : null,
+        userId: req.user.scope_own_data ? req.user.id : null,
+      });
+      totalCommissionDirect = kpi.directGross;
+    } else {
+      totalCommissionDirect = await sumDirectGrossAccrualForOrderFilters(pool, {
+        scopeOwnData: !!req.user.scope_own_data,
+        userId: req.user.id,
+        search,
+        status,
+        employee,
+        warehouse,
+        date_from,
+        date_to,
+        group_id,
+      });
+    }
+
     // Convert DECIMAL strings to numbers and compute commission
     const formattedRows = rows.map(row => {
       const total = parseFloat(row.total_amount) || 0;
@@ -157,7 +183,7 @@ router.get('/', auth, async (req, res, next) => {
       summary: {
         total_orders: parseInt(summary?.total_orders) || 0,
         total_revenue: parseFloat(summary?.total_revenue) || 0,
-        total_commission: parseFloat(summary?.total_commission) || 0,
+        total_commission: totalCommissionDirect,
       },
     });
   } catch (err) {
