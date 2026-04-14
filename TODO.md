@@ -62,6 +62,8 @@
 ## ✅ HOÀN THÀNH
 
 - [x] **KPI hoa hồng khớp giữa Dashboard / báo cáo / danh sách đơn** — `commissionKpi.js` + `salary.summary.kpi_*` + `/orders` tổng direct theo phát sinh; fix Dashboard Admin/Sales và Admin báo cáo cộng thiếu từ bảng NV — Files: `backend/services/commissionKpi.js`, `backend/routes/reports.js`, `backend/routes/orders.js`, `src/pages/CommissionReport.tsx`, `src/pages/OrderList.tsx`
+- [x] **Báo cáo hoa hồng: tổng “Hoa hồng nhân viên” khớp KPI Tổng lương** — Không bỏ sót NV chỉ có phát sinh HH (override/adjustment) nhưng không có đơn bán trong kỳ, để tổng bảng không lệch Dashboard. — File: `backend/routes/reports.js`
+- [x] **Báo cáo hoa hồng: thêm cột NV bán ở chi tiết theo đơn** — Hiển thị nhân viên bán bên cạnh mã đơn trong bảng chi tiết. — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`
 
 - [x] **Báo cáo hoa hồng (Admin): tổng doanh số hoàn + tổng HH hoàn lọc theo nhóm** — KPI hoàn lọc theo `group_id` (khi chọn nhóm) để khớp bộ lọc báo cáo; fix API `/reports/returns-summary` join `orders` để filter nhóm cho cả doanh số hoàn và HH hoàn — Files: `backend/routes/reports.js`
 - [x] **Gom logic KPI hoàn dùng chung (Dashboard + Báo cáo hoa hồng)** — Tách helper tính doanh số hoàn / số đơn hoàn / HH hoàn để tránh lệch số giữa các màn — Files: `backend/services/returnMetrics.js`, `backend/routes/reports.js`

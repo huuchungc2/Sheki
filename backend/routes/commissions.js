@@ -169,6 +169,7 @@ router.get('/orders', auth, async (req, res, next) => {
         JOIN orders o ON ca.order_id = o.id
       ) t
       JOIN orders o ON t.order_id = o.id
+      LEFT JOIN users sp ON o.salesperson_id = sp.id
       LEFT JOIN users ctv ON t.ctv_user_id = ctv.id
       LEFT JOIN groups g ON o.group_id = g.id
       LEFT JOIN customers cu ON o.customer_id = cu.id
@@ -181,6 +182,7 @@ router.get('/orders', auth, async (req, res, next) => {
           ctv.full_name as ctv_name,
           o.id as order_id, o.code as order_code,
           o.salesperson_id AS order_salesperson_id,
+          sp.full_name as salesperson_name,
           o.total_amount, o.status, t.entry_date as order_date,
           o.group_id, g.name as group_name,
           cu.name as customer_name,

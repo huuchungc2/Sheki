@@ -334,12 +334,6 @@ router.get('/salary', auth, async (req, res, next) => {
     // Vì báo cáo hoa hồng theo nhóm đang hiển thị theo o.group_id (CommissionReport).
     const groupId = group_id ? parseInt(group_id) : null;
     const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
-    // Khi lọc theo nhóm: chỉ lấy NV có đơn thuộc nhóm trong kỳ (tránh lẫn NV không liên quan).
-    // (Giữ behavior cũ: danh sách NV chỉ hiện khi có doanh số kỳ.)
-    const ordersExistsCond =
-      groupId != null
-        ? ' AND EXISTS (SELECT 1 FROM orders o2 WHERE o2.salesperson_id = u.id AND MONTH(o2.created_at) = ? AND YEAR(o2.created_at) = ? AND o2.group_id = ?)'
-        : '';
     const [salesData] = await pool.query(
       `SELECT
         u.id,
@@ -442,8 +436,6 @@ router.get('/salary', auth, async (req, res, next) => {
          GROUP BY salesperson_id
        ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE r.code = 'sales' AND u.is_active = 1
-       ${ordersExistsCond}
-       AND COALESCE(o_stats.total_orders, 0) > 0
        ORDER BY total_sales DESC`,
       [
         // o_stats
@@ -460,8 +452,6 @@ router.get('/salary', auth, async (req, res, next) => {
         currentMonth, currentYear, ...(groupId ? [groupId] : []),
         // ship_nv — chỉ theo NV phụ trách đơn (salesperson_id), không nhân cho người chỉ HH override
         currentMonth, currentYear, ...(groupId ? [groupId] : []),
-        // EXISTS filter
-        ...(groupId ? [currentMonth, currentYear, groupId] : []),
       ]
     );
 
@@ -477,25 +467,46 @@ router.get('/salary', auth, async (req, res, next) => {
     );
 
     // Convert DECIMAL strings to numbers
-    const formattedSalesData = salesData.map(s => {
-      const totalAll = parseFloat(s.total_all_commission) || 0;
+    const formattedSalesDataAll = salesData.map(s => {
+      const directGross = parseFloat(s.direct_commission) || 0;
+      const overrideNet = parseFloat(s.override_commission) || 0;
+      const returnDirectAdj = parseFloat(s.direct_adjustment) || 0; // negative
       const khach = parseFloat(s.total_khach_ship) || 0;
       const nv = parseFloat(s.total_nv_chiu) || 0;
+      const returnAbs = Math.abs(returnDirectAdj);
+      // Tổng HH (đúng KPI): direct gross + override net (KHÔNG trừ hoàn direct ở đây)
+      const totalHH = directGross + overrideNet;
+      // Tổng lương: Tổng HH − |HH hoàn direct| + Ship KH Trả − NV chịu
+      const totalLuong = totalHH - returnAbs + khach - nv;
       return {
         ...s,
         total_orders: parseInt(s.total_orders) || 0,
         total_sales: parseFloat(s.total_sales) || 0,
-        direct_commission: parseFloat(s.direct_commission) || 0,
-        direct_adjustment: parseFloat(s.direct_adjustment) || 0,
-        total_commission: parseFloat(s.total_commission) || 0,
-        override_commission: parseFloat(s.override_commission) || 0,
-        total_all_commission: totalAll,
+        direct_commission: directGross,
+        direct_adjustment: returnDirectAdj,
+        // Giữ field cũ nhưng chuẩn hóa ý nghĩa để UI không bị lệch:
+        // - total_commission: tổng HH direct gross
+        // - total_all_commission: tổng HH (direct gross + override net)
+        total_commission: directGross,
+        override_commission: overrideNet,
+        total_all_commission: totalHH,
         total_khach_ship: khach,
         total_nv_chiu: nv,
-        total_luong: totalAll + khach - nv,
+        total_luong: totalLuong,
         salary: parseFloat(s.salary) || 0,
         commission_rate: parseFloat(s.commission_rate) || 0,
+        total_return_commission_abs: returnAbs,
       };
+    });
+
+    // Bảng “Hoa hồng nhân viên” phải bao gồm cả NV không có đơn bán nhưng có phát sinh HH (override/adjustment),
+    // để tổng trong bảng không bị lệch KPI tổng.
+    const formattedSalesData = formattedSalesDataAll.filter(s => {
+      const totalAll = Number(s.total_all_commission) || 0;
+      const ship = Number(s.total_khach_ship) || 0;
+      const nv = Number(s.total_nv_chiu) || 0;
+      const orders = Number(s.total_orders) || 0;
+      return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0;
     });
 
     const totalSales = formattedSalesData.reduce((sum, s) => sum + s.total_sales, 0);
@@ -509,6 +520,38 @@ router.get('/salary', auth, async (req, res, next) => {
       groupId: Number.isFinite(groupId) ? groupId : null,
     });
 
+    // KPI Tổng lương (Admin) phải khớp Dashboard:
+    // Tổng lương = Tổng HH (direct gross + override net) − |HH hoàn direct| + Ship KH Trả − NV chịu
+    // Lưu ý: danh sách salesData có thể chỉ gồm NV có đơn trong kỳ, nên không dùng sum bảng để làm KPI.
+    const kpiReturnCommission = await getReturnCommissionByMonthYear(pool, {
+      month: cm,
+      year: cy,
+      userId: null,
+      groupId: Number.isFinite(groupId) ? groupId : null,
+    }); // negative
+
+    const [[shipNvAll]] = await pool.query(
+      `
+      SELECT
+        COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+        COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+      FROM orders o
+      JOIN users u ON o.salesperson_id = u.id
+      JOIN roles r ON u.role_id = r.id
+      WHERE MONTH(o.created_at) = ?
+        AND YEAR(o.created_at) = ?
+        AND o.status <> 'cancelled'
+        AND r.code = 'sales'
+        AND u.is_active = 1
+        ${groupId ? ' AND o.group_id = ?' : ''}
+      `,
+      [cm, cy, ...(groupId ? [groupId] : [])]
+    );
+    const kpiShip = parseFloat(shipNvAll?.total_khach_ship) || 0;
+    const kpiNv = parseFloat(shipNvAll?.total_nv_chiu) || 0;
+    const kpiTotalLuong =
+      (parseFloat(kpiTotals.totalHH) || 0) - Math.abs(kpiReturnCommission || 0) + kpiShip - kpiNv;
+
     res.json({
       data: {
         salesData: formattedSalesData,
@@ -520,6 +563,10 @@ router.get('/salary', auth, async (req, res, next) => {
           kpi_direct_gross: kpiTotals.directGross,
           kpi_override_net: kpiTotals.overrideNet,
           kpi_total_hh: kpiTotals.totalHH,
+          kpi_return_commission: kpiReturnCommission,
+          kpi_total_khach_ship: kpiShip,
+          kpi_total_nv_chiu: kpiNv,
+          kpi_total_luong: kpiTotalLuong,
         }
       }
     });

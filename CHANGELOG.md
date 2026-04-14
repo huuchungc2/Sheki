@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [14/04/2026] - Báo cáo HH: tổng “Hoa hồng nhân viên” khớp KPI Tổng lương
+### Fixed
+- **reports/salary** — Bảng “Hoa hồng nhân viên” không còn bỏ sót NV chỉ phát sinh HH (override/adjustment) nhưng không có đơn bán trong kỳ; tổng cột “Tổng lương” trong bảng khớp KPI/Dashboard. — File: `backend/routes/reports.js`
+
+## [14/04/2026] - Báo cáo HH: thêm cột “NV bán” ở chi tiết theo đơn
+### Added
+- **CommissionReport** — Bảng “Chi tiết hoa hồng theo đơn hàng” hiển thị thêm cột “NV bán” cạnh “Mã đơn”. — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`
+
 ## [14/04/2026] - Loại HH: «Điều chỉnh» → «Hoàn»
 ### Changed
 - **CommissionReport + Excel** — Badge/ cột loại giao dịch từ điều chỉnh hoa hồng (hoàn hàng) hiển thị **Hoàn**; export thêm cột «Loại HH» (Bán hàng / HH từ CTV / Hoàn). — Files: `src/pages/CommissionReport.tsx`, `src/lib/exportExcel.ts`

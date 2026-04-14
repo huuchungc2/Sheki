@@ -197,6 +197,9 @@ export function CommissionReport() {
           const kpiD = Number(j.data?.summary?.kpi_direct_gross);
           const kpiO = Number(j.data?.summary?.kpi_override_net);
           const kpiT = Number(j.data?.summary?.kpi_total_hh);
+          const kpiLuong = Number(j.data?.summary?.kpi_total_luong);
+          const kpiShip = Number(j.data?.summary?.kpi_total_khach_ship);
+          const kpiNv = Number(j.data?.summary?.kpi_total_nv_chiu);
           const fallbackD = sd.reduce((s: number, i: any) => s + (Number(i.direct_commission) || 0), 0);
           const fallbackO = sd.reduce((s: number, i: any) => s + (Number(i.override_commission) || 0), 0);
 
@@ -206,9 +209,9 @@ export function CommissionReport() {
             override_commission: Number.isFinite(kpiO) ? kpiO : fallbackO,
             total_commission: Number.isFinite(kpiT) ? kpiT : fallbackD + fallbackO,
             total_orders: ordersAll || sumOrders,
-            total_khach_ship: sumShip,
-            total_nv_chiu: sumNv,
-            total_luong: sumLuong,
+            total_khach_ship: Number.isFinite(kpiShip) ? kpiShip : sumShip,
+            total_nv_chiu: Number.isFinite(kpiNv) ? kpiNv : sumNv,
+            total_luong: Number.isFinite(kpiLuong) ? kpiLuong : sumLuong,
           }));
         }
         if (ctvRes.ok) {
@@ -764,6 +767,7 @@ export function CommissionReport() {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">NV bán</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Loại HH</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ngày</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Khách hàng</th>
@@ -779,7 +783,7 @@ export function CommissionReport() {
             <tbody className="divide-y divide-slate-50">
               {orderCommissions.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-5 py-12 text-center text-slate-400">
+                  <td colSpan={12} className="px-5 py-12 text-center text-slate-400">
                     Chưa có hoa hồng trong tháng {month}/{year}
                     {groupId ? ` — nhóm đã chọn` : ""}
                   </td>
@@ -792,6 +796,9 @@ export function CommissionReport() {
                     onClick={() => openOrderPopup(item)}>
                     <td className="px-5 py-3">
                       <span className="font-bold text-blue-600 font-mono">{item.order_code}</span>
+                    </td>
+                    <td className="px-5 py-3 text-slate-700 font-medium">
+                      {item.salesperson_name || "—"}
                     </td>
                     <td className="px-5 py-3">
                       {String(item.entry_kind) === "adjustment"
