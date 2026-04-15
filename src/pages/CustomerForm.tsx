@@ -559,11 +559,28 @@ export function CustomerForm() {
                     </select>
                     {errors.ward && <p className="text-[11px] text-red-500 font-medium">{errors.ward}</p>}
                   </div>
-                  <div className="space-y-1">
-                    <input type="text" value={formData.address} onChange={(e) => handleChange("address", e.target.value)} placeholder="Số nhà, tên đường" className={cn("w-full px-3 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2", errors.address ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
-                    {errors.address && <p className="text-[11px] text-red-500 font-medium">{errors.address}</p>}
-                  </div>
                 </div>
+
+                {/* Địa chỉ nhà: nằm hàng dưới, full width */}
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700">
+                    Địa chỉ nhà <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address}
+                    onChange={(e) => handleChange("address", e.target.value)}
+                    placeholder="Số nhà, tên đường"
+                    className={cn(
+                      "w-full px-4 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2",
+                      errors.address
+                        ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50"
+                        : "border-transparent focus:border-blue-500 focus:ring-blue-500/10"
+                    )}
+                  />
+                  {errors.address && <p className="text-[11px] text-red-500 font-medium">{errors.address}</p>}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700">Nhân viên phụ trách</label>

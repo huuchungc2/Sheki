@@ -5,6 +5,14 @@
 - **OrderList** — Thêm nút «Xuất Excel» theo bộ lọc hiện tại; file có 2 sheet: «Đơn hàng» và «Chi tiết SP» (Tên sản phẩm, Số lượng, SKU, đơn giá, CK, thành tiền). — Files: `src/pages/OrderList.tsx`, `src/lib/exportExcel.ts`, `backend/routes/orders.js`
 - **SalesReturnsList** — Thêm nút «Xuất Excel» cho tab Đơn hoàn; backend trả thêm `group_name` và `salesperson_name` để export đủ thông tin. — Files: `src/pages/SalesReturnsList.tsx`, `src/lib/exportExcel.ts`, `backend/routes/returns.js`
 
+## [15/04/2026] - Khách hàng: Địa chỉ nhà xuống hàng dưới
+### Changed
+- **CustomerForm** — Màn thêm/sửa khách hàng: ô «Địa chỉ nhà» nằm một hàng riêng (full width) dưới phần Tỉnh/Quận/Phường để dễ nhập trên mobile. — File: `src/pages/CustomerForm.tsx`
+
+## [15/04/2026] - Đơn hàng: hiển thị địa chỉ giao hàng đầy đủ khi chọn khách
+### Changed
+- **OrderForm** — Khi chọn khách hàng (tạo mới/sửa đơn), hệ thống lấy địa chỉ khách hàng đầy đủ (số nhà + phường + quận + tỉnh) để hiển thị vào ô «Địa chỉ giao hàng»; nếu user đã sửa tay địa chỉ giao hàng thì không tự ghi đè. — File: `src/pages/OrderForm.tsx`
+
 ## [15/04/2026] - Đơn hàng: Sales không sửa/xóa đơn đang giao & đã giao
 ### Changed
 - **OrderList** — Với tài khoản không phải Admin: ẩn nút sửa/xóa, tắt mở form khi click dòng, và không cho chọn bulk các đơn trạng thái «Đang giao» / «Đã giao». Admin giữ nguyên.

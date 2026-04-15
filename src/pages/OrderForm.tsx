@@ -27,6 +27,13 @@ import { computeOrderCollects, type ShipPayer } from "../lib/orderCollect";
 type CustomerLite = { id: string; name: string; phone?: string; address?: string };
 type ProductLite = { id: string; name: string; sku: string; price: number };
 
+function joinAddressParts(parts: Array<string | null | undefined>) {
+  return parts
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 /** Phí ship / cọc: hiển thị như các dòng tiền (formatCurrency), click để nhập số */
 function MoneyAmountField({
   value,
@@ -113,10 +120,27 @@ export function OrderForm() {
     }
   };
 
-  const selectCustomer = (customer: any) => {
+  const selectCustomer = async (customer: any) => {
+    // Set nhanh để UI phản hồi ngay
     setSelectedCustomer(customer);
     setCustomerQuery(customer.name);
     setShowCustomerSuggestions(false);
+
+    // Fetch đầy đủ địa chỉ để hiển thị shipping address full (số nhà + phường + quận + tỉnh)
+    try {
+      const res: any = await api.get(`/customers/${customer.id}`);
+      const c = res?.data ?? res;
+      const full = joinAddressParts([c?.address, c?.ward, c?.district, c?.city]);
+      setSelectedCustomer((prev: any) => {
+        if (!prev) return prev;
+        return { ...prev, address: full || prev.address };
+      });
+      if (!shipmentAddressTouched) {
+        setShipmentAddress(full || String(customer.address ?? "").trim() || "");
+      }
+    } catch {
+      // ignore: giữ address lite từ suggest
+    }
   };
 
   const addProduct = (product: any) => {
@@ -153,6 +177,7 @@ export function OrderForm() {
 
   const [items, setItems] = React.useState<OrderItem[]>([]);
   const [shipmentAddress, setShipmentAddress] = React.useState<string>("");
+  const [shipmentAddressTouched, setShipmentAddressTouched] = React.useState(false);
   const [shippingFee, setShippingFee] = React.useState<number>(0);
   /** shop = shop trả ship (mặc định); customer = khách trả ship */
   const [shipPayer, setShipPayer] = React.useState<ShipPayer>("customer");
@@ -358,6 +383,7 @@ export function OrderForm() {
         if (itemsData.length) setItems(itemsData as any);
 
         setShipmentAddress(order?.shipping_address ?? '');
+        setShipmentAddressTouched(Boolean(String(order?.shipping_address ?? '').trim()));
         setShippingFee(Number(order?.shipping_fee ?? 0));
         setShipPayer(order?.ship_payer === "shop" ? "shop" : "customer");
         setDeposit(Number(order?.deposit ?? 0));
@@ -449,7 +475,7 @@ export function OrderForm() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    const shippingAddr = selectedCustomer?.address?.trim() || '';
+    const shippingAddr = shipmentAddress.trim();
     if (!shippingAddr) {
       setFormError('Vui lòng nhập địa chỉ giao hàng');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -777,8 +803,11 @@ export function OrderForm() {
                   <MapPin className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-300" />
                   <textarea
                     placeholder="Nhập địa chỉ chi tiết..."
-                    value={selectedCustomer?.address ?? ''}
-                    onChange={(e) => setSelectedCustomer((prev: any) => prev ? { ...prev, address: e.target.value } : prev)}
+                    value={shipmentAddress}
+                    onChange={(e) => {
+                      setShipmentAddressTouched(true);
+                      setShipmentAddress(e.target.value);
+                    }}
                     className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all resize-none"
                     rows={3}
                   />
