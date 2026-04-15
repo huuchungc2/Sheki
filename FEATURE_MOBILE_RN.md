@@ -13,7 +13,7 @@
 - **Navigation:** React Navigation v6 (Stack + Bottom Tabs)
 - **State:** React hooks (useState, useContext) — không dùng Redux
 - **Auth:** JWT lưu vào `expo-secure-store` (KHÔNG dùng AsyncStorage cho token)
-- **API:** Gọi thẳng VPS IP — `http://[VPS_IP]:3000/api`
+- **API:** Ưu tiên domain + HTTPS (khuyến nghị). Dev có thể dùng IP tạm thời.
 - **Styling:** StyleSheet của React Native — follow design system dưới
 
 ---
@@ -125,7 +125,9 @@ mobile/
 ## 5. API Endpoints cần dùng
 
 ```
-BASE_URL = http://[VPS_IP]:3000/api
+BASE_URL =
+  - Production: `https://<domain>/api` (khuyến nghị)
+  - Dev: `http://[LAN_IP_OR_VPS_IP]:3000/api` (chỉ dùng tạm)
 
 Auth:
   POST   /auth/login              body: {username, password}
@@ -190,6 +192,29 @@ Vì VPS dùng IP không có HTTPS, cần thêm vào `app.json`:
 ```
 
 **Lưu ý:** Khi có domain + HTTPS thật thì xóa dòng này đi.
+
+---
+
+## 7.1 ENV config (khuyến nghị)
+
+- Không hardcode API URL trong code.
+- Dùng `app.json` / `expo.extra` hoặc `.env` (Expo) để cấu hình `API_URL` theo môi trường (dev/staging/prod).
+
+---
+
+## 7.2 Auth & bảo mật (khuyến nghị tối thiểu)
+
+- Token JWT lưu SecureStore key: `auth_token`
+- Không log token ra console
+- Khi 401: xoá token + điều hướng về Login
+
+---
+
+## 7.3 UX quan trọng trên mobile
+
+- **Search input**: phải hỗ trợ IME tiếng Việt (composition) + debounce khi gọi API.
+- **List**: dùng `FlatList` + `keyExtractor`, hỗ trợ pull-to-refresh.
+- **Offline**: hiển thị trạng thái “Mất kết nối” thay vì crash/treo.
 
 ---
 

@@ -1,103 +1,87 @@
-# PROMPT MOBILE — Dùng với Cursor Agent
+# PROMPT MOBILE — React Native native (ít token)
 
-> Paste vào đầu mỗi session khi làm màn hình mobile mới
-
----
-
-## 🟢 Prompt mở session mobile
-
-```
-Đọc các file sau trước khi làm bất cứ điều gì:
-- CLAUDE.md
-- FEATURE_MOBILE_RN.md
-- mobile/src/theme/colors.ts
-
-Sau khi đọc, làm màn hình: [TÊN MÀN HÌNH]
-
-Quy tắc bắt buộc:
-- Dùng StyleSheet.create(), KHÔNG inline style
-- Dùng SecureStore thay localStorage
-- Mọi API call qua src/config/api.ts
-- Loading + Empty state bắt buộc
-- Text phải trong <Text>, không để text raw
-- Dùng SafeAreaView cho màn hình ngoài cùng
-
-Sau khi xong: update TODO.md + CHANGELOG.md
-```
+> Paste vào đầu mỗi session khi mở agent mới làm mobile.
 
 ---
 
-## 📱 Prompt tạo màn hình List (danh sách)
+## 🟢 Prompt gốc (RN native, tối ưu token)
 
-```
-Đọc CLAUDE.md và FEATURE_MOBILE_RN.md.
+```text
+Bạn là AI coding agent trong Cursor.
 
-Màn hình: [Tên]Screen.tsx trong mobile/src/screens/
-API endpoint: GET /api/[endpoint]
+Mục tiêu: Làm MOBILE APP React Native (Expo + TypeScript) theo docs trong repo, ưu tiên ít token.
 
-Cần có:
-- FlatList với pull-to-refresh
-- Search bar ở trên (nếu cần)
-- Loading skeleton hoặc ActivityIndicator
-- Empty state: icon + text "Chưa có dữ liệu"
-- Mỗi row: tap → navigate sang DetailScreen
+BẮT BUỘC:
+- Chỉ đọc đúng 2 file trước: FEATURE_MOBILE_RN.md và TODO.md.
+- Không tự khám phá repo. Nếu cần file khác thì hỏi 1 câu xin phép rồi dừng.
+- Mỗi session chỉ làm 1 task nhỏ, hoàn thành end-to-end.
+- Chỉ sửa/tạo file trong folder mobile/.
+- Không giải thích dài, tối đa 10 dòng/response.
+- Sau khi xong task: update TODO.md + CHANGELOG.md đúng format repo.
 
-Style theo colors.ts — KHÔNG hardcode màu.
+FILES ĐƯỢC PHÉP SỬA:
+- mobile/[...]
+- TODO.md
+- CHANGELOG.md
+
+Đầu ra:
+- List file đã sửa
+- 1-2 lệnh chạy/test trên Android
+- Không viết tài liệu thừa
+
+TASK: <GHI 1 DÒNG RÕ RÀNG>
+Definition of done:
+- <2-4 gạch đầu dòng>
+API_URL: <https://domain/api hoặc http://ip:3000/api>
 ```
 
 ---
 
-## 📝 Prompt tạo màn hình Form (tạo/sửa)
+## 🧩 TASK mẫu (copy/paste để khỏi nghĩ nhiều)
 
-```
-Đọc CLAUDE.md và FEATURE_MOBILE_RN.md.
+### 1) Setup project + nền tảng auth/api/utils/types
 
-Màn hình: [Tên]CreateScreen.tsx trong mobile/src/screens/
-API: POST /api/[endpoint]
-
-Cần có:
-- KeyboardAvoidingView
-- ScrollView để scroll khi bàn phím lên
-- Validation realtime
-- Loading khi submit
-- Alert thành công / thất bại sau submit
-- Nút Hủy + Lưu ở cuối form
-
-Dùng colors.ts cho màu sắc.
+```text
+TASK: Setup Expo RN trong mobile/ + khung auth/api/utils/types.
+Definition of done:
+- Tạo project Expo TS trong mobile/
+- Có lib/constants.ts (API_URL), lib/api.ts (fetch wrapper), lib/auth.ts (SecureStore)
+- Có root navigation: login → tabs (placeholder)
+- Chạy được: npx expo start (Android)
+API_URL: <...>
 ```
 
----
+### 2) Màn Login native
 
-## 🐛 Prompt fix bug mobile
-
-```
-Đọc FEATURE_MOBILE_RN.md và CLAUDE.md.
-
-Bug: [mô tả]
-File: mobile/src/screens/[tên file]
-Platform: Android
-
-Yêu cầu:
-- Báo nguyên nhân trước khi fix
-- Chỉ sửa đúng chỗ
-- Không động vào file khác
+```text
+TASK: Implement màn Login native + lưu token SecureStore + verify /auth/me.
+Definition of done:
+- Login bằng username/email + password
+- Success: lưu token, gọi /auth/me lấy user, vào tabs
+- Fail: hiện lỗi tiếng Việt, không crash
+- 401: xóa token, về login
+API_URL: <...>
 ```
 
----
+### 3) Tab Orders list
 
-## 🚀 Prompt setup lần đầu
-
+```text
+TASK: Implement OrderList (FlatList) + search debounce + filter status.
+Definition of done:
+- FlatList + pull-to-refresh + load more
+- Search hỗ trợ IME tiếng Việt (composition) + debounce 350ms
+- Gọi GET /orders?page&limit&search&status
+- Empty/loading/error state chuẩn
+API_URL: <...>
 ```
-Đọc FEATURE_MOBILE_RN.md.
 
-Task: Setup project Expo React Native trong folder mobile/
+### 4) Order detail
 
-Làm theo thứ tự:
-1. Tạo project: npx create-expo-app mobile --template blank-typescript
-2. Cài dependencies theo danh sách trong FEATURE_MOBILE_RN.md mục 10
-3. Copy các file đã có: App.tsx, src/theme/colors.ts, src/config/api.ts
-4. Tạo placeholder screens cho 4 tab: Dashboard, OrderList, CustomerList, Profile
-5. Chạy: npx expo start
-
-Sau khi xong báo tao các bước tiếp theo.
+```text
+TASK: Implement OrderDetail: xem chi tiết + đổi status.
+Definition of done:
+- GET /orders/:id render thông tin chính + items
+- Đổi status (PUT /orders/:id hoặc endpoint hiện có) + refresh
+- Không crash khi thiếu field/null
+API_URL: <...>
 ```

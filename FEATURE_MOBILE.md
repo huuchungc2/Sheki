@@ -32,6 +32,8 @@ Reuse toàn bộ API backend từ web, chỉ viết lại UI cho mobile.
 - [ ] Web phải responsive (mobile-friendly)
 - [ ] Deploy lên domain thật (không dùng localhost)
 - [ ] HTTPS bắt buộc (App Store yêu cầu)
+- [ ] Kiểm tra login trên mobile browser: IME tiếng Việt, dấu cách, focus input, scroll/keyboard
+- [ ] CORS / cookie / localStorage: đảm bảo auth hoạt động trong WebView như trên Chrome mobile
 
 ### Code WebView cơ bản
 ```javascript
@@ -47,6 +49,13 @@ export default function App() {
   );
 }
 ```
+
+### Checklist WebView “không vỡ UX”
+- **Android Back button**: bấm back để back trong WebView trước, không thoát app đột ngột.
+- **Keyboard**: không che input (đặc biệt OrderForm).
+- **File upload**: nếu web có upload ảnh/file, cần test WebView có mở picker được không.
+- **Deep link**: mở link nội bộ trong WebView, không bật browser ngoài (trừ link ngoài).
+- **Loading / offline**: hiển thị loading khi WebView đang load và trang offline khi mất mạng.
 
 ### Cấu trúc project mobile
 ```
@@ -107,6 +116,13 @@ eas build --platform ios
 - [ ] API backend stable, không còn bug lớn
 - [ ] Apple Developer Account (nếu cần iOS)
 - [ ] Google Play Console account ($25 một lần)
+
+## Checklist release (khuyến nghị)
+
+- [ ] Icon/splash đúng kích thước
+- [ ] Versioning + build number rõ ràng
+- [ ] Privacy policy (tối thiểu cho store)
+- [ ] Chuẩn bị link hỗ trợ / email support
 
 ---
 

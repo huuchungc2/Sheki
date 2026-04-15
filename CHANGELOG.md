@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [15/04/2026] - Xuất Excel: đơn hàng & đơn hoàn
+### Added
+- **OrderList** — Thêm nút «Xuất Excel» theo bộ lọc hiện tại; file có 2 sheet: «Đơn hàng» và «Chi tiết SP» (Tên sản phẩm, Số lượng, SKU, đơn giá, CK, thành tiền). — Files: `src/pages/OrderList.tsx`, `src/lib/exportExcel.ts`, `backend/routes/orders.js`
+- **SalesReturnsList** — Thêm nút «Xuất Excel» cho tab Đơn hoàn; backend trả thêm `group_name` và `salesperson_name` để export đủ thông tin. — Files: `src/pages/SalesReturnsList.tsx`, `src/lib/exportExcel.ts`, `backend/routes/returns.js`
+
 ## [15/04/2026] - Đơn hàng: Sales không sửa/xóa đơn đang giao & đã giao
 ### Changed
 - **OrderList** — Với tài khoản không phải Admin: ẩn nút sửa/xóa, tắt mở form khi click dòng, và không cho chọn bulk các đơn trạng thái «Đang giao» / «Đã giao». Admin giữ nguyên.
@@ -1276,6 +1281,14 @@
 ## [15/04/2026] - [Fix: Search input gõ tiếng Việt bị giật]
 ### Fixed
 - Fix các ô tìm kiếm ở nhiều màn danh sách bị giật/không gõ được tiếng Việt hoặc dấu cách do sync URL trực tiếp + trim/debounce sai; chuyển sang dùng state local + debounce cập nhật query + bỏ cập nhật khi đang IME composition. - Files: `src/pages/EmployeeList.tsx`, `src/pages/ProductList.tsx`, `src/pages/OrderList.tsx`, `src/pages/CustomerList.tsx`, `src/pages/SalesReturnsList.tsx`, `src/pages/InventoryHistory.tsx`, `src/pages/ActivityLog.tsx`
+
+## [15/04/2026] - [Docs: sẵn sàng làm Mobile App]
+### Changed
+- Chuẩn hoá README theo repo ERP + thêm mục Mobile docs, bổ sung checklist WebView/RN (env, back button, offline, IME, release). - Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
+
+## [15/04/2026] - [Docs: prompt RN native ít token]
+### Changed
+- Chuẩn hoá `PROMPT_MOBILE.md` thành prompt gốc RN native + các task mẫu (setup/login/orders/detail) để mở agent nhanh và giảm token. - Files: `PROMPT_MOBILE.md`
 
 ### Business Rules Implemented
 - Mã đơn hàng: `DH-YYYYMMDD-XXXX` (reset theo ngày)

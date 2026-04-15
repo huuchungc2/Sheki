@@ -191,6 +191,97 @@ router.get('/', auth, async (req, res, next) => {
   }
 });
 
+// Export: chi tiết sản phẩm theo bộ lọc (phục vụ Excel)
+// GET /api/orders/export-items?search=&status=&employee=&warehouse=&date_from=&date_to=&group_id=
+router.get('/export-items', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const { search, status, employee, warehouse, date_from, date_to, group_id } = req.query;
+
+    let query = `
+      SELECT
+        o.id as order_id,
+        o.code as order_code,
+        o.created_at as order_date,
+        o.status,
+        c.name as customer_name,
+        u.full_name as salesperson_name,
+        g.name as group_name,
+        w.name as warehouse_name,
+        oi.product_id,
+        p.sku,
+        p.name as product_name,
+        p.unit,
+        oi.qty,
+        oi.unit_price,
+        oi.discount_rate,
+        oi.discount_amount,
+        oi.subtotal
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.id
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN customers c ON o.customer_id = c.id
+      LEFT JOIN users u ON o.salesperson_id = u.id
+      LEFT JOIN groups g ON o.group_id = g.id
+      LEFT JOIN warehouses w ON o.warehouse_id = w.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (req.user.scope_own_data) {
+      query += ' AND o.salesperson_id = ?';
+      params.push(req.user.id);
+    }
+
+    if (search) {
+      query += ' AND (o.code LIKE ? OR c.name LIKE ? OR p.name LIKE ? OR p.sku LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like, like, like);
+    }
+    if (status) {
+      query += ' AND o.status = ?';
+      params.push(status);
+    }
+    if (employee) {
+      query += ' AND o.salesperson_id = ?';
+      params.push(employee);
+    }
+    if (warehouse) {
+      query += ' AND o.warehouse_id = ?';
+      params.push(warehouse);
+    }
+    if (date_from) {
+      query += ' AND DATE(o.created_at) >= ?';
+      params.push(date_from);
+    }
+    if (date_to) {
+      query += ' AND DATE(o.created_at) <= ?';
+      params.push(date_to);
+    }
+    if (group_id) {
+      query += ' AND o.group_id = ?';
+      params.push(parseInt(group_id, 10));
+    }
+
+    query += ' ORDER BY o.created_at DESC, o.id DESC, oi.id ASC';
+
+    const [rows] = await pool.query(query, params);
+
+    const formatted = rows.map((r) => ({
+      ...r,
+      qty: parseFloat(r.qty) || 0,
+      unit_price: parseFloat(r.unit_price) || 0,
+      discount_rate: parseFloat(r.discount_rate) || 0,
+      discount_amount: parseFloat(r.discount_amount) || 0,
+      subtotal: parseFloat(r.subtotal) || 0,
+    }));
+
+    res.json({ data: formatted });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', auth, async (req, res, next) => {
   try {
     const pool = await getPool();

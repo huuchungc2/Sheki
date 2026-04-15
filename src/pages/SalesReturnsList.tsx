@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { formatCurrency, formatDate, cn, isAdminUser } from "../lib/utils";
 import { parseListPage, getVisiblePageNumbers } from "../lib/listUrl";
+import { exportReturnsList } from "../lib/exportExcel";
 import {
   Loader2,
   AlertCircle,
@@ -21,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Download,
 } from "lucide-react";
 
 type ReturnRow = {
@@ -111,6 +113,7 @@ export function SalesReturnsList() {
   const [groups, setGroups] = React.useState<any[]>([]);
   const [searchInput, setSearchInput] = React.useState("");
   const [isComposing, setIsComposing] = React.useState(false);
+  const [exporting, setExporting] = React.useState(false);
 
   const [tab, setTab] = React.useState<"returns" | "requests">("returns");
 
@@ -251,6 +254,36 @@ export function SalesReturnsList() {
       setLoading(false);
     }
   }, [searchParams.toString(), patchListParams]);
+
+  const exportExcel = React.useCallback(async () => {
+    try {
+      setExporting(true);
+      const { search: q, groupId: gid, dateFrom: df, dateTo: dt } = readListParams(searchParams);
+      const qs = new URLSearchParams({
+        page: "1",
+        limit: "10000",
+        ...(q ? { q } : {}),
+        ...(df ? { date_from: df } : {}),
+        ...(dt ? { date_to: dt } : {}),
+        ...(gid ? { group_id: gid } : {}),
+      });
+      const res: any = await api.get(`/returns?${qs.toString()}`);
+      const allRows = (res?.data ?? []) as any[];
+      const groupName = gid ? (groups.find((g) => String(g.id) === String(gid))?.name || "") : "";
+      exportReturnsList({
+        rows: allRows,
+        meta: {
+          dateFrom: df,
+          dateTo: dt,
+          groupName: groupName || undefined,
+        },
+      });
+    } catch (e: any) {
+      alert(e?.message || "Xuất Excel thất bại");
+    } finally {
+      setExporting(false);
+    }
+  }, [searchParams.toString(), groups]);
 
   const deleteReturn = React.useCallback(
     async (id: number) => {
@@ -405,9 +438,28 @@ export function SalesReturnsList() {
             Danh sách đơn hoàn liên quan đơn hàng của bạn (chỉ xem).
           </p>
         </div>
-        <button onClick={fetchData} className="text-sm font-semibold text-slate-500 hover:text-slate-700 shrink-0">
-          Làm mới
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {tab === "returns" && (
+            <button
+              type="button"
+              onClick={exportExcel}
+              disabled={exporting}
+              className={cn(
+                "inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-all",
+                exporting
+                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                  : "bg-white text-slate-700 border-slate-200 hover:border-emerald-200 hover:text-emerald-700"
+              )}
+              title="Xuất Excel theo bộ lọc hiện tại"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Xuất Excel
+            </button>
+          )}
+          <button onClick={fetchData} className="text-sm font-semibold text-slate-500 hover:text-slate-700">
+            Làm mới
+          </button>
+        </div>
       </div>
 
       {isAdmin && (

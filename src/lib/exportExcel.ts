@@ -10,12 +10,32 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("vi-VN");
 }
 
+function fmtDateTime(d: string) {
+  if (!d) return "";
+  return new Date(d).toLocaleString("vi-VN");
+}
+
 /** Khớp cột «Loại HH» trên CommissionReport */
 function hhKindLabel(o: { entry_kind?: string; type?: string }) {
   if (String(o?.entry_kind) === "adjustment") return "Hoàn";
   if (o?.type === "override") return "HH từ CTV";
   if (o?.type === "direct") return "Bán hàng";
   return "—";
+}
+
+function orderStatusLabel(st: string) {
+  if (st === "pending") return "Chờ duyệt";
+  if (st === "shipping") return "Đang giao";
+  if (st === "completed") return "Đã giao";
+  if (st === "cancelled") return "Đã hủy";
+  return st || "—";
+}
+
+function paymentLabel(p: string) {
+  if (p === "cash") return "Tiền mặt";
+  if (p === "transfer") return "Chuyển khoản";
+  if (p === "card") return "Thẻ ATM";
+  return p || "—";
 }
 
 // ─── Export hoa hồng Sales (danh sách đơn của mình) ───────────────────────
@@ -435,4 +455,331 @@ export function exportCashTransactions(opts: {
   ];
   XLSX.utils.book_append_sheet(wb, ws, "Thu chi");
   XLSX.writeFile(wb, `ThuChi_T${parseInt(month, 10)}_${year}.xlsx`);
+}
+
+// ─── Export danh sách Đơn hàng ────────────────────────────────────────────
+export function exportOrdersList(opts: {
+  rows: any[];
+  itemRows?: any[];
+  meta?: { dateFrom?: string; dateTo?: string; groupName?: string; employeeName?: string };
+}) {
+  const { rows, itemRows = [], meta } = opts;
+  const wb = XLSX.utils.book_new();
+
+  const header: any[][] = [
+    ["DANH SÁCH ĐƠN HÀNG"],
+    [
+      `Lọc: ${
+        meta?.dateFrom || meta?.dateTo
+          ? `${meta?.dateFrom || "..."} → ${meta?.dateTo || "..."}`
+          : "—"
+      }${meta?.groupName ? ` — Nhóm: ${meta.groupName}` : ""}${
+        meta?.employeeName ? ` — NV: ${meta.employeeName}` : ""
+      }`,
+    ],
+    [],
+  ];
+
+  const cols = [
+    "Mã đơn",
+    "Thời gian",
+    "Trạng thái",
+    "Khách hàng",
+    "SĐT",
+    "Nhân viên",
+    "Nhóm BH",
+    "Kho",
+    "Tạm tính",
+    "Ship (phí)",
+    "Ai trả ship",
+    "Ship KH Trả",
+    "Tiền NV chịu",
+    "Hoa hồng (direct)",
+    "Lương (HH + Ship KH − NV)",
+    "Cọc",
+    "Thu khách",
+    "Shop thu",
+    "Thanh toán",
+    "Ghi chú",
+  ];
+
+  const detail: any[][] = [
+    ...header,
+    cols,
+  ];
+
+  rows.forEach((o) => {
+    const shipFee = Number(o.shipping_fee) || 0;
+    const khachTraShip = o.ship_payer === "shop" ? 0 : shipFee;
+    const nvChiu = Number(o.salesperson_absorbed_amount) || 0;
+    const commission = Number(o.commission_amount) || 0;
+    const luong = commission + khachTraShip - nvChiu;
+    detail.push([
+      o.code || `#${o.id}`,
+      fmtDateTime(o.created_at),
+      orderStatusLabel(String(o.status || "")),
+      o.customer_name || "—",
+      o.customer_phone || "",
+      o.salesperson_name || "—",
+      o.group_name || "—",
+      o.warehouse_name || "—",
+      Number(o.subtotal) || 0,
+      shipFee,
+      o.ship_payer === "shop" ? "Shop" : "Khách",
+      khachTraShip,
+      nvChiu,
+      commission,
+      luong,
+      Number(o.deposit) || 0,
+      Number(o.customer_collect) || 0,
+      Number(o.shop_collect) || 0,
+      paymentLabel(String(o.payment_method || "")),
+      o.note || "",
+    ]);
+  });
+
+  detail.push([]);
+  detail.push([
+    "TỔNG CỘNG",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    rows.reduce((s, o) => s + (Number(o.subtotal) || 0), 0),
+    rows.reduce((s, o) => s + (Number(o.shipping_fee) || 0), 0),
+    "",
+    rows.reduce((s, o) => s + (o.ship_payer === "shop" ? 0 : Number(o.shipping_fee) || 0), 0),
+    rows.reduce((s, o) => s + (Number(o.salesperson_absorbed_amount) || 0), 0),
+    rows.reduce((s, o) => s + (Number(o.commission_amount) || 0), 0),
+    rows.reduce((s, o) => {
+      const shipFee = Number(o.shipping_fee) || 0;
+      const khachTraShip = o.ship_payer === "shop" ? 0 : shipFee;
+      const nvChiu = Number(o.salesperson_absorbed_amount) || 0;
+      const commission = Number(o.commission_amount) || 0;
+      return s + (commission + khachTraShip - nvChiu);
+    }, 0),
+    rows.reduce((s, o) => s + (Number(o.deposit) || 0), 0),
+    rows.reduce((s, o) => s + (Number(o.customer_collect) || 0), 0),
+    rows.reduce((s, o) => s + (Number(o.shop_collect) || 0), 0),
+    "",
+    "",
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(detail);
+  ws["!cols"] = [
+    { wch: 20 }, // mã
+    { wch: 20 }, // time
+    { wch: 12 }, // status
+    { wch: 22 }, // customer
+    { wch: 12 }, // phone
+    { wch: 18 }, // salesperson
+    { wch: 14 }, // group
+    { wch: 14 }, // warehouse
+    { wch: 16 }, // subtotal
+    { wch: 14 }, // ship fee
+    { wch: 10 }, // payer
+    { wch: 14 }, // ship KH
+    { wch: 14 }, // NV chịu
+    { wch: 16 }, // HH
+    { wch: 16 }, // lương
+    { wch: 12 }, // cọc
+    { wch: 16 }, // thu khách
+    { wch: 16 }, // shop thu
+    { wch: 12 }, // payment
+    { wch: 30 }, // note
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, "Đơn hàng");
+
+  // Sheet 2: Chi tiết sản phẩm theo đơn
+  const itemHeader: any[][] = [
+    ["CHI TIẾT SẢN PHẨM — THEO ĐƠN HÀNG"],
+    [
+      `Lọc: ${
+        meta?.dateFrom || meta?.dateTo
+          ? `${meta?.dateFrom || "..."} → ${meta?.dateTo || "..."}`
+          : "—"
+      }${meta?.groupName ? ` — Nhóm: ${meta.groupName}` : ""}${
+        meta?.employeeName ? ` — NV: ${meta.employeeName}` : ""
+      }`,
+    ],
+    [],
+    [
+      "Mã đơn",
+      "Thời gian",
+      "Trạng thái",
+      "Khách hàng",
+      "Nhân viên",
+      "Nhóm BH",
+      "Kho",
+      "SKU",
+      "Tên sản phẩm",
+      "ĐVT",
+      "Số lượng",
+      "Đơn giá",
+      "CK %",
+      "CK (VNĐ)",
+      "Thành tiền (sau CK)",
+    ],
+  ];
+
+  const itemRowsAoa: any[][] = [...itemHeader];
+  itemRows.forEach((r: any) => {
+    itemRowsAoa.push([
+      r.order_code || `#${r.order_id}`,
+      fmtDateTime(r.order_date),
+      orderStatusLabel(String(r.status || "")),
+      r.customer_name || "—",
+      r.salesperson_name || "—",
+      r.group_name || "—",
+      r.warehouse_name || "—",
+      r.sku || "",
+      r.product_name || `#${r.product_id}`,
+      r.unit || "",
+      Number(r.qty) || 0,
+      Number(r.unit_price) || 0,
+      Number(r.discount_rate) || 0,
+      Number(r.discount_amount) || 0,
+      Number(r.subtotal) || 0,
+    ]);
+  });
+  itemRowsAoa.push([]);
+  itemRowsAoa.push([
+    "TỔNG CỘNG",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    itemRows.reduce((s: number, r: any) => s + (Number(r.qty) || 0), 0),
+    "",
+    "",
+    itemRows.reduce((s: number, r: any) => s + (Number(r.discount_amount) || 0), 0),
+    itemRows.reduce((s: number, r: any) => s + (Number(r.subtotal) || 0), 0),
+  ]);
+
+  const wsItems = XLSX.utils.aoa_to_sheet(itemRowsAoa);
+  wsItems["!cols"] = [
+    { wch: 20 },
+    { wch: 20 },
+    { wch: 12 },
+    { wch: 22 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 28 },
+    { wch: 8 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 8 },
+    { wch: 14 },
+    { wch: 16 },
+  ];
+  XLSX.utils.book_append_sheet(wb, wsItems, "Chi tiết SP");
+
+  const fileSuffix =
+    meta?.dateFrom || meta?.dateTo ? `_${meta?.dateFrom || ""}-${meta?.dateTo || ""}` : "";
+  XLSX.writeFile(wb, `DonHang${fileSuffix}.xlsx`);
+}
+
+// ─── Export danh sách Đơn hoàn ────────────────────────────────────────────
+export function exportReturnsList(opts: {
+  rows: any[];
+  meta?: { dateFrom?: string; dateTo?: string; groupName?: string };
+}) {
+  const { rows, meta } = opts;
+  const wb = XLSX.utils.book_new();
+
+  const header: any[][] = [
+    ["DANH SÁCH ĐƠN HOÀN"],
+    [
+      `Lọc: ${
+        meta?.dateFrom || meta?.dateTo
+          ? `${meta?.dateFrom || "..."} → ${meta?.dateTo || "..."}`
+          : "—"
+      }${meta?.groupName ? ` — Nhóm: ${meta.groupName}` : ""}`,
+    ],
+    [],
+  ];
+
+  const cols = [
+    "Mã hoàn",
+    "Thời gian",
+    "Đơn gốc",
+    "Nhân viên bán",
+    "Nhóm BH",
+    "Kho nhập",
+    "Giá trị hoàn (âm)",
+    "HH hoàn (âm)",
+    "Sản phẩm (SKU × SL)",
+    "Ghi chú",
+    "Người xử lý",
+  ];
+
+  const detail: any[][] = [
+    ...header,
+    cols,
+  ];
+
+  rows.forEach((r) => {
+    const itemsText =
+      (r.items || [])
+        .map((it: any) => `${it.sku || `PID:${it.product_id}`} - ${it.product_name || ""} × ${it.qty}`)
+        .join("; ");
+    detail.push([
+      `#${r.id}`,
+      fmtDateTime(r.created_at),
+      r.order_code || `#${r.order_id}`,
+      r.salesperson_name || "—",
+      r.group_name || "—",
+      r.warehouse_name || "—",
+      -Math.abs(Number(r.return_amount) || 0),
+      -Math.abs(Number(r.commission_return_amount) || 0),
+      itemsText,
+      r.note || "",
+      r.created_by_name || "",
+    ]);
+  });
+
+  detail.push([]);
+  detail.push([
+    "TỔNG CỘNG",
+    "",
+    "",
+    "",
+    "",
+    "",
+    -Math.abs(rows.reduce((s, r) => s + (Number(r.return_amount) || 0), 0)),
+    -Math.abs(rows.reduce((s, r) => s + Math.abs(Number(r.commission_return_amount) || 0), 0)),
+    "",
+    "",
+    "",
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(detail);
+  ws["!cols"] = [
+    { wch: 10 },
+    { wch: 20 },
+    { wch: 20 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 50 },
+    { wch: 30 },
+    { wch: 18 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, "Đơn hoàn");
+
+  const fileSuffix =
+    meta?.dateFrom || meta?.dateTo ? `_${meta?.dateFrom || ""}-${meta?.dateTo || ""}` : "";
+  XLSX.writeFile(wb, `DonHoan${fileSuffix}.xlsx`);
 }

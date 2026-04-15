@@ -131,11 +131,15 @@ router.get('/', auth, async (req, res, next) => {
         r.id, r.order_id, r.return_request_id, r.warehouse_id, r.created_by, r.note, r.created_at,
         o.code as order_code,
         w.name as warehouse_name,
-        u.full_name as created_by_name
+        u.full_name as created_by_name,
+        g.name as group_name,
+        sp.full_name as salesperson_name
        FROM returns r
        JOIN orders o ON r.order_id = o.id
        LEFT JOIN warehouses w ON r.warehouse_id = w.id
        JOIN users u ON r.created_by = u.id
+       LEFT JOIN groups g ON o.group_id = g.id
+       LEFT JOIN users sp ON o.salesperson_id = sp.id
        ${where}
        ORDER BY r.created_at DESC
        LIMIT ? OFFSET ?`,

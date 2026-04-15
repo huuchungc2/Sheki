@@ -1,20 +1,52 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ERP Sheki
 
-# Run and deploy your AI Studio app
+ERP quản lý bán hàng nội bộ cho Sheki.
 
-This contains everything you need to run your app locally.
+- **Frontend**: React + Vite + TypeScript + Tailwind
+- **Backend**: Node.js + Express
+- **DB**: MySQL (local)
+- **Auth**: JWT
 
-View your app in AI Studio: https://ai.studio/apps/6274c148-0615-4c80-a3a3-bf985a8fb093
+## Tài liệu quan trọng (đọc theo thứ tự)
 
-## Run Locally
+- `TODO.md` — task hiện tại
+- `CHANGELOG.md` — lịch sử thay đổi
+- `RULES.md` — quy tắc code bắt buộc
+- `LOGIC_BUSINESS.md` — nghiệp vụ đơn/hoa hồng/lương/hoàn
+- `UI_SPEC.md` — chuẩn UI
+- `plan.md` — tổng quan + cấu trúc + schema
 
-**Prerequisites:**  Node.js
+## Chạy local
 
+### Backend
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+cd backend
+npm install
+node server.js
+```
+
+- **Port**: 3000
+- **DB**: `localhost:3306`, user `root`, pass rỗng, db `erp`
+
+### Frontend
+
+```bash
+npm install
+npm run dev
+```
+
+- **Port**: 5173
+
+## Mobile App
+
+Repo đã có đặc tả để bắt đầu làm mobile:
+
+- **Tổng quan WebView vs RN**: `FEATURE_MOBILE.md`
+- **Đặc tả React Native (Expo + TS)**: `FEATURE_MOBILE_RN.md`
+- **Prompt làm mobile trong Cursor**: `PROMPT_MOBILE.md`
+
+Điều kiện tối thiểu trước khi làm mobile:
+- Web deploy có **domain + HTTPS**
+- UI web responsive tốt trên mobile browser
+- API backend ổn định (ít thay đổi breaking)

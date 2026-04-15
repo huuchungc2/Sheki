@@ -7,11 +7,15 @@
 
 ## 🔴 ĐANG LÀM
 
+- [x] **Xuất Excel đơn hàng + đơn hoàn** — Đơn hàng có thêm sheet chi tiết sản phẩm (tên SP, số lượng); Đơn hoàn export theo bộ lọc.
+
 - [ ] **Đa shop (multi-tenant)** — Đọc `FEATURE_MULTI_SHOP.md`; triển khai theo giai đoạn: DB `shops` + `user_shops` + `shop_id` → auth/switch-shop → middleware từng route → FE chọn shop → UI admin gán user
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
+
+- [ ] **Mobile: chuẩn bị phase WebView/RN** — Rà soát tài liệu + checklist release + cấu hình env API_URL, back button, offline, file upload WebView. — Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
 
 - [ ] **Settings: phân quyền theo vai (role) đúng nghĩa** — Bỏ hardcode role ở UI, load roles từ DB; đổi `role_permissions` theo `role_id`; thêm middleware `requirePermission(module, action)` và áp dần vào routes (giữ `scope_own_data` để lọc dữ liệu). — Files: `backend/routes/settings.js`, `backend/middleware/authorize.js` (hoặc middleware mới), `backend/routes/*`, `src/pages/Settings.tsx`
 
@@ -64,6 +68,7 @@
 ## ✅ HOÀN THÀNH
 
 - [x] **Fix search: gõ tiếng Việt + dấu cách bị giật** — Các màn danh sách/nhật ký dùng debounce + composition guard, không trim làm mất space. — Files: `src/pages/EmployeeList.tsx`, `src/pages/ProductList.tsx`, `src/pages/OrderList.tsx`, `src/pages/CustomerList.tsx`, `src/pages/SalesReturnsList.tsx`, `src/pages/InventoryHistory.tsx`, `src/pages/ActivityLog.tsx`
+- [x] **Mobile: chuẩn hoá prompt RN native ít token** — Cập nhật `PROMPT_MOBILE.md` thành prompt gốc + task mẫu để mở agent nhanh, ít tốn token. — Files: `PROMPT_MOBILE.md`
 
 - [x] **Đơn hàng (Sales): khóa sửa/xóa đơn đang giao & đã giao** — UI ẩn sửa/xóa + API 403; Admin không đổi. — Files: `src/pages/OrderList.tsx`, `src/pages/OrderForm.tsx`, `backend/routes/orders.js`
 - [x] **Báo cáo HH: bỏ lọc role 'sales'** — Dashboard + Báo cáo hoa hồng Admin không còn phụ thuộc `roles.code='sales'`; ai phát sinh đơn/HH thì được tính theo rule hiện tại. — File: `backend/routes/reports.js`

@@ -3,11 +3,12 @@ import {
   Search, Plus, ChevronLeft, ChevronRight,
   ShoppingCart, Calendar, CreditCard, Truck,
   Edit2, Trash2, CheckCircle2, Clock, XCircle,
-  Wallet, ArrowRight, Loader2, ChevronDown, X
+  Wallet, ArrowRight, Loader2, ChevronDown, X, Download
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
 import { parseListPage, getVisiblePageNumbers } from "../lib/listUrl";
+import { exportOrdersList } from "../lib/exportExcel";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -135,6 +136,7 @@ export function OrderList() {
     total_commission: 0,
   });
   const [deleting, setDeleting]     = React.useState<string | null>(null);
+  const [exporting, setExporting]   = React.useState(false);
 
   const patchListParams = React.useCallback(
     (patch: Record<string, string | null | undefined>, opts?: { resetPage?: boolean }) => {
@@ -249,6 +251,56 @@ export function OrderList() {
 
   React.useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
+  const exportExcel = React.useCallback(async () => {
+    try {
+      setExporting(true);
+      const token = localStorage.getItem("token");
+      const params = new URLSearchParams({
+        search,
+        status,
+        page: "1",
+        limit: "10000",
+        ...(dateFrom && { date_from: dateFrom }),
+        ...(dateTo && { date_to: dateTo }),
+        ...(employeeId && { employee: employeeId }),
+        ...(groupId && { group_id: groupId }),
+      });
+      const [resOrders, resItems] = await Promise.all([
+        fetch(`${API_URL}/orders?${params}`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        }),
+        fetch(`${API_URL}/orders/export-items?${params}`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        }),
+      ]);
+      if (!resOrders.ok) throw new Error("Không thể tải dữ liệu để xuất Excel");
+      if (!resItems.ok) throw new Error("Không thể tải chi tiết sản phẩm để xuất Excel");
+      const jsonOrders = await resOrders.json();
+      const jsonItems = await resItems.json();
+      const rows = jsonOrders?.data ?? [];
+      const itemRows = jsonItems?.data ?? [];
+
+      const groupName = groupId ? (groups.find((g: any) => String(g.id) === String(groupId))?.name || "") : "";
+      const employeeName =
+        employeeId ? (employees.find((e: any) => String(e.id) === String(employeeId))?.full_name || "") : "";
+
+      exportOrdersList({
+        rows,
+        itemRows,
+        meta: {
+          dateFrom,
+          dateTo,
+          groupName: groupName || undefined,
+          employeeName: employeeName || undefined,
+        },
+      });
+    } catch (e: any) {
+      alert(e?.message || "Xuất Excel thất bại");
+    } finally {
+      setExporting(false);
+    }
+  }, [search, status, dateFrom, dateTo, employeeId, groupId, groups, employees]);
+
   // Apply preset
   const applyPreset = (preset: DatePreset) => {
     if (preset !== "custom") {
@@ -329,10 +381,27 @@ export function OrderList() {
           <h1 className="text-2xl font-bold text-slate-900">Quản lý đơn hàng</h1>
           <p className="text-slate-500 text-sm mt-0.5">Theo dõi và quản lý các giao dịch bán hàng.</p>
         </div>
-        <Link to="/orders/new" state={{ ordersListReturn }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
-          <Plus className="w-3.5 h-3.5 shrink-0" />
-          Thêm đơn
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportExcel}
+            disabled={exporting}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
+              exporting
+                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                : "bg-white text-slate-700 border-slate-200 hover:border-emerald-200 hover:text-emerald-700"
+            )}
+            title="Xuất Excel theo bộ lọc hiện tại"
+          >
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 shrink-0" />}
+            Xuất Excel
+          </button>
+          <Link to="/orders/new" state={{ ordersListReturn }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            Thêm đơn
+          </Link>
+        </div>
       </div>
 
       {/* Filter bar */}
