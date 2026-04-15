@@ -56,6 +56,7 @@ export function EmployeeList() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchInput, setSearchInput] = React.useState("");
+  const [isComposing, setIsComposing] = React.useState(false);
   const [total, setTotal] = React.useState(0);
   const limit = 20;
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
@@ -132,13 +133,15 @@ export function EmployeeList() {
 
   // Debounce ô tìm → ghi URL `q` (đồng bộ với các danh sách khác)
   React.useEffect(() => {
+    if (isComposing) return;
     const t = window.setTimeout(() => {
-      const next = searchInput.trim();
+      const next = searchInput;
       if (next === q) return;
-      patchListParams({ q: next || null }, { resetPage: true });
+      const hasMeaningful = next.trim().length > 0;
+      patchListParams({ q: hasMeaningful ? next : null }, { resetPage: true });
     }, 350);
     return () => window.clearTimeout(t);
-  }, [searchInput, q, patchListParams]);
+  }, [searchInput, q, patchListParams, isComposing]);
 
   const fetchEmployees = React.useCallback(async () => {
     const { page: p, q: searchTerm, department: dep, roleCode: role, statusFilter: st } =
@@ -361,6 +364,11 @@ export function EmployeeList() {
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-300 focus:ring-2 focus:ring-blue-100 rounded-xl text-sm transition-all outline-none"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={(e) => {
+                setIsComposing(false);
+                setSearchInput((e.target as HTMLInputElement).value);
+              }}
             />
           </div>
 

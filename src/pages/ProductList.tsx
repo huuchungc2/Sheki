@@ -72,6 +72,8 @@ export function ProductList() {
   const [categories, setCategories] = React.useState<any[]>([]);
   const [warehouses, setWarehouses] = React.useState<any[]>([]);
   const [total, setTotal] = React.useState(0);
+  const [searchInput, setSearchInput] = React.useState("");
+  const [isComposing, setIsComposing] = React.useState(false);
   const limit = 20;
 
   const patchListParams = React.useCallback(
@@ -100,6 +102,21 @@ export function ProductList() {
     },
     [searchParams, patchListParams]
   );
+
+  React.useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  React.useEffect(() => {
+    if (isComposing) return;
+    const t = window.setTimeout(() => {
+      const next = searchInput;
+      if (next === search) return;
+      const hasMeaningful = next.trim().length > 0;
+      patchListParams({ q: hasMeaningful ? next : null }, { resetPage: true });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [searchInput, search, patchListParams, isComposing]);
 
   const fetchProducts = React.useCallback(async () => {
     const { page: p, search: q, category: cat, warehouseId: wh } = readProductListParams(searchParams);
@@ -279,8 +296,13 @@ export function ProductList() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            value={search}
-            onChange={(e) => { patchListParams({ q: e.target.value || null }, { resetPage: true }); }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={(e) => {
+              setIsComposing(false);
+              setSearchInput((e.target as HTMLInputElement).value);
+            }}
             placeholder="Tìm theo tên, SKU, danh mục..." 
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
           />

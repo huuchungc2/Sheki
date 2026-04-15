@@ -79,7 +79,9 @@ export function InventoryHistory() {
     importCount: number;
     exportCount: number;
   } | null>(null);
-  const [search, setSearch] = React.useState("");
+  const [searchInput, setSearchInput] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [isComposing, setIsComposing] = React.useState(false);
   const [type, setType] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [warehouseId, setWarehouseId] = React.useState<string>("");
@@ -93,6 +95,18 @@ export function InventoryHistory() {
   const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const limit = 10;
+
+  React.useEffect(() => {
+    if (isComposing) return;
+    const t = window.setTimeout(() => {
+      const next = searchInput;
+      if (next === searchQuery) return;
+      const hasMeaningful = next.trim().length > 0;
+      setSearchQuery(hasMeaningful ? next : "");
+      setPage(1);
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [searchInput, searchQuery, isComposing]);
 
   // Load warehouses for filter dropdown
   React.useEffect(() => {
@@ -155,7 +169,7 @@ export function InventoryHistory() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (search) params.set("search", search);
+      if (searchQuery) params.set("search", searchQuery);
       if (type) params.set("type", type);
       if (status) params.set("status", status);
       if (warehouseId) params.set("warehouse_id", warehouseId);
@@ -189,7 +203,7 @@ export function InventoryHistory() {
     } finally {
       setLoading(false);
     }
-  }, [search, type, status, warehouseId, dateFrom, dateTo, page]);
+  }, [searchQuery, type, status, warehouseId, dateFrom, dateTo, page]);
 
   const fetchSummary = React.useCallback(async () => {
     try {
@@ -282,8 +296,13 @@ export function InventoryHistory() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            value={searchInput}
+            onChange={(e) => { setSearchInput(e.target.value); }}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={(e) => {
+              setIsComposing(false);
+              setSearchInput((e.target as HTMLInputElement).value);
+            }}
             placeholder="Tìm theo mã phiếu, người lập..." 
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
           />

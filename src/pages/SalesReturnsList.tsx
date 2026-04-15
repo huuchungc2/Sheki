@@ -109,6 +109,8 @@ export function SalesReturnsList() {
   const [total, setTotal] = React.useState(0);
   const [showDateMenu, setShowDateMenu] = React.useState(false);
   const [groups, setGroups] = React.useState<any[]>([]);
+  const [searchInput, setSearchInput] = React.useState("");
+  const [isComposing, setIsComposing] = React.useState(false);
 
   const [tab, setTab] = React.useState<"returns" | "requests">("returns");
 
@@ -175,6 +177,21 @@ export function SalesReturnsList() {
     },
     [searchParams, patchListParams]
   );
+
+  React.useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  React.useEffect(() => {
+    if (isComposing) return;
+    const t = window.setTimeout(() => {
+      const next = searchInput;
+      if (next === search) return;
+      const hasMeaningful = next.trim().length > 0;
+      patchListParams({ q: hasMeaningful ? next : null }, { resetPage: true });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [searchInput, search, patchListParams, isComposing]);
 
   const applyPreset = (preset: DatePreset) => {
     if (preset !== "custom") {
@@ -646,9 +663,12 @@ export function SalesReturnsList() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              value={search}
-              onChange={(e) => {
-                patchListParams({ q: e.target.value || null }, { resetPage: true });
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={(e) => {
+                setIsComposing(false);
+                setSearchInput((e.target as HTMLInputElement).value);
               }}
               placeholder="Mã đơn, ghi chú..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none transition-all"

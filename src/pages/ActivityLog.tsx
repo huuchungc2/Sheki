@@ -46,7 +46,9 @@ export function ActivityLog() {
   const [logs, setLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [search, setSearch] = React.useState("");
+  const [searchInput, setSearchInput] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [isComposing, setIsComposing] = React.useState(false);
   const [module, setModule] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [page, setPage] = React.useState(1);
@@ -54,12 +56,24 @@ export function ActivityLog() {
   const [selectedLog, setSelectedLog] = React.useState<any>(null);
   const limit = 20;
 
+  React.useEffect(() => {
+    if (isComposing) return;
+    const t = window.setTimeout(() => {
+      const next = searchInput;
+      if (next === searchQuery) return;
+      const hasMeaningful = next.trim().length > 0;
+      setSearchQuery(hasMeaningful ? next : "");
+      setPage(1);
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [searchInput, searchQuery, isComposing]);
+
   const fetchLogs = React.useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({
-        search,
+        search: searchQuery,
         module,
         status,
         page: String(page),
@@ -77,7 +91,7 @@ export function ActivityLog() {
     } finally {
       setLoading(false);
     }
-  }, [search, module, status, page]);
+  }, [searchQuery, module, status, page]);
 
   React.useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
@@ -97,8 +111,13 @@ export function ActivityLog() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            value={searchInput}
+            onChange={(e) => { setSearchInput(e.target.value); }}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={(e) => {
+              setIsComposing(false);
+              setSearchInput((e.target as HTMLInputElement).value);
+            }}
             placeholder="Tìm theo người dùng, mô tả..." 
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
           />

@@ -63,6 +63,8 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Fix search: gõ tiếng Việt + dấu cách bị giật** — Các màn danh sách/nhật ký dùng debounce + composition guard, không trim làm mất space. — Files: `src/pages/EmployeeList.tsx`, `src/pages/ProductList.tsx`, `src/pages/OrderList.tsx`, `src/pages/CustomerList.tsx`, `src/pages/SalesReturnsList.tsx`, `src/pages/InventoryHistory.tsx`, `src/pages/ActivityLog.tsx`
+
 - [x] **Đơn hàng (Sales): khóa sửa/xóa đơn đang giao & đã giao** — UI ẩn sửa/xóa + API 403; Admin không đổi. — Files: `src/pages/OrderList.tsx`, `src/pages/OrderForm.tsx`, `backend/routes/orders.js`
 - [x] **Báo cáo HH: bỏ lọc role 'sales'** — Dashboard + Báo cáo hoa hồng Admin không còn phụ thuộc `roles.code='sales'`; ai phát sinh đơn/HH thì được tính theo rule hiện tại. — File: `backend/routes/reports.js`
 - [x] **KPI hoa hồng khớp giữa Dashboard / báo cáo / danh sách đơn** — `commissionKpi.js` + `salary.summary.kpi_*` + `/orders` tổng direct theo phát sinh; fix Dashboard Admin/Sales và Admin báo cáo cộng thiếu từ bảng NV — Files: `backend/services/commissionKpi.js`, `backend/routes/reports.js`, `backend/routes/orders.js`, `src/pages/CommissionReport.tsx`, `src/pages/OrderList.tsx`

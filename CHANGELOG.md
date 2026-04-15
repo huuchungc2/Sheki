@@ -1273,6 +1273,10 @@
 - `backend/routes/warehouses.js` - CRUD warehouses
 - `backend/services/orderService.js` - Auto code generation, stock & commission calculation
 
+## [15/04/2026] - [Fix: Search input gõ tiếng Việt bị giật]
+### Fixed
+- Fix các ô tìm kiếm ở nhiều màn danh sách bị giật/không gõ được tiếng Việt hoặc dấu cách do sync URL trực tiếp + trim/debounce sai; chuyển sang dùng state local + debounce cập nhật query + bỏ cập nhật khi đang IME composition. - Files: `src/pages/EmployeeList.tsx`, `src/pages/ProductList.tsx`, `src/pages/OrderList.tsx`, `src/pages/CustomerList.tsx`, `src/pages/SalesReturnsList.tsx`, `src/pages/InventoryHistory.tsx`, `src/pages/ActivityLog.tsx`
+
 ### Business Rules Implemented
 - Mã đơn hàng: `DH-YYYYMMDD-XXXX` (reset theo ngày)
 - Tồn kho 3 chỉ số: stock_qty = available_stock + reserved_stock
