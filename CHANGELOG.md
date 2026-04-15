@@ -6,6 +6,10 @@
 ### Changed
 - Sidebar Sales: menu cha “Hoa hồng” → “Báo cáo hoa hồng”; menu con “Tổng quan hoa hồng” → “Hoa hồng bán hàng”, “Hoa hồng từ CTV” → “Hoa hồng CTV”. - Files: `src/components/Layout.tsx`
 
+## [15/04/2026] - Admin: quản lý danh mục sản phẩm
+### Added
+- Thêm trang CRUD danh mục sản phẩm (thêm/sửa/ẩn) cho Admin, gắn route + menu, API categories hỗ trợ xem tất cả và ẩn danh mục. - Files: `src/pages/Categories.tsx`, `src/App.tsx`, `src/components/Layout.tsx`, `backend/routes/categories.js`
+
 # CHANGELOG
 
 ## [15/04/2026] - Xuất Excel: đơn hàng & đơn hoàn

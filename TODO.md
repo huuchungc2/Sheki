@@ -65,6 +65,8 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Admin: quản lý danh mục sản phẩm (CRUD)** — Thêm trang Danh mục sản phẩm (thêm/sửa/ẩn), bổ sung API categories hỗ trợ xem tất cả + ẩn danh mục, gắn route + menu Admin. — Files: `src/pages/Categories.tsx`, `src/App.tsx`, `src/components/Layout.tsx`, `backend/routes/categories.js`
+
 - [x] **Menu Sales: đổi tên nhóm báo cáo hoa hồng** — Menu cha “Hoa hồng” → “Báo cáo hoa hồng”; menu con “Tổng quan hoa hồng” → “Hoa hồng bán hàng”, “Hoa hồng từ CTV” → “Hoa hồng CTV”. — File: `src/components/Layout.tsx`
 
 - [x] **Danh sách đơn: gộp cột + cột Sản phẩm + filter theo sản phẩm** — Thêm cột Sản phẩm (tên × số lượng), chuyển thời gian vào cột Mã đơn, gộp Ship/NV/HH thành 1 cột 3 dòng, gộp Trạng thái + Thanh toán, bỏ cột Nhóm BH (đưa vào cột Nhân viên), cho phép lọc theo tên/SKU sản phẩm. — Files: `src/pages/OrderList.tsx`, `backend/routes/orders.js`

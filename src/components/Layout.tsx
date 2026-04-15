@@ -44,6 +44,7 @@ const navigationAdmin = [
     children: [
       { name: "Nhân viên", href: "/employees" },
       { name: "Vai trò", href: "/roles" },
+      { name: "Danh mục sản phẩm", href: "/categories" },
       { name: "Sản phẩm", href: "/products" },
     ],
   },

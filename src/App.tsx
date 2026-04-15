@@ -32,6 +32,7 @@ import { ChangePassword } from "./pages/ChangePassword";
 import { SalesReturnsList } from "./pages/SalesReturnsList";
 import { RolesPage } from "./pages/RolesPage";
 import { CashTransactions } from "./pages/CashTransactions";
+import { Categories } from "./pages/Categories";
 import { isAdminUser } from "./lib/utils";
 
 function getStoredUser() {
@@ -115,6 +116,7 @@ export default function App() {
                   <Route path="/products/new" element={<AdminRoute><ProductForm /></AdminRoute>} />
                   <Route path="/products/edit/:id" element={<AdminRoute><ProductForm /></AdminRoute>} />
                   <Route path="/products/import" element={<AdminRoute><BulkImport /></AdminRoute>} />
+                  <Route path="/categories" element={<AdminRoute><Categories /></AdminRoute>} />
                   <Route path="/customers" element={<CustomerList />} />
                   <Route path="/customers/new" element={<CustomerForm />} />
                   <Route path="/customers/edit/:id" element={<CustomerForm />} />
