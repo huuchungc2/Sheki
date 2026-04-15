@@ -68,6 +68,7 @@
 - [x] **Xuất Excel: đơn hàng + đơn hoàn** — Đơn hàng export theo bộ lọc, có sheet chi tiết sản phẩm (Tên SP, Số lượng); Đơn hoàn export theo bộ lọc. — Files: `src/pages/OrderList.tsx`, `src/pages/SalesReturnsList.tsx`, `src/lib/exportExcel.ts`, `backend/routes/orders.js`, `backend/routes/returns.js`
 - [x] **CustomerForm: Địa chỉ nhà xuống hàng dưới** — Màn thêm/sửa khách hàng: ô Địa chỉ nhà nằm một hàng riêng (full width) dưới phần Tỉnh/Quận/Phường. — File: `src/pages/CustomerForm.tsx`
 - [x] **OrderForm: địa chỉ giao hàng đầy đủ khi chọn khách** — Tạo mới/sửa đơn: khi chọn khách hàng, auto-fill địa chỉ giao hàng đầy đủ (số nhà + phường + quận + tỉnh) và không ghi đè nếu đã sửa tay. — File: `src/pages/OrderForm.tsx`
+- [x] **Dashboard: Top khách hàng theo doanh số** — Thêm bảng top khách mua nhiều theo doanh số tháng (Admin toàn bộ, Sales theo đơn mình). — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`
 
 - [x] **Fix search: gõ tiếng Việt + dấu cách bị giật** — Các màn danh sách/nhật ký dùng debounce + composition guard, không trim làm mất space. — Files: `src/pages/EmployeeList.tsx`, `src/pages/ProductList.tsx`, `src/pages/OrderList.tsx`, `src/pages/CustomerList.tsx`, `src/pages/SalesReturnsList.tsx`, `src/pages/InventoryHistory.tsx`, `src/pages/ActivityLog.tsx`
 - [x] **Mobile: chuẩn hoá prompt RN native ít token** — Cập nhật `PROMPT_MOBILE.md` thành prompt gốc + task mẫu để mở agent nhanh, ít tốn token. — Files: `PROMPT_MOBILE.md`

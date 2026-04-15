@@ -13,6 +13,10 @@
 ### Changed
 - **OrderForm** — Khi chọn khách hàng (tạo mới/sửa đơn), hệ thống lấy địa chỉ khách hàng đầy đủ (số nhà + phường + quận + tỉnh) để hiển thị vào ô «Địa chỉ giao hàng»; nếu user đã sửa tay địa chỉ giao hàng thì không tự ghi đè. — File: `src/pages/OrderForm.tsx`
 
+## [15/04/2026] - Dashboard: Top khách hàng theo doanh số
+### Added
+- **Dashboard** — Thêm bảng Top khách hàng mua nhiều theo doanh số (SUM `orders.subtotal`, không gồm đơn hủy), áp theo scope: Admin xem toàn bộ, Sales chỉ đơn của mình. — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`
+
 ## [15/04/2026] - Đơn hàng: Sales không sửa/xóa đơn đang giao & đã giao
 ### Changed
 - **OrderList** — Với tài khoản không phải Admin: ẩn nút sửa/xóa, tắt mở form khi click dòng, và không cho chọn bulk các đơn trạng thái «Đang giao» / «Đã giao». Admin giữ nguyên.

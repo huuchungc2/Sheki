@@ -192,6 +192,24 @@ router.get('/dashboard', auth, async (req, res, next) => {
       [firstDayThisMonth, ...spParam]
     );
 
+    // ── Top khách hàng theo doanh số (tháng này) ──
+    // Doanh số = SUM orders.subtotal (sau CK dòng), không gồm đơn hủy.
+    const [topCustomers] = await pool.query(
+      `SELECT
+         c.id,
+         c.name,
+         c.phone,
+         COUNT(o.id) as total_orders,
+         COALESCE(SUM(o.subtotal), 0) as revenue
+       FROM orders o
+       JOIN customers c ON o.customer_id = c.id
+       WHERE o.created_at >= ?${spFilterOrdersAlias} AND o.status != 'cancelled'
+       GROUP BY c.id, c.name, c.phone
+       ORDER BY revenue DESC
+       LIMIT 5`,
+      [firstDayThisMonth, ...spFilterOrdersAliasParam]
+    );
+
     // ── Top nhân viên tháng này (admin only) ──
     let topSales = [];
     if (!isSales) {
@@ -302,6 +320,11 @@ router.get('/dashboard', auth, async (req, res, next) => {
           ...p,
           total_sold: parseFloat(p.total_sold) || 0,
           revenue:    parseFloat(p.revenue) || 0,
+        })),
+        topCustomers: topCustomers.map((c) => ({
+          ...c,
+          total_orders: parseInt(c.total_orders) || 0,
+          revenue: parseFloat(c.revenue) || 0,
         })),
         topSales,
       }

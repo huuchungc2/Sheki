@@ -84,6 +84,7 @@ export function Dashboard() {
   const d = data;
   const recentOrders = d?.recentOrders || [];
   const topProducts  = d?.topProducts  || [];
+  const topCustomers = d?.topCustomers || [];
   const topSales     = d?.topSales     || [];
   const byStatus     = d?.byStatus     || {};
   const commission   = d?.commission   || { direct: 0, override: 0, total: 0 };
@@ -318,6 +319,62 @@ export function Dashboard() {
             </div>
           </div>
 
+          {/* Top khách hàng */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-700">Top khách hàng theo doanh số (tháng này)</h2>
+              <Link to="/customers" className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
+                Xem tất cả <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            {topCustomers.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 text-sm">Chưa có dữ liệu</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-left">#</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-left">Khách hàng</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-center">Đơn</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Doanh số</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {topCustomers.map((c: any, i: number) => (
+                    <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-5 py-3">
+                        <span
+                          className={cn(
+                            "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                            i === 0
+                              ? "bg-amber-100 text-amber-700"
+                              : i === 1
+                                ? "bg-slate-200 text-slate-600"
+                                : i === 2
+                                  ? "bg-orange-100 text-orange-600"
+                                  : "bg-slate-50 text-slate-400"
+                          )}
+                        >
+                          {i + 1}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 truncate">{c.name || "—"}</p>
+                          <p className="text-xs text-slate-400">{c.phone || ""}</p>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-center text-slate-600">{c.total_orders || 0}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-slate-900">
+                        {formatCurrency(c.revenue || 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
           {/* Top sản phẩm */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -529,6 +586,51 @@ export function Dashboard() {
                 })}
               </div>
             </div>
+          </div>
+
+          {/* Top khách hàng */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-700">Top khách hàng theo doanh số (tháng này)</h2>
+              <Link to="/customers" className="text-xs text-blue-600 hover:underline flex items-center gap-0.5">
+                Xem tất cả <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            {topCustomers.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 text-sm">Chưa có dữ liệu</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-left">#</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-left">Khách hàng</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-center">Đơn</th>
+                    <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Doanh số</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {topCustomers.map((c: any, i: number) => (
+                    <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-5 py-3">
+                        <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-slate-50 text-slate-400">
+                          {i + 1}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 truncate">{c.name || "—"}</p>
+                          <p className="text-xs text-slate-400">{c.phone || ""}</p>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-center text-slate-600">{c.total_orders || 0}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-slate-900">
+                        {formatCurrency(c.revenue || 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </>
       )}
