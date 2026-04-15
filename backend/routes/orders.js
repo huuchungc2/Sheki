@@ -27,7 +27,7 @@ const DEFAULT_LINE_COMMISSION_RATE = 10;
 router.get('/', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, status, employee, warehouse, date_from, date_to, group_id, page = 1, limit = 20 } = req.query;
+    const { search, status, employee, warehouse, date_from, date_to, group_id, product, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
     let query = `
@@ -73,6 +73,40 @@ router.get('/', auth, async (req, res, next) => {
       const like = `%${search}%`;
       params.push(like, like);
       summaryParams.push(like, like);
+    }
+
+    if (product) {
+      // Filter theo tên/SKU sản phẩm (EXISTS để không nhân bản rows)
+      query += `
+        AND EXISTS (
+          SELECT 1
+          FROM order_items oi
+          JOIN products p ON oi.product_id = p.id
+          WHERE oi.order_id = o.id
+            AND (p.name LIKE ? OR p.sku LIKE ?)
+        )
+      `;
+      countQuery += `
+        AND EXISTS (
+          SELECT 1
+          FROM order_items oi
+          JOIN products p ON oi.product_id = p.id
+          WHERE oi.order_id = orders.id
+            AND (p.name LIKE ? OR p.sku LIKE ?)
+        )
+      `;
+      summaryQuery += `
+        AND EXISTS (
+          SELECT 1
+          FROM order_items oi
+          JOIN products p ON oi.product_id = p.id
+          WHERE oi.order_id = o.id
+            AND (p.name LIKE ? OR p.sku LIKE ?)
+        )
+      `;
+      const likeProd = `%${product}%`;
+      params.push(likeProd, likeProd);
+      summaryParams.push(likeProd, likeProd);
     }
 
     if (status) {
@@ -132,7 +166,7 @@ router.get('/', auth, async (req, res, next) => {
     // Cùng tháng đủ ngày + không lọc hẹp → dùng đúng `getCommissionMonthKpi` như báo cáo HH (tránh lệch DATE vs MONTH/YEAR).
     const fullMonth = tryParseFullCalendarMonthFromRange(date_from, date_to);
     const narrowFilters =
-      !!(search || status || employee || warehouse);
+      !!(search || status || employee || warehouse || product);
     let totalCommissionDirect;
     if (fullMonth && !narrowFilters) {
       const kpi = await getCommissionMonthKpi(pool, {
@@ -196,7 +230,7 @@ router.get('/', auth, async (req, res, next) => {
 router.get('/export-items', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, status, employee, warehouse, date_from, date_to, group_id } = req.query;
+    const { search, status, employee, warehouse, date_from, date_to, group_id, product } = req.query;
 
     let query = `
       SELECT
@@ -238,6 +272,11 @@ router.get('/export-items', auth, async (req, res, next) => {
       const like = `%${search}%`;
       params.push(like, like, like, like);
     }
+    if (product) {
+      query += ' AND (p.name LIKE ? OR p.sku LIKE ?)';
+      const likeProd = `%${product}%`;
+      params.push(likeProd, likeProd);
+    }
     if (status) {
       query += ' AND o.status = ?';
       params.push(status);
@@ -274,6 +313,57 @@ router.get('/export-items', auth, async (req, res, next) => {
       discount_rate: parseFloat(r.discount_rate) || 0,
       discount_amount: parseFloat(r.discount_amount) || 0,
       subtotal: parseFloat(r.subtotal) || 0,
+    }));
+
+    res.json({ data: formatted });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Page items: trả danh sách sản phẩm theo list order_ids (phục vụ cột "Sản phẩm" trong OrderList)
+// GET /api/orders/page-items?order_ids=1,2,3
+router.get('/page-items', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const raw = String(req.query.order_ids || '');
+    const ids = raw
+      .split(',')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+
+    if (ids.length === 0) return res.json({ data: [] });
+
+    // Scope: Sales chỉ được xem items của đơn mình bán
+    let scopeSql = '';
+    const scopeParams = [];
+    if (req.user.scope_own_data) {
+      scopeSql = ' AND o.salesperson_id = ?';
+      scopeParams.push(req.user.id);
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const [rows] = await pool.query(
+      `
+      SELECT
+        oi.order_id,
+        oi.product_id,
+        p.name as product_name,
+        p.unit,
+        oi.qty
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      JOIN orders o ON o.id = oi.order_id
+      WHERE oi.order_id IN (${placeholders})
+      ${scopeSql}
+      ORDER BY oi.order_id DESC, oi.id ASC
+      `,
+      [...ids, ...scopeParams]
+    );
+
+    const formatted = rows.map((r) => ({
+      ...r,
+      qty: parseFloat(r.qty) || 0,
     }));
 
     res.json({ data: formatted });

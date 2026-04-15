@@ -89,11 +89,11 @@ const navigationSales = [
     ],
   },
   {
-    name: "Hoa hồng",
+    name: "Báo cáo hoa hồng",
     icon: DollarSign,
     children: [
-      { name: "Tổng quan hoa hồng", href: "/reports/commissions" },
-      { name: "Hoa hồng từ CTV", href: "/reports/commissions/ctv" },
+      { name: "Hoa hồng bán hàng", href: "/reports/commissions" },
+      { name: "Hoa hồng CTV", href: "/reports/commissions/ctv" },
     ],
   },
 ];

@@ -65,6 +65,10 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Menu Sales: đổi tên nhóm báo cáo hoa hồng** — Menu cha “Hoa hồng” → “Báo cáo hoa hồng”; menu con “Tổng quan hoa hồng” → “Hoa hồng bán hàng”, “Hoa hồng từ CTV” → “Hoa hồng CTV”. — File: `src/components/Layout.tsx`
+
+- [x] **Danh sách đơn: gộp cột + cột Sản phẩm + filter theo sản phẩm** — Thêm cột Sản phẩm (tên × số lượng), chuyển thời gian vào cột Mã đơn, gộp Ship/NV/HH thành 1 cột 3 dòng, gộp Trạng thái + Thanh toán, bỏ cột Nhóm BH (đưa vào cột Nhân viên), cho phép lọc theo tên/SKU sản phẩm. — Files: `src/pages/OrderList.tsx`, `backend/routes/orders.js`
+
 - [x] **Xuất Excel: đơn hàng + đơn hoàn** — Đơn hàng export theo bộ lọc, có sheet chi tiết sản phẩm (Tên SP, Số lượng); Đơn hoàn export theo bộ lọc. — Files: `src/pages/OrderList.tsx`, `src/pages/SalesReturnsList.tsx`, `src/lib/exportExcel.ts`, `backend/routes/orders.js`, `backend/routes/returns.js`
 - [x] **CustomerForm: Địa chỉ nhà xuống hàng dưới** — Màn thêm/sửa khách hàng: ô Địa chỉ nhà nằm một hàng riêng (full width) dưới phần Tỉnh/Quận/Phường. — File: `src/pages/CustomerForm.tsx`
 - [x] **OrderForm: địa chỉ giao hàng đầy đủ khi chọn khách** — Tạo mới/sửa đơn: khi chọn khách hàng, auto-fill địa chỉ giao hàng đầy đủ (số nhà + phường + quận + tỉnh) và không ghi đè nếu đã sửa tay. — File: `src/pages/OrderForm.tsx`

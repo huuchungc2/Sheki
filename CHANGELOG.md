@@ -1,3 +1,11 @@
+## [15/04/2026] - OrderList gộp cột + filter theo sản phẩm
+### Changed
+- Danh sách đơn: thêm cột Sản phẩm (tên × số lượng), chuyển thời gian vào cột Mã đơn, gộp Ship/NV/HH thành 1 cột 3 dòng, gộp Trạng thái + Thanh toán, bỏ cột Nhóm BH (đưa vào cột Nhân viên), thêm filter theo tên/SKU sản phẩm (API + UI). - Files: `src/pages/OrderList.tsx`, `backend/routes/orders.js`
+
+## [15/04/2026] - Menu Sales đổi tên báo cáo hoa hồng
+### Changed
+- Sidebar Sales: menu cha “Hoa hồng” → “Báo cáo hoa hồng”; menu con “Tổng quan hoa hồng” → “Hoa hồng bán hàng”, “Hoa hồng từ CTV” → “Hoa hồng CTV”. - Files: `src/components/Layout.tsx`
+
 # CHANGELOG
 
 ## [15/04/2026] - Xuất Excel: đơn hàng & đơn hoàn

@@ -70,6 +70,7 @@ function readListParams(sp: URLSearchParams) {
   const today = toDateStr(new Date());
   const page = parseListPage(sp);
   const search = sp.get("q") ?? "";
+  const product = sp.get("product") ?? "";
   const status = sp.get("status") ?? "";
   const groupId = sp.get("group") ?? "";
   const employeeId = sp.get("employee") ?? "";
@@ -80,7 +81,7 @@ function readListParams(sp: URLSearchParams) {
       : "today";
   const dateFrom = sp.get("from") ?? today;
   const dateTo = sp.get("to") ?? today;
-  return { page, search, status, groupId, employeeId, dateFrom, dateTo, datePreset };
+  return { page, search, product, status, groupId, employeeId, dateFrom, dateTo, datePreset };
 }
 
 export function OrderList() {
@@ -107,12 +108,13 @@ export function OrderList() {
   );
 
   const todayStr = toDateStr(new Date());
-  const { page, search, status, groupId, employeeId, dateFrom, dateTo, datePreset } = React.useMemo(
+  const { page, search, product, status, groupId, employeeId, dateFrom, dateTo, datePreset } = React.useMemo(
     () => readListParams(searchParams),
     [searchParams.toString()]
   );
   const hasActiveFilters =
     Boolean(search) ||
+    Boolean(product) ||
     Boolean(status) ||
     Boolean(groupId) ||
     Boolean(employeeId) ||
@@ -129,6 +131,7 @@ export function OrderList() {
   const [showDateMenu, setShowDateMenu] = React.useState(false);
   const [total, setTotal]           = React.useState(0);
   const [searchInput, setSearchInput] = React.useState("");
+  const [productInput, setProductInput] = React.useState("");
   const [isComposing, setIsComposing] = React.useState(false);
   const [summary, setSummary]       = React.useState<{ total_orders: number; total_revenue: number; total_commission: number }>({
     total_orders: 0,
@@ -137,6 +140,8 @@ export function OrderList() {
   });
   const [deleting, setDeleting]     = React.useState<string | null>(null);
   const [exporting, setExporting]   = React.useState(false);
+
+  const [orderItemsByOrderId, setOrderItemsByOrderId] = React.useState<Record<string, any[]>>({});
 
   const patchListParams = React.useCallback(
     (patch: Record<string, string | null | undefined>, opts?: { resetPage?: boolean }) => {
@@ -170,6 +175,10 @@ export function OrderList() {
   }, [search]);
 
   React.useEffect(() => {
+    setProductInput(product);
+  }, [product]);
+
+  React.useEffect(() => {
     if (isComposing) return;
     const t = window.setTimeout(() => {
       const next = searchInput;
@@ -179,6 +188,17 @@ export function OrderList() {
     }, 350);
     return () => window.clearTimeout(t);
   }, [searchInput, search, patchListParams, isComposing]);
+
+  React.useEffect(() => {
+    if (isComposing) return;
+    const t = window.setTimeout(() => {
+      const next = productInput;
+      if (next === product) return;
+      const hasMeaningful = next.trim().length > 0;
+      patchListParams({ product: hasMeaningful ? next : null }, { resetPage: true });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [productInput, product, patchListParams, isComposing]);
 
   // Bulk select
   const [selected, setSelected]     = React.useState<Set<number>>(new Set());
@@ -208,7 +228,7 @@ export function OrderList() {
   }, [isAdmin]);
 
   const fetchOrders = React.useCallback(async () => {
-    const { page: p, search: q, status: st, groupId: gid, employeeId: eid, dateFrom: df, dateTo: dt } =
+    const { page: p, search: q, product: prod, status: st, groupId: gid, employeeId: eid, dateFrom: df, dateTo: dt } =
       readListParams(searchParams);
     try {
       setLoading(true);
@@ -216,6 +236,7 @@ export function OrderList() {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({
         search: q,
+        ...(prod && { product: prod }),
         status: st,
         page: String(p),
         limit: String(limit),
@@ -238,6 +259,7 @@ export function OrderList() {
         total_commission: Number(json?.summary?.total_commission) || 0,
       });
       setSelected(new Set());
+      setOrderItemsByOrderId({});
       const totalPages = Math.ceil(newTotal / limit);
       if (totalPages > 0 && p > totalPages) {
         patchListParams({ page: String(totalPages) });
@@ -251,12 +273,44 @@ export function OrderList() {
 
   React.useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    const ids = orders.map((o: any) => o?.id).filter((id: any) => Number.isFinite(Number(id)));
+    if (!token || ids.length === 0) {
+      setOrderItemsByOrderId({});
+      return;
+    }
+    let aborted = false;
+    (async () => {
+      try {
+        const params = new URLSearchParams({ order_ids: ids.join(",") });
+        const res = await fetch(`${API_URL}/orders/page-items?${params}`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const rows = (json?.data ?? []) as any[];
+        const by: Record<string, any[]> = {};
+        for (const r of rows) {
+          const oid = String(r.order_id);
+          if (!by[oid]) by[oid] = [];
+          by[oid].push(r);
+        }
+        if (!aborted) setOrderItemsByOrderId(by);
+      } catch {
+        if (!aborted) setOrderItemsByOrderId({});
+      }
+    })();
+    return () => { aborted = true; };
+  }, [orders]);
+
   const exportExcel = React.useCallback(async () => {
     try {
       setExporting(true);
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({
         search,
+        ...(product && { product }),
         status,
         page: "1",
         limit: "10000",
@@ -299,7 +353,7 @@ export function OrderList() {
     } finally {
       setExporting(false);
     }
-  }, [search, status, dateFrom, dateTo, employeeId, groupId, groups, employees]);
+  }, [search, product, status, dateFrom, dateTo, employeeId, groupId, groups, employees]);
 
   // Apply preset
   const applyPreset = (preset: DatePreset) => {
@@ -420,6 +474,23 @@ export function OrderList() {
                 setSearchInput((e.target as HTMLInputElement).value);
               }}
               placeholder="Mã đơn, tên khách, SĐT..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none transition-all"
+            />
+          </div>
+
+          {/* Filter theo sản phẩm */}
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={productInput}
+              onChange={(e) => setProductInput(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={(e) => {
+                setIsComposing(false);
+                setProductInput((e.target as HTMLInputElement).value);
+              }}
+              placeholder="Tên/SKU sản phẩm..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none transition-all"
             />
           </div>
@@ -613,7 +684,7 @@ export function OrderList() {
             <p className="md:hidden text-[11px] text-slate-400 px-3 pt-3 pb-0">
               Vuốt ngang để xem đủ cột.
             </p>
-            <table className="w-full min-w-[980px] text-left border-collapse text-sm">
+            <table className="w-full min-w-[1120px] text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-4 py-3 w-10">
@@ -629,20 +700,14 @@ export function OrderList() {
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Khách hàng</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sản phẩm</th>
                   {isAdmin && !employeeId && (
                     <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
                   )}
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhóm BH</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Thời gian</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng tiền</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">
-                    Ship KH Trả
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">NV chịu</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Ship / NV / HH</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Trạng thái</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Thanh toán</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Trạng thái / TT</th>
                   <th className="px-4 py-3 w-24"></th>
                 </tr>
               </thead>
@@ -655,6 +720,7 @@ export function OrderList() {
                   const initials = (order.customer_name || "?").split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
                   const isToday = order.created_at && new Date(order.created_at).toDateString() === new Date().toDateString();
                   const { khachTraShip, commissionAmt, nvChiuAmt, luongDon } = computeOrderMoney(order);
+                  const items = orderItemsByOrderId[String(order.id)] || [];
                   return (
                     <tr key={order.id}
                       className={cn(
@@ -677,7 +743,18 @@ export function OrderList() {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-sm font-bold text-red-600 font-mono">{order.code || `#${order.id}`}</span>
+                        <div>
+                          <span className="text-sm font-bold text-red-600 font-mono">{order.code || `#${order.id}`}</span>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {isToday ? "Hôm nay" : (order.created_at ? formatDate(order.created_at) : "—")}
+                            {order.created_at ? ` • ${new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : ""}
+                          </p>
+                          {!isAdmin && order.group_name ? (
+                            <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">
+                              {order.group_name}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
@@ -690,43 +767,66 @@ export function OrderList() {
                           </div>
                         </div>
                       </td>
+                      <td className="px-4 py-3">
+                        {items.length ? (
+                          <div className="space-y-0.5">
+                            {items.slice(0, 2).map((it: any, idx: number) => (
+                              <p key={`${it.product_id}-${idx}`} className="text-xs text-slate-700 leading-tight">
+                                <span className="font-semibold">{it.product_name}</span>{" "}
+                                <span className="text-slate-400">×</span>{" "}
+                                <span className="tabular-nums font-semibold">{it.qty}</span>
+                                {it.unit ? <span className="text-slate-400"> {it.unit}</span> : null}
+                              </p>
+                            ))}
+                            {items.length > 2 ? (
+                              <p className="text-[11px] text-slate-400">+{items.length - 2} sản phẩm</p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
                       {isAdmin && !employeeId && (
                         <td className="px-4 py-3">
-                          <p className="text-sm text-slate-700 font-medium">{order.salesperson_name || "—"}</p>
+                          <div>
+                            <p className="text-sm text-slate-700 font-medium">{order.salesperson_name || "—"}</p>
+                            {order.group_name ? (
+                              <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">
+                                {order.group_name}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            )}
+                          </div>
                         </td>
                       )}
-                      <td className="px-4 py-3">
-                        {order.group_name
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">{order.group_name}</span>
-                          : <span className="text-slate-300 text-xs">—</span>
-                        }
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-slate-700">{isToday ? "Hôm nay" : (order.created_at ? formatDate(order.created_at) : "—")}</p>
-                        <p className="text-xs text-slate-400">{order.created_at ? new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ""}</p>
-                      </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm font-bold text-slate-900">{formatCurrency(order.total_amount || 0)}</span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-medium text-slate-900 tabular-nums">
-                          {formatCurrency(
-                            order.ship_payer === "shop" ? 0 : Number(order.shipping_fee) || 0
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={cn(
-                          "text-sm tabular-nums",
-                          Number(order.salesperson_absorbed_amount) > 0 ? "font-semibold text-rose-700" : "text-slate-400"
-                        )}>
-                          {Number(order.salesperson_absorbed_amount) > 0
-                            ? formatCurrency(order.salesperson_absorbed_amount)
-                            : "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-semibold text-emerald-600">{formatCurrency(order.commission_amount || 0)}</span>
+                      <td className="px-4 py-3">
+                        <div className="space-y-0.5">
+                          <p className="text-xs text-slate-700">
+                            <span className="text-slate-400">Ship:</span>{" "}
+                            <span className="font-semibold tabular-nums">
+                              {order.ship_payer === "shop" ? "Shop trả" : `KH trả ${formatCurrency(Number(order.shipping_fee) || 0)}`}
+                            </span>
+                          </p>
+                          <p className="text-xs">
+                            <span className="text-slate-400">NV chịu:</span>{" "}
+                            <span className={cn(
+                              "tabular-nums",
+                              nvChiuAmt > 0 ? "font-semibold text-rose-700" : "text-slate-400"
+                            )}>
+                              {nvChiuAmt > 0 ? formatCurrency(nvChiuAmt) : "—"}
+                            </span>
+                          </p>
+                          <p className="text-xs">
+                            <span className="text-slate-400">HH:</span>{" "}
+                            <span className="font-semibold text-emerald-600 tabular-nums">
+                              {formatCurrency(commissionAmt)}
+                            </span>
+                          </p>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span
@@ -739,16 +839,16 @@ export function OrderList() {
                           {formatCurrency(luongDon)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", st.color)}>
-                          <st.icon className="w-3 h-3" />
-                          {st.label}
-                        </span>
-                      </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                          <pay.icon className="w-3.5 h-3.5 text-slate-300" />
-                          {pay.label}
+                        <div className="space-y-1">
+                          <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", st.color)}>
+                            <st.icon className="w-3 h-3" />
+                            {st.label}
+                          </span>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <pay.icon className="w-3.5 h-3.5 text-slate-300" />
+                            {pay.label}
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
