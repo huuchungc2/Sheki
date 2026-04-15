@@ -520,6 +520,15 @@ router.put('/:id', auth, async (req, res, next) => {
       return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
     }
 
+    const isAdminOrderPut = req.user.can_access_admin === true || req.user.role === 'admin';
+    if (
+      !isAdminOrderPut &&
+      req.user.scope_own_data &&
+      ['shipping', 'completed'].includes(String(order.status))
+    ) {
+      return res.status(403).json({ error: 'Không được sửa đơn đang giao hoặc đã giao' });
+    }
+
     const {
       customer_id,
       warehouse_id,
@@ -560,8 +569,7 @@ router.put('/:id', auth, async (req, res, next) => {
       String(order.source_type || 'sales') === 'collaborator' ? 'collaborator' : 'sales';
     let finalCollaboratorUserId = order.collaborator_user_id || null;
 
-    const isAdminUserPut = req.user.can_access_admin === true || req.user.role === 'admin';
-    if (isAdminUserPut && effectiveSourceType === 'collaborator') {
+    if (isAdminOrderPut && effectiveSourceType === 'collaborator') {
       return res.status(403).json({
         error: 'Admin không dùng chế độ ghi nhận quản lý nhận HH trực tiếp — chỉ nhân viên Sales.',
       });
@@ -790,6 +798,15 @@ router.delete('/:id', auth, async (req, res, next) => {
       order.salesperson_id !== req.user.id
     ) {
       return res.status(403).json({ error: 'Không có quyền xóa đơn hàng này' });
+    }
+
+    const isAdminOrderDel = req.user.can_access_admin === true || req.user.role === 'admin';
+    if (
+      !isAdminOrderDel &&
+      req.user.scope_own_data &&
+      ['shipping', 'completed'].includes(String(order.status))
+    ) {
+      return res.status(403).json({ error: 'Không được xóa đơn đang giao hoặc đã giao' });
     }
 
     const deletedStatus = order.status;

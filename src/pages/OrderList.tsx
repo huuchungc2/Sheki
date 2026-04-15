@@ -96,6 +96,15 @@ export function OrderList() {
   const isAdmin =
     currentUser?.can_access_admin === true || currentUser?.role === "admin";
 
+  /** NV phạm vi cá nhân (scope_own_data): không sửa/xóa/bulk chọn đơn đang giao hoặc đã giao — Admin & role xem toàn hệ thống giữ quyền */
+  const canSalesMutateOrderRow = React.useCallback(
+    (order: any) => {
+      if (isAdmin || currentUser?.scope_own_data === false) return true;
+      return !["shipping", "completed"].includes(String(order?.status ?? ""));
+    },
+    [isAdmin, currentUser?.scope_own_data]
+  );
+
   const todayStr = toDateStr(new Date());
   const { page, search, status, groupId, employeeId, dateFrom, dateTo, datePreset } = React.useMemo(
     () => readListParams(searchParams),
@@ -267,15 +276,22 @@ export function OrderList() {
     fetchOrders();
   };
 
+  const selectableOrders = React.useMemo(
+    () => orders.filter((o: any) => canSalesMutateOrderRow(o)),
+    [orders, canSalesMutateOrderRow]
+  );
+
   const toggleAll = () => {
-    if (selected.size === orders.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(orders.map((o: any) => o.id)));
-    }
+    const ids = selectableOrders.map((o: any) => o.id);
+    if (ids.length === 0) return;
+    const allSelected = ids.every((id) => selected.has(id));
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(ids));
   };
 
   const toggleOne = (id: number) => {
+    const row = orders.find((o: any) => o.id === id);
+    if (row && !canSalesMutateOrderRow(row)) return;
     const next = new Set(selected);
     next.has(id) ? next.delete(id) : next.add(id);
     setSelected(next);
@@ -510,9 +526,13 @@ export function OrderList() {
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-4 py-3 w-10">
                     <input type="checkbox"
-                      checked={orders.length > 0 && selected.size === orders.length}
+                      checked={
+                        selectableOrders.length > 0 &&
+                        selectableOrders.every((o: any) => selected.has(o.id))
+                      }
                       onChange={toggleAll}
-                      className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                      disabled={selectableOrders.length === 0}
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>
@@ -539,21 +559,29 @@ export function OrderList() {
                   const st = statusConfig[order.status] || { label: order.status, color: "bg-slate-100 text-slate-600", icon: Clock };
                   const pay = paymentConfig[order.payment_method] || { label: order.payment_method || "—", icon: Wallet };
                   const isSelected = selected.has(order.id);
+                  const rowCanMutate = canSalesMutateOrderRow(order);
                   const initials = (order.customer_name || "?").split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
                   const isToday = order.created_at && new Date(order.created_at).toDateString() === new Date().toDateString();
                   const { khachTraShip, commissionAmt, nvChiuAmt, luongDon } = computeOrderMoney(order);
                   return (
                     <tr key={order.id}
-                      className={cn("group transition-colors cursor-pointer",
-                        isSelected ? "bg-blue-50/60" : "hover:bg-slate-50/60"
+                      className={cn(
+                        "group transition-colors",
+                        rowCanMutate ? "cursor-pointer hover:bg-slate-50/60" : "cursor-default",
+                        isSelected && "bg-blue-50/60"
                       )}
-                      onClick={() => navigate(`/orders/edit/${order.id}`, { state: { ordersListReturn } })}
+                      onClick={
+                        rowCanMutate
+                          ? () => navigate(`/orders/edit/${order.id}`, { state: { ordersListReturn } })
+                          : undefined
+                      }
                     >
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleOne(order.id)}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                          disabled={!rowCanMutate}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -633,19 +661,24 @@ export function OrderList() {
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         {/* Luôn hiện: mobile/touch không có hover → trước đây opacity-0 khiến mất icon */}
-                        <div className="flex items-center justify-end gap-1">
-                          <Link to={`/orders/edit/${order.id}`} state={{ ordersListReturn }}
-                            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-all"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(order.id)}
-                            disabled={deleting === order.id}
-                            className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white flex items-center justify-center text-slate-500 transition-all disabled:opacity-50"
-                          >
-                            {deleting === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                          </button>
+                        <div className="flex items-center justify-end gap-1 min-h-[28px]">
+                          {rowCanMutate ? (
+                            <>
+                              <Link to={`/orders/edit/${order.id}`} state={{ ordersListReturn }}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-all"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(order.id)}
+                                disabled={deleting === order.id}
+                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white flex items-center justify-center text-slate-500 transition-all disabled:opacity-50"
+                              >
+                                {deleting === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

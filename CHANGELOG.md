@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [15/04/2026] - Đơn hàng: Sales không sửa/xóa đơn đang giao & đã giao
+### Changed
+- **OrderList** — Với tài khoản không phải Admin: ẩn nút sửa/xóa, tắt mở form khi click dòng, và không cho chọn bulk các đơn trạng thái «Đang giao» / «Đã giao». Admin giữ nguyên.
+### Fixed
+- **API + OrderForm** — `PUT`/`DELETE /orders/:id` trả 403 cho user có `scope_own_data` (không phải admin) khi đơn `shipping`/`completed`; mở URL sửa trực tiếp → điều hướng về danh sách. — Files: `backend/routes/orders.js`, `src/pages/OrderList.tsx`, `src/pages/OrderForm.tsx`
+
 ## [14/04/2026] - Branding: Velocity → Sheki
 ### Changed
 - **UI + docs** — Đổi tên hiển thị từ Velocity sang Sheki (sidebar, register, metadata, tài liệu). — Files: `src/components/Layout.tsx`, `src/pages/Register.tsx`, `src/pages/InventoryImport.tsx`, `src/pages/InventoryExport.tsx`, `metadata.json`, `CLAUDE.md`, `plan.md`, `deploy.sh`

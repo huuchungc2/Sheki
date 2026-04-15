@@ -326,6 +326,13 @@ export function OrderForm() {
       try {
         const res: any = await api.get(`/orders/${id}`);
         const order = res?.data ?? res;
+        const st = String(order?.status ?? "");
+        const salesScoped = !isAdmin && currentUser?.scope_own_data !== false;
+        if (salesScoped && (st === "shipping" || st === "completed")) {
+          const listReturn = (location.state as { ordersListReturn?: string } | null)?.ordersListReturn;
+          navigate(listReturn || "/orders", { replace: true });
+          return;
+        }
         const cust = {
           id: order?.customer_id ?? order?.customerId ?? '',
           name: order?.customer_name ?? order?.customerName ?? '',
@@ -385,7 +392,7 @@ export function OrderForm() {
         console.error('Load order error', e);
       }
     })();
-  }, [id, isAdmin]);
+  }, [id, isAdmin, currentUser?.scope_own_data, navigate, location.state]);
 
   // Submit
   const submitOrder = async () => {

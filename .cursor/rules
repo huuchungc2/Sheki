@@ -1,12 +1,22 @@
-Đọc các file sau trước khi làm bất cứ điều gì:
-- TODO.md → task đang làm
-- RULES.md → quy tắc code bắt buộc
+# ERP SHEKI - CURSOR RULES
 
-Stack: React 19 + Vite + TypeScript + Tailwind / Node.js + Express / MySQL db=erp port 3000/5173
+Luôn đọc các file sau trước khi làm việc:
+- TODO.md (Task hiện tại)
+- RULES.md (Quy tắc code)
+- CLAUDE.md (Cấu trúc dự án)
 
-Sau mỗi task: update TODO.md + CHANGELOG.md, báo cáo files đã sửa.
-Không assume, không sửa file ngoài task, hỏi trước khi làm nếu không chắc.
+STACk KỸ THUẬT:
+- Web: React 19, Vite, Tailwind, TypeScript.
+- Mobile: Expo, React Native, TypeScript, StyleSheet (KHÔNG dùng Tailwind).
+- Backend: Node.js, Express, MySQL (Port 3000).
 
-Khi làm UI → đọc thêm @UI_SPEC.md
-Khi làm hoa hồng/lương → đọc thêm @LOGIC_BUSINESS.md  
-Khi làm tính năng mới → đọc thêm @FEATURE_[tên].md
+QUY TẮC:
+- Không tự ý cài package mới.
+- Không sửa file ngoài phạm vi task.
+- Luôn báo nguyên nhân bug trước khi fix.
+- Sau khi xong: Update TODO.md và CHANGELOG.md.
+
+KHI LÀM MOBILE:
+- Đọc thêm @FEATURE_MOBILE_RN.md và @PROMPT_MOBILE.md.
+- Sử dụng SafeAreaView, SecureStore (thay cho localStorage), và FlatList.
+- Style phải dùng StyleSheet.create().
