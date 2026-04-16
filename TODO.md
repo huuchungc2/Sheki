@@ -65,6 +65,8 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **OrderForm: kho xuất hàng mặc định khi tạo mới** — Màn tạo đơn auto load kho `is_default` ngay khi mở form (fallback kho active đầu tiên). — File: `src/pages/OrderForm.tsx`
+
 - [x] **Admin: quản lý danh mục sản phẩm (CRUD)** — Thêm trang Danh mục sản phẩm (thêm/sửa/ẩn), bổ sung API categories hỗ trợ xem tất cả + ẩn danh mục, gắn route + menu Admin. — Files: `src/pages/Categories.tsx`, `src/App.tsx`, `src/components/Layout.tsx`, `backend/routes/categories.js`
 
 - [x] **Menu Sales: đổi tên nhóm báo cáo hoa hồng** — Menu cha “Hoa hồng” → “Báo cáo hoa hồng”; menu con “Tổng quan hoa hồng” → “Hoa hồng bán hàng”, “Hoa hồng từ CTV” → “Hoa hồng CTV”. — File: `src/components/Layout.tsx`

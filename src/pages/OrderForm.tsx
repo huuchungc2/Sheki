@@ -290,11 +290,28 @@ export function OrderForm() {
 
   // Fetch danh sách kho
   React.useEffect(() => {
-    api.get('/warehouses').then((res: any) => {
-      const data = res?.data ?? res ?? [];
-      setWarehouses(Array.isArray(data) ? data : []);
-    }).catch(() => setWarehouses([]));
-  }, []);
+    api
+      .get("/warehouses")
+      .then((res: any) => {
+        const data = res?.data ?? res ?? [];
+        const list = Array.isArray(data) ? data : [];
+        setWarehouses(list);
+
+        // Tạo mới: auto pick kho mặc định ngay khi load danh sách kho
+        if (!id) {
+          const pick =
+            list.find((w: any) => Boolean(w?.is_active) && Boolean(w?.is_default)) ||
+            list.find((w: any) => Boolean(w?.is_active));
+          if (pick?.id != null) {
+            const pickId = Number(pick.id);
+            if (Number.isFinite(pickId)) {
+              setSelectedWarehouseId((prev) => (prev == null ? pickId : prev));
+            }
+          }
+        }
+      })
+      .catch(() => setWarehouses([]));
+  }, [id]);
 
   // Khi chọn kho → sync available_stock theo kho
   React.useEffect(() => {

@@ -1,3 +1,7 @@
+## [16/04/2026] - OrderForm: auto chọn kho mặc định khi tạo đơn
+### Fixed
+- **OrderForm** — Khi vào màn tạo đơn (`/orders/new`), dropdown “Kho xuất hàng” tự động chọn kho mặc định (`warehouses.is_default=1`) ngay khi load; fallback kho active đầu tiên nếu thiếu default. — File: `src/pages/OrderForm.tsx`
+
 ## [15/04/2026] - OrderList gộp cột + filter theo sản phẩm
 ### Changed
 - Danh sách đơn: thêm cột Sản phẩm (tên × số lượng), chuyển thời gian vào cột Mã đơn, gộp Ship/NV/HH thành 1 cột 3 dòng, gộp Trạng thái + Thanh toán, bỏ cột Nhóm BH (đưa vào cột Nhân viên), thêm filter theo tên/SKU sản phẩm (API + UI). - Files: `src/pages/OrderList.tsx`, `backend/routes/orders.js`
