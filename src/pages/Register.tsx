@@ -75,7 +75,7 @@ export function Register() {
               S
             </div>
             <h1 className="text-4xl font-black tracking-tight mb-4">
-              Sheki <span className="text-blue-500">Retail</span>
+              Smart <span className="text-blue-500">Retail</span>
             </h1>
             <p className="text-slate-400 font-medium text-lg leading-relaxed">
               Bắt đầu hành trình tối ưu hóa doanh nghiệp của bạn ngay hôm nay.

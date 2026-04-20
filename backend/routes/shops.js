@@ -96,6 +96,65 @@ async function getAdminRoleId(conn) {
   return r.id;
 }
 
+async function getSalesRoleId(conn) {
+  const [[r]] = await conn.query("SELECT id, code FROM roles WHERE code = 'sales' LIMIT 1");
+  if (!r || String(r.code) !== 'sales') {
+    const err = new Error('Thiếu role sales trong hệ thống (roles.code = sales)');
+    err.status = 500;
+    throw err;
+  }
+  return r.id;
+}
+
+async function seedRolePermissionsForShop(conn, shopId, roleIds) {
+  if (!shopId || !Array.isArray(roleIds) || roleIds.length === 0) return;
+
+  // Prefer new schema: role_permissions has role_id. Fallback to legacy schema: role string.
+  try {
+    // Copy rows from template shop (id=1) for the given roleIds.
+    await conn.query(
+      `INSERT INTO role_permissions (shop_id, role_id, role, module, action, allowed)
+       SELECT ?, rp.role_id, rp.role, rp.module, rp.action, rp.allowed
+       FROM role_permissions rp
+       WHERE rp.shop_id = 1 AND rp.role_id IN (?)
+       ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)`,
+      [shopId, roleIds]
+    );
+    return;
+  } catch (e) {
+    if (!e || e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+  }
+
+  // Legacy: role_permissions(shop_id, role, module, action, allowed)
+  const [roles] = await conn.query('SELECT id, code FROM roles WHERE id IN (?)', [roleIds]);
+  const codes = (roles || []).map((r) => String(r.code || '').toLowerCase()).filter(Boolean);
+  if (codes.length === 0) return;
+
+  await conn.query(
+    `INSERT INTO role_permissions (shop_id, role, module, action, allowed)
+     SELECT ?, rp.role, rp.module, rp.action, rp.allowed
+     FROM role_permissions rp
+     WHERE rp.shop_id = 1 AND rp.role IN (?)
+     ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)`,
+    [shopId, codes]
+  );
+}
+
+async function ensureDefaultWarehouseForShop(conn, shopId) {
+  if (!shopId) return;
+  // Create a minimal default warehouse so order/inventory flows have a warehouse_id.
+  await conn.query('UPDATE warehouses SET is_default = 0 WHERE shop_id = ?', [shopId]);
+  const [[w]] = await conn.query('SELECT id FROM warehouses WHERE shop_id = ? LIMIT 1', [shopId]);
+  if (w?.id) {
+    await conn.query('UPDATE warehouses SET is_default = 1 WHERE id = ? AND shop_id = ?', [w.id, shopId]);
+    return;
+  }
+  await conn.query(
+    'INSERT INTO warehouses (shop_id, name, address, is_default, is_active) VALUES (?, ?, ?, 1, 1)',
+    [shopId, 'Kho trung tâm', null]
+  );
+}
+
 function normalizeAdminsInput(body) {
   let admins = Array.isArray(body?.admins) ? body.admins : [];
   admins = admins.filter(
@@ -254,6 +313,7 @@ router.post('/', auth, requireSuperAdmin, async (req, res, next) => {
     await conn.beginTransaction();
 
     const adminRoleId = await getAdminRoleId(conn);
+    const salesRoleId = await getSalesRoleId(conn);
 
     const [r] = await conn.query(
       'INSERT INTO shops (name, code, is_active, valid_until) VALUES (?, ?, 1, ?)',
@@ -269,6 +329,12 @@ router.post('/', auth, requireSuperAdmin, async (req, res, next) => {
        WHERE shop_id = 1`,
       [shopId]
     );
+
+    // Seed role_permissions cho shop mới (copy từ shop mẫu id=1) để không bị 403 khi bật phân quyền
+    await seedRolePermissionsForShop(conn, shopId, [adminRoleId, salesRoleId]);
+
+    // Ensure at least one default warehouse for the new shop
+    await ensureDefaultWarehouseForShop(conn, shopId);
 
     let admins_created = [];
     if (admins.length > 0) {

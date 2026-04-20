@@ -173,7 +173,7 @@ export function Login() {
               S
             </div>
             <h1 className="text-4xl font-black tracking-tight mb-4">
-              Sheki <span className="text-blue-500">ERP</span>
+              Smart <span className="text-blue-500">ERP</span>
             </h1>
             <p className="text-slate-400 font-medium text-lg leading-relaxed">
               Hệ thống quản lý bán hàng, nhân sự và kho bãi tích hợp mạnh mẽ nhất cho doanh nghiệp của bạn.

@@ -293,12 +293,17 @@ CREATE TABLE `loyalty_points` (
 -- ============================================
 CREATE TABLE `role_permissions` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `role` VARCHAR(64) NOT NULL,
+  `shop_id` INT UNSIGNED NOT NULL DEFAULT 1,
+  `role_id` INT UNSIGNED NOT NULL,
+  `role` VARCHAR(64) DEFAULT NULL COMMENT 'Legacy: role code (tương thích cũ)',
   `module` VARCHAR(50) NOT NULL,
   `action` VARCHAR(20) NOT NULL,
   `allowed` TINYINT(1) NOT NULL DEFAULT 0,
-  UNIQUE KEY `uk_role_module_action` (`role`, `module`, `action`),
-  INDEX `idx_role_permissions_role` (`role`)
+  UNIQUE KEY `uk_shop_roleId_module_action` (`shop_id`, `role_id`, `module`, `action`),
+  INDEX `idx_role_permissions_shop` (`shop_id`),
+  INDEX `idx_role_permissions_role_id` (`role_id`),
+  CONSTRAINT `fk_role_permissions_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_role_permissions_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
@@ -374,27 +379,27 @@ CREATE TABLE `cash_transactions` (
   CONSTRAINT `fk_cash_tx_creator` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Default permissions for admin (all allowed)
-INSERT INTO `role_permissions` (`role`, `module`, `action`, `allowed`) VALUES
-('admin', 'dashboard', 'view', 1), ('admin', 'dashboard', 'create', 1), ('admin', 'dashboard', 'edit', 1), ('admin', 'dashboard', 'delete', 1),
-('admin', 'employees', 'view', 1), ('admin', 'employees', 'create', 1), ('admin', 'employees', 'edit', 1), ('admin', 'employees', 'delete', 1),
-('admin', 'products', 'view', 1), ('admin', 'products', 'create', 1), ('admin', 'products', 'edit', 1), ('admin', 'products', 'delete', 1),
-('admin', 'customers', 'view', 1), ('admin', 'customers', 'create', 1), ('admin', 'customers', 'edit', 1), ('admin', 'customers', 'delete', 1),
-('admin', 'orders', 'view', 1), ('admin', 'orders', 'create', 1), ('admin', 'orders', 'edit', 1), ('admin', 'orders', 'delete', 1),
-('admin', 'inventory', 'view', 1), ('admin', 'inventory', 'create', 1), ('admin', 'inventory', 'edit', 1), ('admin', 'inventory', 'delete', 1),
-('admin', 'reports', 'view', 1), ('admin', 'reports', 'create', 1), ('admin', 'reports', 'edit', 1), ('admin', 'reports', 'delete', 1),
-('admin', 'settings', 'view', 1), ('admin', 'settings', 'create', 1), ('admin', 'settings', 'edit', 1), ('admin', 'settings', 'delete', 1);
+-- Default permissions for admin (all allowed) - role_id = 1
+INSERT INTO `role_permissions` (`shop_id`, `role_id`, `role`, `module`, `action`, `allowed`) VALUES
+(1, 1, 'admin', 'dashboard', 'view', 1), (1, 1, 'admin', 'dashboard', 'create', 1), (1, 1, 'admin', 'dashboard', 'edit', 1), (1, 1, 'admin', 'dashboard', 'delete', 1),
+(1, 1, 'admin', 'employees', 'view', 1), (1, 1, 'admin', 'employees', 'create', 1), (1, 1, 'admin', 'employees', 'edit', 1), (1, 1, 'admin', 'employees', 'delete', 1),
+(1, 1, 'admin', 'products', 'view', 1), (1, 1, 'admin', 'products', 'create', 1), (1, 1, 'admin', 'products', 'edit', 1), (1, 1, 'admin', 'products', 'delete', 1),
+(1, 1, 'admin', 'customers', 'view', 1), (1, 1, 'admin', 'customers', 'create', 1), (1, 1, 'admin', 'customers', 'edit', 1), (1, 1, 'admin', 'customers', 'delete', 1),
+(1, 1, 'admin', 'orders', 'view', 1), (1, 1, 'admin', 'orders', 'create', 1), (1, 1, 'admin', 'orders', 'edit', 1), (1, 1, 'admin', 'orders', 'delete', 1),
+(1, 1, 'admin', 'inventory', 'view', 1), (1, 1, 'admin', 'inventory', 'create', 1), (1, 1, 'admin', 'inventory', 'edit', 1), (1, 1, 'admin', 'inventory', 'delete', 1),
+(1, 1, 'admin', 'reports', 'view', 1), (1, 1, 'admin', 'reports', 'create', 1), (1, 1, 'admin', 'reports', 'edit', 1), (1, 1, 'admin', 'reports', 'delete', 1),
+(1, 1, 'admin', 'settings', 'view', 1), (1, 1, 'admin', 'settings', 'create', 1), (1, 1, 'admin', 'settings', 'edit', 1), (1, 1, 'admin', 'settings', 'delete', 1);
 
--- Default permissions for sales (limited)
-INSERT INTO `role_permissions` (`role`, `module`, `action`, `allowed`) VALUES
-('sales', 'dashboard', 'view', 1), ('sales', 'dashboard', 'create', 0), ('sales', 'dashboard', 'edit', 0), ('sales', 'dashboard', 'delete', 0),
-('sales', 'employees', 'view', 0), ('sales', 'employees', 'create', 0), ('sales', 'employees', 'edit', 0), ('sales', 'employees', 'delete', 0),
-('sales', 'products', 'view', 1), ('sales', 'products', 'create', 0), ('sales', 'products', 'edit', 0), ('sales', 'products', 'delete', 0),
-('sales', 'customers', 'view', 1), ('sales', 'customers', 'create', 1), ('sales', 'customers', 'edit', 1), ('sales', 'customers', 'delete', 0),
-('sales', 'orders', 'view', 1), ('sales', 'orders', 'create', 1), ('sales', 'orders', 'edit', 1), ('sales', 'orders', 'delete', 0),
-('sales', 'inventory', 'view', 0), ('sales', 'inventory', 'create', 0), ('sales', 'inventory', 'edit', 0), ('sales', 'inventory', 'delete', 0),
-('sales', 'reports', 'view', 1), ('sales', 'reports', 'create', 0), ('sales', 'reports', 'edit', 0), ('sales', 'reports', 'delete', 0),
-('sales', 'settings', 'view', 0), ('sales', 'settings', 'create', 0), ('sales', 'settings', 'edit', 0), ('sales', 'settings', 'delete', 0);
+-- Default permissions for sales (limited) - role_id = 2
+INSERT INTO `role_permissions` (`shop_id`, `role_id`, `role`, `module`, `action`, `allowed`) VALUES
+(1, 2, 'sales', 'dashboard', 'view', 1), (1, 2, 'sales', 'dashboard', 'create', 0), (1, 2, 'sales', 'dashboard', 'edit', 0), (1, 2, 'sales', 'dashboard', 'delete', 0),
+(1, 2, 'sales', 'employees', 'view', 0), (1, 2, 'sales', 'employees', 'create', 0), (1, 2, 'sales', 'employees', 'edit', 0), (1, 2, 'sales', 'employees', 'delete', 0),
+(1, 2, 'sales', 'products', 'view', 1), (1, 2, 'sales', 'products', 'create', 0), (1, 2, 'sales', 'products', 'edit', 0), (1, 2, 'sales', 'products', 'delete', 0),
+(1, 2, 'sales', 'customers', 'view', 1), (1, 2, 'sales', 'customers', 'create', 1), (1, 2, 'sales', 'customers', 'edit', 1), (1, 2, 'sales', 'customers', 'delete', 0),
+(1, 2, 'sales', 'orders', 'view', 1), (1, 2, 'sales', 'orders', 'create', 1), (1, 2, 'sales', 'orders', 'edit', 1), (1, 2, 'sales', 'orders', 'delete', 0),
+(1, 2, 'sales', 'inventory', 'view', 0), (1, 2, 'sales', 'inventory', 'create', 0), (1, 2, 'sales', 'inventory', 'edit', 0), (1, 2, 'sales', 'inventory', 'delete', 0),
+(1, 2, 'sales', 'reports', 'view', 1), (1, 2, 'sales', 'reports', 'create', 0), (1, 2, 'sales', 'reports', 'edit', 0), (1, 2, 'sales', 'reports', 'delete', 0),
+(1, 2, 'sales', 'settings', 'view', 0), (1, 2, 'sales', 'settings', 'create', 0), (1, 2, 'sales', 'settings', 'edit', 0), (1, 2, 'sales', 'settings', 'delete', 0);
 
 -- ============================================
 -- SEED DATA
@@ -516,12 +521,7 @@ ALTER TABLE `cash_transactions` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAU
 ALTER TABLE `cash_transactions` ADD KEY `idx_cash_tx_shop` (`shop_id`);
 ALTER TABLE `cash_transactions` ADD CONSTRAINT `fk_cash_tx_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
 
--- role_permissions: per-shop
-ALTER TABLE `role_permissions` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
-ALTER TABLE `role_permissions` DROP INDEX `uk_role_module_action`;
-ALTER TABLE `role_permissions` ADD UNIQUE KEY `uk_shop_role_module_action` (`shop_id`, `role`, `module`, `action`);
-ALTER TABLE `role_permissions` ADD KEY `idx_role_permissions_shop` (`shop_id`);
-ALTER TABLE `role_permissions` ADD CONSTRAINT `fk_role_permissions_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE CASCADE;
+-- role_permissions: đã là per-shop trong schema mới
 
 -- Missing tables in schema.sql but used by app (multi-shop versions)
 CREATE TABLE IF NOT EXISTS `groups` (

@@ -3,6 +3,16 @@
 - **Users API** — Thêm `GET /users/me` để lấy profile hiện tại; bỏ `requireShop` khỏi `PUT /users/me` để user chưa gán shop vẫn cập nhật thông tin cá nhân (tránh 403 “không có quyền truy cập”). — File: `backend/routes/users.js`
 - **FE Profile** — Khi mở `/profile` sẽ gọi `GET /users/me` để load dữ liệu mới nhất (không phụ thuộc localStorage), đồng bộ lại `localStorage.user` và phát `auth-change`. — File: `src/pages/Profile.tsx`
 
+## [20/04/2026] - Settings: phân quyền theo role_id + middleware requirePermission
+### Changed
+- `role_permissions` chuyển sang lưu theo `role_id` (FK `roles.id`) thay vì `role` string; bổ sung migration. — Files: `migrations/021_role_permissions_role_id.sql`, `schema.sql`
+- Thêm middleware `requirePermission(module, action)` và áp vào settings/roles/groups (CRUD). — Files: `backend/middleware/requirePermission.js`, `backend/routes/settings.js`, `backend/routes/roles.js`, `backend/routes/groups.js`, `backend/middleware/auth.js`
+- UI Settings load danh sách vai trò từ DB, không hardcode `admin/sales`. — File: `src/pages/Settings.tsx`
+
+## [20/04/2026] - Sidebar Admin: sắp xếp lại menu
+### Changed
+- Nhóm lại menu Admin theo Bán hàng / Sản phẩm / Nhân sự / Kho / Báo cáo / Excel / Nhật ký để dễ tìm, giữ nguyên route. — File: `src/components/Layout.tsx`
+
 ## [20/04/2026] - Orders: chặn cọc > giá trị đơn + Logs: nhật ký theo shop
 ### Fixed
 - **OrderForm** — Khi nhập `tiền cọc` lớn hơn `giá trị đơn` (tạm tính sau CK dòng), hiển thị cảnh báo và chặn lưu đơn. — File: `src/pages/OrderForm.tsx`
@@ -28,6 +38,10 @@
 ## [20/04/2026] - Shop: seed commission tiers cho shop đã tạo
 ### Added
 - **Shops API** — Thêm `POST /shops/:id/seed-commission-tiers` (Super Admin) để copy `commission_tiers` từ shop mẫu `shop_id=1` sang shop khác (dùng khi shop tạo trước lúc auto-seed). — File: `backend/routes/shops.js`
+
+## [20/04/2026] - Super Admin: tạo shop auto-seed quyền + kho mặc định
+### Changed
+- **Shops API** — Khi Super Admin tạo shop mới, hệ thống tự seed `role_permissions` (copy từ shop mẫu id=1 cho role admin/sales; có fallback nếu DB chưa migrate `role_id`) và tự tạo 1 kho mặc định để tránh lỗi khi lên đơn/nhập-xuất. — File: `backend/routes/shops.js`
 
 ## [20/04/2026] - Commission tiers: normalize min/max để shop nào cũng match
 ### Fixed

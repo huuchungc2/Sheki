@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
-const authorize = require('../middleware/authorize');
+const requirePermission = require('../middleware/requirePermission');
 const { getPool } = require('../config/db');
 
 // Get all groups
@@ -27,7 +27,7 @@ router.get('/user/:userId', auth, requireShop, async (req, res, next) => {
 });
 
 // Create group
-router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post('/', auth, requireShop, requirePermission('settings', 'edit'), async (req, res, next) => {
   try {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ error: 'Thiếu tên nhóm' });
@@ -38,7 +38,7 @@ router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) =
 });
 
 // Update group
-router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.put('/:id', auth, requireShop, requirePermission('settings', 'edit'), async (req, res, next) => {
   try {
     const { name, description, is_active } = req.body;
     const pool = await getPool();
@@ -48,7 +48,7 @@ router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next)
 });
 
 // Delete group
-router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, requirePermission('settings', 'delete'), async (req, res, next) => {
   try {
     const pool = await getPool();
     await pool.query('UPDATE groups SET is_active = 0 WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
@@ -57,7 +57,7 @@ router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, ne
 });
 
 // Assign user to groups
-router.put('/user/:userId', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.put('/user/:userId', auth, requireShop, requirePermission('employees', 'edit'), async (req, res, next) => {
   try {
     const { group_ids } = req.body;
     const pool = await getPool();

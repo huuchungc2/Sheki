@@ -25,6 +25,8 @@ async function auth(req, res, next) {
     if (decoded.is_super_admin) {
       decoded.role = 'super_admin';
       decoded.role_name = 'Super Admin';
+      // Super admin is global; role_id depends on seeded roles, but keep stable fields for UI
+      decoded.role_id = decoded.role_id || null;
       decoded.can_access_admin = true;
       decoded.scope_own_data = false;
       req.user = decoded;
@@ -35,7 +37,7 @@ async function auth(req, res, next) {
       try {
         const pool = await getPool();
         const [[row]] = await pool.query(
-          `SELECT r.code as role, r.name as role_name, r.can_access_admin, r.scope_own_data
+          `SELECT us.role_id as role_id, r.code as role, r.name as role_name, r.can_access_admin, r.scope_own_data
            FROM user_shops us
            JOIN roles r ON us.role_id = r.id
            WHERE us.user_id = ? AND us.shop_id = ?`,
@@ -44,6 +46,7 @@ async function auth(req, res, next) {
         if (row) {
           decoded.role = row.role;
           decoded.role_name = row.role_name;
+          decoded.role_id = row.role_id;
           decoded.can_access_admin = !!row.can_access_admin;
           decoded.scope_own_data = !!row.scope_own_data;
         }
@@ -56,7 +59,7 @@ async function auth(req, res, next) {
       try {
         const pool = await getPool();
         const [[row]] = await pool.query(
-          `SELECT r.code as role, r.name as role_name, r.can_access_admin, r.scope_own_data
+          `SELECT u.role_id as role_id, r.code as role, r.name as role_name, r.can_access_admin, r.scope_own_data
            FROM users u
            JOIN roles r ON u.role_id = r.id
            WHERE u.id = ?`,
@@ -65,6 +68,7 @@ async function auth(req, res, next) {
         if (row) {
           decoded.role = row.role;
           decoded.role_name = row.role_name;
+          decoded.role_id = row.role_id;
           decoded.can_access_admin = !!row.can_access_admin;
           decoded.scope_own_data = !!row.scope_own_data;
         } else {

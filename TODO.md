@@ -7,13 +7,15 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **Mobile: chuẩn bị phase WebView/RN** — Rà soát tài liệu + checklist release + cấu hình env API_URL, back button, offline, file upload WebView. — Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
+- [ ] **Sidebar Admin: sắp xếp lại menu** — Nhóm theo Bán hàng / Sản phẩm / Nhân sự / Kho / Báo cáo / Excel / Nhật ký; giữ nguyên route. — Files: `src/components/Layout.tsx`
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
-- [ ] **Settings: phân quyền theo vai (role) đúng nghĩa** — Bỏ hardcode role ở UI, load roles từ DB; đổi `role_permissions` theo `role_id`; thêm middleware `requirePermission(module, action)` và áp dần vào routes (giữ `scope_own_data` để lọc dữ liệu). — Files: `backend/routes/settings.js`, `backend/middleware/authorize.js` (hoặc middleware mới), `backend/routes/*`, `src/pages/Settings.tsx`
+- [ ] **Super Admin: tạo shop auto-seed quyền + kho mặc định** — Khi tạo shop mới, auto copy `role_permissions` từ shop mẫu (id=1) và tạo 1 `warehouse` mặc định để tránh lỗi 403/thiếu kho. — Files: `backend/routes/shops.js`
+- [ ] **Settings: phân quyền theo vai (role) đúng nghĩa** — Bỏ hardcode role ở UI, load roles từ DB; đổi `role_permissions` theo `role_id`; thêm middleware `requirePermission(module, action)` và áp dần vào routes (giữ `scope_own_data` để lọc dữ liệu). — Files: `backend/routes/settings.js`, `backend/middleware/requirePermission.js`, `backend/routes/roles.js`, `src/pages/Settings.tsx`, `migrations/021_role_permissions_role_id.sql`, `schema.sql`
+- [ ] **Mobile: chuẩn bị phase WebView/RN** — Rà soát tài liệu + checklist release + cấu hình env API_URL, back button, offline, file upload WebView. — Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
 
 - [x] **Sales: Cài đặt mở hồ sơ + đổi mật khẩu** — Sidebar “Cài đặt” không redirect về Dashboard nữa; Sales vào `/profile` để sửa thông tin cá nhân + link đổi mật khẩu. — Files: `src/components/Layout.tsx`, `src/pages/Profile.tsx`, `src/App.tsx`, `backend/routes/users.js`, `CHANGELOG.md`
   - Update: thêm địa chỉ + ngày vào làm trong `/profile`. — Files: `src/pages/Profile.tsx`, `backend/routes/users.js`

@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
-const authorize = require('../middleware/authorize');
+const requirePermission = require('../middleware/requirePermission');
 const { getPool } = require('../config/db');
 
 // Nhóm nhân viên theo mã vai trò (roles.code) — nhân viên thuộc shop hiện tại (user_shops)
-router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.get('/', auth, requireShop, requirePermission('settings', 'view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
@@ -34,37 +34,113 @@ router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) =>
   }
 });
 
-// Get role permissions
-router.get('/:role/permissions', auth, requireShop, authorize('admin'), async (req, res, next) => {
+async function resolveRole(req, pool) {
+  const raw = String(req.params.roleId || req.params.role || '').trim();
+  if (!raw) return null;
+
+  const asNum = Number(raw);
+  if (Number.isFinite(asNum) && String(parseInt(raw, 10)) === raw) {
+    const [[r]] = await pool.query('SELECT id, code FROM roles WHERE id = ? LIMIT 1', [parseInt(raw, 10)]);
+    return r || null;
+  }
+
+  const [[r]] = await pool.query('SELECT id, code FROM roles WHERE code = ? LIMIT 1', [raw.toLowerCase()]);
+  return r || null;
+}
+
+function salesLikePermissions() {
+  return [
+    { module: 'dashboard', action: 'view', allowed: true },
+    { module: 'orders', action: 'view', allowed: true },
+    { module: 'orders', action: 'create', allowed: true },
+    { module: 'orders', action: 'edit', allowed: true },
+    { module: 'orders', action: 'delete', allowed: false },
+    { module: 'customers', action: 'view', allowed: true },
+    { module: 'customers', action: 'create', allowed: true },
+    { module: 'customers', action: 'edit', allowed: true },
+    { module: 'customers', action: 'delete', allowed: false },
+    { module: 'reports', action: 'view', allowed: true },
+    { module: 'products', action: 'view', allowed: true },
+  ];
+}
+
+function getDefaultPermissions(roleCode) {
+  const modules = ['dashboard', 'employees', 'products', 'customers', 'orders', 'inventory', 'reports', 'settings'];
+  const permissions = [];
+
+  if (roleCode === 'admin') {
+    modules.forEach((m) => {
+      ['view', 'create', 'edit', 'delete'].forEach((a) => {
+        permissions.push({ module: m, action: a, allowed: true });
+      });
+    });
+    return permissions;
+  }
+
+  // Mọi vai trò khác (sales, tùy chỉnh): mặc định giống sales
+  return salesLikePermissions();
+}
+
+// Get role permissions (roleId preferred; fallback supports role code)
+router.get('/:roleId/permissions', auth, requireShop, requirePermission('settings', 'view'), async (req, res, next) => {
   try {
-    const { role } = req.params;
     const pool = await getPool();
-    const [rows] = await pool.query('SELECT * FROM role_permissions WHERE role = ? AND shop_id = ?', [role, req.shopId]);
-    
-    const defaultPermissions = getDefaultPermissions(role);
-    if (rows.length === 0) {
-      res.json({ data: defaultPermissions });
-    } else {
-      res.json({ data: rows });
+    const r = await resolveRole(req, pool);
+    if (!r) return res.status(404).json({ error: 'Không tìm thấy vai trò' });
+
+    let rows = [];
+    try {
+      const [out] = await pool.query(
+        'SELECT module, action, allowed FROM role_permissions WHERE shop_id = ? AND role_id = ?',
+        [req.shopId, r.id]
+      );
+      rows = out;
+    } catch (err) {
+      // Legacy DB: role_permissions chưa có role_id
+      if (!err || err.code !== 'ER_BAD_FIELD_ERROR') throw err;
+      const [out] = await pool.query(
+        'SELECT module, action, allowed FROM role_permissions WHERE shop_id = ? AND role = ?',
+        [req.shopId, String(r.code || '').toLowerCase()]
+      );
+      rows = out;
     }
+
+    const defaultPermissions = getDefaultPermissions(String(r.code || '').toLowerCase());
+    return res.json({ data: rows.length ? rows : defaultPermissions, role_id: r.id, role: r.code });
   } catch (err) { next(err); }
 });
 
 // Update role permissions
-router.put('/:role/permissions', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.put('/:roleId/permissions', auth, requireShop, requirePermission('settings', 'edit'), async (req, res, next) => {
   try {
-    const { role } = req.params;
     const { permissions } = req.body;
     const pool = await getPool();
     const sid = req.shopId;
 
-    await pool.query('DELETE FROM role_permissions WHERE role = ? AND shop_id = ?', [role, sid]);
+    const r = await resolveRole(req, pool);
+    if (!r) return res.status(404).json({ error: 'Không tìm thấy vai trò' });
+
+    let legacyMode = false;
+    try {
+      await pool.query('DELETE FROM role_permissions WHERE shop_id = ? AND role_id = ?', [sid, r.id]);
+    } catch (err) {
+      if (!err || err.code !== 'ER_BAD_FIELD_ERROR') throw err;
+      legacyMode = true;
+      await pool.query('DELETE FROM role_permissions WHERE shop_id = ? AND role = ?', [sid, String(r.code || '').toLowerCase()]);
+    }
 
     for (const perm of permissions) {
-      await pool.query(
-        'INSERT INTO role_permissions (shop_id, role, module, action, allowed) VALUES (?, ?, ?, ?, ?)',
-        [sid, role, perm.module, perm.action, perm.allowed ? 1 : 0]
-      );
+      if (!legacyMode) {
+        await pool.query(
+          'INSERT INTO role_permissions (shop_id, role_id, module, action, allowed) VALUES (?, ?, ?, ?, ?)',
+          [sid, r.id, perm.module, perm.action, perm.allowed ? 1 : 0]
+        );
+      } else {
+        await pool.query(
+          'INSERT INTO role_permissions (shop_id, role, module, action, allowed) VALUES (?, ?, ?, ?, ?)',
+          [sid, String(r.code || '').toLowerCase(), perm.module, perm.action, perm.allowed ? 1 : 0]
+        );
+      }
     }
     
     res.json({ message: 'Cập nhật phân quyền thành công' });
@@ -72,7 +148,7 @@ router.put('/:role/permissions', auth, requireShop, authorize('admin'), async (r
 });
 
 // Update user role
-router.put('/users/:id/role', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.put('/users/:id/role', auth, requireShop, requirePermission('employees', 'edit'), async (req, res, next) => {
   try {
     const roleId = parseInt(req.body.role_id, 10);
     if (!roleId) {
@@ -91,38 +167,5 @@ router.put('/users/:id/role', auth, requireShop, authorize('admin'), async (req,
     next(err);
   }
 });
-
-function salesLikePermissions() {
-  return [
-    { module: 'dashboard', action: 'view', allowed: true },
-    { module: 'orders', action: 'view', allowed: true },
-    { module: 'orders', action: 'create', allowed: true },
-    { module: 'orders', action: 'edit', allowed: true },
-    { module: 'orders', action: 'delete', allowed: false },
-    { module: 'customers', action: 'view', allowed: true },
-    { module: 'customers', action: 'create', allowed: true },
-    { module: 'customers', action: 'edit', allowed: true },
-    { module: 'customers', action: 'delete', allowed: false },
-    { module: 'reports', action: 'view', allowed: true },
-    { module: 'products', action: 'view', allowed: true },
-  ];
-}
-
-function getDefaultPermissions(role) {
-  const modules = ['dashboard', 'employees', 'products', 'customers', 'orders', 'inventory', 'reports', 'settings'];
-  const permissions = [];
-
-  if (role === 'admin') {
-    modules.forEach((m) => {
-      ['view', 'create', 'edit', 'delete'].forEach((a) => {
-        permissions.push({ module: m, action: a, allowed: true });
-      });
-    });
-    return permissions;
-  }
-
-  // Mọi vai trò khác (sales, tùy chỉnh): mặc định giống sales
-  return salesLikePermissions();
-}
 
 module.exports = router;

@@ -40,13 +40,19 @@ const navigationAdmin = [
     ],
   },
   {
-    name: "Danh mục",
+    name: "Sản phẩm",
     icon: Package,
+    children: [
+      { name: "Danh mục sản phẩm", href: "/categories" },
+      { name: "Sản phẩm", href: "/products" },
+    ],
+  },
+  {
+    name: "Nhân sự",
+    icon: Users,
     children: [
       { name: "Nhân viên", href: "/employees" },
       { name: "Vai trò", href: "/roles" },
-      { name: "Danh mục sản phẩm", href: "/categories" },
-      { name: "Sản phẩm", href: "/products" },
     ],
   },
   {
@@ -58,7 +64,7 @@ const navigationAdmin = [
     ],
   },
   {
-    name: "Báo cáo & HH",
+    name: "Báo cáo",
     icon: BarChart3,
     children: [
       { name: "Doanh thu", href: "/reports/revenue" },
@@ -68,7 +74,7 @@ const navigationAdmin = [
     ],
   },
   {
-    name: "Nhập Excel",
+    name: "Excel",
     icon: Upload,
     children: [
       { name: "Sản phẩm", href: "/products/import" },

@@ -9,10 +9,15 @@ const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
   "/api";
 
-const ROLE_CONFIG = [
-  { id: "admin", name: "Quản trị viên", description: "Toàn quyền hệ thống, cấu hình và bảo mật.", icon: Shield },
-  { id: "sales", name: "Nhân viên bán hàng", description: "Tạo đơn hàng, quản lý khách hàng, xem hoa hồng cá nhân.", icon: ShoppingCart },
-];
+type RoleRow = {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  can_access_admin?: any;
+  scope_own_data?: any;
+  is_system?: any;
+};
 
 const MODULES = [
   { id: "dashboard", name: "Tổng quan", icon: BarChart3 },
@@ -53,8 +58,9 @@ function getDefaultPermissions(role) {
 
 export function Settings() {
   const [tab, setTab] = React.useState<"roles" | "groups">("roles");
-  const [selectedRoleId, setSelectedRoleId] = React.useState("admin");
-  const [permissions, setPermissions] = React.useState([]);
+  const [roles, setRoles] = React.useState<RoleRow[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = React.useState<number | null>(null);
+  const [permissions, setPermissions] = React.useState<any[]>([]);
   const [saving, setSaving] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -66,24 +72,55 @@ export function Settings() {
   const [groupDesc, setGroupDesc] = React.useState("");
 
   React.useEffect(() => {
-    fetchPermissions();
+    fetchRoles();
     fetchGroups();
+  }, []);
+
+  React.useEffect(() => {
+    if (selectedRoleId == null) return;
+    fetchPermissions();
   }, [selectedRoleId]);
+
+  const fetchRoles = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/roles`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Không thể tải danh sách vai trò");
+      const json = await res.json();
+      const list: RoleRow[] = Array.isArray(json?.data) ? json.data : [];
+      setRoles(list);
+
+      // Pick default role: admin if exists, else first role
+      if (selectedRoleId == null) {
+        const admin = list.find((r) => String(r.code).toLowerCase() === "admin");
+        setSelectedRoleId(admin?.id ?? list[0]?.id ?? null);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Không thể tải danh sách vai trò");
+    }
+  };
 
   const fetchPermissions = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/settings/${selectedRoleId}/permissions`, {
+      const rid = selectedRoleId;
+      if (rid == null) return;
+      const res = await fetch(`${API_URL}/settings/${rid}/permissions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const json = await res.json();
-        setPermissions(json.data || getDefaultPermissions(selectedRoleId));
+        const roleCode = String(json?.role || "").toLowerCase();
+        setPermissions(json.data || getDefaultPermissions(roleCode));
       } else {
-        setPermissions(getDefaultPermissions(selectedRoleId));
+        const roleCode = String(roles.find((r) => r.id === rid)?.code || "").toLowerCase();
+        setPermissions(getDefaultPermissions(roleCode));
       }
     } catch (err) {
-      setPermissions(getDefaultPermissions(selectedRoleId));
+      const roleCode = String(roles.find((r) => r.id === selectedRoleId)?.code || "").toLowerCase();
+      setPermissions(getDefaultPermissions(roleCode));
     }
   };
 
@@ -106,7 +143,9 @@ export function Settings() {
     setSuccess(false);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/settings/${selectedRoleId}/permissions`, {
+      const rid = selectedRoleId;
+      if (rid == null) throw new Error("Chưa chọn vai trò");
+      const res = await fetch(`${API_URL}/settings/${rid}/permissions`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ permissions })
@@ -166,7 +205,7 @@ export function Settings() {
     }
   };
 
-  const selectedRole = ROLE_CONFIG.find(r => r.id === selectedRoleId) || ROLE_CONFIG[0];
+  const selectedRole = roles.find((r) => r.id === selectedRoleId) || roles[0];
   const allowedCount = permissions.filter(p => p.allowed).length;
   const totalCount = permissions.length;
 
@@ -198,18 +237,30 @@ export function Settings() {
           <div className="lg:col-span-4 space-y-8">
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-black text-slate-900 tracking-tight">Vai trò hệ thống</h2>
-              <span className="px-3 py-1 bg-red-100 text-red-600 text-[10px] font-black rounded-full uppercase tracking-widest">{ROLE_CONFIG.length} Vai trò</span>
+              <span className="px-3 py-1 bg-red-100 text-red-600 text-[10px] font-black rounded-full uppercase tracking-widest">{roles.length} Vai trò</span>
             </div>
             <div className="space-y-4">
-              {ROLE_CONFIG.map((role) => {
-                const Icon = role.icon;
+              {roles.map((role) => {
+                const roleCode = String(role.code || "").toLowerCase();
+                const Icon = roleCode === "admin" ? Shield : ShoppingCart;
                 return (
-                  <button key={role.id} onClick={() => setSelectedRoleId(role.id)} className={cn("w-full p-8 rounded-[32px] text-left transition-all relative group", selectedRoleId === role.id ? "bg-white shadow-2xl shadow-red-200/50 border-l-4 border-red-600" : "bg-white/50 hover:bg-white border-l-4 border-transparent")}>
+                  <button
+                    key={role.id}
+                    onClick={() => setSelectedRoleId(role.id)}
+                    className={cn(
+                      "w-full p-8 rounded-[32px] text-left transition-all relative group",
+                      selectedRoleId === role.id
+                        ? "bg-white shadow-2xl shadow-red-200/50 border-l-4 border-red-600"
+                        : "bg-white/50 hover:bg-white border-l-4 border-transparent"
+                    )}
+                  >
                     <div className="flex items-center gap-3 mb-4">
                       <Icon className={cn("w-5 h-5", selectedRoleId === role.id ? "text-red-600" : "text-slate-400")} />
-                      <span className={cn("text-xl font-black tracking-tight", selectedRoleId === role.id ? "text-red-600" : "text-slate-900")}>{role.name}</span>
+                      <span className={cn("text-xl font-black tracking-tight", selectedRoleId === role.id ? "text-red-600" : "text-slate-900")}>
+                        {role.name}
+                      </span>
                     </div>
-                    <p className="text-sm font-medium text-slate-500 leading-relaxed">{role.description}</p>
+                    <p className="text-sm font-medium text-slate-500 leading-relaxed">{role.description || "—"}</p>
                   </button>
                 );
               })}
@@ -219,8 +270,8 @@ export function Settings() {
           <div className="lg:col-span-8 bg-white rounded-[48px] p-12 shadow-sm">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">{selectedRole.name}</h2>
-                <p className="text-slate-500 font-medium mt-1">{selectedRole.description}</p>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">{selectedRole?.name || "—"}</h2>
+                <p className="text-slate-500 font-medium mt-1">{selectedRole?.description || "—"}</p>
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-sm font-bold text-slate-400">{allowedCount}/{totalCount} quyền</span>
