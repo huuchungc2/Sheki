@@ -13,7 +13,45 @@ async function auth(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Backward compatible: old tokens may not carry can_access_admin/scope_own_data (or role after migration 007).
+    // Always load is_super_admin from DB (source of truth)
+    try {
+      const pool = await getPool();
+      const [[urow]] = await pool.query('SELECT is_super_admin FROM users WHERE id = ? LIMIT 1', [decoded.id]);
+      decoded.is_super_admin = !!urow?.is_super_admin;
+    } catch {
+      decoded.is_super_admin = !!decoded.is_super_admin;
+    }
+
+    if (decoded.is_super_admin) {
+      decoded.role = 'super_admin';
+      decoded.role_name = 'Super Admin';
+      decoded.can_access_admin = true;
+      decoded.scope_own_data = false;
+      req.user = decoded;
+      return next();
+    }
+
+    if (decoded.shop_id != null) {
+      try {
+        const pool = await getPool();
+        const [[row]] = await pool.query(
+          `SELECT r.code as role, r.name as role_name, r.can_access_admin, r.scope_own_data
+           FROM user_shops us
+           JOIN roles r ON us.role_id = r.id
+           WHERE us.user_id = ? AND us.shop_id = ?`,
+          [decoded.id, decoded.shop_id]
+        );
+        if (row) {
+          decoded.role = row.role;
+          decoded.role_name = row.role_name;
+          decoded.can_access_admin = !!row.can_access_admin;
+          decoded.scope_own_data = !!row.scope_own_data;
+        }
+      } catch {
+        // fallback below
+      }
+    }
+
     if (typeof decoded.can_access_admin !== 'boolean' || typeof decoded.scope_own_data !== 'boolean') {
       try {
         const pool = await getPool();
@@ -25,7 +63,7 @@ async function auth(req, res, next) {
           [decoded.id]
         );
         if (row) {
-          decoded.role = row.role; // keep legacy field for existing checks
+          decoded.role = row.role;
           decoded.role_name = row.role_name;
           decoded.can_access_admin = !!row.can_access_admin;
           decoded.scope_own_data = !!row.scope_own_data;
@@ -34,7 +72,6 @@ async function auth(req, res, next) {
           decoded.scope_own_data = true;
         }
       } catch {
-        // Fallback: best effort infer if role exists in token
         if (typeof decoded.can_access_admin !== 'boolean') {
           decoded.can_access_admin = decoded.role === 'admin';
         }

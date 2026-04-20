@@ -47,6 +47,7 @@ CREATE TABLE `users` (
   `district` VARCHAR(50) DEFAULT NULL,
   `postal_code` VARCHAR(10) DEFAULT NULL,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `is_super_admin` TINYINT(1) NOT NULL DEFAULT 0,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_users_email` (`email`),
   INDEX `idx_users_username` (`username`),
@@ -403,6 +404,10 @@ INSERT INTO `role_permissions` (`role`, `module`, `action`, `allowed`) VALUES
 INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `role_id`, `commission_rate`, `is_active`, `join_date`) VALUES
 ('Admin Sheki', 'admin', 'admin@velocity.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 1, 0.00, 1, '2020-01-01');
 
+-- Super admin user (password: superadmin123)
+INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `role_id`, `commission_rate`, `is_active`, `is_super_admin`, `join_date`) VALUES
+('Super Admin', 'superadmin', 'superadmin@sheki.vn', '$2a$10$Zhz.v5UVYxRL/paZZa7VC.2Se3NpDgUcaOCUFd1QkNBx4gkohcuRu', 1, 0.00, 1, 1, '2020-01-01');
+
 -- Sales employees (password: abc123)
 INSERT INTO `users` (`full_name`, `username`, `email`, `password_hash`, `phone`, `role_id`, `commission_rate`, `is_active`, `join_date`) VALUES
 ('Nguyễn Thị Lan', 'lan_sales', 'lan.sales@velocity.vn', '$2a$10$qTMEmtj46j0yexPvtoyo3elQvIWkSft96w0DJphILaGewZfSkfYea', '0912345678', 2, 5.00, 1, '2020-01-01'),
@@ -420,3 +425,238 @@ INSERT INTO `categories` (`name`, `is_active`) VALUES
 ('Quần nam', 1),
 ('Giày dép', 1),
 ('Phụ kiện', 1);
+
+-- ============================================
+-- MULTI-SHOP EXTENSIONS (Đa shop / tenant)
+-- Note: schema.sql dành cho cài mới → thêm shop mặc định (Sheki id=1) và backfill shop_id=1.
+-- ============================================
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- Shops + user_shops
+CREATE TABLE IF NOT EXISTS `shops` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(100) NOT NULL,
+  `code` VARCHAR(32) NOT NULL COMMENT 'Mã shop (slug)',
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `valid_until` DATE NULL DEFAULT NULL COMMENT 'Hết hạn dùng shop; NULL = không giới hạn',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_shops_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `shops` (`id`, `name`, `code`, `is_active`, `valid_until`) VALUES (1, 'Sheki', 'sheki', 1, NULL)
+  ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
+CREATE TABLE IF NOT EXISTS `user_shops` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL,
+  `shop_id` INT UNSIGNED NOT NULL,
+  `role_id` INT UNSIGNED NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_shop` (`user_id`, `shop_id`),
+  KEY `idx_user_shops_shop` (`shop_id`),
+  KEY `idx_user_shops_user` (`user_id`),
+  CONSTRAINT `fk_user_shops_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_user_shops_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_user_shops_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `user_shops` (`user_id`, `shop_id`, `role_id`)
+SELECT `id`, 1, `role_id` FROM `users`
+ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
+
+-- Add shop_id columns + constraints
+ALTER TABLE `categories` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `categories` ADD KEY `idx_categories_shop` (`shop_id`);
+ALTER TABLE `categories` ADD CONSTRAINT `fk_categories_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+
+ALTER TABLE `warehouses` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `warehouses` ADD KEY `idx_warehouses_shop` (`shop_id`);
+ALTER TABLE `warehouses` ADD CONSTRAINT `fk_warehouses_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+
+ALTER TABLE `customers` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `customers` ADD KEY `idx_customers_shop` (`shop_id`);
+ALTER TABLE `customers` ADD CONSTRAINT `fk_customers_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+
+ALTER TABLE `products` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `products` ADD KEY `idx_products_shop` (`shop_id`);
+ALTER TABLE `products` ADD CONSTRAINT `fk_products_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+ALTER TABLE `products` DROP INDEX `sku`;
+ALTER TABLE `products` ADD UNIQUE KEY `uk_products_shop_sku` (`shop_id`, `sku`);
+
+ALTER TABLE `orders` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `orders` ADD KEY `idx_orders_shop` (`shop_id`);
+ALTER TABLE `orders` ADD CONSTRAINT `fk_orders_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+ALTER TABLE `orders` DROP INDEX `code`;
+ALTER TABLE `orders` ADD UNIQUE KEY `uk_orders_shop_code` (`shop_id`, `code`);
+
+ALTER TABLE `warehouse_stock` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `warehouse_stock` ADD KEY `idx_warehouse_stock_shop` (`shop_id`);
+ALTER TABLE `warehouse_stock` ADD CONSTRAINT `fk_warehouse_stock_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+
+ALTER TABLE `stock_movements` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `stock_movements` ADD KEY `idx_stock_movements_shop` (`shop_id`);
+ALTER TABLE `stock_movements` ADD CONSTRAINT `fk_stock_movements_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+
+ALTER TABLE `commissions` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `commissions` ADD KEY `idx_commissions_shop` (`shop_id`);
+ALTER TABLE `commissions` ADD CONSTRAINT `fk_commissions_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+
+ALTER TABLE `loyalty_points` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `loyalty_points` ADD KEY `idx_loyalty_shop` (`shop_id`);
+ALTER TABLE `loyalty_points` ADD CONSTRAINT `fk_loyalty_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+
+ALTER TABLE `activity_logs` ADD COLUMN `shop_id` INT UNSIGNED NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `activity_logs` ADD KEY `idx_logs_shop` (`shop_id`);
+ALTER TABLE `activity_logs` ADD CONSTRAINT `fk_logs_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE SET NULL;
+
+ALTER TABLE `cash_transactions` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `cash_transactions` ADD KEY `idx_cash_tx_shop` (`shop_id`);
+ALTER TABLE `cash_transactions` ADD CONSTRAINT `fk_cash_tx_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT;
+
+-- role_permissions: per-shop
+ALTER TABLE `role_permissions` ADD COLUMN `shop_id` INT UNSIGNED NOT NULL DEFAULT 1 AFTER `id`;
+ALTER TABLE `role_permissions` DROP INDEX `uk_role_module_action`;
+ALTER TABLE `role_permissions` ADD UNIQUE KEY `uk_shop_role_module_action` (`shop_id`, `role`, `module`, `action`);
+ALTER TABLE `role_permissions` ADD KEY `idx_role_permissions_shop` (`shop_id`);
+ALTER TABLE `role_permissions` ADD CONSTRAINT `fk_role_permissions_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE CASCADE;
+
+-- Missing tables in schema.sql but used by app (multi-shop versions)
+CREATE TABLE IF NOT EXISTS `groups` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `shop_id` INT UNSIGNED NOT NULL DEFAULT 1,
+  `name` VARCHAR(100) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_groups_shop` (`shop_id`),
+  INDEX `idx_groups_is_active` (`is_active`),
+  CONSTRAINT `fk_groups_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `user_groups` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT UNSIGNED NOT NULL,
+  `group_id` INT UNSIGNED NOT NULL,
+  UNIQUE KEY `uk_user_group` (`user_id`, `group_id`),
+  INDEX `idx_user_groups_user` (`user_id`),
+  INDEX `idx_user_groups_group` (`group_id`),
+  CONSTRAINT `fk_user_groups_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_user_groups_group` FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `commission_tiers` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `shop_id` INT UNSIGNED NOT NULL DEFAULT 1,
+  `ctv_rate_min` DECIMAL(5,2) NOT NULL,
+  `ctv_rate_max` DECIMAL(5,2) DEFAULT NULL,
+  `sales_override_rate` DECIMAL(5,2) NOT NULL DEFAULT 0,
+  `note` VARCHAR(255) DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_commission_tiers_shop` (`shop_id`),
+  INDEX `idx_commission_tiers_min` (`ctv_rate_min`),
+  CONSTRAINT `fk_commission_tiers_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `collaborators` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `shop_id` INT UNSIGNED NOT NULL DEFAULT 1,
+  `sales_id` INT UNSIGNED NOT NULL,
+  `ctv_id` INT UNSIGNED NOT NULL,
+  `override_rate` DECIMAL(5,2) NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_collab_shop_sales_ctv` (`shop_id`, `sales_id`, `ctv_id`),
+  INDEX `idx_collaborators_shop` (`shop_id`),
+  INDEX `idx_collaborators_sales` (`sales_id`),
+  INDEX `idx_collaborators_ctv` (`ctv_id`),
+  CONSTRAINT `fk_collaborators_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_collaborators_sales` FOREIGN KEY (`sales_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_collaborators_ctv` FOREIGN KEY (`ctv_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `commission_adjustments` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `shop_id` INT UNSIGNED NOT NULL DEFAULT 1,
+  `order_id` INT UNSIGNED NOT NULL,
+  `return_id` INT UNSIGNED DEFAULT NULL,
+  `user_id` INT UNSIGNED NOT NULL,
+  `type` ENUM('direct','override') NOT NULL DEFAULT 'direct',
+  `ctv_user_id` INT UNSIGNED DEFAULT NULL,
+  `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'âm = trừ hoa hồng',
+  `reason` TEXT DEFAULT NULL,
+  `created_by` INT UNSIGNED NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_ca_shop` (`shop_id`),
+  INDEX `idx_ca_order` (`order_id`),
+  INDEX `idx_ca_return` (`return_id`),
+  INDEX `idx_ca_user` (`user_id`),
+  INDEX `idx_ca_created_at` (`created_at`),
+  CONSTRAINT `fk_ca_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops`(`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_ca_order` FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ca_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ca_created_by` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `return_requests` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `shop_id` INT UNSIGNED NOT NULL DEFAULT 1,
+  `order_id` INT UNSIGNED NOT NULL,
+  `requested_by` INT UNSIGNED NOT NULL COMMENT 'Sales tạo yêu cầu',
+  `status` ENUM('pending','approved','rejected','cancelled') NOT NULL DEFAULT 'pending',
+  `reason` TEXT DEFAULT NULL,
+  `admin_note` TEXT DEFAULT NULL,
+  `approved_by` INT UNSIGNED DEFAULT NULL,
+  `approved_at` DATETIME DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_return_requests_shop` (`shop_id`),
+  INDEX `idx_return_requests_order` (`order_id`),
+  INDEX `idx_return_requests_status` (`status`),
+  CONSTRAINT `fk_return_requests_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops`(`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_return_requests_order` FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_return_requests_requested_by` FOREIGN KEY (`requested_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_return_requests_approved_by` FOREIGN KEY (`approved_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `return_request_items` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `return_request_id` INT UNSIGNED NOT NULL,
+  `product_id` INT UNSIGNED NOT NULL,
+  `qty` DECIMAL(10,3) NOT NULL DEFAULT 0,
+  INDEX `idx_rri_request` (`return_request_id`),
+  INDEX `idx_rri_product` (`product_id`),
+  CONSTRAINT `fk_rri_request` FOREIGN KEY (`return_request_id`) REFERENCES `return_requests`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_rri_product` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `returns` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `shop_id` INT UNSIGNED NOT NULL DEFAULT 1,
+  `order_id` INT UNSIGNED NOT NULL COMMENT 'Đơn gốc',
+  `return_request_id` INT UNSIGNED DEFAULT NULL,
+  `warehouse_id` INT UNSIGNED NOT NULL,
+  `created_by` INT UNSIGNED NOT NULL,
+  `note` TEXT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_returns_shop` (`shop_id`),
+  INDEX `idx_returns_order` (`order_id`),
+  INDEX `idx_returns_request` (`return_request_id`),
+  CONSTRAINT `fk_returns_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops`(`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_returns_order` FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_returns_request` FOREIGN KEY (`return_request_id`) REFERENCES `return_requests`(`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_returns_warehouse` FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses`(`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_returns_created_by` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `return_items` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `return_id` INT UNSIGNED NOT NULL,
+  `product_id` INT UNSIGNED NOT NULL,
+  `qty` DECIMAL(10,3) NOT NULL DEFAULT 0,
+  INDEX `idx_return_items_return` (`return_id`),
+  CONSTRAINT `fk_return_items_return` FOREIGN KEY (`return_id`) REFERENCES `returns`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_return_items_product` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;

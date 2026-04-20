@@ -53,6 +53,7 @@ export function RevenueReport() {
   const [year, setYear] = React.useState(String(new Date().getFullYear()));
   const [groupId, setGroupId] = React.useState("");
   const [groups, setGroups] = React.useState<any[]>([]);
+  const [token, setToken] = React.useState<string>(() => localStorage.getItem("token") || "");
 
   const yearOptions = React.useMemo(() => {
     const y = new Date().getFullYear();
@@ -62,7 +63,6 @@ export function RevenueReport() {
   React.useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const token = localStorage.getItem("token");
         const res = await fetch(`${API_URL}/groups`, { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
           const json = await res.json();
@@ -73,13 +73,25 @@ export function RevenueReport() {
       }
     };
     fetchGroups();
+  }, [token]);
+
+  // Sync token after switch-shop/login/logout
+  React.useEffect(() => {
+    const sync = () => setToken(localStorage.getItem("token") || "");
+    sync();
+    window.addEventListener("auth-change", sync as any);
+    window.addEventListener("storage", sync as any);
+    return () => {
+      window.removeEventListener("auth-change", sync as any);
+      window.removeEventListener("storage", sync as any);
+    };
   }, []);
 
   const fetchReport = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
       const params = new URLSearchParams({ month, year });
       if (groupId) params.set("group_id", groupId);
       const res = await fetch(`${API_URL}/reports/revenue?${params}`, {
@@ -94,7 +106,7 @@ export function RevenueReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, year, groupId]);
+  }, [month, year, groupId, token]);
 
   React.useEffect(() => {
     fetchReport();

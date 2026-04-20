@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 const { normalizeCustomerBirthday } = require('../utils/customerBirthday');
@@ -14,15 +15,15 @@ async function resolveAssignedEmployeeId(pool, raw) {
   return rows.length ? id : null;
 }
 
-router.get('/', auth, async (req, res, next) => {
+router.get('/', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, tier, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = 'SELECT c.*, u.full_name as assigned_employee_name FROM customers c LEFT JOIN users u ON c.assigned_employee_id = u.id WHERE 1=1';
-    let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE 1=1';
-    const params = [];
+    let query = 'SELECT c.*, u.full_name as assigned_employee_name FROM customers c LEFT JOIN users u ON c.assigned_employee_id = u.id WHERE c.shop_id = ?';
+    let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE shop_id = ?';
+    const params = [req.shopId];
 
     if (req.user.scope_own_data) {
       query += ' AND (created_by = ? OR assigned_employee_id = ?)';
@@ -55,13 +56,13 @@ router.get('/', auth, async (req, res, next) => {
   }
 });
 
-router.get('/suggest', auth, async (req, res, next) => {
+router.get('/suggest', auth, requireShop, async (req, res, next) => {
   try {
     const { q } = req.query;
     const pool = await getPool();
 
-    let query = 'SELECT id, name, phone, email, tier, address, city, district, ward FROM customers WHERE 1=1';
-    const params = [];
+    let query = 'SELECT id, name, phone, email, tier, address, city, district, ward FROM customers WHERE shop_id = ?';
+    const params = [req.shopId];
 
     // Sales chỉ thấy KH do mình tạo hoặc được gán cho mình
     if (req.user.scope_own_data) {
@@ -84,12 +85,12 @@ router.get('/suggest', auth, async (req, res, next) => {
   }
 });
 
-router.get('/:id', auth, async (req, res, next) => {
+router.get('/:id', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
-      'SELECT c.*, u.full_name as assigned_employee_name FROM customers c LEFT JOIN users u ON c.assigned_employee_id = u.id WHERE c.id = ?',
-      [req.params.id]
+      'SELECT c.*, u.full_name as assigned_employee_name FROM customers c LEFT JOIN users u ON c.assigned_employee_id = u.id WHERE c.id = ? AND c.shop_id = ?',
+      [req.params.id, req.shopId]
     );
 
     if (rows.length === 0) {
@@ -106,7 +107,7 @@ router.get('/:id', auth, async (req, res, next) => {
   }
 });
 
-router.post('/', auth, async (req, res, next) => {
+router.post('/', auth, requireShop, async (req, res, next) => {
   try {
     const { name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note } = req.body;
 
@@ -137,8 +138,8 @@ router.post('/', auth, async (req, res, next) => {
     const assignDb = await resolveAssignedEmployeeId(pool, assigned_employee_id);
 
     const [result] = await pool.query(
-      'INSERT INTO customers (name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, cleanedPhone, email || null, address, city, district, ward, birthdayDb, tier || 'new', source || null, assignDb, note != null ? note : null, req.user.id]
+      'INSERT INTO customers (shop_id, name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.shopId, name, cleanedPhone, email || null, address, city, district, ward, birthdayDb, tier || 'new', source || null, assignDb, note != null ? note : null, req.user.id]
     );
 
     res.status(201).json({ id: result.insertId, message: 'Tạo khách hàng thành công' });
@@ -147,12 +148,12 @@ router.post('/', auth, async (req, res, next) => {
   }
 });
 
-router.put('/:id', auth, async (req, res, next) => {
+router.put('/:id', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
 
     if (req.user.scope_own_data) {
-      const [existing] = await pool.query('SELECT created_by, assigned_employee_id FROM customers WHERE id = ?', [req.params.id]);
+      const [existing] = await pool.query('SELECT created_by, assigned_employee_id FROM customers WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
       if (existing.length === 0 || (existing[0].created_by !== req.user.id && existing[0].assigned_employee_id !== req.user.id)) {
         return res.status(403).json({ error: 'Không có quyền sửa khách hàng này' });
       }
@@ -177,8 +178,8 @@ router.put('/:id', auth, async (req, res, next) => {
     const assignDb = await resolveAssignedEmployeeId(pool, assigned_employee_id);
 
     await pool.query(
-      'UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, city = ?, district = ?, ward = ?, birthday = ?, tier = ?, source = ?, assigned_employee_id = ?, note = ? WHERE id = ?',
-      [name, cleanedPhone, email || null, address, city, district, ward, birthdayDb, tier, source || null, assignDb, note != null ? note : null, req.params.id]
+      'UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, city = ?, district = ?, ward = ?, birthday = ?, tier = ?, source = ?, assigned_employee_id = ?, note = ? WHERE id = ? AND shop_id = ?',
+      [name, cleanedPhone, email || null, address, city, district, ward, birthdayDb, tier, source || null, assignDb, note != null ? note : null, req.params.id, req.shopId]
     );
 
     res.json({ message: 'Cập nhật khách hàng thành công' });
@@ -187,10 +188,10 @@ router.put('/:id', auth, async (req, res, next) => {
   }
 });
 
-router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    await pool.query('DELETE FROM customers WHERE id = ?', [req.params.id]);
+    await pool.query('DELETE FROM customers WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
     res.json({ message: 'Xóa khách hàng thành công' });
   } catch (err) {
     next(err);

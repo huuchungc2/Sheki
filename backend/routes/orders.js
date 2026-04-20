@@ -3,6 +3,7 @@ const router = express.Router();
 
 
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const { getPool } = require('../config/db');
 const {
   generateOrderCode,
@@ -24,7 +25,7 @@ const {
 
 const DEFAULT_LINE_COMMISSION_RATE = 10;
 
-router.get('/', auth, async (req, res, next) => {
+router.get('/', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, status, employee, warehouse, date_from, date_to, group_id, product, page = 1, limit = 20 } = req.query;
@@ -56,6 +57,12 @@ router.get('/', auth, async (req, res, next) => {
     `;
     const params = [];
     const summaryParams = [];
+
+    query += ' AND o.shop_id = ?';
+    countQuery += ' AND shop_id = ?';
+    summaryQuery += ' AND o.shop_id = ?';
+    params.push(req.shopId);
+    summaryParams.push(req.shopId);
 
     if (req.user.scope_own_data) {
       // Sales "Đơn hàng của tôi": CHỈ các đơn mình bán
@@ -174,10 +181,12 @@ router.get('/', auth, async (req, res, next) => {
         year: fullMonth.year,
         groupId: group_id ? parseInt(String(group_id), 10) : null,
         userId: req.user.scope_own_data ? req.user.id : null,
+        shopId: req.shopId,
       });
       totalCommissionDirect = kpi.directGross;
     } else {
       totalCommissionDirect = await sumDirectGrossAccrualForOrderFilters(pool, {
+        shopId: req.shopId,
         scopeOwnData: !!req.user.scope_own_data,
         userId: req.user.id,
         search,
@@ -227,7 +236,7 @@ router.get('/', auth, async (req, res, next) => {
 
 // Export: chi tiết sản phẩm theo bộ lọc (phục vụ Excel)
 // GET /api/orders/export-items?search=&status=&employee=&warehouse=&date_from=&date_to=&group_id=
-router.get('/export-items', auth, async (req, res, next) => {
+router.get('/export-items', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, status, employee, warehouse, date_from, date_to, group_id, product } = req.query;
@@ -261,6 +270,9 @@ router.get('/export-items', auth, async (req, res, next) => {
       WHERE 1=1
     `;
     const params = [];
+
+    query += ' AND o.shop_id = ?';
+    params.push(req.shopId);
 
     if (req.user.scope_own_data) {
       query += ' AND o.salesperson_id = ?';
@@ -323,7 +335,7 @@ router.get('/export-items', auth, async (req, res, next) => {
 
 // Page items: trả danh sách sản phẩm theo list order_ids (phục vụ cột "Sản phẩm" trong OrderList)
 // GET /api/orders/page-items?order_ids=1,2,3
-router.get('/page-items', auth, async (req, res, next) => {
+router.get('/page-items', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const raw = String(req.query.order_ids || '');
@@ -355,10 +367,11 @@ router.get('/page-items', auth, async (req, res, next) => {
       JOIN products p ON oi.product_id = p.id
       JOIN orders o ON o.id = oi.order_id
       WHERE oi.order_id IN (${placeholders})
+      AND o.shop_id = ?
       ${scopeSql}
       ORDER BY oi.order_id DESC, oi.id ASC
       `,
-      [...ids, ...scopeParams]
+      [...ids, req.shopId, ...scopeParams]
     );
 
     const formatted = rows.map((r) => ({
@@ -372,7 +385,7 @@ router.get('/page-items', auth, async (req, res, next) => {
   }
 });
 
-router.get('/:id', auth, async (req, res, next) => {
+router.get('/:id', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -383,8 +396,8 @@ router.get('/:id', auth, async (req, res, next) => {
        LEFT JOIN users u ON o.salesperson_id = u.id
        LEFT JOIN warehouses w ON o.warehouse_id = w.id
        LEFT JOIN groups g ON o.group_id = g.id
-       WHERE o.id = ?`,
-      [req.params.id]
+       WHERE o.id = ? AND o.shop_id = ?`,
+      [req.params.id, req.shopId]
     );
 
     if (rows.length === 0) {
@@ -400,9 +413,9 @@ router.get('/:id', auth, async (req, res, next) => {
       const [[ov]] = await pool.query(
         `SELECT 1 as ok
          FROM commissions c
-         WHERE c.order_id = ? AND c.user_id = ? AND c.type = 'override'
+         WHERE c.order_id = ? AND c.user_id = ? AND c.type = 'override' AND c.shop_id = ?
          LIMIT 1`,
-        [rows[0].id, req.user.id]
+        [rows[0].id, req.user.id, req.shopId]
       );
       if (!ov?.ok) {
         return res.status(403).json({ error: 'Không có quyền xem đơn hàng này' });
@@ -499,7 +512,7 @@ router.get('/:id', auth, async (req, res, next) => {
   }
 });
 
-router.post('/', auth, async (req, res, next) => {
+router.post('/', auth, requireShop, async (req, res, next) => {
   try {
     const {
       customer_id,
@@ -557,8 +570,8 @@ router.post('/', auth, async (req, res, next) => {
 
       // Validate quan hệ quản lý-CTV: managerId phải là sales_id của user hiện tại (CTV)
       const [pair] = await pool.query(
-        'SELECT 1 FROM collaborators WHERE sales_id = ? AND ctv_id = ? LIMIT 1',
-        [managerId, req.user.id]
+        'SELECT 1 FROM collaborators WHERE shop_id = ? AND sales_id = ? AND ctv_id = ? LIMIT 1',
+        [req.shopId, managerId, req.user.id]
       );
       if (!pair.length) {
         return res.status(400).json({ error: 'Quản lý và nhân viên lên đơn không khớp quan hệ đã gán trong hệ thống' });
@@ -568,7 +581,7 @@ router.post('/', auth, async (req, res, next) => {
       finalCollaboratorUserId = managerId;
     }
 
-    const code = await generateOrderCode();
+    const code = await generateOrderCode(req.shopId);
 
     // Validate stock: qty <= available_stock in this warehouse (server-side, cannot bypass)
     for (const it of items) {
@@ -576,8 +589,8 @@ router.post('/', auth, async (req, res, next) => {
       const qty = parseFloat(it.qty);
       if (!productId || !Number.isFinite(qty) || qty <= 0) continue;
       const [wsRows] = await pool.query(
-        'SELECT available_stock FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ? LIMIT 1',
-        [warehouse_id, productId]
+        'SELECT available_stock FROM warehouse_stock WHERE shop_id = ? AND warehouse_id = ? AND product_id = ? LIMIT 1',
+        [req.shopId, warehouse_id, productId]
       );
       const available = wsRows.length ? parseFloat(wsRows[0].available_stock) || 0 : 0;
       if (qty > available) {
@@ -617,9 +630,10 @@ router.post('/', auth, async (req, res, next) => {
     const orderStatus = req.body.status || 'pending';
 
     const [orderResult] = await pool.query(
-      `INSERT INTO orders (code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, ship_payer, deposit, customer_collect, shop_collect, salesperson_absorbed_amount, payment_method, subtotal, discount, total_amount, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO orders (shop_id, code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, ship_payer, deposit, customer_collect, shop_collect, salesperson_absorbed_amount, payment_method, subtotal, discount, total_amount, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        req.shopId,
         code,
         customer_id,
         finalSalespersonId,
@@ -661,7 +675,7 @@ router.post('/', auth, async (req, res, next) => {
     // Nếu tạo đơn với status=completed ngay từ đầu → trừ kho vật lý đúng kho
     if (orderStatus === 'completed') {
       await deductStockOnComplete(orderId);
-      await updateLoyaltyPoints(customer_id, orderId, totalAmount);
+      await updateLoyaltyPoints(customer_id, orderId, totalAmount, req.shopId);
     }
 
     // Realtime notify: tạo đơn mới
@@ -683,11 +697,11 @@ router.post('/', auth, async (req, res, next) => {
   }
 });
 
-router.put('/:id', auth, async (req, res, next) => {
+router.put('/:id', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
 
-    const [existing] = await pool.query('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT * FROM orders WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
     }
@@ -765,8 +779,8 @@ router.put('/:id', auth, async (req, res, next) => {
 
         // Validate quan hệ quản lý-CTV theo người đang sửa/lên đơn (sales user)
         const [pair] = await pool.query(
-          'SELECT 1 FROM collaborators WHERE sales_id = ? AND ctv_id = ? LIMIT 1',
-          [managerId, req.user.id]
+          'SELECT 1 FROM collaborators WHERE shop_id = ? AND sales_id = ? AND ctv_id = ? LIMIT 1',
+          [req.shopId, managerId, req.user.id]
         );
         if (!pair.length) {
           return res.status(400).json({ error: 'Quản lý và nhân viên lên đơn không khớp quan hệ đã gán trong hệ thống' });
@@ -821,8 +835,8 @@ router.put('/:id', auth, async (req, res, next) => {
         const qty = parseFloat(it.qty);
         if (!productId || !Number.isFinite(qty) || qty <= 0) continue;
         const [wsRows] = await pool.query(
-          'SELECT available_stock FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ? LIMIT 1',
-          [targetWarehouseId, productId]
+          'SELECT available_stock FROM warehouse_stock WHERE shop_id = ? AND warehouse_id = ? AND product_id = ? LIMIT 1',
+          [req.shopId, targetWarehouseId, productId]
         );
         const available = wsRows.length ? parseFloat(wsRows[0].available_stock) || 0 : 0;
         const baseline = addBackAllowed ? (parseFloat(baselineByProduct[String(productId)]) || 0) : 0;
@@ -883,7 +897,7 @@ router.put('/:id', auth, async (req, res, next) => {
 
     await pool.query(
       `UPDATE orders SET customer_id = ?, warehouse_id = ?, group_id = ?, salesperson_id = ?, source_type = ?, collaborator_user_id = ?, status = ?, shipping_address = ?, carrier_service = ?, shipping_fee = ?, ship_payer = ?, deposit = ?, customer_collect = ?, shop_collect = ?, salesperson_absorbed_amount = ?, payment_method = ?, subtotal = ?, discount = ?, total_amount = ?, note = ?
-       WHERE id = ?`,
+       WHERE id = ? AND shop_id = ?`,
       [
         customer_id || order.customer_id,
         warehouse_id || order.warehouse_id,
@@ -906,6 +920,7 @@ router.put('/:id', auth, async (req, res, next) => {
         totalAmount,
         note || order.note,
         req.params.id,
+        req.shopId,
       ]
     );
 
@@ -939,7 +954,7 @@ router.put('/:id', auth, async (req, res, next) => {
     await recalculateCommission(req.params.id);
 
     if (newStatus === 'completed' && oldStatus !== 'completed') {
-      await updateLoyaltyPoints(customer_id || order.customer_id, req.params.id, totalAmount);
+      await updateLoyaltyPoints(customer_id || order.customer_id, req.params.id, totalAmount, req.shopId);
     }
 
     // Realtime notify: đổi trạng thái
@@ -963,11 +978,11 @@ router.put('/:id', auth, async (req, res, next) => {
   }
 });
 
-router.delete('/:id', auth, async (req, res, next) => {
+router.delete('/:id', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
 
-    const [existing] = await pool.query('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT * FROM orders WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
     }
@@ -1003,7 +1018,7 @@ router.delete('/:id', auth, async (req, res, next) => {
 
     await pool.query('DELETE FROM commissions WHERE order_id = ?', [req.params.id]);
     await pool.query('DELETE FROM order_items WHERE order_id = ?', [req.params.id]);
-    await pool.query('DELETE FROM orders WHERE id = ?', [req.params.id]);
+    await pool.query('DELETE FROM orders WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
 
     // Recalc reserved sau khi xóa
     for (const productId of productIds) {

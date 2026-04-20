@@ -51,13 +51,18 @@ project/
 - Menu sidebar tự động ẩn/hiện theo role
 
 ## 🔑 Tài khoản test
-Đăng nhập bằng **tên đăng nhập** hoặc **email** (cùng mật khẩu).
+Đăng nhập chỉ bằng **username** (cột `users.username`) — không đăng nhập bằng email.
 
 | Tên đăng nhập | Email | Password | Role |
 |---|---|---|---|
 | admin@velocity.vn | admin@velocity.vn | comiumauden1234 | Admin |
 | lan.sales@velocity.vn | lan.sales@velocity.vn | abc123 | Sales |
 | minh.sales@velocity.vn | minh.sales@velocity.vn | abc123 | Sales |
+| superadmin | superadmin@sheki.vn | **Giống mật khẩu Admin** sau migration `019_super_admin.sql` (copy `password_hash` từ user admin) — thường là `comiumauden1234` nếu admin tồn tại. Seed `schema.sql` thuần có thể dùng hash khác — xem comment trong SQL. | Super Admin |
+
+**Quên mật khẩu Super Admin:** (1) `node backend/scripts/resetSuperAdminPassword.js <mật_mới> [username]` trên máy có DB; hoặc (2) đặt `SUPERADMIN_RESET_KEY` trong `backend/.env` rồi mở trang `/super-admin-recovery` và đặt lại qua API.
+
+**Đặt lại mật khẩu admin của một shop (không phải super admin):** đăng nhập **Super Admin** → menu **Quản lý shop** (`/admin/shops`) → cột admin của shop → **Đặt lại MK** (không cần mật khẩu cũ). Admin shop đã đăng nhập có thể tự đổi tại `/change-password`.
 
 ## ⚠️ Business Rules cốt lõi (KHÔNG được bỏ qua)
 - Mã đơn: `DH-YYYYMMDD-XXXX`, reset theo ngày

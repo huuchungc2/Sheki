@@ -18,6 +18,7 @@ import {
   DollarSign,
   ClipboardList,
   Upload,
+  Building2,
 } from "lucide-react";
 import { cn, isAdminUser } from "../lib/utils";
 import { api } from "../lib/api";
@@ -135,6 +136,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     console.log('👋 Logging out user:', currentUser?.email);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("shops");
+    localStorage.removeItem("all_shops");
     
     // Notify App component about auth change
     window.dispatchEvent(new Event('auth-change'));
@@ -148,15 +151,60 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return userStr ? JSON.parse(userStr) : null;
   });
 
+  const [shops, setShops] = React.useState<{ id: number; name: string; code?: string }[]>(() => {
+    try {
+      const raw = localStorage.getItem("shops");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [allShops, setAllShops] = React.useState<{ id: number; name: string; code?: string }[]>(() => {
+    try {
+      const raw = localStorage.getItem("all_shops");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const shopSwitcherOptions = React.useMemo(() => {
+    if (currentUser?.is_super_admin && Array.isArray(allShops) && allShops.length > 0) {
+      return allShops;
+    }
+    return shops;
+  }, [currentUser?.is_super_admin, allShops, shops]);
+
+  const currentShopName = React.useMemo(() => {
+    const sid = currentUser?.shop_id != null ? Number(currentUser.shop_id) : null;
+    if (sid == null || !Number.isFinite(sid)) return null;
+    const list = currentUser?.is_super_admin ? allShops : shops;
+    const found = Array.isArray(list) ? list.find((s: any) => Number(s?.id) === sid) : null;
+    return found?.name || null;
+  }, [currentUser?.shop_id, currentUser?.is_super_admin, allShops, shops]);
+
   // Keep user in sync (role/permissions changes, login/logout)
   React.useEffect(() => {
     const syncFromStorage = () => {
       const userStr = localStorage.getItem("user");
       setCurrentUser(userStr ? JSON.parse(userStr) : null);
+      try {
+        const raw = localStorage.getItem("shops");
+        setShops(raw ? JSON.parse(raw) : []);
+      } catch {
+        setShops([]);
+      }
+      try {
+        const rawAll = localStorage.getItem("all_shops");
+        setAllShops(rawAll ? JSON.parse(rawAll) : []);
+      } catch {
+        setAllShops([]);
+      }
     };
     const onAuthChange = () => syncFromStorage();
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "user" || e.key === "token") syncFromStorage();
+      if (e.key === "user" || e.key === "token" || e.key === "shops" || e.key === "all_shops") syncFromStorage();
     };
     window.addEventListener("auth-change", onAuthChange as any);
     window.addEventListener("storage", onStorage);
@@ -175,14 +223,35 @@ export function Layout({ children }: { children: React.ReactNode }) {
         const res: any = await api.get("/auth/me");
         const u = res?.data;
         if (u && typeof u === "object") {
-          localStorage.setItem("user", JSON.stringify(u));
-          setCurrentUser(u);
+          const merged = {
+            ...u,
+            shop_id: res.current_shop_id != null ? res.current_shop_id : u.shop_id,
+          };
+          localStorage.setItem("user", JSON.stringify(merged));
+          setCurrentUser(merged);
         }
-      } catch {
+        if (Array.isArray(res?.shops)) {
+          localStorage.setItem("shops", JSON.stringify(res.shops));
+          setShops(res.shops);
+        }
+        if (Array.isArray(res?.all_shops)) {
+          localStorage.setItem("all_shops", JSON.stringify(res.all_shops));
+          setAllShops(res.all_shops);
+        }
+      } catch (err: any) {
+        if (err?.code === "SHOP_SESSION_INVALID") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("shops");
+          localStorage.removeItem("all_shops");
+          window.dispatchEvent(new Event("auth-change"));
+          navigate("/login", { replace: true });
+          return;
+        }
         // ignore (token may be invalid; App will route to login on next auth-check)
       }
     })();
-  }, []);
+  }, [navigate]);
 
   React.useEffect(() => {
     const token = localStorage.getItem("token");
@@ -214,7 +283,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
     };
   }, [currentUser?.id]);
 
-  const navigation = isAdminUser(currentUser) ? navigationAdmin : navigationSales;
+  const navigation = React.useMemo(() => {
+    if (!isAdminUser(currentUser)) return navigationSales;
+    if (currentUser?.is_super_admin) {
+      const rest = navigationAdmin.slice(1);
+      return [navigationAdmin[0], { name: "Quản lý shop", href: "/admin/shops", icon: Building2 }, ...rest];
+    }
+    return navigationAdmin;
+  }, [currentUser]);
   const visibleNavigation = navigation.filter((item, idx, arr) =>
     arr.findIndex(i => i.name === item.name) === idx
   );
@@ -269,7 +345,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             S
           </div>
           {isSidebarOpen && (
-            <span className="font-bold text-xl text-slate-900 tracking-tight">Sheki</span>
+            <span className="font-bold text-xl text-slate-900 tracking-tight">
+              {currentShopName || "—"}
+            </span>
           )}
         </div>
 
@@ -373,17 +451,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <div className="p-4 border-t border-slate-100 space-y-1">
           <Link 
-            to="/settings"
+            to={isAdmin ? "/settings" : "/profile"}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
-              location.pathname === "/settings" 
+              location.pathname === "/settings" || location.pathname === "/profile"
                 ? "bg-blue-50 text-blue-600 font-medium" 
                 : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
             )}
           >
             <Settings className={cn("w-5 h-5 shrink-0", location.pathname === "/settings" ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
-            {isSidebarOpen && <span>Cài đặt</span>}
+            {isSidebarOpen && <span>{isAdmin ? "Cài đặt" : "Tài khoản"}</span>}
           </Link>
+          {!isAdmin && (
+            <Link
+              to="/change-password"
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
+                location.pathname === "/change-password"
+                  ? "bg-blue-50 text-blue-600 font-medium"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+              )}
+            >
+              <KeyRound className={cn("w-5 h-5 shrink-0", location.pathname === "/change-password" ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
+              {isSidebarOpen && <span>Đổi mật khẩu</span>}
+            </Link>
+          )}
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 transition-all"
@@ -481,6 +573,57 @@ export function Layout({ children }: { children: React.ReactNode }) {
               )}
             </div>
             <div className="h-8 w-px bg-slate-200 mx-2"></div>
+            {shopSwitcherOptions.length > 1 && (
+              <div className="hidden sm:block">
+                <label className="sr-only" htmlFor="layout-shop-select">
+                  Shop
+                </label>
+                <select
+                  id="layout-shop-select"
+                  className="text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-2 py-1.5 max-w-[200px]"
+                  value={String(currentUser?.shop_id ?? "")}
+                  onChange={async (e) => {
+                    const shopId = parseInt(e.target.value, 10);
+                    if (!Number.isFinite(shopId)) return;
+                    try {
+                      const out: any = await api.post("/auth/switch-shop", { shop_id: shopId });
+                      localStorage.setItem("token", out.token);
+                      localStorage.setItem("last_shop_id", String(shopId));
+                      if (Array.isArray(out.shops)) {
+                        localStorage.setItem("shops", JSON.stringify(out.shops));
+                        setShops(out.shops);
+                      }
+                      if (Array.isArray(out.all_shops)) {
+                        localStorage.setItem("all_shops", JSON.stringify(out.all_shops));
+                        setAllShops(out.all_shops);
+                      }
+                      const sh = out.shop;
+                      const prev = JSON.parse(localStorage.getItem("user") || "{}");
+                      const next = {
+                        ...prev,
+                        shop_id: sh.id,
+                        role: sh.role,
+                        role_id: sh.role_id,
+                        role_name: sh.role_name,
+                        can_access_admin: sh.can_access_admin,
+                        scope_own_data: sh.scope_own_data,
+                      };
+                      localStorage.setItem("user", JSON.stringify(next));
+                      setCurrentUser(next);
+                      window.dispatchEvent(new Event("auth-change"));
+                    } catch (err: any) {
+                      console.error(err);
+                    }
+                  }}
+                >
+                  {shopSwitcherOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-slate-900 leading-none">

@@ -76,6 +76,13 @@ export function ProductList() {
   const [isComposing, setIsComposing] = React.useState(false);
   const limit = 20;
 
+  // Bulk select
+  const [selectedIds, setSelectedIds] = React.useState<Set<number>>(() => new Set());
+  const [bulkCategoryId, setBulkCategoryId] = React.useState<string>("");
+  const [bulkApplying, setBulkApplying] = React.useState(false);
+
+  const selectedCount = selectedIds.size;
+
   const patchListParams = React.useCallback(
     (patch: Record<string, string | null | undefined>, opts?: { resetPage?: boolean }) => {
       setSearchParams(
@@ -138,6 +145,14 @@ export function ProductList() {
       const newTotal = json.total || 0;
       setProducts(json.data);
       setTotal(newTotal);
+      // drop selections that are not visible anymore (filters/page changed)
+      setSelectedIds((prev) => {
+        if (!prev.size) return prev;
+        const visible = new Set<number>((json.data || []).map((p: any) => Number(p.id)));
+        const next = new Set<number>();
+        prev.forEach((id) => { if (visible.has(id)) next.add(id); });
+        return next;
+      });
       const totalPages = Math.ceil(newTotal / limit);
       if (totalPages > 0 && p > totalPages) {
         patchListParams({ page: String(totalPages) });
@@ -211,11 +226,85 @@ export function ProductList() {
     }
   };
 
-  const currentUser = React.useMemo(() => {
+  const [currentUser, setCurrentUser] = React.useState<any>(() => {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
+  });
+  React.useEffect(() => {
+    const sync = () => {
+      const u = localStorage.getItem("user");
+      setCurrentUser(u ? JSON.parse(u) : null);
+    };
+    const onAuthChange = () => sync();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "user") sync();
+    };
+    window.addEventListener("auth-change", onAuthChange as any);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("auth-change", onAuthChange as any);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
   const canAdmin = currentUser?.can_access_admin === true || currentUser?.role === "admin";
+
+  const pageIds = React.useMemo(() => products.map((p) => Number(p.id)).filter((n) => Number.isFinite(n)), [products]);
+  const allPageSelected = React.useMemo(() => pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id)), [pageIds, selectedIds]);
+
+  const toggleSelectAllPage = React.useCallback(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        pageIds.forEach((id) => next.delete(id));
+      } else {
+        pageIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }, [allPageSelected, pageIds]);
+
+  const toggleRow = React.useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const applyBulkCategory = React.useCallback(async () => {
+    if (!canAdmin) return;
+    if (selectedIds.size === 0) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      setBulkApplying(true);
+      setError(null);
+      const category_id =
+        bulkCategoryId === ""
+          ? undefined
+          : bulkCategoryId === "__none__"
+            ? null
+            : parseInt(bulkCategoryId, 10);
+      if (category_id === undefined) {
+        throw new Error("Chọn danh mục để gán (hoặc chọn 'Bỏ danh mục').");
+      }
+      const res = await fetch(`${API_URL}/products/bulk/category`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ product_ids: Array.from(selectedIds), category_id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error || "Không cập nhật được danh mục");
+      setSelectedIds(new Set());
+      setBulkCategoryId("");
+      await fetchProducts();
+    } catch (e: any) {
+      setError(e?.message || "Không cập nhật được danh mục");
+    } finally {
+      setBulkApplying(false);
+    }
+  }, [API_URL, bulkCategoryId, canAdmin, fetchProducts, selectedIds]);
 
   const handleDelete = async (id: string) => {
     if (!canAdmin) {
@@ -331,6 +420,50 @@ export function ProductList() {
         </div>
       </div>
 
+      {canAdmin && selectedCount > 0 && (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="text-sm font-bold text-blue-900">
+            Đã chọn {selectedCount} sản phẩm (trên trang này).
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <select
+              value={bulkCategoryId}
+              onChange={(e) => setBulkCategoryId(e.target.value)}
+              className="px-4 py-2 bg-white border border-blue-200 text-slate-700 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="">Chọn danh mục…</option>
+              <option value="__none__">Bỏ danh mục</option>
+              {categories.map((cat: any) => (
+                <option key={cat.id} value={String(cat.id)}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={bulkApplying || bulkCategoryId === ""}
+              onClick={applyBulkCategory}
+              className={cn(
+                "px-4 py-2 rounded-xl text-sm font-bold transition-all inline-flex items-center gap-2",
+                bulkApplying || bulkCategoryId === ""
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20"
+              )}
+            >
+              {bulkApplying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
+              Gán danh mục
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-white border border-transparent hover:border-slate-200"
+            >
+              Bỏ chọn
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
       )}
@@ -346,6 +479,17 @@ export function ProductList() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-200">
+                    {canAdmin && (
+                      <th className="px-4 py-4 w-10">
+                        <input
+                          type="checkbox"
+                          checked={allPageSelected}
+                          onChange={toggleSelectAllPage}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                          aria-label="Chọn tất cả trên trang"
+                        />
+                      </th>
+                    )}
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sản phẩm</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Danh mục</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Giá bán</th>
@@ -356,14 +500,27 @@ export function ProductList() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {products.length === 0 ? (
-                    <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">Không có sản phẩm nào</td></tr>
+                    <tr><td colSpan={canAdmin ? 7 : 6} className="px-6 py-12 text-center text-slate-400">Không có sản phẩm nào</td></tr>
                   ) : products.map((product: any) => {
                     const status = getProductStatus(product);
                     const images = product.images ? (() => { try { return JSON.parse(product.images); } catch { return []; } })() : [];
                     const mainImage = images[0] || null;
+                    const pid = Number(product.id);
+                    const checked = canAdmin && Number.isFinite(pid) ? selectedIds.has(pid) : false;
                     
                     return (
                     <tr key={product.id} className="hover:bg-slate-50/50 transition-all group">
+                      {canAdmin && (
+                        <td className="px-4 py-4 align-middle">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleRow(pid)}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                            aria-label={`Chọn sản phẩm ${product.name}`}
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 shadow-sm overflow-hidden flex items-center justify-center">

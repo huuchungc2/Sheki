@@ -29,10 +29,13 @@ import { CommissionReport } from "./pages/CommissionReport";
 import CommissionRules from "./pages/CommissionRules";
 import CollaboratorsCommissionsReportPage from "./pages/CollaboratorsCommissionsReport";
 import { ChangePassword } from "./pages/ChangePassword";
+import { Profile } from "./pages/Profile";
 import { SalesReturnsList } from "./pages/SalesReturnsList";
 import { RolesPage } from "./pages/RolesPage";
 import { CashTransactions } from "./pages/CashTransactions";
 import { Categories } from "./pages/Categories";
+import { SuperAdminShops } from "./pages/SuperAdminShops";
+import { SuperAdminRecovery } from "./pages/SuperAdminRecovery";
 import { isAdminUser } from "./lib/utils";
 
 function getStoredUser() {
@@ -54,6 +57,14 @@ function checkAuth() {
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   if (!isAdminUser(getStoredUser())) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+  const u = getStoredUser() as { is_super_admin?: boolean } | null;
+  if (!u?.is_super_admin) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
@@ -96,6 +107,7 @@ export default function App() {
         {/* Public Routes */}
         <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" replace />} />
         <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />} />
+        <Route path="/super-admin-recovery" element={!isAuthenticated ? <SuperAdminRecovery /> : <Navigate to="/" replace />} />
         
         {/* Protected Routes Wrapper */}
         <Route 
@@ -132,6 +144,7 @@ export default function App() {
                   <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                   <Route path="/logs" element={<AdminRoute><ActivityLog /></AdminRoute>} />
                   <Route path="/change-password" element={<ChangePassword />} />
+                  <Route path="/profile" element={<Profile />} />
                   <Route path="/reports/revenue" element={<AdminRoute><RevenueReport /></AdminRoute>} />
                   <Route path="/reports/commissions" element={<CommissionReport />} />
                   <Route path="/reports/commissions/ctv" element={<CtvCommissionRoute />} />
@@ -140,6 +153,16 @@ export default function App() {
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
                   <Route path="/cash-transactions" element={<AdminRoute><CashTransactions /></AdminRoute>} />
                   <Route path="/roles" element={<AdminRoute><RolesPage /></AdminRoute>} />
+                  <Route
+                    path="/admin/shops"
+                    element={
+                      <AdminRoute>
+                        <SuperAdminRoute>
+                          <SuperAdminShops />
+                        </SuperAdminRoute>
+                      </AdminRoute>
+                    }
+                  />
                   <Route path="/returns" element={<SalesReturnsList />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

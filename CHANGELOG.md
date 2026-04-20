@@ -1,6 +1,161 @@
+## [20/04/2026] - Profile: Sales bấm “Tài khoản” không bị 403 và luôn load dữ liệu mới nhất
+### Fixed
+- **Users API** — Thêm `GET /users/me` để lấy profile hiện tại; bỏ `requireShop` khỏi `PUT /users/me` để user chưa gán shop vẫn cập nhật thông tin cá nhân (tránh 403 “không có quyền truy cập”). — File: `backend/routes/users.js`
+- **FE Profile** — Khi mở `/profile` sẽ gọi `GET /users/me` để load dữ liệu mới nhất (không phụ thuộc localStorage), đồng bộ lại `localStorage.user` và phát `auth-change`. — File: `src/pages/Profile.tsx`
+
+## [20/04/2026] - Orders: chặn cọc > giá trị đơn + Logs: nhật ký theo shop
+### Fixed
+- **OrderForm** — Khi nhập `tiền cọc` lớn hơn `giá trị đơn` (tạm tính sau CK dòng), hiển thị cảnh báo và chặn lưu đơn. — File: `src/pages/OrderForm.tsx`
+- **Activity logs** — Ghi `shop_id` vào `activity_logs` khi log hoạt động để màn Nhật ký lọc theo shop hoạt động đúng (trước đó log thiếu `shop_id` nên admin đổi shop thấy nhật ký sai/không có). — File: `backend/middleware/logger.js`
+
+## [20/04/2026] - Hoa hồng quản lý (override): shop mới vẫn tính được
+### Fixed
+- **Shop create** — Khi tạo shop mới, tự copy `commission_tiers` từ shop mẫu (shop_id=1) sang shop mới để tính hoa hồng quản lý (override) không bị 0 do thiếu cấu hình. — File: `backend/routes/shops.js`
+- **Order commissions** — Bỏ đọc cột không tồn tại `collaborators.override_rate` (tránh lỗi 500 “Unknown column”). Override rate lấy từ `commission_tiers`. — File: `backend/services/orderService.js`
+
+## [20/04/2026] - Dashboard: đổi shop không bị dính doanh thu shop cũ
+### Fixed
+- **FE Dashboard** — Đồng bộ `token/user` theo `auth-change`/`storage` và tự refetch `/reports/dashboard` khi switch-shop, tránh hiển thị doanh thu/hoa hồng của shop trước (vd Sheki) khi đã chuyển sang shop khác (vd TNK). — File: `src/pages/Dashboard.tsx`
+
+## [20/04/2026] - Revenue report: đổi shop không bị dính dữ liệu shop cũ
+### Fixed
+- **FE RevenueReport** — Đồng bộ token theo `auth-change`/`storage` và refetch `/reports/revenue` + `/groups` theo token mới sau switch-shop (tránh lấy dữ liệu Sheki khi đang ở TNK). — File: `src/pages/RevenueReport.tsx`
+
+## [20/04/2026] - Reports revenue: Summary không lọt cross-shop
+### Fixed
+- **Reports API** — `GET /reports/revenue` phần `summary.totalSales/totalCommission/totalReturns` trước đây thiếu filter `shop_id` nên có thể hiện số của shop khác (vd Sheki) khi đang ở TNK. Đã thêm `o.shop_id = ?` cho các query summary. — File: `backend/routes/reports.js`
+
+## [20/04/2026] - Shop: seed commission tiers cho shop đã tạo
+### Added
+- **Shops API** — Thêm `POST /shops/:id/seed-commission-tiers` (Super Admin) để copy `commission_tiers` từ shop mẫu `shop_id=1` sang shop khác (dùng khi shop tạo trước lúc auto-seed). — File: `backend/routes/shops.js`
+
+## [20/04/2026] - Commission tiers: normalize min/max để shop nào cũng match
+### Fixed
+- **Commission tiers API** — Khi tạo/sửa tier nếu `ctv_rate_min > ctv_rate_max` (UI hiển thị 30% → 10%), backend tự swap để lưu đúng (min=10, max=30) giúp tính override không bị 0 ở shop mới. — File: `backend/routes/commission-tiers.js`
+
+## [20/04/2026] - Multi-shop: fix Reports lọt dữ liệu cross-shop (Admin TNK thấy data Sheki)
+### Fixed
+- **Reports API** — Thêm `requireShop` và filter theo `shop_id` cho `GET /reports/dashboard`, `GET /reports/salary`, `GET /reports/revenue`, `GET /reports/returns-summary` (bao gồm KPI hoàn/HH hoàn). Trước đó các endpoint chỉ cần `auth` nên admin shop có thể thấy dữ liệu toàn hệ thống. — File: `backend/routes/reports.js`
+- **Returns API** — Update trạng thái `return_requests` khi approve/reject thêm điều kiện `AND shop_id = ?` để tránh cập nhật nhầm yêu cầu hoàn của shop khác. — File: `backend/routes/returns.js`
+
+## [20/04/2026] - Multi-shop: login nhớ shop lần trước (tránh tự về Sheki)
+### Fixed
+- **FE Auth** — Lưu `last_shop_id` khi đổi shop và tự gửi/auto `switch-shop` sau login để vào đúng shop lần trước, thay vì default `shops[0]` (thường là Sheki) khi user thuộc nhiều shop. — Files: `src/pages/Login.tsx`, `src/components/Layout.tsx`
+- **FE Auth** — Nếu `last_shop_id` không còn hợp lệ (server trả `SHOP_FORBIDDEN` “Bạn không thuộc shop đã chọn”), tự xoá `last_shop_id` và retry login không kèm `shop_id` để tránh bị kẹt. — File: `src/pages/Login.tsx`
+
+## [20/04/2026] - Import/Export: export ra import vào được (nhân viên/sản phẩm)
+### Fixed
+- **Import Export** — `GET /import/export/:entity` trước đây xuất theo `Object.keys(row)` nên **lệch cột** so với header, và header không khớp template import → import lại hay lỗi “kiểm tra sản phẩm/nhân viên”. Giờ export dùng đúng `TEMPLATES[entity].headers/keys` (round-trip export → import). — File: `backend/routes/import.js`
+- **Import products** — Fix SQL `INSERT INTO products` thiếu placeholder gây lỗi MySQL `Column count doesn't match value count`. — File: `backend/routes/import.js`
+
+## [20/04/2026] - Categories: fix UI không thêm được sau switch-shop/login
+### Fixed
+- **FE Categories** — Không memoize token một lần; đồng bộ token theo `auth-change`/`storage` để nút Thêm/Sửa/Ẩn gọi API với token mới nhất (tránh “bấm không ăn” sau login/switch-shop). — File: `src/pages/Categories.tsx`
+
+## [20/04/2026] - Products: chọn nhiều và gán danh mục hàng loạt
+### Added
+- **Products API** — `POST /products/bulk/category` cập nhật `category_id` cho nhiều `product_ids` trong shop hiện tại (validate category thuộc shop; cho phép `null` để bỏ danh mục). — File: `backend/routes/products.js`
+- **ProductList UI** — Thêm checkbox chọn sản phẩm (select all theo trang) + thanh hành động “Gán danh mục” chọn danh mục hoặc “Bỏ danh mục”. — File: `src/pages/ProductList.tsx`
+
+## [20/04/2026] - Import products: tồn kho vào kho mặc định
+### Fixed
+- **Import products** — Khi import sản phẩm có `stock_qty`, tự ghi `warehouse_stock` vào kho mặc định của shop (`warehouses.is_default=1`, fallback kho active đầu tiên) để tồn không bị “trôi” chỉ nằm ở `products.stock_qty`. — File: `backend/routes/import.js`
+
+## [20/04/2026] - CustomerForm: SĐT 10 số + ngày sinh 1 ô (nullable)
+### Changed
+- **FE CustomerForm** — SĐT bắt buộc 10 số (input chỉ nhận số, max 10), Ngày sinh 1 ô (nullable) dùng `GregorianDateSelect` để tránh iOS hiển thị năm Phật lịch (BE 2569). — File: `src/pages/CustomerForm.tsx`
+
+## [20/04/2026] - Sales: Cài đặt mở hồ sơ + đổi mật khẩu (không về Dashboard)
+### Fixed
+- **Layout** — Link “Cài đặt” ở sidebar: Admin → `/settings`; Sales → `/profile` và có thêm link `/change-password`, tránh bị redirect về Dashboard do `AdminRoute`. — File: `src/components/Layout.tsx`
+- **Profile** — Thêm trang `/profile` để Sales sửa thông tin cá nhân; API `PUT /users/me` cập nhật hồ sơ (full_name/phone/email/department/position/**join_date/address/city/district**). — Files: `src/pages/Profile.tsx`, `src/App.tsx`, `backend/routes/users.js`
+
+## [20/04/2026] - Super Admin: màn tạo shop + minh bạch role Admin / fix hiển thị active
+### Changed
+- **SuperAdminShops** — Modal tạo shop: 2 bước (shop → quản trị), giải thích rõ Admin vs Sales; mặc định bắt buộc ≥1 quản trị (tuỳ chọn «chỉ tạo shop trống»); badge `role_code` sau khi tạo. Đồng bộ `userActiveFromApi` cho shop/admin (tránh hiển thị sai Active). — Files: `src/pages/SuperAdminShops.tsx`
+- **Shops API** — `admins_created` kèm `role_code`, `role_id`; `attachAdmins` dùng `rowUserIsActive` thay vì `!!is_active`; `getAdminRoleId` kiểm tra `code === 'admin'`. — Files: `backend/routes/shops.js`
+- **Docs** — `FEATURE_MULTI_SHOP.md` (UI tạo shop + nguồn gốc Sales).
+
+## [20/04/2026] - Super Admin: Mở/Khoá user shop (không bắt buộc role admin trong user_shops)
+### Fixed
+- **Shops API** — `PATCH /shops/:shopId/admins/:userId` trước đây `JOIN roles ... code='admin'` nên **không cập nhật** user chỉ có membership **sales** (vd `huuchungc2`): `is_active` vẫn 0 dù đã «Mở» chỗ khác. Giờ cập nhật theo `user_shops` (mọi role), vẫn `requireSuperAdmin`. — Files: `backend/routes/shops.js`
+
+## [20/04/2026] - Login: giảm oan «tài khoản khóa» (is_active / driver)
+### Fixed
+- **Auth** — Không còn SELECT `is_active` lần 2 sau bcrypt. Coi được đăng nhập nếu `login_allowed` (SQL) **hoặc** `is_active` parse an toàn (Buffer/BIGINT/chuỗi). — Files: `backend/routes/auth.js`, `backend/scripts/checkUserPassword.js`
+
+## [20/04/2026] - Login: chỉ theo username (không email)
+### Changed
+- **Auth** — `POST /auth/login` chỉ tra `users.username`; không đọc `req.body.email`; không khớp cột email. **Khôi phục super admin** (`/auth/super-admin-recovery`) cũng chỉ theo username. — Files: `backend/routes/auth.js`, `backend/scripts/checkUserPassword.js`, `src/pages/Login.tsx`, `src/pages/SuperAdminRecovery.tsx`, `CLAUDE.md`
+
+## [20/04/2026] - Login: tránh «bị khóa» oan khi OR username/email khớp 2 user
+### Fixed
+- **Auth** — Chuỗi không có `@` chỉ tra **username** trước; có `@` chỉ tra **email** trước; chỉ khi không có dòng mới fallback `OR`. Tránh trường hợp cùng chuỗi (vd `huuchungc2`) khớp user khóa theo email + user mở theo username mà mật khẩu trùng user khóa → báo khóa oan. Sau khi bcrypt khớp, đọc lại `is_active` từ DB. — Files: `backend/routes/auth.js`, `backend/scripts/checkUserPassword.js`
+
+## [20/04/2026] - Super Admin: đặt lại mật khẩu admin shop
+### Added
+- **API** — `PATCH /api/shops/:shopId/admins/:userId/password` (body `newPassword`), chỉ super admin; chỉ user có `user_shops` + role `admin` trong shop đó (không áp cho `is_super_admin`).
+- **UI** — `SuperAdminShops`: nút «Đặt lại MK» cạnh từng admin trong bảng shop + modal nhập mật khẩu mới.
+- **Docs** — `CLAUDE.md`, `FEATURE_MULTI_SHOP.md`
+
+## [20/04/2026] - Super Admin: khôi phục mật khẩu khi quên + ghi rõ pass seed
+### Added
+- **Auth** — `POST /api/auth/super-admin-recovery` (body: `username`, `newPassword`, `resetKey`) khi đặt `SUPERADMIN_RESET_KEY` trong `backend/.env`.
+- **FE** — Trang công khai `/super-admin-recovery` + link từ màn đăng nhập.
+- **Script** — `backend/scripts/resetSuperAdminPassword.js` đặt lại mật khẩu super admin qua MySQL (không cần .env).
+### Changed / Docs
+- **CLAUDE.md** — Bảng tài khoản test: thêm `superadmin`; nêu rõ sau migration 019 mật khẩu superadmin **copy từ admin** (thường trùng `comiumauden1234`), tránh nhầm với comment `schema.sql`.
+- **backend/.env.example** — Gợi ý `SUPERADMIN_RESET_KEY`.
+
+## [20/04/2026] - Login: ưu tiên user đang hoạt động khi trùng username/email
+### Fixed
+- **Auth** — Truy vấn `WHERE username OR email` có thể khớp nhiều dòng (email trùng được phép; hoặc cùng chuỗi vừa là username user này vừa là email user khác). Code cũ lấy `rows[0]` nên có thể chọn nhầm tài khoản đã `is_active=0` → báo «Tài khoản đã bị khóa» dù admin mới đúng. Đã thêm `ORDER BY is_active DESC`, ưu tiên khớp `email` rồi `username`, rồi `id DESC` + `LIMIT 1`. — Files: `backend/routes/auth.js`, `backend/scripts/checkUserPassword.js`
+- **Auth (bổ sung)** — Lấy **tất cả** user khớp OR, lọc `is_active` trong JS (chuẩn hóa kiểu từ MySQL/driver), sắp xếp ưu tiên khớp email → username, rồi `bcrypt` lần lượt từng tài khoản **đang active** cho đến khi khớp mật khẩu — tránh vẫn báo khóa khi còn 1 user active đúng mật khẩu. — Files: `backend/routes/auth.js`, `backend/scripts/checkUserPassword.js`
+- **Auth** — Cột `login_allowed` tính bằng SQL `COALESCE(is_active,0) IN (1,TRUE)` thay vì chỉ tin `is_active` sau khi đọc qua driver — tránh lệch kiểu khiến tài khoản đang bật trong DB vẫn bị coi là khóa. — Files: `backend/routes/auth.js`, `backend/scripts/checkUserPassword.js`
+- **Auth (login)** — Không còn trả «khóa» khi chưa thử mật khẩu; sắp **active trước** rồi `bcrypt` lần lượt — cùng chuỗi login trùng user khóa + user đang bật thì vào đúng tài khoản đang bật; `login_allowed` dùng `CAST(is_active AS UNSIGNED)=1`. — Files: `backend/routes/auth.js`, `backend/scripts/checkUserPassword.js`
+
 ## [16/04/2026] - OrderForm: auto chọn kho mặc định khi tạo đơn
 ### Fixed
 - **OrderForm** — Khi vào màn tạo đơn (`/orders/new`), dropdown “Kho xuất hàng” tự động chọn kho mặc định (`warehouses.is_default=1`) ngay khi load; fallback kho active đầu tiên nếu thiếu default. — File: `src/pages/OrderForm.tsx`
+
+## [20/04/2026] - Đa shop (multi-tenant) giai đoạn 1
+### Added/Changed
+- **DB** — Thêm `shops`, `user_shops`, và cột `shop_id` trên các bảng nghiệp vụ; cập nhật unique key theo shop (vd `orders(shop_id, code)`, `products(shop_id, sku)`), seed shop mặc định `Sheki (id=1)` và backfill dữ liệu cũ về shop 1. — Files: `migrations/018_multi_shop.sql`
+- **Auth** — Login trả danh sách shop user được gán; JWT chứa `shop_id`; thêm `POST /auth/switch-shop`; `/auth/me` trả `shops` + `current_shop_id`. — Files: `backend/routes/auth.js`, `backend/middleware/auth.js`, `backend/middleware/requireShop.js`
+- **Backend routes/services** — Áp `requireShop` và filter/insert theo `shop_id` cho các module chính (orders, products, customers, inventory, reports, returns, commissions, cash, logs, import, uploads, groups, categories, warehouses, collaborators, commission tiers, users/settings). — Files: `backend/routes/*.js`, `backend/services/*.js`
+- **Frontend** — Lưu `shops` sau login, hiển thị dropdown đổi shop (gọi `/auth/switch-shop`) và clear `shops` khi logout. — Files: `src/pages/Login.tsx`, `src/components/Layout.tsx`
+
+## [20/04/2026] - Super Admin (global) cho multi-shop
+### Added/Changed
+- **DB** — Thêm cột `users.is_super_admin` và seed user `superadmin` (mật khẩu dùng chung hash với admin seed). — Files: `migrations/019_super_admin.sql`, `schema.sql`
+- **Auth/Middleware** — Super admin đăng nhập không cần `user_shops`, được chọn shop để thao tác; `requireShop` cho phép super admin vào mọi shop active. — Files: `backend/routes/auth.js`, `backend/middleware/auth.js`, `backend/middleware/requireShop.js`, `backend/middleware/requireSuperAdmin.js`
+- **API** — Thêm `GET/POST/PUT /api/shops` và `POST /api/shops/:shopId/users` để tạo shop và gán user vào shop. — Files: `backend/routes/shops.js`, `backend/server.js`
+
+## [20/04/2026] - Super Admin: màn hình Quản lý shop (FE)
+### Added
+- **UI** — Trang `/admin/shops` (menu sidebar khi `is_super_admin`): danh sách shop, thêm/sửa shop, tìm user và gán vai trò vào shop; API bổ sung `GET /api/shops/users-lookup`, `GET /api/shops/:shopId/users`. — Files: `src/pages/SuperAdminShops.tsx`, `src/App.tsx`, `src/components/Layout.tsx`, `backend/routes/shops.js`
+
+### Changed
+- **Super Admin shop** — Chỉ chỉ định quản trị viên shop (role `admin`); không gán sales/NV từ màn này; `POST /api/shops/:shopId/users` từ super admin bắt buộc `role_id` là admin. — Files: `src/pages/SuperAdminShops.tsx`, `backend/routes/shops.js`
+
+- **Tài liệu** — `FEATURE_MULTI_SHOP.md` §2.1: nêu rõ admin shop (Sheki hay shop mới) dùng **cùng logic** `user_shops` + JWT `shop_id`; super admin chỉ tạo shop + chỉ định admin ban đầu. — File: `FEATURE_MULTI_SHOP.md`
+
+## [20/04/2026] - Auth: chặn login khi shop tắt / hết hạn
+### Changed
+- **Login / switch-shop** — User thường không đăng nhập vào shop `is_active=0` hoặc quá `valid_until`; nếu cố chọn shop đó → `403` `SHOP_INACTIVE_OR_EXPIRED` hoặc `SHOP_FORBIDDEN`. `loadShopsForUser` đã lọc shop hợp lệ.
+- **GET /auth/me** — Nếu JWT còn `shop_id` nhưng shop không còn trong danh sách shop hợp lệ → `403` `SHOP_SESSION_INVALID` (bắt đăng nhập lại).
+- **FE** — `Layout` xử lý `SHOP_SESSION_INVALID` (xoá token, về `/login`); `Login` hiển thị lỗi theo `code`. — Files: `backend/routes/auth.js`, `src/lib/api.ts`, `src/components/Layout.tsx`, `src/pages/Login.tsx`
+
+## [20/04/2026] - Super Admin: tạo shop + 1 hoặc nhiều tài khoản admin (mới)
+### Added/Changed
+- **API** — `POST /api/shops` nhận `admins: [{ full_name, username, email, password }]` (0..n); transaction tạo shop + user + `user_shops` role admin. `POST /api/shops/:shopId/admins` thêm admin cho shop đã có. — File: `backend/routes/shops.js`
+- **UI** — `SuperAdminShops`: form nhiều dòng admin khi tạo shop; nút «Thêm admin» trên từng shop để tạo thêm tài khoản admin. — File: `src/pages/SuperAdminShops.tsx`
+
+## [20/04/2026] - Super Admin login: tránh lỗi “chưa gán shop” + đổi shop toàn hệ thống
+### Fixed/Changed
+- **Auth** — Super admin mặc định vào shop `id=1` nếu chưa có `user_shops`; JWT luôn có `role_id` hợp lệ (fallback `users.role_id`); `/auth/me` + `/auth/switch-shop` trả `all_shops` cho super admin. — Files: `backend/routes/auth.js`
+- **Middleware** — `auth` ưu tiên cờ super admin (không bị ghi đè role theo `user_shops`/users role khi vào shop không membership). — Files: `backend/middleware/auth.js`
+- **Frontend** — Login xử lý `requires_shop_select`; Layout dùng `all_shops` để dropdown đổi shop khi super admin không có membership. — Files: `src/pages/Login.tsx`, `src/components/Layout.tsx`
 
 ## [15/04/2026] - OrderList gộp cột + filter theo sản phẩm
 ### Changed

@@ -504,6 +504,13 @@ export function OrderForm() {
       return;
     }
 
+    // Cọc không được lớn hơn giá trị đơn (tạm tính sau CK dòng)
+    if ((Number(deposit) || 0) > (Number(subtotal) || 0)) {
+      setFormError("Tiền cọc không được lớn hơn giá trị đơn hàng");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     if (!isAdmin && directManagerId != null) {
       const ok = managerOptions.some((o) => o.id === directManagerId);
       if (!ok) {

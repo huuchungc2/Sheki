@@ -73,7 +73,12 @@ const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || data.error || "Lỗi API");
+    if (!res.ok) {
+      const err: any = new Error(data.message || data.error || "Lỗi API");
+      err.status = res.status;
+      err.code = data.code;
+      throw err;
+    }
     return data;
   },
   post: async (endpoint: string, body: any) => {
@@ -84,7 +89,12 @@ const api = {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || data.error || "Lỗi API");
+    if (!res.ok) {
+      const err: any = new Error(data.message || data.error || "Lỗi API");
+      err.status = res.status;
+      err.code = data.code;
+      throw err;
+    }
     return data;
   },
   put: async (endpoint: string, body: any) => {

@@ -1,13 +1,13 @@
 const { getPool } = require('../config/db');
 
-async function generateOrderCode() {
+async function generateOrderCode(shopId) {
   const pool = await getPool();
   const today = new Date();
   const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
 
   const [rows] = await pool.query(
-    "SELECT code FROM orders WHERE code LIKE ? ORDER BY id DESC LIMIT 1",
-    [`DH-${dateStr}-%`]
+    'SELECT code FROM orders WHERE shop_id = ? AND code LIKE ? ORDER BY id DESC LIMIT 1',
+    [shopId, `DH-${dateStr}-%`]
   );
 
   let seq = 1;
@@ -24,21 +24,25 @@ async function generateOrderCode() {
 async function recalculateWarehouseStock(productId, warehouseId) {
   const pool = await getPool();
 
+  const [[wh]] = await pool.query('SELECT shop_id FROM warehouses WHERE id = ? LIMIT 1', [warehouseId]);
+  if (!wh) return;
+  const shopId = wh.shop_id;
+
   // reserved = SL đơn pending/shipping từ KHO ĐÓ
   const [reservedResult] = await pool.query(
     `SELECT COALESCE(SUM(oi.qty), 0) as reserved
      FROM order_items oi
      JOIN orders o ON oi.order_id = o.id
-     WHERE oi.product_id = ? AND o.warehouse_id = ? AND o.status IN ('pending', 'shipping')`,
-    [productId, warehouseId]
+     WHERE oi.product_id = ? AND o.warehouse_id = ? AND o.status IN ('pending', 'shipping') AND o.shop_id = ?`,
+    [productId, warehouseId, shopId]
   );
 
   const reserved = parseFloat(reservedResult[0].reserved) || 0;
 
   // Lấy stock_qty của kho đó
   const [ws] = await pool.query(
-    'SELECT stock_qty FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?',
-    [productId, warehouseId]
+    'SELECT stock_qty FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ? AND shop_id = ?',
+    [productId, warehouseId, shopId]
   );
 
   if (!ws.length) return; // Kho này chưa có sản phẩm
@@ -47,8 +51,8 @@ async function recalculateWarehouseStock(productId, warehouseId) {
   const availableStock = Math.max(0, stockQty - reserved);
 
   await pool.query(
-    'UPDATE warehouse_stock SET reserved_stock = ?, available_stock = ? WHERE product_id = ? AND warehouse_id = ?',
-    [reserved, availableStock, productId, warehouseId]
+    'UPDATE warehouse_stock SET reserved_stock = ?, available_stock = ? WHERE product_id = ? AND warehouse_id = ? AND shop_id = ?',
+    [reserved, availableStock, productId, warehouseId, shopId]
   );
 }
 
@@ -105,9 +109,10 @@ async function recalculateAllStock() {
 async function deductStockOnComplete(orderId) {
   const pool = await getPool();
 
-  const [orderRows] = await pool.query('SELECT warehouse_id FROM orders WHERE id = ?', [orderId]);
+  const [orderRows] = await pool.query('SELECT warehouse_id, shop_id FROM orders WHERE id = ?', [orderId]);
   if (!orderRows.length) return;
   const warehouseId = orderRows[0].warehouse_id;
+  const shopId = orderRows[0].shop_id;
 
   const [items] = await pool.query(
     'SELECT product_id, qty FROM order_items WHERE order_id = ?', [orderId]
@@ -118,8 +123,8 @@ async function deductStockOnComplete(orderId) {
 
     // Trừ stock_qty trong warehouse_stock
     await pool.query(
-      'UPDATE warehouse_stock SET stock_qty = GREATEST(0, stock_qty - ?) WHERE product_id = ? AND warehouse_id = ?',
-      [qty, item.product_id, warehouseId]
+      'UPDATE warehouse_stock SET stock_qty = GREATEST(0, stock_qty - ?) WHERE product_id = ? AND warehouse_id = ? AND shop_id = ?',
+      [qty, item.product_id, warehouseId, shopId]
     );
 
     await recalculateStock(item.product_id, warehouseId);
@@ -130,9 +135,10 @@ async function deductStockOnComplete(orderId) {
 async function restoreStockOnCancel(orderId, oldStatus) {
   const pool = await getPool();
 
-  const [orderRows] = await pool.query('SELECT warehouse_id FROM orders WHERE id = ?', [orderId]);
+  const [orderRows] = await pool.query('SELECT warehouse_id, shop_id FROM orders WHERE id = ?', [orderId]);
   if (!orderRows.length) return;
   const warehouseId = orderRows[0].warehouse_id;
+  const shopId = orderRows[0].shop_id;
 
   const [items] = await pool.query(
     'SELECT product_id, qty FROM order_items WHERE order_id = ?', [orderId]
@@ -142,8 +148,8 @@ async function restoreStockOnCancel(orderId, oldStatus) {
     if (oldStatus === 'completed') {
       // Đã trừ stock_qty rồi → cộng lại vào đúng kho
       await pool.query(
-        'UPDATE warehouse_stock SET stock_qty = stock_qty + ? WHERE product_id = ? AND warehouse_id = ?',
-        [parseFloat(item.qty), item.product_id, warehouseId]
+        'UPDATE warehouse_stock SET stock_qty = stock_qty + ? WHERE product_id = ? AND warehouse_id = ? AND shop_id = ?',
+        [parseFloat(item.qty), item.product_id, warehouseId, shopId]
       );
     }
     await recalculateStock(item.product_id, warehouseId);
@@ -155,10 +161,11 @@ async function recalculateCommission(orderId) {
 
   // Nếu đơn đã hủy → không tính hoa hồng (xóa commission nếu có)
   const [orderCheck] = await pool.query(
-    'SELECT status, salesperson_id, total_amount, source_type, collaborator_user_id FROM orders WHERE id = ?',
+    'SELECT status, salesperson_id, total_amount, source_type, collaborator_user_id, shop_id FROM orders WHERE id = ?',
     [orderId]
   );
   if (!orderCheck.length) return;
+  const shopId = orderCheck[0].shop_id;
   if (String(orderCheck[0].status) === 'cancelled') {
     await pool.query('DELETE FROM commissions WHERE order_id = ?', [orderId]);
     return;
@@ -180,8 +187,8 @@ async function recalculateCommission(orderId) {
   await pool.query('DELETE FROM commissions WHERE order_id = ?', [orderId]);
 
   await pool.query(
-    'INSERT INTO commissions (order_id, user_id, commission_amount, type) VALUES (?, ?, ?, "direct")',
-    [orderId, userId, totalCommission]
+    'INSERT INTO commissions (shop_id, order_id, user_id, commission_amount, type) VALUES (?, ?, ?, ?, "direct")',
+    [shopId, orderId, userId, totalCommission]
   );
 
   // Đơn ghi nhận quản lý (2 kiểu legacy/new):
@@ -194,15 +201,15 @@ async function recalculateCommission(orderId) {
 
     // New mode: (collaborator_user_id -> manager) and (salesperson_id -> ctv) matches collaborators table
     const [[newPair]] = await pool.query(
-      'SELECT 1 as ok FROM collaborators WHERE sales_id = ? AND ctv_id = ? LIMIT 1',
-      [collaboratorUserId, userId]
+      'SELECT 1 as ok FROM collaborators WHERE shop_id = ? AND sales_id = ? AND ctv_id = ? LIMIT 1',
+      [shopId, collaboratorUserId, userId]
     );
     if (!newPair?.ok) {
       // Legacy mode (hoặc dữ liệu không khớp): chỉ tính direct (đã insert ở trên), không tính override
       return;
     }
 
-    await calculateOverrideCommissions(orderId, userId, orderTotalAmount, items, collaboratorUserId);
+    await calculateOverrideCommissions(orderId, userId, orderTotalAmount, items, collaboratorUserId, shopId);
     return;
   }
   // Rule mới: không chọn quản lý → hoa hồng chỉ tính cho người lên đơn (A)
@@ -210,16 +217,17 @@ async function recalculateCommission(orderId) {
   return;
 }
 
-async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount, items, restrictManagerId = null) {
+async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount, items, restrictManagerId = null, shopId = null) {
   const pool = await getPool();
 
-  const [orderRows] = await pool.query('SELECT group_id FROM orders WHERE id = ?', [orderId]);
+  const [orderRows] = await pool.query('SELECT group_id, shop_id FROM orders WHERE id = ?', [orderId]);
   if (!orderRows.length) return;
   const orderGroupId = orderRows[0].group_id;
+  const sid = shopId != null ? shopId : orderRows[0].shop_id;
 
   const [managers] = await pool.query(
-    'SELECT c.sales_id FROM collaborators c WHERE c.ctv_id = ?',
-    [ctvUserId]
+    'SELECT c.sales_id FROM collaborators c WHERE c.shop_id = ? AND c.ctv_id = ?',
+    [sid, ctvUserId]
   );
   if (managers.length === 0) return;
 
@@ -229,9 +237,9 @@ async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount
     if (tierCache[key] !== undefined) return tierCache[key];
     const [tiers] = await pool.query(
       `SELECT sales_override_rate FROM commission_tiers
-       WHERE ctv_rate_min <= ? AND (ctv_rate_max IS NULL OR ctv_rate_max >= ?)
+       WHERE shop_id = ? AND ctv_rate_min <= ? AND (ctv_rate_max IS NULL OR ctv_rate_max >= ?)
        ORDER BY ctv_rate_min DESC LIMIT 1`,
-      [commissionRate, commissionRate]
+      [sid, commissionRate, commissionRate]
     );
     tierCache[key] = tiers.length > 0 ? parseFloat(tiers[0].sales_override_rate) : null;
     return tierCache[key];
@@ -241,21 +249,15 @@ async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount
     if (restrictManagerId != null && Number(manager.sales_id) !== Number(restrictManagerId)) {
       continue;
     }
-    if (orderGroupId) {
-      const [inGroup] = await pool.query(
-        'SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ? LIMIT 1',
-        [manager.sales_id, orderGroupId]
-      );
-      if (inGroup.length === 0) continue;
-    }
 
     let totalOverrideAmount = 0;
     const itemRates = [];
 
     for (const item of items) {
       const itemRate = parseFloat(item.commission_rate) || 0;
-      const overrideRate = await getTierRate(itemRate);
-      if (!overrideRate) continue;
+      const tierRate = await getTierRate(itemRate);
+      const overrideRate = tierRate != null ? (parseFloat(tierRate) || 0) : 0;
+      if (!overrideRate || overrideRate <= 0) continue;
 
       const netAmount = parseFloat(item.net_amount) || 0;
       const itemOverride = Math.round(netAmount * overrideRate / 100 * 100) / 100;
@@ -269,8 +271,8 @@ async function calculateOverrideCommissions(orderId, ctvUserId, orderTotalAmount
     const savedRate = uniqueRates.length === 1 ? uniqueRates[0] : null;
 
     await pool.query(
-      'INSERT INTO commissions (order_id, user_id, commission_amount, type, ctv_user_id, override_rate) VALUES (?, ?, ?, "override", ?, ?)',
-      [orderId, manager.sales_id, Math.round(totalOverrideAmount * 100) / 100, ctvUserId, savedRate]
+      'INSERT INTO commissions (shop_id, order_id, user_id, commission_amount, type, ctv_user_id, override_rate) VALUES (?, ?, ?, ?, "override", ?, ?)',
+      [sid, orderId, manager.sales_id, Math.round(totalOverrideAmount * 100) / 100, ctvUserId, savedRate]
     );
   }
 }
@@ -280,20 +282,20 @@ async function calculateItemCommission(unitPrice, qty, discountAmount, commissio
   return Math.round(netAmount * parseFloat(commissionRate || 0) / 100 * 100) / 100;
 }
 
-async function updateLoyaltyPoints(customerId, orderId, totalAmount) {
+async function updateLoyaltyPoints(customerId, orderId, totalAmount, shopId) {
   const pool = await getPool();
 
   const points = Math.floor(parseFloat(totalAmount) / 10000);
 
   if (points > 0) {
     await pool.query(
-      'INSERT INTO loyalty_points (customer_id, order_id, points, type, note) VALUES (?, ?, ?, "earn", ?)',
-      [customerId, orderId, points, `Tích lũy từ đơn hàng`]
+      'INSERT INTO loyalty_points (shop_id, customer_id, order_id, points, type, note) VALUES (?, ?, ?, ?, "earn", ?)',
+      [shopId, customerId, orderId, points, `Tích lũy từ đơn hàng`]
     );
 
     await pool.query(
-      'UPDATE customers SET points_balance = points_balance + ?, total_spent = total_spent + ? WHERE id = ?',
-      [points, totalAmount, customerId]
+      'UPDATE customers SET points_balance = points_balance + ?, total_spent = total_spent + ? WHERE id = ? AND shop_id = ?',
+      [points, totalAmount, customerId, shopId]
     );
   }
 }

@@ -1,18 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
-router.get('/', auth, authorize('admin'), async (req, res, next) => {
+router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, module, status, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = 'SELECT * FROM activity_logs WHERE 1=1';
-    let countQuery = 'SELECT COUNT(*) as total FROM activity_logs WHERE 1=1';
-    const params = [];
+    let query = 'SELECT * FROM activity_logs WHERE shop_id = ?';
+    let countQuery = 'SELECT COUNT(*) as total FROM activity_logs WHERE shop_id = ?';
+    const params = [req.shopId];
 
     if (search) {
       query += ' AND (user_name LIKE ? OR target_name LIKE ? OR module LIKE ?)';

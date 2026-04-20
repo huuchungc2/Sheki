@@ -1,7 +1,7 @@
 # FEATURE: Đa shop (Multi-shop / tenant)
 
-> **Trạng thái:** CHỈ ĐẶC TẢ — **chưa triển khai code** trong repo.  
-> Khi bắt đầu code: đọc file này trước, làm theo **thứ tự giai đoạn** cuối tài liệu.
+> **Trạng thái:** ĐANG TRIỂN KHAI (đã có migration + backend auth/middleware/routes + FE switch shop).  
+> Khi làm tiếp: follow **thứ tự giai đoạn** cuối tài liệu.
 
 ---
 
@@ -22,6 +22,12 @@
 | **Gán shop** | Quan hệ nhiều-nhiều qua bảng **`user_shops`**: `user_id`, `shop_id`, `role_id` (hoặc tương đương quyền **theo từng shop**). |
 | **Shop hiện tại** | Sau khi đăng nhập, user **chọn một shop** (hoặc nhớ shop lần trước). Mọi API đọc/ghi dùng **`shop_id` trong context** (JWT / session). |
 
+### 2.1 Super Admin và Admin shop (Sheki hay shop mới — cùng một logic)
+
+- **Admin của một shop** (kể cả shop Sheki `id=1` hay shop do super admin tạo ra): **không đổi** cách hoạt động — vẫn là user có dòng **`user_shops`** với **`role_id` = admin** cho **đúng shop đó**, JWT mang **`shop_id`** tương ứng, `can_access_admin` / menu / API **giống nhau** (lọc theo `shop_id` của shop đang làm việc).
+- **Super admin** là lớp **tạo shop** và **tạo một hoặc nhiều tài khoản admin mới** cho shop đó (insert `users` + `user_shops` role admin). Có thể thêm admin sau qua cùng luồng «thêm admin» cho shop đã có. Trên màn **Quản lý shop** (`/admin/shops`), super admin có thể **đặt lại mật khẩu** cho từng admin shop đã tồn tại (nút «Đặt lại MK»; API `PATCH /shops/:shopId/admins/:userId/password`). Sau đó **admin shop** đăng nhập và quản lý nhân viên / nghiệp vụ **giống admin shop Sheki** — super admin không thay admin shop trong vận hành hàng ngày.
+- **UI tạo shop:** mặc định **bắt buộc ít nhất một tài khoản quản trị** (trừ khi tick «Chỉ tạo shop không kèm quản trị»). User chỉ thành **Sales** khi được thêm từ **màn Nhân viên** (admin shop) hoặc đổi `user_shops.role_id` — không phải do luồng tạo admin trên màn này. API trả `role_code: admin` trong `admins_created` để đối soát.
+
 ---
 
 ## 3. Đăng ký (Register)
@@ -34,7 +40,8 @@
 
 ## 4. Admin gán user vào shop
 
-- Admin (theo từng shop hoặc super-admin — **quy định sau**) tìm user theo **email** hoặc **tên đăng nhập**.
+- **Admin shop** (màn Nhân viên / API theo shop): tìm user theo **email** hoặc **tên đăng nhập**, gán role (sales, …) **trong shop của admin đó**.
+- **Super admin** (màn Quản lý shop): chỉ **tạo shop** và **chỉ định admin** cho shop mới; không thay luồng gán nhân viên của admin shop (mục 2.1).
 - Thao tác: **Thêm vào shop X** + chọn **role trong shop đó** (insert/update `user_shops`).
 - Có thể **gỡ** user khỏi một shop (xóa dòng `user_shops`) — cần rule: không gỡ nếu còn ràng buộc (tùy nghiệp vụ).
 

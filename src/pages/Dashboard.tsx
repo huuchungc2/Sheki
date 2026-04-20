@@ -48,14 +48,40 @@ export function Dashboard() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError]     = React.useState<string | null>(null);
 
-  const currentUser = React.useMemo(() => {
+  const [currentUser, setCurrentUser] = React.useState<any>(() => {
     const u = localStorage.getItem("user");
     return u ? JSON.parse(u) : null;
-  }, []);
+  });
+  const [token, setToken] = React.useState<string>(() => localStorage.getItem("token") || "");
   const isAdmin = isAdminUser(currentUser);
 
   React.useEffect(() => {
-    const token = localStorage.getItem("token");
+    const syncAuth = () => {
+      try {
+        const u = localStorage.getItem("user");
+        setCurrentUser(u ? JSON.parse(u) : null);
+      } catch {
+        setCurrentUser(null);
+      }
+      setToken(localStorage.getItem("token") || "");
+    };
+    syncAuth();
+    window.addEventListener("auth-change", syncAuth as any);
+    window.addEventListener("storage", syncAuth as any);
+    return () => {
+      window.removeEventListener("auth-change", syncAuth as any);
+      window.removeEventListener("storage", syncAuth as any);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!token) {
+      setError("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     fetch(`${API_URL}/reports/dashboard`, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -63,7 +89,7 @@ export function Dashboard() {
       .then(j => setData(j.data))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [token]);
 
   if (loading) return (
     <div className="min-h-[60vh] flex items-center justify-center">

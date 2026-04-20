@@ -25,14 +25,29 @@ export function Categories() {
   const [draftById, setDraftById] = React.useState<Record<string, { name: string; is_active: 0 | 1 }>>({});
   const [deletingId, setDeletingId] = React.useState<number | null>(null);
 
-  const token = React.useMemo(() => localStorage.getItem("token"), []);
+  // Token/user có thể đổi sau login/switch-shop; không memoize một lần.
+  const [token, setToken] = React.useState<string | null>(() => localStorage.getItem("token"));
+
+  React.useEffect(() => {
+    const sync = () => setToken(localStorage.getItem("token"));
+    const onAuthChange = () => sync();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "token") sync();
+    };
+    window.addEventListener("auth-change", onAuthChange as any);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("auth-change", onAuthChange as any);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   const fetchAll = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await fetch(`${API_URL}/categories?all=1`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error || "Không thể tải danh mục");
@@ -56,7 +71,10 @@ export function Categories() {
 
   const createCategory = async () => {
     const name = newName.trim();
-    if (!name) return;
+    if (!name) {
+      setError("Nhập tên danh mục trước khi thêm");
+      return;
+    }
     try {
       setCreating(true);
       setError(null);
@@ -64,7 +82,7 @@ export function Categories() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ name }),
       });
@@ -94,7 +112,7 @@ export function Categories() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ name, is_active: d.is_active }),
       });
@@ -115,7 +133,7 @@ export function Categories() {
       setError(null);
       const res = await fetch(`${API_URL}/categories/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error || "Ẩn danh mục thất bại");

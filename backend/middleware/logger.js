@@ -1,12 +1,12 @@
 const { getPool } = require('../config/db');
 
-async function logActivity({ userId, userName, module, action, targetId, targetName, details, ipAddress, userAgent, status = 'success', errorMessage = null }) {
+async function logActivity({ shopId = null, userId, userName, module, action, targetId, targetName, details, ipAddress, userAgent, status = 'success', errorMessage = null }) {
   try {
     const pool = await getPool();
     await pool.query(
-      `INSERT INTO activity_logs (user_id, user_name, module, action, target_id, target_name, details, ip_address, user_agent, status, error_message)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, userName, module, action, targetId || null, targetName || null, details ? JSON.stringify(details) : null, ipAddress || null, userAgent || null, status, errorMessage]
+      `INSERT INTO activity_logs (shop_id, user_id, user_name, module, action, target_id, target_name, details, ip_address, user_agent, status, error_message)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [shopId, userId, userName, module, action, targetId || null, targetName || null, details ? JSON.stringify(details) : null, ipAddress || null, userAgent || null, status, errorMessage]
     );
   } catch (err) {
     console.error('❌ Failed to log activity:', err.message);
@@ -43,7 +43,9 @@ function logMiddleware(req, res, next) {
       for (const [path, mod] of Object.entries(moduleMap)) {
         if (req.originalUrl && req.originalUrl.startsWith(path)) {
           const status = statusCode >= 400 ? 'error' : 'success';
+          const shopId = req.shopId ?? req.user?.shop_id ?? null;
           logActivity({
+            shopId,
             userId: req.user.id,
             userName: req.user.full_name,
             module: mod,

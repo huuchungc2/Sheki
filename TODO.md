@@ -7,15 +7,16 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **Đa shop (multi-tenant)** — Đọc `FEATURE_MULTI_SHOP.md`; triển khai theo giai đoạn: DB `shops` + `user_shops` + `shop_id` → auth/switch-shop → middleware từng route → FE chọn shop → UI admin gán user
+- [ ] **Mobile: chuẩn bị phase WebView/RN** — Rà soát tài liệu + checklist release + cấu hình env API_URL, back button, offline, file upload WebView. — Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
-- [ ] **Mobile: chuẩn bị phase WebView/RN** — Rà soát tài liệu + checklist release + cấu hình env API_URL, back button, offline, file upload WebView. — Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
-
 - [ ] **Settings: phân quyền theo vai (role) đúng nghĩa** — Bỏ hardcode role ở UI, load roles từ DB; đổi `role_permissions` theo `role_id`; thêm middleware `requirePermission(module, action)` và áp dần vào routes (giữ `scope_own_data` để lọc dữ liệu). — Files: `backend/routes/settings.js`, `backend/middleware/authorize.js` (hoặc middleware mới), `backend/routes/*`, `src/pages/Settings.tsx`
+
+- [x] **Sales: Cài đặt mở hồ sơ + đổi mật khẩu** — Sidebar “Cài đặt” không redirect về Dashboard nữa; Sales vào `/profile` để sửa thông tin cá nhân + link đổi mật khẩu. — Files: `src/components/Layout.tsx`, `src/pages/Profile.tsx`, `src/App.tsx`, `backend/routes/users.js`, `CHANGELOG.md`
+  - Update: thêm địa chỉ + ngày vào làm trong `/profile`. — Files: `src/pages/Profile.tsx`, `backend/routes/users.js`
 
 - [x] **Tài liệu: chuẩn hóa quy ước KPI hoa hồng** — Thêm mục KPI (Số đơn hàng chỉ đơn bán, HH bán gross, HH hoàn tách KPI, override net, tổng HH) để tránh lệch giữa các màn — Files: `CLAUDE.md`, `LOGIC_BUSINESS.md`
 
@@ -65,9 +66,45 @@
 
 ## ✅ HOÀN THÀNH
 
+- [x] **Dashboard: switch-shop không dính số shop cũ** — Dashboard refetch theo `auth-change`/`storage` khi token đổi để không hiển thị doanh thu/hoa hồng của shop trước. — Files: `src/pages/Dashboard.tsx`, `CHANGELOG.md`
+
+- [x] **Revenue report: switch-shop không dính số shop cũ** — RevenueReport refetch theo `auth-change`/`storage` khi token đổi để không hiển thị dữ liệu shop trước (vd Sheki) khi đã chuyển sang shop khác (vd TNK). — Files: `src/pages/RevenueReport.tsx`, `CHANGELOG.md`
+  - Update: fix backend `/reports/revenue` summary lọc theo `shop_id` (tránh số tổng bị lấy của shop khác). — File: `backend/routes/reports.js`
+  - Update: thêm API seed `commission_tiers` cho shop cũ để HH quản lý (override) không bị 0. — File: `backend/routes/shops.js`
+  - Update: normalize `ctv_rate_min/max` khi tạo/sửa tier để không bị lưu ngược (30→10) làm override = 0. — File: `backend/routes/commission-tiers.js`
+
+- [x] **Hoa hồng quản lý (override): shop mới vẫn tính được** — Override HH quản lý fallback theo `collaborators.override_rate` khi shop chưa có `commission_tiers`; bỏ điều kiện check `user_groups` trong tính override để tránh bỏ sót. — Files: `backend/services/orderService.js`, `CHANGELOG.md`
+  - Update: seed `commission_tiers` cho shop mới (copy từ shop mẫu `shop_id=1`); bỏ đọc `collaborators.override_rate` để tránh lỗi DB “Unknown column”. — Files: `backend/routes/shops.js`, `backend/services/orderService.js`, `CHANGELOG.md`
+
+- [x] **Orders + Logs: chặn cọc > giá trị đơn + nhật ký theo shop** — OrderForm cảnh báo/chặn lưu khi cọc vượt giá trị đơn; logger ghi `shop_id` vào `activity_logs` để màn Nhật ký lọc theo shop đúng. — Files: `src/pages/OrderForm.tsx`, `backend/middleware/logger.js`, `CHANGELOG.md`
+
+- [x] **Profile: fix “Tài khoản” báo không có quyền truy cập** — `/profile` load dữ liệu từ API `GET /users/me`; `PUT /users/me` không requireShop để không bị 403 khi user chưa gán shop. — Files: `src/pages/Profile.tsx`, `backend/routes/users.js`, `CHANGELOG.md`
+
+- [x] **Login: fix «Tài khoản đã bị khóa» khi tạo admin shop mới (trùng OR username/email)** — `ORDER BY` ưu tiên `is_active` + khớp cột phù hợp — Files: `backend/routes/auth.js`, `backend/scripts/checkUserPassword.js`
+
+- [x] **Super Admin: PATCH Mở/Khoá user shop — user chỉ có role sales trong `user_shops`** — Bỏ `JOIN roles ... admin` khỏi `PATCH .../admins/:userId`; cập nhật `is_active` theo membership shop (mọi role). — Files: `backend/routes/shops.js`
+
+- [x] **Super Admin: thiết kế lại màn tạo shop + làm rõ Admin vs Sales** — UI 2 bước, checkbox shop trống, `admins_created` trả `role_code`; fix parse `is_active` list shop. — Files: `src/pages/SuperAdminShops.tsx`, `backend/routes/shops.js`, `FEATURE_MULTI_SHOP.md`
+
+- [x] **Multi-shop: fix Reports lọt dữ liệu cross-shop (Admin shop thấy data shop khác)** — Áp `requireShop` + filter `shop_id` cho các endpoint reports; fix update `return_requests` theo `shop_id`. — Files: `backend/routes/reports.js`, `backend/routes/returns.js`
+
+- [x] **Multi-shop: login nhớ shop lần trước (tránh tự về Sheki)** — Lưu `last_shop_id` khi đổi shop và auto switch đúng shop sau login cho user có nhiều shop. — Files: `src/pages/Login.tsx`, `src/components/Layout.tsx`
+  - Fix edge-case: `last_shop_id` không còn thuộc user → xoá và retry login (tránh báo “Bạn không thuộc shop đã chọn”).
+
+- [x] **Import/Export: export ra import vào được (nhân viên/sản phẩm)** — `GET /import/export/:entity` dùng đúng template headers/keys, không bị lệch cột khi import lại. — File: `backend/routes/import.js`
+  - Fix MySQL error `Column count doesn't match value count` khi import products (thiếu placeholder).
+  - Fix: import products có `stock_qty` sẽ đẩy tồn vào kho mặc định (`warehouse_stock`) của shop.
+
+- [x] **Đa shop (multi-tenant) — giai đoạn 1** — DB `shops` + `user_shops` + `shop_id`; auth/switch-shop; middleware/route filter theo shop; FE login + đổi shop; super admin bypass membership. — Files: `migrations/018_multi_shop.sql`, `migrations/019_super_admin.sql`, `backend/routes/auth.js`, `backend/middleware/*`, `backend/routes/*`, `src/pages/Login.tsx`, `src/components/Layout.tsx`
+
+- [x] **Super Admin: UI Quản lý shop** — Trang `/admin/shops`: CRUD shop (tên/mã/trạng thái), tìm user, gán `user_shops` + role; API lookup & list thành viên shop. — Files: `src/pages/SuperAdminShops.tsx`, `src/App.tsx`, `src/components/Layout.tsx`, `backend/routes/shops.js`
+
 - [x] **OrderForm: kho xuất hàng mặc định khi tạo mới** — Màn tạo đơn auto load kho `is_default` ngay khi mở form (fallback kho active đầu tiên). — File: `src/pages/OrderForm.tsx`
 
 - [x] **Admin: quản lý danh mục sản phẩm (CRUD)** — Thêm trang Danh mục sản phẩm (thêm/sửa/ẩn), bổ sung API categories hỗ trợ xem tất cả + ẩn danh mục, gắn route + menu Admin. — Files: `src/pages/Categories.tsx`, `src/App.tsx`, `src/components/Layout.tsx`, `backend/routes/categories.js`
+  - Fix: không memoize token khiến admin “không thêm được” sau login/switch-shop. — File: `src/pages/Categories.tsx`
+
+- [x] **Sản phẩm: chọn nhiều và gán danh mục hàng loạt** — Thêm checkbox chọn sản phẩm trong danh sách + action gán danh mục/bỏ danh mục cho nhiều sản phẩm. — Files: `src/pages/ProductList.tsx`, `backend/routes/products.js`
 
 - [x] **Menu Sales: đổi tên nhóm báo cáo hoa hồng** — Menu cha “Hoa hồng” → “Báo cáo hoa hồng”; menu con “Tổng quan hoa hồng” → “Hoa hồng bán hàng”, “Hoa hồng từ CTV” → “Hoa hồng CTV”. — File: `src/components/Layout.tsx`
 
@@ -75,6 +112,7 @@
 
 - [x] **Xuất Excel: đơn hàng + đơn hoàn** — Đơn hàng export theo bộ lọc, có sheet chi tiết sản phẩm (Tên SP, Số lượng); Đơn hoàn export theo bộ lọc. — Files: `src/pages/OrderList.tsx`, `src/pages/SalesReturnsList.tsx`, `src/lib/exportExcel.ts`, `backend/routes/orders.js`, `backend/routes/returns.js`
 - [x] **CustomerForm: Địa chỉ nhà xuống hàng dưới** — Màn thêm/sửa khách hàng: ô Địa chỉ nhà nằm một hàng riêng (full width) dưới phần Tỉnh/Quận/Phường. — File: `src/pages/CustomerForm.tsx`
+  - Update: SĐT input chỉ nhận số, max 10; Ngày sinh 1 ô (nullable) dùng `GregorianDateSelect` để tránh iOS hiển thị năm Phật lịch. — File: `src/pages/CustomerForm.tsx`
 - [x] **OrderForm: địa chỉ giao hàng đầy đủ khi chọn khách** — Tạo mới/sửa đơn: khi chọn khách hàng, auto-fill địa chỉ giao hàng đầy đủ (số nhà + phường + quận + tỉnh) và không ghi đè nếu đã sửa tay. — File: `src/pages/OrderForm.tsx`
 - [x] **Dashboard: Top khách hàng theo doanh số** — Thêm bảng top khách mua nhiều theo doanh số tháng (Admin toàn bộ, Sales theo đơn mình). — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`
 

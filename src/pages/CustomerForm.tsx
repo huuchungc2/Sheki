@@ -6,6 +6,7 @@ import {
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
 import locationsData from "../lib/vietnam-locations-simple.json";
+import { GregorianDateSelect } from "../components/GregorianDateSelect";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -16,25 +17,6 @@ const LOCATIONS = locationsData as any;
 function birthdayToInputValue(iso: string | null | undefined): string {
   if (!iso) return "";
   return String(iso).split("T")[0].trim().slice(0, 10);
-}
-
-function splitBirthday(iso: string): { y: string; m: string; d: string } {
-  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { y: "", m: "", d: "" };
-  const [y, m, d] = iso.split("-");
-  return { y, m: String(Number(m)), d: String(Number(d)) };
-}
-
-/** Đủ ngày/tháng/năm → yyyy-mm-dd (dương lịch); thiếu → "" */
-function composeBirthday(y: string, m: string, d: string): string {
-  if (!y || !m || !d) return "";
-  const yi = parseInt(y, 10);
-  const mi = parseInt(m, 10);
-  const di = parseInt(d, 10);
-  if (Number.isNaN(yi) || Number.isNaN(mi) || Number.isNaN(di) || mi < 1 || mi > 12 || di < 1) return "";
-  const maxD = new Date(yi, mi, 0).getDate();
-  const day = Math.min(di, maxD);
-  const dt = new Date(yi, mi - 1, day);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 }
 
 function getDefaultCustomerForm() {
@@ -126,7 +108,6 @@ export function CustomerForm() {
 
   const [formData, setFormData] = React.useState(getDefaultCustomerForm);
   const [employees, setEmployees] = React.useState<any[]>([]);
-  const [birthParts, setBirthParts] = React.useState({ y: "", m: "", d: "" });
   const [isLoading, setIsLoading] = React.useState(false);
   const [fetchLoading, setFetchLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -224,7 +205,6 @@ export function CustomerForm() {
             assigned_employee_id: c.assigned_employee_id != null ? String(c.assigned_employee_id) : "",
             note: c.note || "",
           });
-          setBirthParts(splitBirthday(bIso));
         } catch (err: any) {
           setError(err.message);
         } finally {
@@ -243,15 +223,6 @@ export function CustomerForm() {
     if (errors[field as keyof typeof errors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
-  };
-
-  const setBirthPart = (key: "y" | "m" | "d", val: string) => {
-    setBirthParts(prev => {
-      const next = { ...prev, [key]: val };
-      const iso = composeBirthday(next.y, next.m, next.d);
-      setFormData(f => ({ ...f, birthday: iso }));
-      return next;
-    });
   };
 
   const validateForm = (): boolean => {
@@ -345,21 +316,6 @@ export function CustomerForm() {
       setIsLoading(false);
     }
   };
-
-  /** Phải gọi trước mọi return — không đặt useMemo sau `if (fetchLoading) return` (Rules of Hooks) */
-  const birthYearOptions = React.useMemo(() => {
-    const cy = new Date().getFullYear();
-    const out: number[] = [];
-    for (let y = cy; y >= 1920; y--) out.push(y);
-    return out;
-  }, []);
-
-  const maxBirthDay = React.useMemo(() => {
-    const y = parseInt(birthParts.y, 10);
-    const m = parseInt(birthParts.m, 10);
-    if (!y || !m || m < 1 || m > 12) return 31;
-    return new Date(y, m, 0).getDate();
-  }, [birthParts.y, birthParts.m]);
 
   const cities = Object.keys(LOCATIONS);
   const districts = formData.city ? Object.keys(LOCATIONS[formData.city] || {}) : [];
@@ -477,7 +433,24 @@ export function CustomerForm() {
                   <label className="text-sm font-bold text-slate-700">Số điện thoại <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="0912 345 678" maxLength={11} className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.phone ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={formData.phone}
+                      onChange={(e) => {
+                        // chỉ giữ số, tối đa 10 ký tự
+                        const digits = String(e.target.value || "").replace(/\D/g, "").slice(0, 10);
+                        handleChange("phone", digits);
+                      }}
+                      placeholder="0912345678"
+                      maxLength={10}
+                      className={cn(
+                        "w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none",
+                        errors.phone
+                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50"
+                          : "border-transparent focus:border-blue-500 focus:ring-blue-500/10"
+                      )}
+                    />
                   </div>
                   {errors.phone && <p className="text-xs text-red-500 font-medium">{errors.phone}</p>}
                 </div>
@@ -491,41 +464,17 @@ export function CustomerForm() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700">Ngày sinh</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="relative">
-                      <Calendar className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-[1]" />
-                      <select
-                        value={birthParts.d}
-                        onChange={(e) => setBirthPart("d", e.target.value)}
-                        className="w-full pl-9 pr-2 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none appearance-none"
-                      >
-                        <option value="">Ngày</option>
-                        {Array.from({ length: maxBirthDay }, (_, i) => i + 1).map((n) => (
-                          <option key={n} value={String(n)}>{n}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <select
-                      value={birthParts.m}
-                      onChange={(e) => setBirthPart("m", e.target.value)}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none"
-                    >
-                      <option value="">Tháng</option>
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                        <option key={n} value={String(n)}>Tháng {n}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={birthParts.y}
-                      onChange={(e) => setBirthPart("y", e.target.value)}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none"
-                    >
-                      <option value="">Năm</option>
-                      {birthYearOptions.map((y) => (
-                        <option key={y} value={String(y)}>{y}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* iOS date picker có thể hiển thị Phật lịch (BE). Dùng GregorianDateSelect để giữ dương lịch. */}
+                  <GregorianDateSelect
+                    value={formData.birthday}
+                    onChange={(iso) => handleChange("birthday", iso)}
+                    allowEmpty
+                    yearMin={1920}
+                    yearMax={new Date().getFullYear()}
+                    className="max-w-full"
+                    monthNumericOptions
+                  />
+                  <p className="text-[11px] text-slate-400">Có thể để trống.</p>
                 </div>
               </div>
             </div>

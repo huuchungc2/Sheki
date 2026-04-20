@@ -1,19 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
-// Nhóm nhân viên theo mã vai trò (roles.code)
-router.get('/', auth, authorize('admin'), async (req, res, next) => {
+// Nhóm nhân viên theo mã vai trò (roles.code) — nhân viên thuộc shop hiện tại (user_shops)
+router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
       `SELECT u.id, u.full_name, u.email, u.phone, u.department, u.position, u.commission_rate, u.salary, u.join_date, u.is_active, u.created_at,
               r.code AS role, r.name AS role_name, r.id AS role_id
        FROM users u
-       JOIN roles r ON u.role_id = r.id
-       ORDER BY r.code, u.full_name`
+       INNER JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+       JOIN roles r ON us.role_id = r.id
+       ORDER BY r.code, u.full_name`,
+      [req.shopId]
     );
 
     const roleMap = {};
@@ -32,11 +35,11 @@ router.get('/', auth, authorize('admin'), async (req, res, next) => {
 });
 
 // Get role permissions
-router.get('/:role/permissions', auth, authorize('admin'), async (req, res, next) => {
+router.get('/:role/permissions', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { role } = req.params;
     const pool = await getPool();
-    const [rows] = await pool.query('SELECT * FROM role_permissions WHERE role = ?', [role]);
+    const [rows] = await pool.query('SELECT * FROM role_permissions WHERE role = ? AND shop_id = ?', [role, req.shopId]);
     
     const defaultPermissions = getDefaultPermissions(role);
     if (rows.length === 0) {
@@ -48,18 +51,19 @@ router.get('/:role/permissions', auth, authorize('admin'), async (req, res, next
 });
 
 // Update role permissions
-router.put('/:role/permissions', auth, authorize('admin'), async (req, res, next) => {
+router.put('/:role/permissions', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { role } = req.params;
     const { permissions } = req.body;
     const pool = await getPool();
-    
-    await pool.query('DELETE FROM role_permissions WHERE role = ?', [role]);
-    
+    const sid = req.shopId;
+
+    await pool.query('DELETE FROM role_permissions WHERE role = ? AND shop_id = ?', [role, sid]);
+
     for (const perm of permissions) {
       await pool.query(
-        'INSERT INTO role_permissions (role, module, action, allowed) VALUES (?, ?, ?, ?)',
-        [role, perm.module, perm.action, perm.allowed ? 1 : 0]
+        'INSERT INTO role_permissions (shop_id, role, module, action, allowed) VALUES (?, ?, ?, ?, ?)',
+        [sid, role, perm.module, perm.action, perm.allowed ? 1 : 0]
       );
     }
     
@@ -68,17 +72,19 @@ router.put('/:role/permissions', auth, authorize('admin'), async (req, res, next
 });
 
 // Update user role
-router.put('/users/:id/role', auth, authorize('admin'), async (req, res, next) => {
+router.put('/users/:id/role', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const roleId = parseInt(req.body.role_id, 10);
     if (!roleId) {
       return res.status(400).json({ error: 'Thiếu role_id' });
     }
     const pool = await getPool();
+    const sid = req.shopId;
     const [[r]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
     if (!r) {
       return res.status(400).json({ error: 'Vai trò không hợp lệ' });
     }
+    await pool.query('UPDATE user_shops SET role_id = ? WHERE user_id = ? AND shop_id = ?', [roleId, req.params.id, sid]);
     await pool.query('UPDATE users SET role_id = ? WHERE id = ?', [roleId, req.params.id]);
     res.json({ message: 'Cập nhật quyền thành công' });
   } catch (err) {

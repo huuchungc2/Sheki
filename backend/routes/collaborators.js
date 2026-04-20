@@ -1,15 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
 // GET /api/collaborators/my-managers — CTV xem quản lý; ?group_id= chỉ quản lý thuộc nhóm đó (user_groups)
 // ?include_user_ids=1,2 — thêm user (vd. quản lý đơn đang sửa) nếu chưa có trong danh sách lọc
-router.get('/my-managers', auth, async (req, res, next) => {
+router.get('/my-managers', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const uid = req.user.id;
+    const sid = req.shopId;
     const groupIdRaw = req.query.group_id;
     const groupId =
       groupIdRaw !== undefined && groupIdRaw !== null && groupIdRaw !== ''
@@ -19,13 +21,14 @@ router.get('/my-managers', auth, async (req, res, next) => {
     let sql = `SELECT u.id, u.full_name, u.email, u.phone, u.commission_rate
        FROM collaborators c
        JOIN users u ON c.sales_id = u.id
-       WHERE c.ctv_id = ? AND u.is_active = 1`;
-    const params = [uid];
+       WHERE c.shop_id = ? AND c.ctv_id = ? AND u.is_active = 1`;
+    const params = [sid, uid];
     if (groupId && Number.isFinite(groupId)) {
       sql += ` AND EXISTS (
-        SELECT 1 FROM user_groups ug WHERE ug.user_id = u.id AND ug.group_id = ?
+        SELECT 1 FROM user_groups ug INNER JOIN groups g ON g.id = ug.group_id
+        WHERE ug.user_id = u.id AND ug.group_id = ? AND g.shop_id = ?
       )`;
-      params.push(groupId);
+      params.push(groupId, sid);
     }
     sql += ` ORDER BY u.full_name`;
     const [rows] = await pool.query(sql, params);
@@ -40,8 +43,8 @@ router.get('/my-managers', auth, async (req, res, next) => {
       for (const extraId of wantIds) {
         if (have.has(extraId)) continue;
         const [pair] = await pool.query(
-          'SELECT 1 FROM collaborators WHERE sales_id = ? AND ctv_id = ? LIMIT 1',
-          [extraId, uid]
+          'SELECT 1 FROM collaborators WHERE shop_id = ? AND sales_id = ? AND ctv_id = ? LIMIT 1',
+          [sid, extraId, uid]
         );
         if (!pair.length) continue;
         const [urows] = await pool.query(
@@ -60,7 +63,7 @@ router.get('/my-managers', auth, async (req, res, next) => {
 });
 
 // GET /api/collaborators/my-ctvs — Quản lý xem CTV của mình
-router.get('/my-ctvs', auth, async (req, res, next) => {
+router.get('/my-ctvs', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const uid = req.user.id;
@@ -68,9 +71,9 @@ router.get('/my-ctvs', auth, async (req, res, next) => {
       `SELECT u.id, u.full_name, u.email, u.phone, u.commission_rate
        FROM collaborators c
        JOIN users u ON c.ctv_id = u.id
-       WHERE c.sales_id = ? AND u.is_active = 1
+       WHERE c.shop_id = ? AND c.sales_id = ? AND u.is_active = 1
        ORDER BY u.full_name`,
-      [uid]
+      [req.shopId, uid]
     );
     res.json({ data: rows });
   } catch (err) {
@@ -79,12 +82,12 @@ router.get('/my-ctvs', auth, async (req, res, next) => {
 });
 
 // GET /api/collaborators - Lấy danh sách CTV theo sales hoặc tất cả
-router.get('/', auth, authorize('admin'), async (req, res, next) => {
+router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { sales_id } = req.query;
-    let where = 'WHERE 1=1';
-    const params = [];
+    let where = 'WHERE c.shop_id = ?';
+    const params = [req.shopId];
     if (sales_id) {
       where += ' AND c.sales_id = ?';
       params.push(sales_id);
@@ -112,20 +115,22 @@ router.get('/', auth, authorize('admin'), async (req, res, next) => {
 });
 
 // POST /api/collaborators - Gán CTV cho Sale
-router.post('/', auth, authorize('admin'), async (req, res, next) => {
+router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { sales_id, ctv_id } = req.body;
     if (!sales_id || !ctv_id) {
       return res.status(400).json({ message: 'Thiếu sales_id hoặc ctv_id' });
     }
     const pool = await getPool();
+    const sid = req.shopId;
 
-    // Validate: cả 2 phải là role sales
+    // Validate: cả 2 phải là role sales trong shop hiện tại
     const [users] = await pool.query(
       `SELECT u.id, r.scope_own_data, r.can_access_admin FROM users u
-       JOIN roles r ON u.role_id = r.id
+       JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+       JOIN roles r ON us.role_id = r.id
        WHERE u.id IN (?, ?) AND u.is_active = 1`,
-      [sales_id, ctv_id]
+      [sid, sales_id, ctv_id]
     );
     if (users.length < 2) {
       return res.status(400).json({ message: 'Không tìm thấy nhân viên hoặc nhân viên không hoạt động' });
@@ -137,8 +142,8 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
     }
 
     const [result] = await pool.query(
-      'INSERT IGNORE INTO collaborators (sales_id, ctv_id) VALUES (?, ?)',
-      [sales_id, ctv_id]
+      'INSERT IGNORE INTO collaborators (shop_id, sales_id, ctv_id) VALUES (?, ?, ?)',
+      [sid, sales_id, ctv_id]
     );
     if (result.affectedRows === 0) {
       return res.status(409).json({ message: 'CTV này đã được gán cho Sale' });
@@ -150,12 +155,12 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
 });
 
 // DELETE /api/collaborators/:salesId/:ctvId - Bỏ gán CTV
-router.delete('/:salesId/:ctvId', auth, authorize('admin'), async (req, res, next) => {
+router.delete('/:salesId/:ctvId', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const [result] = await pool.query(
-      'DELETE FROM collaborators WHERE sales_id = ? AND ctv_id = ?',
-      [req.params.salesId, req.params.ctvId]
+      'DELETE FROM collaborators WHERE shop_id = ? AND sales_id = ? AND ctv_id = ?',
+      [req.shopId, req.params.salesId, req.params.ctvId]
     );
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Không tìm thấy quan hệ CTV này' });
@@ -167,20 +172,22 @@ router.delete('/:salesId/:ctvId', auth, authorize('admin'), async (req, res, nex
 });
 
 // GET /api/collaborators/available-ctvs - Lấy danh sách sales chưa được gán làm CTV cho sales_id nào đó
-router.get('/available-ctvs', auth, authorize('admin'), async (req, res, next) => {
+router.get('/available-ctvs', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { sales_id } = req.query;
     if (!sales_id) {
       return res.status(400).json({ message: 'Thiếu sales_id' });
     }
     const pool = await getPool();
+    const sid = req.shopId;
     const [rows] = await pool.query(
       `SELECT u.id, u.full_name, u.email, u.phone FROM users u
-       JOIN roles r ON u.role_id = r.id
+       JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+       JOIN roles r ON us.role_id = r.id
        WHERE r.scope_own_data = 1 AND r.can_access_admin = 0 AND u.is_active = 1 AND u.id != ?
-       AND u.id NOT IN (SELECT ctv_id FROM collaborators WHERE sales_id = ?)
+       AND u.id NOT IN (SELECT ctv_id FROM collaborators WHERE shop_id = ? AND sales_id = ?)
        ORDER BY u.full_name`,
-      [sales_id, sales_id]
+      [sid, sales_id, sid, sales_id]
     );
     res.json({ data: rows });
   } catch (err) {
@@ -190,9 +197,10 @@ router.get('/available-ctvs', auth, authorize('admin'), async (req, res, next) =
 
 // GET /api/collaborators/commissions - aggregated commissions across all employees
 // Allow both Admin and Sales to view
-router.get('/commissions/all', auth, async (req, res, next) => {
+router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
+    const sid = req.shopId;
     const { month, year, group_id, sales_id } = req.query;
 
     // Filter theo kỳ phát sinh dòng HH/điều chỉnh (created_at của commission/adjustment)
@@ -218,10 +226,10 @@ router.get('/commissions/all', auth, async (req, res, next) => {
     const txFrom = `
       FROM (
         SELECT id AS tx_id, order_id, NULL AS return_id, user_id, type, ctv_user_id, commission_amount AS amount, created_at AS entry_date, 'commission' AS entry_kind
-        FROM commissions
+        FROM commissions WHERE shop_id = ?
         UNION ALL
         SELECT id AS tx_id, order_id, return_id, user_id, type, ctv_user_id, amount, created_at AS entry_date, 'adjustment' AS entry_kind
-        FROM commission_adjustments
+        FROM commission_adjustments WHERE shop_id = ?
       ) t
     `;
 
@@ -248,15 +256,18 @@ router.get('/commissions/all', auth, async (req, res, next) => {
         WHERE 1=1 ${txWhereExtra}${txOrderWhereExtra}
       ) t ON t.user_id = sal.id AND t.type = 'override' AND t.ctv_user_id = ctv.id
       LEFT JOIN orders o ON o.id = t.order_id AND o.salesperson_id = ctv.id ${orderWhereExtra}
-      WHERE 1=1 ${salesFilter}
+      WHERE cr.shop_id = ? ${salesFilter}
       GROUP BY sal.id, sal.full_name, ctv.id, ctv.full_name, ctv.commission_rate
       ORDER BY sal.full_name, override_commission DESC
     `, [
+      sid,
+      sid,
       ...txFilterParams,
       // txOrderWhereExtra (if any)
       ...(orderFilterParams.length ? orderFilterParams : []),
       // orderWhereExtra (if any)
       ...(orderFilterParams.length ? orderFilterParams : []),
+      sid,
       ...salesParam,
     ]);
 
@@ -302,7 +313,8 @@ router.get('/commissions/all', auth, async (req, res, next) => {
             (
               SELECT ct.sales_override_rate
               FROM commission_tiers ct
-              WHERE ct.ctv_rate_min <= oi2.commission_rate
+              WHERE ct.shop_id = (SELECT o3.shop_id FROM orders o3 WHERE o3.id = oi2.order_id LIMIT 1)
+                AND ct.ctv_rate_min <= oi2.commission_rate
                 AND (ct.ctv_rate_max IS NULL OR ct.ctv_rate_max >= oi2.commission_rate)
               ORDER BY ct.ctv_rate_min DESC
               LIMIT 1
@@ -313,9 +325,9 @@ router.get('/commissions/all', auth, async (req, res, next) => {
       ) adj_rates ON adj_rates.tx_id = t.tx_id
       LEFT JOIN groups g ON o.group_id = g.id
       LEFT JOIN customers cu ON o.customer_id = cu.id
-      WHERE 1=1 ${salesFilter}
+      WHERE cr.shop_id = ? ${salesFilter}
       ORDER BY sal.full_name, ctv.full_name, t.entry_date DESC
-    `, [...txFilterParams, ...orderFilterParams, ...salesParam]);
+    `, [sid, sid, ...txFilterParams, ...orderFilterParams, sid, ...salesParam]);
 
     res.json({
       data: {

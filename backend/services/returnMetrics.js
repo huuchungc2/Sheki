@@ -27,20 +27,22 @@ function buildRangeConds(alias, from, to) {
   return { conds, params };
 }
 
-function buildOrderScopedFilters({ orderAlias = 'o', salespersonId = null, groupId = null }) {
+function buildOrderScopedFilters({ orderAlias = 'o', salespersonId = null, groupId = null, shopId = null }) {
   const conds = [];
   const params = [];
+  if (shopId != null) { conds.push(`${orderAlias}.shop_id = ?`); params.push(shopId); }
   if (salespersonId != null) { conds.push(`${orderAlias}.salesperson_id = ?`); params.push(salespersonId); }
   if (groupId != null) { conds.push(`${orderAlias}.group_id = ?`); params.push(groupId); }
   return { conds, params };
 }
 
-async function getReturnRevenueAndOrdersByMonthYear(pool, { month, year, salespersonId = null, groupId = null }) {
+async function getReturnRevenueAndOrdersByMonthYear(pool, { month, year, salespersonId = null, groupId = null, shopId = null }) {
   const { conds, params } = buildMonthYearConds('r', month, year);
   const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
     orderAlias: 'o',
     salespersonId,
     groupId,
+    shopId,
   });
 
   const whereConds = [...conds, ...orderConds];
@@ -73,12 +75,13 @@ async function getReturnRevenueAndOrdersByMonthYear(pool, { month, year, salespe
   };
 }
 
-async function getReturnRevenueByRange(pool, { from, to, salespersonId = null }) {
+async function getReturnRevenueByRange(pool, { from, to, salespersonId = null, shopId = null }) {
   const { conds, params } = buildRangeConds('r', from, to);
   const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
     orderAlias: 'o',
     salespersonId,
     groupId: null,
+    shopId,
   });
   const whereConds = [...conds, ...orderConds];
   const whereParams = [...params, ...orderParams];
@@ -106,12 +109,13 @@ async function getReturnRevenueByRange(pool, { from, to, salespersonId = null })
   return parseFloat(rows?.[0]?.return_revenue) || 0;
 }
 
-async function getReturnOrdersCountByRange(pool, { from, to, salespersonId = null }) {
+async function getReturnOrdersCountByRange(pool, { from, to, salespersonId = null, shopId = null }) {
   const { conds, params } = buildRangeConds('r', from, to);
   const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
     orderAlias: 'o',
     salespersonId,
     groupId: null,
+    shopId,
   });
   const whereConds = [...conds, ...orderConds];
   const whereParams = [...params, ...orderParams];
@@ -136,10 +140,11 @@ async function getReturnOrdersCountByRange(pool, { from, to, salespersonId = nul
  * - ca.user_id = o.salesperson_id
  * - optional filters: userId (salesperson), groupId
  */
-async function getReturnCommissionByMonthYear(pool, { month, year, userId = null, groupId = null }) {
+async function getReturnCommissionByMonthYear(pool, { month, year, userId = null, groupId = null, shopId = null }) {
   const { conds, params } = buildMonthYearConds('ca', month, year);
   conds.push("ca.type = 'direct'");
   conds.push('ca.user_id = o.salesperson_id');
+  if (shopId != null) { conds.push('o.shop_id = ?'); params.push(shopId); }
   if (userId != null) { conds.push('o.salesperson_id = ?'); params.push(userId); }
   if (groupId != null) { conds.push('o.group_id = ?'); params.push(groupId); }
 
@@ -156,10 +161,11 @@ async function getReturnCommissionByMonthYear(pool, { month, year, userId = null
   return parseFloat(rows?.[0]?.return_commission) || 0;
 }
 
-async function getReturnCommissionByRange(pool, { from, to, userId = null }) {
+async function getReturnCommissionByRange(pool, { from, to, userId = null, shopId = null }) {
   const { conds, params } = buildRangeConds('ca', from, to);
   conds.push("ca.type = 'direct'");
   conds.push('ca.user_id = o.salesperson_id');
+  if (shopId != null) { conds.push('o.shop_id = ?'); params.push(shopId); }
   if (userId != null) { conds.push('o.salesperson_id = ?'); params.push(userId); }
 
   const [rows] = await pool.query(

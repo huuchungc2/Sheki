@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
 const CODE_RE = /^[a-z][a-z0-9_]{2,31}$/;
 
-router.get('/', auth, authorize('admin'), async (req, res, next) => {
+router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
@@ -18,7 +19,7 @@ router.get('/', auth, authorize('admin'), async (req, res, next) => {
   }
 });
 
-router.post('/', auth, authorize('admin'), async (req, res, next) => {
+router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { name, description, can_access_admin, scope_own_data } = req.body;
     let code = String(req.body.code || '').trim().toLowerCase();
@@ -49,7 +50,7 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
   }
 });
 
-router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     const { name, description, can_access_admin, scope_own_data } = req.body;
@@ -75,7 +76,7 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
   }
 });
 
-router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     const pool = await getPool();
@@ -97,7 +98,7 @@ router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
 
     const [[rc]] = await pool.query('SELECT code FROM roles WHERE id = ?', [id]);
     if (rc?.code) {
-      await pool.query('DELETE FROM role_permissions WHERE role = ?', [rc.code]);
+      await pool.query('DELETE FROM role_permissions WHERE role = ? AND shop_id = ?', [rc.code, req.shopId]);
     }
     await pool.query('DELETE FROM roles WHERE id = ?', [id]);
     res.json({ message: 'Đã xóa vai trò' });

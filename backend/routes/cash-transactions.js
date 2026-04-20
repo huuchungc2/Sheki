@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
@@ -11,9 +12,9 @@ const BASE_FROM = `
       JOIN users c ON ct.created_by = c.id
     `;
 
-function buildCashTxWhere(query) {
-  let where = ' WHERE 1=1 ';
-  const params = [];
+function buildCashTxWhere(query, shopId) {
+  let where = ' WHERE ct.shop_id = ? ';
+  const params = [shopId];
 
   if (query.user_id) {
     where += ' AND ct.user_id = ? ';
@@ -43,14 +44,14 @@ const SELECT_LIST = `SELECT ct.id, ct.user_id, ct.group_id, ct.kind, ct.amount, 
         c.full_name AS created_by_name`;
 
 /** Admin: thu chi nội bộ — danh sách (lọc theo tháng/năm + NV + loại) */
-router.get('/', auth, authorize('admin'), async (req, res, next) => {
+router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { page = 1, limit = 20 } = req.query;
     const offset = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
     const lim = Math.min(100, Math.max(1, parseInt(limit, 10)));
 
-    const { where, params } = buildCashTxWhere(req.query);
+    const { where, params } = buildCashTxWhere(req.query, req.shopId);
 
     const [countRows] = await pool.query(
       `SELECT COUNT(*) AS total ${BASE_FROM} ${where}`,
@@ -80,10 +81,10 @@ router.get('/', auth, authorize('admin'), async (req, res, next) => {
 });
 
 /** Xuất toàn bộ bản ghi theo bộ lọc (không phân trang) — phục vụ Excel */
-router.get('/export', auth, authorize('admin'), async (req, res, next) => {
+router.get('/export', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { where, params } = buildCashTxWhere(req.query);
+    const { where, params } = buildCashTxWhere(req.query, req.shopId);
     const [rows] = await pool.query(
       `${SELECT_LIST}
       ${BASE_FROM}
@@ -98,9 +99,10 @@ router.get('/export', auth, authorize('admin'), async (req, res, next) => {
 });
 
 /** Admin: tạo phiếu thu/chi */
-router.post('/', auth, authorize('admin'), async (req, res, next) => {
+router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
+    const sid = req.shopId;
     const { user_id, group_id, kind, amount, note } = req.body;
 
     const uid = parseInt(user_id, 10);
@@ -127,8 +129,8 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
         return res.status(400).json({ error: 'Nhóm không hợp lệ' });
       }
       const [mem] = await pool.query(
-        'SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ?',
-        [uid, gid]
+        'SELECT 1 FROM user_groups ug INNER JOIN groups g ON g.id = ug.group_id WHERE ug.user_id = ? AND ug.group_id = ? AND g.shop_id = ?',
+        [uid, gid, sid]
       );
       if (mem.length === 0) {
         return res.status(400).json({ error: 'Nhân viên không thuộc nhóm đã chọn' });
@@ -137,9 +139,9 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
 
     const createdBy = req.user.id;
     const [result] = await pool.query(
-      `INSERT INTO cash_transactions (user_id, group_id, kind, amount, note, created_by)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [uid, gid, kind, amt, note ? String(note).trim() || null : null, createdBy]
+      `INSERT INTO cash_transactions (shop_id, user_id, group_id, kind, amount, note, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [sid, uid, gid, kind, amt, note ? String(note).trim() || null : null, createdBy]
     );
 
     const [inserted] = await pool.query(
@@ -151,8 +153,8 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
        JOIN users u ON ct.user_id = u.id
        LEFT JOIN groups g ON ct.group_id = g.id
        JOIN users c ON ct.created_by = c.id
-       WHERE ct.id = ?`,
-      [result.insertId]
+       WHERE ct.id = ? AND ct.shop_id = ?`,
+      [result.insertId, sid]
     );
 
     res.status(201).json({ data: inserted[0], message: 'Đã lưu' });
@@ -162,12 +164,12 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
 });
 
 /** Admin: xóa bản ghi (nhập nhầm) */
-router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const id = parseInt(req.params.id, 10);
     if (!id) return res.status(400).json({ error: 'ID không hợp lệ' });
-    const [r] = await pool.query('DELETE FROM cash_transactions WHERE id = ?', [id]);
+    const [r] = await pool.query('DELETE FROM cash_transactions WHERE id = ? AND shop_id = ?', [id, req.shopId]);
     if (r.affectedRows === 0) {
       return res.status(404).json({ error: 'Không tìm thấy bản ghi' });
     }

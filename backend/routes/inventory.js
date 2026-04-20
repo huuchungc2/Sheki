@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
 
 // GET: Thống kê nhập/xuất kho (tổng giá trị + số phiếu)
-router.get('/summary', auth, async (req, res, next) => {
+router.get('/summary', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { warehouse_id, date_from, date_to } = req.query;
 
     // Mặc định: tháng hiện tại (theo server time)
     // Nếu có date_from/date_to thì ưu tiên theo range
-    let where = 'WHERE 1=1';
-    const params = [];
+    let where = 'WHERE sm.shop_id = ?';
+    const params = [req.shopId];
 
     if (warehouse_id) {
       where += ' AND sm.warehouse_id = ?';
@@ -65,7 +66,7 @@ router.get('/summary', auth, async (req, res, next) => {
 });
 
 // GET: Lịch sử nhập/xuất kho
-router.get('/', auth, async (req, res, next) => {
+router.get('/', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, type, status, warehouse_id, date_from, date_to, page = 1, limit = 20 } = req.query;
@@ -77,7 +78,7 @@ router.get('/', auth, async (req, res, next) => {
       LEFT JOIN warehouses w ON sm.warehouse_id = w.id
       LEFT JOIN users u ON sm.created_by = u.id
       LEFT JOIN products p ON sm.product_id = p.id
-      WHERE 1=1
+      WHERE sm.shop_id = ?
     `;
     // Count query phải dùng cùng alias/join để không lỗi "Unknown column sm.*"
     let countQuery = `
@@ -86,9 +87,9 @@ router.get('/', auth, async (req, res, next) => {
       LEFT JOIN warehouses w ON sm.warehouse_id = w.id
       LEFT JOIN users u ON sm.created_by = u.id
       LEFT JOIN products p ON sm.product_id = p.id
-      WHERE 1=1
+      WHERE sm.shop_id = ?
     `;
-    const params = [];
+    const params = [req.shopId];
 
     if (search) {
       query += ' AND (sm.reason LIKE ? OR u.full_name LIKE ? OR p.name LIKE ?)';
@@ -139,7 +140,7 @@ router.get('/', auth, async (req, res, next) => {
 });
 
 // GET: Tồn kho theo kho — dùng cho OrderForm khi chọn kho
-router.get('/stock-by-warehouse', auth, async (req, res, next) => {
+router.get('/stock-by-warehouse', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { warehouse_id, product_id } = req.query;
@@ -151,10 +152,11 @@ router.get('/stock-by-warehouse', auth, async (req, res, next) => {
     let query = `
       SELECT ws.*, p.name as product_name, p.sku, p.unit, p.price
       FROM warehouse_stock ws
+      JOIN warehouses wh ON ws.warehouse_id = wh.id AND wh.shop_id = ?
       JOIN products p ON ws.product_id = p.id
-      WHERE ws.warehouse_id = ? AND p.is_active = 1
+      WHERE ws.warehouse_id = ? AND ws.shop_id = ? AND p.is_active = 1 AND p.shop_id = ?
     `;
-    const params = [warehouse_id];
+    const params = [req.shopId, warehouse_id, req.shopId, req.shopId];
 
     if (product_id) {
       query += ' AND ws.product_id = ?';
@@ -169,7 +171,7 @@ router.get('/stock-by-warehouse', auth, async (req, res, next) => {
 });
 
 // POST: Nhập kho
-router.post('/import', auth, authorize('admin'), async (req, res, next) => {
+router.post('/import', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { warehouse_id, items, reason, status } = req.body;
 
@@ -178,6 +180,11 @@ router.post('/import', auth, authorize('admin'), async (req, res, next) => {
     }
 
     const pool = await getPool();
+    const sid = req.shopId;
+    const [[wh]] = await pool.query('SELECT id FROM warehouses WHERE id = ? AND shop_id = ? LIMIT 1', [warehouse_id, sid]);
+    if (!wh) {
+      return res.status(400).json({ error: 'Kho không thuộc shop hiện tại' });
+    }
 
     for (const item of items) {
       const qty = parseFloat(item.qty ?? item.quantity ?? 0);
@@ -187,19 +194,19 @@ router.post('/import', auth, authorize('admin'), async (req, res, next) => {
 
       // Ghi stock_movements
       await pool.query(
-        'INSERT INTO stock_movements (warehouse_id, product_id, type, qty, reason, status, total_value, created_by) VALUES (?, ?, "import", ?, ?, ?, ?, ?)',
-        [warehouse_id, item.product_id, qty, reason || 'Nhập kho', status || 'completed', totalValue, req.user.id]
+        'INSERT INTO stock_movements (shop_id, warehouse_id, product_id, type, qty, reason, status, total_value, created_by) VALUES (?, ?, ?, "import", ?, ?, ?, ?, ?)',
+        [sid, warehouse_id, item.product_id, qty, reason || 'Nhập kho', status || 'completed', totalValue, req.user.id]
       );
 
       if (status === 'completed' || !status) {
         // ✅ Cập nhật warehouse_stock đúng kho
         await pool.query(
-          `INSERT INTO warehouse_stock (warehouse_id, product_id, stock_qty, available_stock)
-           VALUES (?, ?, ?, ?)
+          `INSERT INTO warehouse_stock (shop_id, warehouse_id, product_id, stock_qty, available_stock)
+           VALUES (?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE 
              stock_qty = stock_qty + VALUES(stock_qty),
              available_stock = available_stock + VALUES(available_stock)`,
-          [warehouse_id, item.product_id, qty, qty]
+          [sid, warehouse_id, item.product_id, qty, qty]
         );
       }
     }
@@ -217,7 +224,7 @@ router.post('/import', auth, authorize('admin'), async (req, res, next) => {
 });
 
 // POST: Xuất kho
-router.post('/export', auth, authorize('admin'), async (req, res, next) => {
+router.post('/export', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { warehouse_id, destination_warehouse_id, items, reason, status } = req.body;
 
@@ -226,6 +233,11 @@ router.post('/export', auth, authorize('admin'), async (req, res, next) => {
     }
 
     const pool = await getPool();
+    const sid = req.shopId;
+    const [[whSrc]] = await pool.query('SELECT id FROM warehouses WHERE id = ? AND shop_id = ? LIMIT 1', [warehouse_id, sid]);
+    if (!whSrc) {
+      return res.status(400).json({ error: 'Kho xuất không thuộc shop hiện tại' });
+    }
     const isCompleted = status === 'completed' || !status;
     const isTransfer = reason === 'export_transfer';
 
@@ -235,6 +247,10 @@ router.post('/export', auth, authorize('admin'), async (req, res, next) => {
       }
       if (parseInt(destination_warehouse_id) === parseInt(warehouse_id)) {
         return res.status(400).json({ error: 'Kho nhận phải khác kho xuất' });
+      }
+      const [[whDst]] = await pool.query('SELECT id FROM warehouses WHERE id = ? AND shop_id = ? LIMIT 1', [destination_warehouse_id, sid]);
+      if (!whDst) {
+        return res.status(400).json({ error: 'Kho nhận không thuộc shop hiện tại' });
       }
     }
 
@@ -248,8 +264,8 @@ router.post('/export', auth, authorize('admin'), async (req, res, next) => {
 
         // ✅ Kiểm tra tồn kho của KHO ĐÓ (không phải tổng)
         const [ws] = await pool.query(
-          'SELECT stock_qty, available_stock FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?',
-          [item.product_id, warehouse_id]
+          'SELECT stock_qty, available_stock FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ? AND shop_id = ?',
+          [item.product_id, warehouse_id, sid]
         );
 
         if (ws.length === 0) {
@@ -262,33 +278,33 @@ router.post('/export', auth, authorize('admin'), async (req, res, next) => {
 
         // Ghi stock_movements (export)
         await pool.query(
-          'INSERT INTO stock_movements (warehouse_id, product_id, type, qty, reason, status, total_value, created_by) VALUES (?, ?, "export", ?, ?, ?, ?, ?)',
-          [warehouse_id, item.product_id, -qty, reason || 'Xuất kho', status || 'completed', totalValue, req.user.id]
+          'INSERT INTO stock_movements (shop_id, warehouse_id, product_id, type, qty, reason, status, total_value, created_by) VALUES (?, ?, ?, "export", ?, ?, ?, ?, ?)',
+          [sid, warehouse_id, item.product_id, -qty, reason || 'Xuất kho', status || 'completed', totalValue, req.user.id]
         );
 
         if (isCompleted) {
           // ✅ Trừ warehouse_stock đúng kho
           await pool.query(
-            'UPDATE warehouse_stock SET stock_qty = GREATEST(0, stock_qty - ?), available_stock = GREATEST(0, available_stock - ?) WHERE product_id = ? AND warehouse_id = ?',
-            [qty, qty, item.product_id, warehouse_id]
+            'UPDATE warehouse_stock SET stock_qty = GREATEST(0, stock_qty - ?), available_stock = GREATEST(0, available_stock - ?) WHERE product_id = ? AND warehouse_id = ? AND shop_id = ?',
+            [qty, qty, item.product_id, warehouse_id, sid]
           );
         }
 
         if (isTransfer) {
           // Ghi movement nhập vào kho nhận
           await pool.query(
-            'INSERT INTO stock_movements (warehouse_id, product_id, type, qty, reason, status, total_value, created_by) VALUES (?, ?, "import", ?, ?, ?, ?, ?)',
-            [destination_warehouse_id, item.product_id, qty, 'Nhập chuyển kho', status || 'completed', totalValue, req.user.id]
+            'INSERT INTO stock_movements (shop_id, warehouse_id, product_id, type, qty, reason, status, total_value, created_by) VALUES (?, ?, ?, "import", ?, ?, ?, ?, ?)',
+            [sid, destination_warehouse_id, item.product_id, qty, 'Nhập chuyển kho', status || 'completed', totalValue, req.user.id]
           );
 
           if (isCompleted) {
             await pool.query(
-              `INSERT INTO warehouse_stock (warehouse_id, product_id, stock_qty, available_stock)
-               VALUES (?, ?, ?, ?)
+              `INSERT INTO warehouse_stock (shop_id, warehouse_id, product_id, stock_qty, available_stock)
+               VALUES (?, ?, ?, ?, ?)
                ON DUPLICATE KEY UPDATE
                  stock_qty = stock_qty + VALUES(stock_qty),
                  available_stock = available_stock + VALUES(available_stock)`,
-              [destination_warehouse_id, item.product_id, qty, qty]
+              [sid, destination_warehouse_id, item.product_id, qty, qty]
             );
           }
         }

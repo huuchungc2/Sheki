@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const XLSX = require('xlsx');
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 const { normalizeCustomerBirthday } = require('../utils/customerBirthday');
@@ -42,7 +43,7 @@ const TEMPLATES = {
 };
 
 // Download Excel template
-router.get('/template/:entity', auth, (req, res) => {
+router.get('/template/:entity', auth, requireShop, (req, res) => {
   const { entity } = req.params;
   const tpl = TEMPLATES[entity];
   if (!tpl) {
@@ -88,7 +89,7 @@ router.get('/template/:entity', auth, (req, res) => {
 });
 
 // Upload and process
-router.post('/:entity', auth, authorize('admin'), upload.single('file'), async (req, res, next) => {
+router.post('/:entity', auth, requireShop, authorize('admin'), upload.single('file'), async (req, res, next) => {
   try {
     const { entity } = req.params;
     
@@ -110,7 +111,7 @@ router.post('/:entity', auth, authorize('admin'), upload.single('file'), async (
     console.log(`📦 Import ${entity}: ${results.length} rows`);
     console.log('📦 First row:', JSON.stringify(results[0]));
 
-    const importResult = await importData(entity, results, req.user.id);
+    const importResult = await importData(entity, results, req.user.id, req.shopId);
     
     res.json({
       message: 'Nhập dữ liệu thành công',
@@ -184,7 +185,7 @@ function parseExcel(buffer, entity) {
   });
 }
 
-async function importData(entity, rows, userId) {
+async function importData(entity, rows, userId, shopId) {
   const pool = await getPool();
   const result = { success: 0, failed: 0, skipped: 0, errors: [] };
 
@@ -192,15 +193,15 @@ async function importData(entity, rows, userId) {
     const row = rows[i];
     try {
       if (entity === 'employees') {
-        const inserted = await importEmployee(pool, row);
+        const inserted = await importEmployee(pool, row, shopId);
         if (!inserted) {
           result.skipped++;
           continue;
         }
       } else if (entity === 'customers') {
-        await importCustomer(pool, row, userId);
+        await importCustomer(pool, row, userId, shopId);
       } else if (entity === 'products') {
-        const inserted = await importProduct(pool, row);
+        const inserted = await importProduct(pool, row, shopId);
         if (!inserted) {
           result.skipped++;
           continue;
@@ -237,7 +238,7 @@ async function ensureUniqueUsername(pool, raw) {
   }
 }
 
-async function importEmployee(pool, row) {
+async function importEmployee(pool, row, shopId) {
   const name = row.full_name || row.name || '';
   let username = String(row.username || '').trim().toLowerCase();
   const email = row.email || '';
@@ -285,16 +286,20 @@ async function importEmployee(pool, row) {
   const defaultPassword = row.password || '123456';
   const passwordHash = await bcrypt.hash(defaultPassword, 10);
 
-  await pool.query(
+  const [ins] = await pool.query(
     `INSERT INTO users (full_name, username, email, password_hash, phone, role_id, department, position, commission_rate, salary, join_date, address, city, district, is_active)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
     [name, username, email, passwordHash, phone, roleRow.id, department, position, commissionRate, salary, joinDate, address, city, district]
   );
-  
+  await pool.query(
+    'INSERT INTO user_shops (user_id, shop_id, role_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)',
+    [ins.insertId, shopId, roleRow.id]
+  );
+
   return true;
 }
 
-async function importCustomer(pool, row, userId) {
+async function importCustomer(pool, row, userId, shopId) {
   const name = row.name || '';
   const phone = row.phone || '';
   const email = row.email || '';
@@ -310,13 +315,13 @@ async function importCustomer(pool, row, userId) {
   }
 
   await pool.query(
-    `INSERT INTO customers (name, phone, email, address, city, district, ward, source, birthday, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, phone, email, address, city, district, ward, source, birthday, userId]
+    `INSERT INTO customers (shop_id, name, phone, email, address, city, district, ward, source, birthday, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [shopId, name, phone, email, address, city, district, ward, source, birthday, userId]
   );
 }
 
-async function importProduct(pool, row) {
+async function importProduct(pool, row, shopId) {
   const name = row.name || '';
   let sku = row.sku || '';
   const unit = row.unit || 'Cái';
@@ -342,8 +347,8 @@ async function importProduct(pool, row) {
     const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const prefix = `SKU-${dateStr}-`;
     const [lastRows] = await pool.query(
-      'SELECT sku FROM products WHERE sku LIKE ? ORDER BY sku DESC LIMIT 1',
-      [`${prefix}%`]
+      'SELECT sku FROM products WHERE shop_id = ? AND sku LIKE ? ORDER BY sku DESC LIMIT 1',
+      [shopId, `${prefix}%`]
     );
     let seq = 1;
     if (lastRows.length > 0 && lastRows[0].sku) {
@@ -355,16 +360,39 @@ async function importProduct(pool, row) {
     sku = `${prefix}${String(seq).padStart(4, '0')}`;
   }
 
-  const [existing] = await pool.query('SELECT id FROM products WHERE sku = ?', [sku]);
+  const [existing] = await pool.query('SELECT id FROM products WHERE shop_id = ? AND sku = ?', [shopId, sku]);
   if (existing.length > 0) {
     return false; // Skip if SKU already exists
   }
 
-  await pool.query(
-    `INSERT INTO products (name, sku, unit, price, cost_price, stock_qty, available_stock, reserved_stock, low_stock_threshold, weight, length, width, height, description, images, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [name, sku, unit, price, costPrice, stockQty, stockQty, lowStockThreshold, weight, length, width, height, description, images]
+  const [ins] = await pool.query(
+    `INSERT INTO products (shop_id, name, sku, unit, price, cost_price, stock_qty, available_stock, reserved_stock, low_stock_threshold, weight, length, width, height, description, images, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [shopId, name, sku, unit, price, costPrice, stockQty, stockQty, lowStockThreshold, weight, length, width, height, description, images]
   );
+
+  const productId = ins?.insertId;
+  // Nếu có tồn kho trong file import → đưa vào kho mặc định của shop (fallback kho active đầu tiên)
+  if (productId && stockQty > 0) {
+    const [[wh]] = await pool.query(
+      `SELECT id
+       FROM warehouses
+       WHERE shop_id = ? AND is_active = 1
+       ORDER BY is_default DESC, id ASC
+       LIMIT 1`,
+      [shopId]
+    );
+    if (wh?.id) {
+      await pool.query(
+        `INSERT INTO warehouse_stock (shop_id, warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
+         VALUES (?, ?, ?, ?, ?, 0)
+         ON DUPLICATE KEY UPDATE
+           stock_qty = stock_qty + VALUES(stock_qty),
+           available_stock = available_stock + VALUES(available_stock)`,
+        [shopId, wh.id, productId, stockQty, stockQty]
+      );
+    }
+  }
   
   return true;
 }
@@ -372,29 +400,42 @@ async function importProduct(pool, row) {
 module.exports = router;
 
 // Export data to Excel
-router.get('/export/:entity', auth, authorize('admin'), async (req, res, next) => {
+router.get('/export/:entity', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { entity } = req.params;
     const pool = await getPool();
-    
+    const sid = req.shopId;
+
     let rows = [];
     let headers = [];
+    let keys = [];
     let filename = '';
-    
+
     if (entity === 'employees') {
-      const [data] = await pool.query('SELECT id, full_name, username, email, phone, role, department, position, commission_rate, salary, join_date, address, city, district, is_active FROM users ORDER BY id');
+      const [data] = await pool.query(
+        `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, u.department, u.position, u.commission_rate, u.salary, u.join_date, u.address, u.city, u.district, u.is_active
+         FROM users u
+         INNER JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+         JOIN roles r ON us.role_id = r.id
+         ORDER BY u.id`,
+        [sid]
+      );
       rows = data;
-      headers = ['ID', 'Họ tên', 'Email', 'Số điện thoại', 'Vai trò', 'Phòng ban', 'Chức vụ', '% Hoa hồng', 'Lương', 'Ngày vào', 'Địa chỉ', 'Tỉnh/TP', 'Quận', 'Trạng thái'];
+      // Export dạng importable: dùng đúng header/keys theo template (round-trip export -> import)
+      headers = TEMPLATES.employees.headers.map((h) => String(h).replace(/\s*\*\s*$/, '').trim());
+      keys = TEMPLATES.employees.keys;
       filename = 'danh_sach_nhan_vien.xlsx';
     } else if (entity === 'customers') {
-      const [data] = await pool.query('SELECT id, name, phone, email, address, city, district, ward, tier, source, birthday, total_spent, points_balance, created_at FROM customers ORDER BY id');
+      const [data] = await pool.query('SELECT id, name, phone, email, address, city, district, ward, tier, source, birthday, total_spent, points_balance, created_at FROM customers WHERE shop_id = ? ORDER BY id', [sid]);
       rows = data;
-      headers = ['ID', 'Họ tên', 'Số điện thoại', 'Email', 'Địa chỉ', 'Tỉnh/TP', 'Quận', 'Phường', 'Hạng', 'Nguồn', 'Ngày sinh', 'Tổng chi tiêu', 'Điểm', 'Ngày tạo'];
+      headers = TEMPLATES.customers.headers.map((h) => String(h).replace(/\s*\*\s*$/, '').trim());
+      keys = TEMPLATES.customers.keys;
       filename = 'danh_sach_khach_hang.xlsx';
     } else if (entity === 'products') {
-      const [data] = await pool.query('SELECT id, name, sku, unit, price, cost_price, stock_qty, available_stock, reserved_stock, low_stock_threshold, weight, length, width, height, description, images, is_active, created_at FROM products ORDER BY id');
+      const [data] = await pool.query('SELECT id, name, sku, unit, price, cost_price, stock_qty, available_stock, reserved_stock, low_stock_threshold, weight, length, width, height, description, images, is_active, created_at FROM products WHERE shop_id = ? ORDER BY id', [sid]);
       rows = data;
-      headers = ['ID', 'Tên sản phẩm', 'SKU', 'Đơn vị', 'Giá bán', 'Giá vốn', 'Tồn kho', 'Có thể bán', 'Tạm giữ', 'Cảnh báo hết', 'Cân nặng (g)', 'Dài (cm)', 'Rộng (cm)', 'Cao (cm)', 'Mô tả', 'Hình ảnh', 'Trạng thái', 'Ngày tạo'];
+      headers = TEMPLATES.products.headers.map((h) => String(h).replace(/\s*\*\s*$/, '').trim());
+      keys = TEMPLATES.products.keys;
       filename = 'danh_sach_san_pham.xlsx';
     } else {
       return res.status(404).json({ error: 'Không hỗ trợ export entity này' });
@@ -403,8 +444,7 @@ router.get('/export/:entity', auth, authorize('admin'), async (req, res, next) =
     // Convert data to array format
     const wsData = [headers];
     rows.forEach(row => {
-      const keys = Object.keys(row);
-      const rowData = keys.map(key => {
+      const rowData = keys.map((key) => {
         let val = row[key];
         if (val instanceof Date) {
           return val.toISOString().split('T')[0];

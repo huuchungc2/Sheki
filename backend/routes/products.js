@@ -1,18 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
 
-async function generateProductSku(pool) {
+async function generateProductSku(pool, shopId) {
   const now = new Date();
   const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
   const prefix = `SKU-${dateStr}-`;
 
   const [rows] = await pool.query(
-    'SELECT sku FROM products WHERE sku LIKE ? ORDER BY sku DESC LIMIT 1',
-    [`${prefix}%`]
+    'SELECT sku FROM products WHERE shop_id = ? AND sku LIKE ? ORDER BY sku DESC LIMIT 1',
+    [shopId, `${prefix}%`]
   );
 
   let seq = 1;
@@ -26,7 +27,7 @@ async function generateProductSku(pool) {
   return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
-router.get('/', auth, async (req, res, next) => {
+router.get('/', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, category, warehouse_id, available_only, active_only, status, page = 1, limit = 20 } = req.query;
@@ -42,15 +43,19 @@ router.get('/', auth, async (req, res, next) => {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN warehouse_stock ws ON ws.product_id = p.id ${warehouse_id ? 'AND ws.warehouse_id = ?' : ''}
-      WHERE 1=1
+      WHERE p.shop_id = ?
     `;
     let countQuery = `
       SELECT COUNT(*) as total
       FROM products p
       LEFT JOIN warehouse_stock ws ON ws.product_id = p.id ${warehouse_id ? 'AND ws.warehouse_id = ?' : ''}
-      WHERE 1=1
+      WHERE p.shop_id = ?
     `;
     const params = [];
+    if (warehouse_id) {
+      params.push(parseInt(warehouse_id));
+    }
+    params.push(req.shopId);
 
     // Mặc định chỉ SP đang kinh doanh; active_only=all → mọi SP; active_only=0 → chỉ đã ngừng
     if (String(active_only) === 'all') {
@@ -61,11 +66,6 @@ router.get('/', auth, async (req, res, next) => {
     } else {
       query += ' AND p.is_active = 1';
       countQuery += ' AND p.is_active = 1';
-    }
-
-    if (warehouse_id) {
-      // Filter theo kho: vẫn trả TẤT CẢ sản phẩm; nếu kho chưa có record thì tồn = 0
-      params.push(parseInt(warehouse_id));
     }
 
     // Khi dùng để xuất kho: chỉ lấy những sản phẩm có thể bán > 0 trong kho đó
@@ -134,22 +134,22 @@ router.get('/', auth, async (req, res, next) => {
 
 // Get next auto SKU (SKU-YYYYMMDD-XXXX), reset per day
 // NOTE: must be declared before '/:id' route
-router.get('/next-sku', auth, authorize('admin'), async (req, res, next) => {
+router.get('/next-sku', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const sku = await generateProductSku(pool);
+    const sku = await generateProductSku(pool, req.shopId);
     res.json({ data: { sku } });
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/:id', auth, async (req, res, next) => {
+router.get('/:id', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
-      'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?',
-      [req.params.id]
+      'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ? AND p.shop_id = ?',
+      [req.params.id, req.shopId]
     );
 
     if (rows.length === 0) {
@@ -178,7 +178,52 @@ router.get('/:id', auth, async (req, res, next) => {
   }
 });
 
-router.post('/', auth, authorize('admin'), async (req, res, next) => {
+// Bulk: gán danh mục cho nhiều sản phẩm trong shop hiện tại
+// POST /api/products/bulk/category { product_ids: number[], category_id: number|null }
+router.post('/bulk/category', auth, requireShop, authorize('admin'), async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const sid = req.shopId;
+    const rawIds = Array.isArray(req.body?.product_ids) ? req.body.product_ids : [];
+    const productIds = rawIds
+      .map((x) => parseInt(String(x), 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+
+    if (productIds.length === 0) {
+      return res.status(400).json({ error: 'Thiếu product_ids' });
+    }
+
+    const hasCategory = Object.prototype.hasOwnProperty.call(req.body || {}, 'category_id');
+    if (!hasCategory) {
+      return res.status(400).json({ error: 'Thiếu category_id (có thể null để bỏ danh mục)' });
+    }
+
+    const catRaw = req.body.category_id;
+    const categoryId = catRaw === null || catRaw === '' ? null : parseInt(String(catRaw), 10);
+    if (categoryId != null && (!Number.isFinite(categoryId) || categoryId <= 0)) {
+      return res.status(400).json({ error: 'category_id không hợp lệ' });
+    }
+
+    if (categoryId != null) {
+      const [[c]] = await pool.query('SELECT id FROM categories WHERE id = ? AND shop_id = ? LIMIT 1', [categoryId, sid]);
+      if (!c) return res.status(400).json({ error: 'Danh mục không thuộc shop hiện tại' });
+    }
+
+    const [r] = await pool.query(
+      'UPDATE products SET category_id = ? WHERE shop_id = ? AND id IN (?)',
+      [categoryId, sid, productIds]
+    );
+
+    res.json({
+      message: 'Đã cập nhật danh mục',
+      updated: r.affectedRows || 0,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images, warehouse_id } = req.body;
 
@@ -193,9 +238,9 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
 
     let finalSku = String(sku || '').trim();
     if (!finalSku) {
-      finalSku = await generateProductSku(pool);
+      finalSku = await generateProductSku(pool, req.shopId);
     } else {
-      const [existing] = await pool.query('SELECT id FROM products WHERE sku = ?', [finalSku]);
+      const [existing] = await pool.query('SELECT id FROM products WHERE shop_id = ? AND sku = ?', [req.shopId, finalSku]);
       if (existing.length > 0) {
         return res.status(409).json({ error: 'SKU đã tồn tại' });
       }
@@ -206,8 +251,8 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
       return res.status(400).json({ error: 'warehouse_id không hợp lệ' });
     }
     const [whCheck] = await pool.query(
-      'SELECT id FROM warehouses WHERE id = ? AND is_active = 1 LIMIT 1',
-      [selectedWarehouseId]
+      'SELECT id FROM warehouses WHERE id = ? AND shop_id = ? AND is_active = 1 LIMIT 1',
+      [selectedWarehouseId, req.shopId]
     );
     if (!whCheck.length) {
       return res.status(400).json({ error: 'Kho không tồn tại hoặc đã bị vô hiệu hóa' });
@@ -216,9 +261,9 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
     const initialStock = parseFloat(stock_qty || 0) || 0;
 
     const [result] = await pool.query(
-      `INSERT INTO products (name, sku, category_id, unit, price, cost_price, stock_qty, available_stock, reserved_stock, low_stock_threshold, weight, length, width, height, description, images)
-       VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, finalSku, category_id, unit || 'Cái', price, cost_price || 0, low_stock_threshold || 10, weight, length, width, height, description, images ? JSON.stringify(images) : null]
+      `INSERT INTO products (shop_id, name, sku, category_id, unit, price, cost_price, stock_qty, available_stock, reserved_stock, low_stock_threshold, weight, length, width, height, description, images)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.shopId, name, finalSku, category_id, unit || 'Cái', price, cost_price || 0, low_stock_threshold || 10, weight, length, width, height, description, images ? JSON.stringify(images) : null]
     );
 
     const productId = result.insertId;
@@ -226,18 +271,18 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
     // Create per-warehouse stock in selected warehouse
     if (initialStock > 0) {
       await pool.query(
-        `INSERT INTO warehouse_stock (warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
-         VALUES (?, ?, ?, ?, 0)
+        `INSERT INTO warehouse_stock (shop_id, warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
+         VALUES (?, ?, ?, ?, ?, 0)
          ON DUPLICATE KEY UPDATE
            stock_qty = VALUES(stock_qty),
            available_stock = VALUES(available_stock)`,
-        [selectedWarehouseId, productId, initialStock, initialStock]
+        [req.shopId, selectedWarehouseId, productId, initialStock, initialStock]
       );
     } else {
       await pool.query(
-        `INSERT IGNORE INTO warehouse_stock (warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
-         VALUES (?, ?, 0, 0, 0)`,
-        [selectedWarehouseId, productId]
+        `INSERT IGNORE INTO warehouse_stock (shop_id, warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
+         VALUES (?, ?, ?, 0, 0, 0)`,
+        [req.shopId, selectedWarehouseId, productId]
       );
     }
 
@@ -250,7 +295,7 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
   }
 });
 
-router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images, is_active, warehouse_id } = req.body;
 
@@ -258,7 +303,7 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
 
     // SKU uniqueness only if sku is provided (avoid false positives on soft-delete updates)
     if (typeof sku === 'string' && sku.trim()) {
-      const [existing] = await pool.query('SELECT id FROM products WHERE sku = ? AND id != ?', [sku, req.params.id]);
+      const [existing] = await pool.query('SELECT id FROM products WHERE shop_id = ? AND sku = ? AND id != ?', [req.shopId, sku, req.params.id]);
       if (existing.length > 0) {
         return res.status(409).json({ error: 'SKU đã tồn tại' });
       }
@@ -290,7 +335,7 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
          description = COALESCE(?, description),
          images = IF(?, ?, images),
          is_active = IF(?, ?, is_active)
-       WHERE id = ?`,
+       WHERE id = ? AND shop_id = ?`,
       [
         name ?? null,
         (typeof sku === 'string' && sku.trim()) ? sku.trim() : null,
@@ -310,6 +355,7 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
         hasIsActive ? 1 : 0,
         isActiveBind,
         req.params.id,
+        req.shopId,
       ]
     );
 
@@ -350,10 +396,10 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
   }
 });
 
-router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    await pool.query('UPDATE products SET is_active = 0 WHERE id = ?', [req.params.id]);
+    await pool.query('UPDATE products SET is_active = 0 WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
     res.json({ message: 'Vô hiệu hóa sản phẩm thành công' });
   } catch (err) {
     next(err);

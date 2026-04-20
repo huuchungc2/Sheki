@@ -2,13 +2,14 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
 
 
 // Admin: toàn bộ NV. Sales (scope_own_data): cần dropdown NV phụ trách ở form KH — không chỉ admin.
-router.get('/', auth, (req, res, next) => {
+router.get('/', auth, requireShop, (req, res, next) => {
   if (req.user.can_access_admin || req.user.scope_own_data) return next();
   return res.status(403).json({ error: 'Không có quyền truy cập' });
 }, async (req, res, next) => {
@@ -20,11 +21,13 @@ router.get('/', auth, (req, res, next) => {
       !req.user.can_access_admin && req.user.scope_own_data ? '1' : scoped;
     const offset = (page - 1) * limit;
 
-    let query = `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, u.role_id,
+    let query = `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, us.role_id,
       u.department, u.position, u.commission_rate, u.salary, u.join_date, u.avatar_url, u.city, u.district, u.is_active, u.created_at
-      FROM users u JOIN roles r ON u.role_id = r.id WHERE 1=1`;
-    let countQuery = 'SELECT COUNT(*) as total FROM users u JOIN roles r ON u.role_id = r.id WHERE 1=1';
-    const params = [];
+      FROM users u
+      INNER JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+      JOIN roles r ON us.role_id = r.id WHERE 1=1`;
+    let countQuery = 'SELECT COUNT(*) as total FROM users u INNER JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ? JOIN roles r ON us.role_id = r.id WHERE 1=1';
+    const params = [req.shopId];
 
     // Mặc định chỉ NV đang làm; active_only=all → tất cả; active_only=0 → chỉ đã nghỉ
     if (String(active_only) === 'all') {
@@ -73,14 +76,75 @@ router.get('/', auth, (req, res, next) => {
   }
 });
 
-router.get('/:id', auth, async (req, res, next) => {
+// NOTE: `/me` phải nằm trước `/:id` để tránh bị match nhầm (id="me")
+router.get('/me', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const id = req.user.id;
+    const [[row]] = await pool.query(
+      'SELECT id, full_name, username, email, phone, department, position, join_date, address, city, district, is_active, is_super_admin FROM users WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if (!row) return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+    res.json({ data: row });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Sales/self: cập nhật thông tin cá nhân (không đổi role, không đổi is_active)
+// NOTE: Không requireShop — cho phép user chưa được gán shop vẫn sửa profile cơ bản.
+router.put('/me', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const id = req.user.id;
+    const full_name = req.body?.full_name != null ? String(req.body.full_name).trim() : '';
+    const phoneRaw = req.body?.phone != null ? String(req.body.phone) : '';
+    const phone = phoneRaw.replace(/\D/g, '');
+    const email = req.body?.email != null ? String(req.body.email).trim() : '';
+    const department = req.body?.department != null ? String(req.body.department).trim() : null;
+    const position = req.body?.position != null ? String(req.body.position).trim() : null;
+    const address = req.body?.address != null ? String(req.body.address).trim() : null;
+    const city = req.body?.city != null ? String(req.body.city).trim() : null;
+    const district = req.body?.district != null ? String(req.body.district).trim() : null;
+    const join_date_raw = req.body?.join_date != null ? String(req.body.join_date).trim().slice(0, 10) : '';
+    const join_date = join_date_raw ? join_date_raw : null;
+
+    if (!full_name) return res.status(400).json({ error: 'Thiếu họ tên' });
+    if (phone && phone.length !== 10) return res.status(400).json({ error: 'Số điện thoại phải có đúng 10 chữ số' });
+    if (email) {
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email không hợp lệ' });
+    }
+    if (join_date != null && !/^\d{4}-\d{2}-\d{2}$/.test(join_date)) {
+      return res.status(400).json({ error: 'Ngày vào làm không hợp lệ (YYYY-MM-DD)' });
+    }
+
+    await pool.query(
+      'UPDATE users SET full_name = ?, phone = ?, email = ?, department = ?, position = ?, join_date = ?, address = ?, city = ?, district = ? WHERE id = ?',
+      [full_name, phone || null, email || null, department, position, join_date, address || null, city || null, district || null, id]
+    );
+
+    const [[row]] = await pool.query(
+      'SELECT id, full_name, username, email, phone, department, position, join_date, address, city, district FROM users WHERE id = ? LIMIT 1',
+      [id]
+    );
+    res.json({ message: 'Đã cập nhật', data: row });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
-      `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, u.role_id,
+      `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, us.role_id,
         u.department, u.position, u.commission_rate, u.salary, u.join_date, u.avatar_url, u.address, u.city, u.district, u.postal_code, u.is_active, u.created_at
-       FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
-      [req.params.id]
+       FROM users u
+       INNER JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+       JOIN roles r ON us.role_id = r.id WHERE u.id = ?`,
+      [req.shopId, req.params.id]
     );
 
     if (rows.length === 0) {
@@ -88,6 +152,65 @@ router.get('/:id', auth, async (req, res, next) => {
     }
 
     res.json({ data: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Self: lấy profile cơ bản (không phụ thuộc shop)
+router.get('/me', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const id = req.user.id;
+    const [[row]] = await pool.query(
+      'SELECT id, full_name, username, email, phone, department, position, join_date, address, city, district, is_active, is_super_admin FROM users WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if (!row) return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+    res.json({ data: row });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Sales/self: cập nhật thông tin cá nhân (không đổi role, không đổi is_active)
+// NOTE: Không requireShop — cho phép user chưa được gán shop vẫn sửa profile cơ bản.
+router.put('/me', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const id = req.user.id;
+    const full_name = req.body?.full_name != null ? String(req.body.full_name).trim() : '';
+    const phoneRaw = req.body?.phone != null ? String(req.body.phone) : '';
+    const phone = phoneRaw.replace(/\D/g, '');
+    const email = req.body?.email != null ? String(req.body.email).trim() : '';
+    const department = req.body?.department != null ? String(req.body.department).trim() : null;
+    const position = req.body?.position != null ? String(req.body.position).trim() : null;
+    const address = req.body?.address != null ? String(req.body.address).trim() : null;
+    const city = req.body?.city != null ? String(req.body.city).trim() : null;
+    const district = req.body?.district != null ? String(req.body.district).trim() : null;
+    const join_date_raw = req.body?.join_date != null ? String(req.body.join_date).trim().slice(0, 10) : '';
+    const join_date = join_date_raw ? join_date_raw : null;
+
+    if (!full_name) return res.status(400).json({ error: 'Thiếu họ tên' });
+    if (phone && phone.length !== 10) return res.status(400).json({ error: 'Số điện thoại phải có đúng 10 chữ số' });
+    if (email) {
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'Email không hợp lệ' });
+    }
+    if (join_date != null && !/^\d{4}-\d{2}-\d{2}$/.test(join_date)) {
+      return res.status(400).json({ error: 'Ngày vào làm không hợp lệ (YYYY-MM-DD)' });
+    }
+
+    await pool.query(
+      'UPDATE users SET full_name = ?, phone = ?, email = ?, department = ?, position = ?, join_date = ?, address = ?, city = ?, district = ? WHERE id = ?',
+      [full_name, phone || null, email || null, department, position, join_date, address || null, city || null, district || null, id]
+    );
+
+    const [[row]] = await pool.query(
+      'SELECT id, full_name, username, email, phone, department, position, join_date, address, city, district FROM users WHERE id = ? LIMIT 1',
+      [id]
+    );
+    res.json({ message: 'Đã cập nhật', data: row });
   } catch (err) {
     next(err);
   }
@@ -108,7 +231,7 @@ function normalizeUsername(s) {
   return String(s || '').trim().toLowerCase();
 }
 
-router.post('/', auth, authorize('admin'), async (req, res, next) => {
+router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { full_name, email, password, phone, department, position, commission_rate, salary, join_date, address, city, district, postal_code } = req.body;
     const username = normalizeUsername(req.body.username);
@@ -153,14 +276,19 @@ router.post('/', auth, authorize('admin'), async (req, res, next) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [full_name, username, email, passwordHash, phone, roleId, department, position, commission_rate || 5.00, salary || 0, join_date, address, city, district, postal_code]
     );
+    const newUserId = result.insertId;
+    await pool.query(
+      'INSERT INTO user_shops (user_id, shop_id, role_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)',
+      [newUserId, req.shopId, roleId]
+    );
 
-    res.status(201).json({ id: result.insertId, message: 'Tạo nhân viên thành công' });
+    res.status(201).json({ id: newUserId, message: 'Tạo nhân viên thành công' });
   } catch (err) {
     next(err);
   }
 });
 
-router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const { full_name, email, phone, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, password } = req.body;
     const username = normalizeUsername(req.body.username);
@@ -205,6 +333,10 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
         [full_name, username, email, phone, roleId, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, req.params.id]
       );
     }
+    await pool.query(
+      'UPDATE user_shops SET role_id = ? WHERE user_id = ? AND shop_id = ?',
+      [roleId, req.params.id, req.shopId]
+    );
 
     res.json({ message: 'Cập nhật nhân viên thành công' });
   } catch (err) {
@@ -212,7 +344,7 @@ router.put('/:id', auth, authorize('admin'), async (req, res, next) => {
   }
 });
 
-router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     await pool.query('UPDATE users SET is_active = 0 WHERE id = ?', [req.params.id]);
@@ -222,7 +354,7 @@ router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
   }
 });
 
-router.put('/:id/role', auth, authorize('admin'), async (req, res, next) => {
+router.put('/:id/role', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const roleId = parseInt(req.body.role_id, 10);
     if (!roleId) {
@@ -234,20 +366,23 @@ router.put('/:id/role', auth, authorize('admin'), async (req, res, next) => {
       return res.status(400).json({ error: 'Vai trò không hợp lệ' });
     }
     await pool.query('UPDATE users SET role_id = ? WHERE id = ?', [roleId, req.params.id]);
+    await pool.query('UPDATE user_shops SET role_id = ? WHERE user_id = ? AND shop_id = ?', [roleId, req.params.id, req.shopId]);
     res.json({ message: 'Cập nhật quyền thành công' });
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/available/collaborators', auth, async (req, res, next) => {
+router.get('/available/collaborators', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { exclude_id } = req.query;
 
     let query = `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, u.department, u.position, u.is_active
-      FROM users u JOIN roles r ON u.role_id = r.id WHERE u.is_active = 1`;
-    const params = [];
+      FROM users u
+      INNER JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+      JOIN roles r ON us.role_id = r.id WHERE u.is_active = 1`;
+    const params = [req.shopId];
 
     if (exclude_id) {
       query += ' AND u.id != ?';
@@ -268,21 +403,24 @@ router.get('/available/collaborators', auth, async (req, res, next) => {
   }
 });
 
-router.get('/:id/overview', auth, async (req, res, next) => {
+router.get('/:id/overview', auth, requireShop, async (req, res, next) => {
   try {
     if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem thông tin nhân viên này' });
     }
 
     const pool = await getPool();
+    const sid = req.shopId;
     const targetUserId = parseInt(req.params.id);
     const { date_from, date_to } = req.query;
 
     const [userRows] = await pool.query(
-      `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, r.name AS role_name, u.role_id,
+      `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, r.name AS role_name, us.role_id,
         u.department, u.position, u.commission_rate, u.salary, u.join_date, u.avatar_url, u.city, u.district, u.is_active, u.created_at
-       FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
-      [targetUserId]
+       FROM users u
+       INNER JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+       JOIN roles r ON us.role_id = r.id WHERE u.id = ?`,
+      [sid, targetUserId]
     );
     if (userRows.length === 0) {
       return res.status(404).json({ error: 'Không tìm thấy nhân viên' });
@@ -292,8 +430,8 @@ router.get('/:id/overview', auth, async (req, res, next) => {
     const [groupRows] = await pool.query(
       `SELECT g.id, g.name, g.description FROM groups g
        JOIN user_groups ug ON g.id = ug.group_id
-       WHERE ug.user_id = ?`,
-      [targetUserId]
+       WHERE ug.user_id = ? AND g.shop_id = ?`,
+      [targetUserId, sid]
     );
 
     // Build date filter condition
@@ -310,8 +448,8 @@ router.get('/:id/overview', auth, async (req, res, next) => {
         COALESCE(SUM(o.total_amount), 0) as total_revenue
        FROM commissions c
        JOIN orders o ON c.order_id = o.id
-       WHERE c.user_id = ? AND c.type = 'direct' ${dateWhere}`,
-      [targetUserId, ...dateParams]
+       WHERE o.shop_id = ? AND c.user_id = ? AND c.type = 'direct' ${dateWhere}`,
+      [sid, targetUserId, ...dateParams]
     );
 
     // Hoa hồng override (từ CTV) — nhân viên Sales nhận khi CTV dưới quyền bán
@@ -319,8 +457,8 @@ router.get('/:id/overview', auth, async (req, res, next) => {
       `SELECT COALESCE(SUM(c.commission_amount), 0) as override_commission
        FROM commissions c
        JOIN orders o ON c.order_id = o.id
-       WHERE c.user_id = ? AND c.type = 'override' ${dateWhere}`,
-      [targetUserId, ...dateParams]
+       WHERE o.shop_id = ? AND c.user_id = ? AND c.type = 'override' ${dateWhere}`,
+      [sid, targetUserId, ...dateParams]
     );
 
     const commission = {
@@ -339,19 +477,19 @@ router.get('/:id/overview', auth, async (req, res, next) => {
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.id
        JOIN products p ON oi.product_id = p.id
-       WHERE o.salesperson_id = ? AND o.status != 'cancelled' ${dateWhere}
+       WHERE o.shop_id = ? AND o.salesperson_id = ? AND o.status != 'cancelled' ${dateWhere}
        GROUP BY p.id, p.name, p.sku, p.unit
        ORDER BY total_qty DESC
        LIMIT 10`,
-      [targetUserId, ...dateParams]
+      [sid, targetUserId, ...dateParams]
     );
 
     const [orderStatsRows] = await pool.query(
       `SELECT status, COUNT(*) as count
        FROM orders
-       WHERE salesperson_id = ? ${dateWhere.replace(/o\./g, '')}
+       WHERE shop_id = ? AND salesperson_id = ? ${dateWhere.replace(/o\./g, '')}
        GROUP BY status`,
-      [targetUserId, ...dateParams]
+      [sid, targetUserId, ...dateParams]
     );
     const orderStats = {};
     orderStatsRows.forEach(r => { orderStats[r.status] = r.count; });
@@ -374,13 +512,14 @@ router.get('/:id/overview', auth, async (req, res, next) => {
   }
 });
 
-router.get('/:id/orders', auth, async (req, res, next) => {
+router.get('/:id/orders', auth, requireShop, async (req, res, next) => {
   try {
     if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem đơn hàng của nhân viên này' });
     }
 
     const pool = await getPool();
+    const sid = req.shopId;
     const targetUserId = parseInt(req.params.id);
     const { status, date_from, date_to, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
@@ -395,10 +534,10 @@ router.get('/:id/orders', auth, async (req, res, next) => {
         ), 0) as commission_amount
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.salesperson_id = ?
+      WHERE o.shop_id = ? AND o.salesperson_id = ?
     `;
-    let countQuery = 'SELECT COUNT(*) as total FROM orders WHERE salesperson_id = ?';
-    const params = [targetUserId];
+    let countQuery = 'SELECT COUNT(*) as total FROM orders WHERE shop_id = ? AND salesperson_id = ?';
+    const params = [sid, targetUserId];
 
     if (status) { query += ' AND o.status = ?'; countQuery += ' AND status = ?'; params.push(status); }
     if (date_from) { query += ' AND DATE(o.created_at) >= ?'; countQuery += ' AND DATE(created_at) >= ?'; params.push(date_from); }
@@ -426,7 +565,7 @@ router.get('/:id/orders', auth, async (req, res, next) => {
   }
 });
 
-router.get('/:id/collaborators', auth, async (req, res, next) => {
+router.get('/:id/collaborators', auth, requireShop, async (req, res, next) => {
   try {
     if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem cộng tác viên của nhân viên này' });
@@ -440,10 +579,11 @@ router.get('/:id/collaborators', auth, async (req, res, next) => {
               u.is_active, u.commission_rate
        FROM collaborators c
        JOIN users u ON c.ctv_id = u.id
-       JOIN roles r ON u.role_id = r.id
-       WHERE c.sales_id = ?
+       JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
+       JOIN roles r ON us.role_id = r.id
+       WHERE c.shop_id = ? AND c.sales_id = ?
        ORDER BY c.created_at DESC`,
-      [req.params.id]
+      [req.shopId, req.shopId, req.params.id]
     );
 
     res.json({ data: rows });
@@ -453,13 +593,14 @@ router.get('/:id/collaborators', auth, async (req, res, next) => {
 });
 
 // Report: tổng hoa hồng từ CTV cho một nhân viên
-router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
+router.get('/:id/collaborators/commissions', auth, requireShop, async (req, res, next) => {
   try {
     if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem báo cáo CTV' });
     }
 
     const pool = await getPool();
+    const sid = req.shopId;
     const targetUserId = parseInt(req.params.id);
     const { month, year, group_id } = req.query;
 
@@ -486,10 +627,10 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
     const txFrom = `
       FROM (
         SELECT id AS tx_id, order_id, NULL AS return_id, user_id, type, ctv_user_id, commission_amount AS amount, created_at AS entry_date, 'commission' AS entry_kind
-        FROM commissions
+        FROM commissions WHERE shop_id = ?
         UNION ALL
         SELECT id AS tx_id, order_id, return_id, user_id, type, ctv_user_id, amount, created_at AS entry_date, 'adjustment' AS entry_kind
-        FROM commission_adjustments
+        FROM commission_adjustments WHERE shop_id = ?
       ) t
     `;
 
@@ -514,17 +655,20 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
         WHERE 1=1 ${txExtra}${txOrderExtra}
       ) t ON t.user_id = ? AND t.type = 'override' AND t.ctv_user_id = col.id
       LEFT JOIN orders o ON o.id = t.order_id AND o.salesperson_id = col.id ${orderExtra}
-      WHERE cr.sales_id = ?
+      WHERE cr.shop_id = ? AND cr.sales_id = ?
       GROUP BY col.id, col.full_name, col.commission_rate
       ORDER BY total_override_commission DESC
     `, [
+      sid,
+      sid,
       ...txFilterParams,
       // txOrderExtra (if any) — must come BEFORE ON t.user_id placeholder
       ...(groupIdInt != null ? [groupIdInt] : []),
       targetUserId,
       // orderExtra (if any)
       ...(groupIdInt != null ? [groupIdInt] : []),
-      // WHERE cr.sales_id
+      // WHERE cr.shop_id, cr.sales_id
+      sid,
       targetUserId,
     ]);
 
@@ -573,7 +717,8 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
             (
               SELECT ct.sales_override_rate
               FROM commission_tiers ct
-              WHERE ct.ctv_rate_min <= oi2.commission_rate
+              WHERE ct.shop_id = (SELECT o3.shop_id FROM orders o3 WHERE o3.id = oi2.order_id LIMIT 1)
+                AND ct.ctv_rate_min <= oi2.commission_rate
                 AND (ct.ctv_rate_max IS NULL OR ct.ctv_rate_max >= oi2.commission_rate)
               ORDER BY ct.ctv_rate_min DESC
               LIMIT 1
@@ -584,9 +729,11 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
       ) adj_rates ON adj_rates.tx_id = t.tx_id
       LEFT JOIN groups g ON o.group_id = g.id
       LEFT JOIN customers cu ON o.customer_id = cu.id
-      WHERE cr.sales_id = ?
+      WHERE cr.shop_id = ? AND cr.sales_id = ?
       ORDER BY col.full_name, t.entry_date DESC
     `, [
+      sid,
+      sid,
       ...txFilterParams,
       ...(groupIdInt != null ? [groupIdInt] : []),
       // ON t.user_id
@@ -595,7 +742,8 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
       ...(groupIdInt != null ? [groupIdInt] : []),
       // LEFT JOIN commissions c.user_id
       targetUserId,
-      // WHERE cr.sales_id
+      // WHERE cr.shop_id, cr.sales_id
+      sid,
       targetUserId,
     ]);
 
@@ -626,7 +774,7 @@ router.get('/:id/collaborators/commissions', auth, async (req, res, next) => {
   }
 });
 
-router.post('/:id/collaborators', auth, async (req, res, next) => {
+router.post('/:id/collaborators', auth, requireShop, async (req, res, next) => {
   try {
     if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền thêm cộng tác viên cho nhân viên này' });
@@ -652,16 +800,16 @@ router.post('/:id/collaborators', auth, async (req, res, next) => {
 
     // Dùng bảng collaborators (sales_id, ctv_id)
     const [duplicate] = await pool.query(
-      'SELECT id FROM collaborators WHERE sales_id = ? AND ctv_id = ?',
-      [userId, collabId]
+      'SELECT id FROM collaborators WHERE shop_id = ? AND sales_id = ? AND ctv_id = ?',
+      [req.shopId, userId, collabId]
     );
     if (duplicate.length > 0) {
       return res.status(409).json({ error: 'Cộng tác viên đã tồn tại' });
     }
 
     await pool.query(
-      'INSERT INTO collaborators (sales_id, ctv_id) VALUES (?, ?)',
-      [userId, collabId]
+      'INSERT INTO collaborators (shop_id, sales_id, ctv_id) VALUES (?, ?, ?)',
+      [req.shopId, userId, collabId]
     );
 
     res.status(201).json({ message: 'Thêm cộng tác viên thành công' });
@@ -670,7 +818,7 @@ router.post('/:id/collaborators', auth, async (req, res, next) => {
   }
 });
 
-router.delete('/:id/collaborators/:collaboratorId', auth, async (req, res, next) => {
+router.delete('/:id/collaborators/:collaboratorId', auth, requireShop, async (req, res, next) => {
   try {
     if (req.user.scope_own_data && parseInt(req.params.id) !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xóa cộng tác viên của nhân viên này' });
@@ -678,8 +826,8 @@ router.delete('/:id/collaborators/:collaboratorId', auth, async (req, res, next)
 
     const pool = await getPool();
     await pool.query(
-      'DELETE FROM collaborators WHERE sales_id = ? AND ctv_id = ?',
-      [req.params.id, req.params.collaboratorId]
+      'DELETE FROM collaborators WHERE shop_id = ? AND sales_id = ? AND ctv_id = ?',
+      [req.shopId, req.params.id, req.params.collaboratorId]
     );
 
     res.json({ message: 'Xóa cộng tác viên thành công' });

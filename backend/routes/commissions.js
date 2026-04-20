@@ -1,17 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 
-router.get('/', auth, async (req, res, next) => {
+router.get('/', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { user_id, month, year, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    const conditions = ['1=1'];
-    const params = [];
+    const conditions = ['o.shop_id = ?'];
+    const params = [req.shopId];
 
     if (req.user.scope_own_data) {
       conditions.push('t.user_id = ?');
@@ -78,13 +79,13 @@ router.get('/', auth, async (req, res, next) => {
   }
 });
 
-router.get('/summary', auth, async (req, res, next) => {
+router.get('/summary', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { user_id, month, year } = req.query;
 
     const conditions = ['1=1'];
-    const params = [];
+    const params = [req.shopId, req.shopId];
     if (req.user.scope_own_data) {
       conditions.push('t.user_id = ?');
       params.push(req.user.id);
@@ -102,9 +103,9 @@ router.get('/summary', auth, async (req, res, next) => {
         COALESCE(SUM(t.amount), 0) as total_commission,
         COALESCE(AVG(t.amount), 0) as avg_commission
        FROM (
-         SELECT order_id, user_id, commission_amount as amount, created_at as entry_date FROM commissions
+         SELECT order_id, user_id, commission_amount as amount, created_at as entry_date FROM commissions WHERE shop_id = ?
          UNION ALL
-         SELECT order_id, user_id, amount, created_at as entry_date FROM commission_adjustments
+         SELECT order_id, user_id, amount, created_at as entry_date FROM commission_adjustments WHERE shop_id = ?
        ) t
        ${whereClause}`,
       params
@@ -116,14 +117,14 @@ router.get('/summary', auth, async (req, res, next) => {
   }
 });
 
-router.get('/orders', auth, async (req, res, next) => {
+router.get('/orders', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { month, year, group_id, page = 1, limit = 20, user_id } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const conditions = ['1=1'];
-    const baseParams = [];
+    const conditions = ['o.shop_id = ?'];
+    const baseParams = [req.shopId];
 
     // Sales: HH bán hàng (direct) + HH từ CTV (override cho user_id = mình).
     // Hoàn hàng tạo `commission_adjustments` (âm) nên phải tính cả adjustment để KPI khớp thực tế.
@@ -218,8 +219,8 @@ router.get('/orders', auth, async (req, res, next) => {
       !req.user.scope_own_data && !Number.isNaN(parsedQueryUid) ? parsedQueryUid : null;
 
     if (req.user.scope_own_data) {
-      const summaryConds = ['t.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
-      const summaryParams = [req.user.id];
+      const summaryConds = ['o.shop_id = ?', 't.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
+      const summaryParams = [req.shopId, req.user.id];
       if (month) {
         summaryConds.push('MONTH(t.entry_date) = ?');
         summaryParams.push(parseInt(month, 10));
@@ -251,8 +252,8 @@ router.get('/orders', auth, async (req, res, next) => {
       );
       s = summaryRows[0];
     } else if (adminEmployeeUid != null) {
-      const summaryConds = ['t.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
-      const summaryParams = [adminEmployeeUid];
+      const summaryConds = ['o.shop_id = ?', 't.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
+      const summaryParams = [req.shopId, adminEmployeeUid];
       if (month) {
         summaryConds.push('MONTH(t.entry_date) = ?');
         summaryParams.push(parseInt(month, 10));
@@ -305,12 +306,13 @@ router.get('/orders', auth, async (req, res, next) => {
     if (req.user.scope_own_data && month && year) {
       // Ship / NV chỉ theo đơn mình là salesperson (giống GET /reports/dashboard — không lấy ship đơn của CTV khi chỉ có override)
       const shipConds = [
+        'o.shop_id = ?',
         'MONTH(o.created_at) = ?',
         'YEAR(o.created_at) = ?',
         'o.salesperson_id = ?',
         "o.status <> 'cancelled'",
       ];
-      const shipParams = [parseInt(month), parseInt(year), req.user.id];
+      const shipParams = [req.shopId, parseInt(month), parseInt(year), req.user.id];
       if (group_id) {
         shipConds.push('o.group_id = ?');
         shipParams.push(parseInt(group_id));
@@ -327,12 +329,13 @@ router.get('/orders', auth, async (req, res, next) => {
       totalNvChiu = parseFloat(shipRows[0]?.total_nv_chiu) || 0;
     } else if (adminEmployeeUid != null && month && year) {
       const shipConds = [
+        'o.shop_id = ?',
         'MONTH(o.created_at) = ?',
         'YEAR(o.created_at) = ?',
         'o.salesperson_id = ?',
         "o.status <> 'cancelled'",
       ];
-      const shipParams = [parseInt(month, 10), parseInt(year, 10), adminEmployeeUid];
+      const shipParams = [req.shopId, parseInt(month, 10), parseInt(year, 10), adminEmployeeUid];
       if (group_id) {
         shipConds.push('o.group_id = ?');
         shipParams.push(parseInt(group_id, 10));
@@ -375,8 +378,8 @@ router.get('/orders', auth, async (req, res, next) => {
     // - ca.type='direct'
     // - ca.user_id = o.salesperson_id
     // - lọc theo kỳ phát sinh adjustment (ca.created_at)
-    const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'MONTH(ca.created_at) = ?', 'YEAR(ca.created_at) = ?'];
-    const retCommParams = [parseInt(month, 10), parseInt(year, 10)];
+    const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'o.shop_id = ?', 'MONTH(ca.created_at) = ?', 'YEAR(ca.created_at) = ?'];
+    const retCommParams = [req.shopId, parseInt(month, 10), parseInt(year, 10)];
     if (req.user.scope_own_data) {
       retCommConds.push('o.salesperson_id = ?');
       retCommParams.push(req.user.id);

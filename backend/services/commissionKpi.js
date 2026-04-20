@@ -8,9 +8,11 @@
  * @param {{ month: number, year: number, groupId?: number|null, userId?: number|null }} opts
  *   userId: chỉ sales — giới hạn c.user_id (và override adj cùng user)
  */
-async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId = null }) {
+async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId = null, shopId = null }) {
   const g = groupId != null ? parseInt(String(groupId), 10) : null;
   const uid = userId != null ? parseInt(String(userId), 10) : null;
+  const sid = shopId != null ? parseInt(String(shopId), 10) : null;
+  const shopCond = sid != null && Number.isFinite(sid) ? ' AND o.shop_id = ?' : '';
   const groupCond = g != null && Number.isFinite(g) ? ' AND o.group_id = ?' : '';
   const userCond = uid != null && Number.isFinite(uid) ? ' AND c.user_id = ?' : '';
   const userCondAdj = uid != null && Number.isFinite(uid) ? ' AND ca.user_id = ?' : '';
@@ -19,6 +21,11 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
   const directParams = [...baseParams];
   const ovParams = [...baseParams];
   const adjParams = [...baseParams];
+  if (sid != null && Number.isFinite(sid)) {
+    directParams.push(sid);
+    ovParams.push(sid);
+    adjParams.push(sid);
+  }
   if (g != null && Number.isFinite(g)) {
     directParams.push(g);
     ovParams.push(g);
@@ -35,7 +42,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
      FROM commissions c
      JOIN orders o ON c.order_id = o.id
      WHERE MONTH(c.created_at) = ? AND YEAR(c.created_at) = ?
-       AND c.type = 'direct' AND o.status != 'cancelled'${groupCond}${userCond}`,
+       AND c.type = 'direct' AND o.status != 'cancelled'${shopCond}${groupCond}${userCond}`,
     directParams
   );
   const [[oRow]] = await pool.query(
@@ -43,7 +50,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
      FROM commissions c
      JOIN orders o ON c.order_id = o.id
      WHERE MONTH(c.created_at) = ? AND YEAR(c.created_at) = ?
-       AND c.type = 'override' AND o.status != 'cancelled'${groupCond}${userCond}`,
+       AND c.type = 'override' AND o.status != 'cancelled'${shopCond}${groupCond}${userCond}`,
     ovParams
   );
   const [[aRow]] = await pool.query(
@@ -51,7 +58,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
      FROM commission_adjustments ca
      JOIN orders o ON ca.order_id = o.id
      WHERE MONTH(ca.created_at) = ? AND YEAR(ca.created_at) = ?
-       AND ca.type = 'override' AND o.status != 'cancelled'${groupCond}${userCondAdj}`,
+       AND ca.type = 'override' AND o.status != 'cancelled'${shopCond}${groupCond}${userCondAdj}`,
     adjParams
   );
 
@@ -75,6 +82,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
  * cùng bộ lọc đơn như danh sách đơn (trừ khi không có ngày — khi đó không lọc theo thời gian).
  */
 async function sumDirectGrossAccrualForOrderFilters(pool, {
+  shopId,
   scopeOwnData,
   userId,
   search,
@@ -94,6 +102,11 @@ async function sumDirectGrossAccrualForOrderFilters(pool, {
     WHERE c.type = 'direct'
       AND o.status != 'cancelled'
   `;
+
+  if (shopId != null) {
+    sql += ' AND o.shop_id = ?';
+    params.push(shopId);
+  }
 
   if (scopeOwnData && userId) {
     sql += ' AND o.salesperson_id = ?';

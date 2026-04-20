@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ const upload = multer({
 });
 
 // Upload single image
-router.post('/', auth, upload.single('image'), (req, res) => {
+router.post('/', auth, requireShop, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Không có file nào được tải lên' });
   }

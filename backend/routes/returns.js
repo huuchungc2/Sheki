@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
@@ -81,27 +82,27 @@ async function computeReturnBaseTotalForRequest(pool, orderId, requestItems) {
   return total;
 }
 
-async function getOverrideTierRate(pool, ctvRate) {
+async function getOverrideTierRate(pool, ctvRate, shopId) {
   const [[t]] = await pool.query(
     `SELECT sales_override_rate
      FROM commission_tiers
-     WHERE ctv_rate_min <= ? AND (ctv_rate_max IS NULL OR ctv_rate_max >= ?)
+     WHERE shop_id = ? AND ctv_rate_min <= ? AND (ctv_rate_max IS NULL OR ctv_rate_max >= ?)
      ORDER BY ctv_rate_min DESC LIMIT 1`,
-    [ctvRate, ctvRate]
+    [shopId, ctvRate, ctvRate]
   );
   return t ? (parseFloat(t.sales_override_rate) || 0) : 0;
 }
 
 // GET /api/returns — danh sách đơn hoàn (bảng returns)
 // Sales: chỉ đơn gốc do mình bán; Admin: tất cả
-router.get('/', auth, async (req, res, next) => {
+router.get('/', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const { page = 1, limit = 50, q, date_from, date_to, group_id } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const conds = ['1=1'];
-    const params = [];
+    const conds = ['r.shop_id = ?'];
+    const params = [req.shopId];
     if (req.user.scope_own_data) {
       // Sales view: chỉ thấy đơn hoàn của đơn mình bán
       conds.push('o.salesperson_id = ?');
@@ -187,9 +188,9 @@ router.get('/', auth, async (req, res, next) => {
       const [adjRows] = await pool.query(
         `SELECT return_id, COALESCE(SUM(amount), 0) AS total_amount
          FROM commission_adjustments
-         WHERE ${adjConds.join(' AND ')}
+         WHERE shop_id = ? AND ${adjConds.join(' AND ')}
          GROUP BY return_id`,
-        adjParams
+        [req.shopId, ...adjParams]
       );
       commissionByRet = adjRows.reduce((acc, r) => {
         acc[String(r.return_id)] = parseFloat(r.total_amount) || 0;
@@ -221,7 +222,7 @@ router.get('/', auth, async (req, res, next) => {
 
 // ADMIN: xóa đơn hoàn (rollback: kho + bút toán hoa hồng + trạng thái request nếu có)
 // DELETE /api/returns/:id
-router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   let conn;
   try {
     const pool = await getPool();
@@ -234,9 +235,9 @@ router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
     const [[ret]] = await conn.query(
       `SELECT id, order_id, return_request_id, warehouse_id
        FROM returns
-       WHERE id = ?
+       WHERE id = ? AND shop_id = ?
        FOR UPDATE`,
-      [returnId]
+      [returnId, req.shopId]
     );
     if (!ret) {
       await conn.rollback();
@@ -253,8 +254,8 @@ router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
       const qty = parseFloat(it.qty) || 0;
       if (qty <= 0) continue;
       await conn.query(
-        'UPDATE warehouse_stock SET stock_qty = GREATEST(0, stock_qty - ?) WHERE warehouse_id = ? AND product_id = ?',
-        [qty, ret.warehouse_id, it.product_id]
+        'UPDATE warehouse_stock SET stock_qty = GREATEST(0, stock_qty - ?) WHERE warehouse_id = ? AND product_id = ? AND shop_id = ?',
+        [qty, ret.warehouse_id, it.product_id, req.shopId]
       );
     }
 
@@ -294,9 +295,10 @@ router.delete('/:id', auth, authorize('admin'), async (req, res, next) => {
 
 // ADMIN: tạo yêu cầu hoàn (Sales không được tạo từ UI/API)
 // POST /api/returns/requests
-router.post('/requests', auth, authorize('admin'), async (req, res, next) => {
+router.post('/requests', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
+    const sid = req.shopId;
     const { order_id, reason } = req.body;
     const items = normalizeItems(req.body.items);
 
@@ -305,8 +307,8 @@ router.post('/requests', auth, authorize('admin'), async (req, res, next) => {
     }
 
     const [orderRows] = await pool.query(
-      'SELECT id, salesperson_id, warehouse_id, status FROM orders WHERE id = ? LIMIT 1',
-      [order_id]
+      'SELECT id, salesperson_id, warehouse_id, status FROM orders WHERE id = ? AND shop_id = ? LIMIT 1',
+      [order_id, sid]
     );
     if (!orderRows.length) return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
     const order = orderRows[0];
@@ -348,8 +350,8 @@ router.post('/requests', auth, authorize('admin'), async (req, res, next) => {
     }
 
     const [rrRes] = await pool.query(
-      'INSERT INTO return_requests (order_id, requested_by, status, reason) VALUES (?, ?, "pending", ?)',
-      [order_id, req.user.id, reason || null]
+      'INSERT INTO return_requests (shop_id, order_id, requested_by, status, reason) VALUES (?, ?, ?, "pending", ?)',
+      [sid, order_id, req.user.id, reason || null]
     );
     const returnRequestId = rrRes.insertId;
 
@@ -367,14 +369,14 @@ router.post('/requests', auth, authorize('admin'), async (req, res, next) => {
 });
 
 // GET /api/returns/requests — Admin: danh sách yêu cầu hoàn (Sales dùng GET /returns)
-router.get('/requests', auth, authorize('admin'), async (req, res, next) => {
+router.get('/requests', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { status, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const conds = ['1=1'];
-    const params = [];
+    const conds = ['rr.shop_id = ?'];
+    const params = [req.shopId];
     if (status) {
       conds.push('rr.status = ?');
       params.push(status);
@@ -491,15 +493,16 @@ router.get('/requests', auth, authorize('admin'), async (req, res, next) => {
 
 // ADMIN: duyệt và tạo đơn hoàn + bút toán hoa hồng âm + cộng kho
 // POST /api/returns/requests/:id/approve
-router.post('/requests/:id/approve', auth, authorize('admin'), async (req, res, next) => {
+router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
+    const sid = req.shopId;
     const requestId = parseInt(req.params.id);
     const { admin_note } = req.body;
 
     const [rrRows] = await pool.query(
-      'SELECT * FROM return_requests WHERE id = ? LIMIT 1',
-      [requestId]
+      'SELECT * FROM return_requests WHERE id = ? AND shop_id = ? LIMIT 1',
+      [requestId, sid]
     );
     if (!rrRows.length) return res.status(404).json({ error: 'Không tìm thấy yêu cầu hoàn' });
     const rr = rrRows[0];
@@ -508,8 +511,8 @@ router.post('/requests/:id/approve', auth, authorize('admin'), async (req, res, 
     }
 
     const [orderRows] = await pool.query(
-      'SELECT id, code, warehouse_id, status FROM orders WHERE id = ? LIMIT 1',
-      [rr.order_id]
+      'SELECT id, code, warehouse_id, status, shop_id FROM orders WHERE id = ? AND shop_id = ? LIMIT 1',
+      [rr.order_id, sid]
     );
     if (!orderRows.length) return res.status(404).json({ error: 'Không tìm thấy đơn gốc' });
     const order = orderRows[0];
@@ -541,8 +544,8 @@ router.post('/requests/:id/approve', auth, authorize('admin'), async (req, res, 
 
     // Create returns + items
     const [retRes] = await pool.query(
-      'INSERT INTO returns (order_id, return_request_id, warehouse_id, created_by, note) VALUES (?, ?, ?, ?, ?)',
-      [rr.order_id, requestId, order.warehouse_id, req.user.id, admin_note || null]
+      'INSERT INTO returns (shop_id, order_id, return_request_id, warehouse_id, created_by, note) VALUES (?, ?, ?, ?, ?, ?)',
+      [sid, rr.order_id, requestId, order.warehouse_id, req.user.id, admin_note || null]
     );
     const returnId = retRes.insertId;
     for (const it of reqItems) {
@@ -575,8 +578,8 @@ router.post('/requests/:id/approve', auth, authorize('admin'), async (req, res, 
 
       // Restore physical stock into warehouse_stock
       await pool.query(
-        'UPDATE warehouse_stock SET stock_qty = stock_qty + ? WHERE warehouse_id = ? AND product_id = ?',
-        [qty, order.warehouse_id, it.product_id]
+        'UPDATE warehouse_stock SET stock_qty = stock_qty + ? WHERE warehouse_id = ? AND product_id = ? AND shop_id = ?',
+        [qty, order.warehouse_id, it.product_id, sid]
       );
       await recalculateStock(it.product_id, order.warehouse_id);
     }
@@ -592,7 +595,7 @@ router.post('/requests/:id/approve', auth, authorize('admin'), async (req, res, 
     const getTier = async (ctvRate) => {
       const key = String(ctvRate);
       if (tierCache.has(key)) return tierCache.get(key);
-      const r = await getOverrideTierRate(pool, ctvRate);
+      const r = await getOverrideTierRate(pool, ctvRate, sid);
       tierCache.set(key, r);
       return r;
     };
@@ -640,9 +643,9 @@ router.post('/requests/:id/approve', auth, authorize('admin'), async (req, res, 
       if (amt !== 0) {
         await pool.query(
           `INSERT INTO commission_adjustments
-            (order_id, return_id, user_id, type, ctv_user_id, amount, reason, created_by)
-           VALUES (?, ?, ?, 'direct', NULL, ?, ?, ?)`,
-          [rr.order_id, returnId, directRow.user_id, -Math.abs(amt), reason, req.user.id]
+            (shop_id, order_id, return_id, user_id, type, ctv_user_id, amount, reason, created_by)
+           VALUES (?, ?, ?, ?, 'direct', NULL, ?, ?, ?)`,
+          [sid, rr.order_id, returnId, directRow.user_id, -Math.abs(amt), reason, req.user.id]
         );
       }
     }
@@ -653,15 +656,15 @@ router.post('/requests/:id/approve', auth, authorize('admin'), async (req, res, 
       if (!amt) continue;
       await pool.query(
         `INSERT INTO commission_adjustments
-          (order_id, return_id, user_id, type, ctv_user_id, amount, reason, created_by)
-         VALUES (?, ?, ?, 'override', ?, ?, ?, ?)`,
-        [rr.order_id, returnId, managerId, m.ctv_user_id || null, -Math.abs(amt), reason, req.user.id]
+          (shop_id, order_id, return_id, user_id, type, ctv_user_id, amount, reason, created_by)
+         VALUES (?, ?, ?, ?, 'override', ?, ?, ?, ?)`,
+        [sid, rr.order_id, returnId, managerId, m.ctv_user_id || null, -Math.abs(amt), reason, req.user.id]
       );
     }
 
     await pool.query(
-      'UPDATE return_requests SET status="approved", admin_note=?, approved_by=?, approved_at=NOW() WHERE id=?',
-      [admin_note || null, req.user.id, requestId]
+      'UPDATE return_requests SET status=\"approved\", admin_note=?, approved_by=?, approved_at=NOW() WHERE id=? AND shop_id=?',
+      [admin_note || null, req.user.id, requestId, req.shopId]
     );
 
     res.json({ id: returnId, message: 'Đã duyệt và tạo đơn hoàn' });
@@ -672,19 +675,19 @@ router.post('/requests/:id/approve', auth, authorize('admin'), async (req, res, 
 
 // ADMIN: từ chối yêu cầu hoàn
 // POST /api/returns/requests/:id/reject
-router.post('/requests/:id/reject', auth, authorize('admin'), async (req, res, next) => {
+router.post('/requests/:id/reject', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const requestId = parseInt(req.params.id);
     const { admin_note } = req.body;
 
-    const [rrRows] = await pool.query('SELECT id, status FROM return_requests WHERE id = ? LIMIT 1', [requestId]);
+    const [rrRows] = await pool.query('SELECT id, status FROM return_requests WHERE id = ? AND shop_id = ? LIMIT 1', [requestId, req.shopId]);
     if (!rrRows.length) return res.status(404).json({ error: 'Không tìm thấy yêu cầu hoàn' });
     if (String(rrRows[0].status) !== 'pending') return res.status(400).json({ error: 'Yêu cầu hoàn không ở trạng thái pending' });
 
     await pool.query(
-      'UPDATE return_requests SET status="rejected", admin_note=?, approved_by=?, approved_at=NOW() WHERE id=?',
-      [admin_note || null, req.user.id, requestId]
+      'UPDATE return_requests SET status=\"rejected\", admin_note=?, approved_by=?, approved_at=NOW() WHERE id=? AND shop_id=?',
+      [admin_note || null, req.user.id, requestId, req.shopId]
     );
     res.json({ message: 'Đã từ chối yêu cầu hoàn' });
   } catch (err) {

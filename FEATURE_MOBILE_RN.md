@@ -106,7 +106,7 @@ mobile/
 ### Giai đoạn 1 — Core (bắt buộc)
 | Màn hình | File | Mô tả |
 |---|---|---|
-| Login | `app/(auth)/login.tsx` | Đăng nhập bằng username/email + password |
+| Login | `app/(auth)/login.tsx` | Đăng nhập bằng username + password (cùng API web: chỉ username) |
 | Dashboard | `app/(tabs)/index.tsx` | KPI tóm tắt: doanh thu hôm nay, số đơn, HH |
 | OrderList | `app/(tabs)/orders.tsx` | Danh sách đơn, filter, search |
 | OrderDetail | `app/orders/[id].tsx` | Xem chi tiết đơn, đổi status |
