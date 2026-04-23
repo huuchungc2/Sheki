@@ -3,8 +3,74 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
+const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
 const { normalizeCustomerBirthday } = require('../utils/customerBirthday');
+const { getScope } = require('../utils/scope');
+
+async function loadUserGroupIds(pool, shopId, userId) {
+  const [rows] = await pool.query(
+    `SELECT ug.group_id
+     FROM user_groups ug
+     JOIN groups g ON g.id = ug.group_id
+     WHERE ug.user_id = ? AND g.shop_id = ? AND g.is_active = 1`,
+    [userId, shopId]
+  );
+  return rows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
+}
+
+async function assertCanViewOrder(pool, req, orderId) {
+  const [rows] = await pool.query(
+    'SELECT id, shop_id, group_id, salesperson_id, customer_id FROM orders WHERE id = ? AND shop_id = ?',
+    [orderId, req.shopId]
+  );
+  if (!rows.length) {
+    const err = new Error('Không tìm thấy đơn hàng');
+    err.status = 404;
+    throw err;
+  }
+  const order = rows[0];
+
+  const scope = await getScope(req, 'orders');
+  if (scope === 'own' && order.salesperson_id !== req.user.id) {
+    const [[ov]] = await pool.query(
+      `SELECT 1 as ok
+       FROM commissions c
+       WHERE c.order_id = ? AND c.user_id = ? AND c.type = 'override' AND c.shop_id = ?
+       LIMIT 1`,
+      [order.id, req.user.id, req.shopId]
+    );
+    if (!ov?.ok) {
+      const err = new Error('Không có quyền xem đơn hàng này');
+      err.status = 403;
+      throw err;
+    }
+  }
+  if (scope === 'group') {
+    const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+    if (!gids.length || !gids.includes(Number(order.group_id))) {
+      const err = new Error('Không có quyền xem đơn hàng này');
+      err.status = 403;
+      throw err;
+    }
+  }
+  return order;
+}
+
+async function loadUserIdsInGroups(pool, shopId, groupIds) {
+  if (!groupIds || groupIds.length === 0) return [];
+  const placeholders = groupIds.map(() => '?').join(',');
+  const [rows] = await pool.query(
+    `SELECT DISTINCT ug.user_id
+     FROM user_groups ug
+     JOIN groups g ON g.id = ug.group_id
+     JOIN user_shops us ON us.user_id = ug.user_id AND us.shop_id = ?
+     WHERE g.shop_id = ?
+       AND ug.group_id IN (${placeholders})`,
+    [shopId, shopId, ...groupIds]
+  );
+  return rows.map((r) => Number(r.user_id)).filter((n) => Number.isFinite(n) && n > 0);
+}
 
 /** Chỉ gán NV khi tồn tại trong users — tránh ER_NO_REFERENCED_ROW_2 (id lỗi / localStorage cũ) */
 async function resolveAssignedEmployeeId(pool, raw) {
@@ -15,7 +81,7 @@ async function resolveAssignedEmployeeId(pool, raw) {
   return rows.length ? id : null;
 }
 
-router.get('/', auth, requireShop, async (req, res, next) => {
+router.get('/', auth, requireShop, requireFeature('customers.list'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, tier, page = 1, limit = 20 } = req.query;
@@ -25,10 +91,23 @@ router.get('/', auth, requireShop, async (req, res, next) => {
     let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE shop_id = ?';
     const params = [req.shopId];
 
-    if (req.user.scope_own_data) {
+    const scope = await getScope(req, 'customers');
+    if (scope === 'own') {
       query += ' AND (created_by = ? OR assigned_employee_id = ?)';
       countQuery += ' AND (created_by = ? OR assigned_employee_id = ?)';
       params.push(req.user.id, req.user.id);
+    } else if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      const uids = await loadUserIdsInGroups(pool, req.shopId, gids);
+      if (!uids.length) {
+        query += ' AND 1=0';
+        countQuery += ' AND 1=0';
+      } else {
+        const placeholders = uids.map(() => '?').join(',');
+        query += ` AND (created_by IN (${placeholders}) OR assigned_employee_id IN (${placeholders}))`;
+        countQuery += ` AND (created_by IN (${placeholders}) OR assigned_employee_id IN (${placeholders}))`;
+        params.push(...uids, ...uids);
+      }
     }
 
     if (search) {
@@ -48,7 +127,9 @@ router.get('/', auth, requireShop, async (req, res, next) => {
     params.push(parseInt(limit), parseInt(offset));
 
     const [rows] = await pool.query(query, params);
-    const [countRows] = await pool.query(countQuery, params.slice(0, req.user.scope_own_data ? -2 : -2));
+    // countQuery uses same params without LIMIT/OFFSET
+    const countParams = params.slice(0, params.length - 2);
+    const [countRows] = await pool.query(countQuery, countParams);
 
     res.json({ data: rows, total: countRows[0].total, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
@@ -56,18 +137,39 @@ router.get('/', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.get('/suggest', auth, requireShop, async (req, res, next) => {
+router.get('/suggest', auth, requireShop, requireFeature('customers.list'), async (req, res, next) => {
   try {
-    const { q } = req.query;
+    const { q, order_id } = req.query;
     const pool = await getPool();
 
     let query = 'SELECT id, name, phone, email, tier, address, city, district, ward FROM customers WHERE shop_id = ?';
     const params = [req.shopId];
 
-    // Sales chỉ thấy KH do mình tạo hoặc được gán cho mình
-    if (req.user.scope_own_data) {
+    // Nếu đang sửa đơn: bám theo salesperson của đơn để lọc KH
+    // (tránh bám theo user login khiến dropdown sai khi sửa đơn của người khác)
+    let scopeUserId = req.user.id;
+    if (order_id != null && String(order_id).trim() !== '') {
+      const oid = parseInt(String(order_id), 10);
+      if (Number.isFinite(oid) && oid > 0) {
+        const order = await assertCanViewOrder(pool, req, oid);
+        scopeUserId = Number(order.salesperson_id) || scopeUserId;
+      }
+    }
+
+    const scope = await getScope(req, 'customers');
+    if (scope === 'own') {
       query += ' AND (created_by = ? OR assigned_employee_id = ?)';
-      params.push(req.user.id, req.user.id);
+      params.push(scopeUserId, scopeUserId);
+    } else if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, scopeUserId);
+      const uids = await loadUserIdsInGroups(pool, req.shopId, gids);
+      if (!uids.length) {
+        query += ' AND 1=0';
+      } else {
+        const placeholders = uids.map(() => '?').join(',');
+        query += ` AND (created_by IN (${placeholders}) OR assigned_employee_id IN (${placeholders}))`;
+        params.push(...uids, ...uids);
+      }
     }
 
     if (q) {
@@ -85,9 +187,11 @@ router.get('/suggest', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.get('/:id', auth, requireShop, async (req, res, next) => {
+router.get('/:id', auth, requireShop, requireFeature('customers.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
+    const { order_id } = req.query;
+
     const [rows] = await pool.query(
       'SELECT c.*, u.full_name as assigned_employee_name FROM customers c LEFT JOIN users u ON c.assigned_employee_id = u.id WHERE c.id = ? AND c.shop_id = ?',
       [req.params.id, req.shopId]
@@ -97,8 +201,27 @@ router.get('/:id', auth, requireShop, async (req, res, next) => {
       return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
     }
 
-    if (req.user.scope_own_data && rows[0].created_by !== req.user.id && rows[0].assigned_employee_id !== req.user.id) {
+    // Nếu có order_id: cho phép xem KH đúng của đơn đang sửa, miễn là user có quyền xem đơn đó.
+    if (order_id != null && String(order_id).trim() !== '') {
+      const oid = parseInt(String(order_id), 10);
+      if (Number.isFinite(oid) && oid > 0) {
+        const order = await assertCanViewOrder(pool, req, oid);
+        if (String(order.customer_id) === String(rows[0].id)) {
+          return res.json({ data: rows[0] });
+        }
+      }
+    }
+
+    const scope = await getScope(req, 'customers');
+    if (scope === 'own' && rows[0].created_by !== req.user.id && rows[0].assigned_employee_id !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xem khách hàng này' });
+    }
+    if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      const uids = await loadUserIdsInGroups(pool, req.shopId, gids);
+      if (!uids.length || (!uids.includes(Number(rows[0].created_by)) && !uids.includes(Number(rows[0].assigned_employee_id)))) {
+        return res.status(403).json({ error: 'Không có quyền xem khách hàng này' });
+      }
     }
 
     res.json({ data: rows[0] });
@@ -107,7 +230,7 @@ router.get('/:id', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.post('/', auth, requireShop, async (req, res, next) => {
+router.post('/', auth, requireShop, requireFeature('customers.create'), async (req, res, next) => {
   try {
     const { name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note } = req.body;
 
@@ -148,13 +271,23 @@ router.post('/', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.put('/:id', auth, requireShop, async (req, res, next) => {
+router.put('/:id', auth, requireShop, requireFeature('customers.edit'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
-    if (req.user.scope_own_data) {
+    const scope = await getScope(req, 'customers');
+    if (scope === 'own') {
       const [existing] = await pool.query('SELECT created_by, assigned_employee_id FROM customers WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
       if (existing.length === 0 || (existing[0].created_by !== req.user.id && existing[0].assigned_employee_id !== req.user.id)) {
+        return res.status(403).json({ error: 'Không có quyền sửa khách hàng này' });
+      }
+    }
+    if (scope === 'group') {
+      const [existing] = await pool.query('SELECT created_by, assigned_employee_id FROM customers WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);
+      if (existing.length === 0) return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      const uids = await loadUserIdsInGroups(pool, req.shopId, gids);
+      if (!uids.length || (!uids.includes(Number(existing[0].created_by)) && !uids.includes(Number(existing[0].assigned_employee_id)))) {
         return res.status(403).json({ error: 'Không có quyền sửa khách hàng này' });
       }
     }
@@ -188,7 +321,7 @@ router.put('/:id', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, requireFeature('customers.delete'), async (req, res, next) => {
   try {
     const pool = await getPool();
     await pool.query('DELETE FROM customers WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);

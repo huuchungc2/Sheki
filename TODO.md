@@ -7,13 +7,27 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **Sidebar Admin: sắp xếp lại menu** — Nhóm theo Bán hàng / Sản phẩm / Nhân sự / Kho / Báo cáo / Excel / Nhật ký; giữ nguyên route. — Files: `src/components/Layout.tsx`
+- [ ] **RBAC (phase 2): áp `requirePermission` dần cho orders/customers/products/reports** — Giữ `scope_own_data` để lọc dữ liệu; thay `authorize('admin')` dần bằng module/action tương ứng; đồng bộ `AdminRoute` vs quyền thật. — Files: `backend/routes/*`, `src/App.tsx`
+
+## 🛠️ VỪA LÀM
+
+- [x] **Gom 1 file SQL final (multi-shop → RBAC/scope) để chạy trên DB backup** — Tạo script idempotent gộp các migration multi-shop + roles.shop_id + scope tables + feature permissions + fix Sales/customer view. — File: `migrations/999_final_multishop_rbac.sql`
+
+- [x] **Thu chi: nhân viên mặc định theo chính mình** — Nhân viên vào màn Thu chi tự khóa theo user hiện tại (mặc định filter + thêm phiếu), Admin mới được chọn/lọc nhân viên. — File: `src/pages/CashTransactions.tsx`
+- [x] **UI: Nhóm nhân viên nằm trong menu Nhân sự** — Tách màn quản lý nhóm ra route riêng `/employees/groups` (submenu Nhân sự) và gỡ tab “Nhóm nhân viên” khỏi Settings. — Files: `src/components/Layout.tsx`, `src/App.tsx`, `src/pages/EmployeeGroups.tsx`, `src/pages/Settings.tsx`
+- [x] **RBAC generator: thêm module mới tự sinh phân quyền + migration** — Thêm script `rbac-gen.js` để tự append feature keys vào `backend/rbac/features.js`, (tuỳ chọn) thêm scope target, và tự tạo migration backfill `role_feature_permissions` cho module mới (strict mode). — File: `backend/scripts/rbac-gen.js`
+- [x] **Feature permissions: bật/tắt “Chức năng” ăn thật (nhóm/role custom)** — Lưu full matrix `role_feature_permissions` (missing key = false), chế độ strict khi role đã seed (missing key = deny), seed feature perms khi tạo role mới; gắn `employees.list` vào `GET /users` để bật/tắt xem nhân viên hoạt động đúng. — Files: `backend/routes/settings.js`, `backend/middleware/requireFeature.js`, `backend/routes/roles.js`, `backend/routes/users.js`
+- [x] **Scope nhóm: fix lọc báo cáo hoa hồng (commissions/ctv) theo group** — Enforce `scope='group'` cho `/commissions`, `/commissions/summary`, `/commissions/orders` và `/collaborators/commissions/all` để không “lọt” dữ liệu ngoài nhóm; nếu không chọn `group_id` sẽ auto chọn nhóm đầu tiên user thuộc. — Files: `backend/routes/commissions.js`, `backend/routes/collaborators.js`
+- [x] **Báo cáo hoa hồng: đồng nhất UI theo menu Admin** — Trang `/reports/commissions` luôn hiển thị tabs “Hoa hồng nhân viên / Hoa hồng từ CTV” như Admin; Sales xem sẽ tự co dữ liệu theo scope (chỉ 1 dòng của mình, CTV theo `sales_id`). — File: `src/pages/CommissionReport.tsx`
+- [x] **RBAC (feature perms): Sales bị 403 khi xem chi tiết khách hàng** — Fix default seed thiếu `customers.view` khiến role Sales/custom role đã seed `role_feature_permissions` không mở được KH/đơn liên quan. — Files: `backend/routes/settings.js`, `migrations/029_fix_customers_view_feature.sql`
+- [x] **OrderForm: “Tổng kết đơn hàng” hiển thị mã đơn + đổi nhãn “trừ HH sau”** — Dòng “Tổng CK” hiển thị mã đơn khi sửa; “Tiền NV chịu” đổi text “trừ vào Lương” (không đổi logic). — File: `src/pages/OrderForm.tsx`
+- [x] **Super Admin: tạo shop auto-seed group + user test + sản phẩm test** — Khi tạo shop mới, tự tạo group theo tên shop, 2 user sales test thuộc group/shop để test, và 2 sản phẩm test + tồn kho trong kho mặc định. — File: `backend/routes/shops.js`
 
 ---
 
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
-- [ ] **Super Admin: tạo shop auto-seed quyền + kho mặc định** — Khi tạo shop mới, auto copy `role_permissions` từ shop mẫu (id=1) và tạo 1 `warehouse` mặc định để tránh lỗi 403/thiếu kho. — Files: `backend/routes/shops.js`
+- [x] **Super Admin: tạo shop auto-seed quyền + kho mặc định** — Khi tạo shop mới, auto copy `role_permissions` từ shop mẫu (id=1) và tạo 1 `warehouse` mặc định để tránh lỗi 403/thiếu kho. — Files: `backend/routes/shops.js`
 - [ ] **Settings: phân quyền theo vai (role) đúng nghĩa** — Bỏ hardcode role ở UI, load roles từ DB; đổi `role_permissions` theo `role_id`; thêm middleware `requirePermission(module, action)` và áp dần vào routes (giữ `scope_own_data` để lọc dữ liệu). — Files: `backend/routes/settings.js`, `backend/middleware/requirePermission.js`, `backend/routes/roles.js`, `src/pages/Settings.tsx`, `migrations/021_role_permissions_role_id.sql`, `schema.sql`
 - [ ] **Mobile: chuẩn bị phase WebView/RN** — Rà soát tài liệu + checklist release + cấu hình env API_URL, back button, offline, file upload WebView. — Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
 
@@ -67,6 +81,14 @@
 ---
 
 ## ✅ HOÀN THÀNH
+
+- [x] **Multi-shop: role theo shop (không “lòi” role TNK sang Sheki)** — Thêm `roles.shop_id`, API `/roles` chỉ trả role của shop hiện tại + role hệ thống; chặn gán `role_id` khác shop. — Files: `migrations/022_roles_shop_id.sql`, `backend/routes/roles.js`, `backend/routes/users.js`, `backend/routes/shops.js`
+- [x] **RBAC: Sales thấy lại Hoa hồng CTV** — Menu non-admin có `reports.view` sẽ hiện `/reports/commissions/ctv` và route này cũng được bảo vệ bằng `reports.view`. — Files: `src/components/Layout.tsx`, `src/App.tsx`
+- [x] **RBAC: default permissions đủ 32** — Settings API default cho role chưa có `role_permissions` trả về full matrix 8×4 để tránh role mới/role kho bị “mất sạch quyền”. — File: `backend/routes/settings.js`
+
+- [x] **RBAC (phase 1): kho + inventory API enforce theo `role_permissions`** — Gắn `requirePermission('inventory', …)` cho API kho; mở route `/inventory*` theo `_caps` từ DB (không hardcode `roles.code`, không cần `can_access_admin`); seed `role_permissions` khi tạo role mới để tránh 403 “không có dòng permission”; UI Settings default matrix khớp backend cho role không phải admin; thêm enforce `reports.view` cho revenue/cash transactions. — Files: `backend/routes/inventory.js`, `backend/routes/roles.js`, `backend/routes/auth.js`, `backend/routes/cash-transactions.js`, `backend/routes/reports.js`, `src/App.tsx`, `src/components/Layout.tsx`, `src/pages/Settings.tsx`, `CHANGELOG.md`
+
+- [x] **Sidebar Admin: sắp xếp lại menu** — Nhóm theo Bán hàng / Sản phẩm / Nhân sự / Kho / Báo cáo / Excel / Nhật ký; giữ nguyên route. — Files: `src/components/Layout.tsx`, `CHANGELOG.md`
 
 - [x] **Dashboard: switch-shop không dính số shop cũ** — Dashboard refetch theo `auth-change`/`storage` khi token đổi để không hiển thị doanh thu/hoa hồng của shop trước. — Files: `src/pages/Dashboard.tsx`, `CHANGELOG.md`
 
@@ -126,6 +148,7 @@
 - [x] **KPI hoa hồng khớp giữa Dashboard / báo cáo / danh sách đơn** — `commissionKpi.js` + `salary.summary.kpi_*` + `/orders` tổng direct theo phát sinh; fix Dashboard Admin/Sales và Admin báo cáo cộng thiếu từ bảng NV — Files: `backend/services/commissionKpi.js`, `backend/routes/reports.js`, `backend/routes/orders.js`, `src/pages/CommissionReport.tsx`, `src/pages/OrderList.tsx`
 - [x] **Báo cáo hoa hồng: tổng “Hoa hồng nhân viên” khớp KPI Tổng lương** — Không bỏ sót NV chỉ có phát sinh HH (override/adjustment) nhưng không có đơn bán trong kỳ, để tổng bảng không lệch Dashboard. — File: `backend/routes/reports.js`
 - [x] **Báo cáo hoa hồng: thêm cột NV bán ở chi tiết theo đơn** — Hiển thị nhân viên bán bên cạnh mã đơn trong bảng chi tiết. — Files: `backend/routes/commissions.js`, `src/pages/CommissionReport.tsx`
+- [x] **reports/commissions: sort lương cao→thấp + gộp cột HH & Ship/NV** — Bảng “Hoa hồng nhân viên” sort theo Tổng lương giảm dần; gộp 3 cột HH thành 1 cột 3 dòng; gộp Ship KH Trả + NV chịu thành 1 cột 2 dòng; bảng chi tiết theo đơn gộp Ship/NV cho gọn. — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`
 
 - [x] **Báo cáo hoa hồng (Admin): tổng doanh số hoàn + tổng HH hoàn lọc theo nhóm** — KPI hoàn lọc theo `group_id` (khi chọn nhóm) để khớp bộ lọc báo cáo; fix API `/reports/returns-summary` join `orders` để filter nhóm cho cả doanh số hoàn và HH hoàn — Files: `backend/routes/reports.js`
 - [x] **Gom logic KPI hoàn dùng chung (Dashboard + Báo cáo hoa hồng)** — Tách helper tính doanh số hoàn / số đơn hoàn / HH hoàn để tránh lệch số giữa các màn — Files: `backend/services/returnMetrics.js`, `backend/routes/reports.js`

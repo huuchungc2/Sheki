@@ -1,3 +1,62 @@
+## [23/04/2026] - Thu chi: nhân viên mặc định theo chính mình
+### Fixed
+- **CashTransactions UI** — Nếu user không phải Admin thì tự mặc định `user_id`/bộ lọc theo chính user đang đăng nhập và khóa chọn nhân viên; Admin vẫn chọn/lọc theo nhân viên như cũ. — File: `src/pages/CashTransactions.tsx`
+
+## [23/04/2026] - Super Admin: tạo shop auto-seed group + user test + sản phẩm test
+### Added
+- **Shops API** — Khi Super Admin tạo shop mới, hệ thống tự tạo 1 group theo tên shop, tạo 2 user sales test thuộc `user_shops` + `user_groups` (password `abc123`) và tạo 2 sản phẩm test kèm `warehouse_stock` ở kho mặc định để có thể lên đơn/nhập-xuất test ngay. — File: `backend/routes/shops.js`
+
+## [23/04/2026] - RBAC: Sales xem chi tiết khách hàng không bị 403
+### Fixed
+- **Feature permissions seed** — Bổ sung quyền mặc định `customers.view` cho role non-admin (sales-like) để khớp middleware `requireFeature('customers.view')` ở `GET /customers/:id`; thêm migration backfill quyền này cho các role đã seed `customers.list`. — Files: `backend/routes/settings.js`, `migrations/029_fix_customers_view_feature.sql`
+
+## [23/04/2026] - Báo cáo hoa hồng: UI đồng nhất theo menu Admin
+### Changed
+- **CommissionReport UI** — Trang `/reports/commissions` luôn hiển thị tabs “Hoa hồng nhân viên / Hoa hồng từ CTV” như Admin; non-admin (Sales) vẫn xem được theo scope `own` (bảng NV chỉ còn 1 dòng của mình, CTV filter theo `sales_id`). — File: `src/pages/CommissionReport.tsx`
+
+## [23/04/2026] - RBAC: scope nhóm không lọt dữ liệu báo cáo
+### Fixed
+- **Commissions + CTV commissions** — Khi `scope='group'`, các endpoint báo cáo hoa hồng bắt buộc giới hạn theo `group_id` thuộc nhóm của user (nếu không truyền `group_id` thì tự chọn nhóm đầu tiên user thuộc) để tránh xem “lọt” ngoài nhóm. — Files: `backend/routes/commissions.js`, `backend/routes/collaborators.js`
+
+## [23/04/2026] - RBAC: “Chức năng” (feature perms) bật/tắt ăn thật
+### Fixed
+- **Feature permissions strict + seed** — `PUT /settings/feature-matrix` luôn lưu đủ tất cả feature keys (key thiếu = false) để tránh fallback mặc định; middleware `requireFeature()` chuyển sang strict khi role đã có dòng seeded (key thiếu = deny); seed `role_feature_permissions` mặc định khi tạo role mới; gắn `employees.list` vào `GET /users` để bật/tắt “Xem nhân viên” hoạt động đúng. — Files: `backend/routes/settings.js`, `backend/middleware/requireFeature.js`, `backend/routes/roles.js`, `backend/routes/users.js`
+
+## [23/04/2026] - Tooling: generator thêm module RBAC
+### Added
+- **rbac-gen** — Script sinh RBAC cho module mới: tự thêm feature keys vào `backend/rbac/features.js`, (tuỳ chọn) thêm scope target, và tự tạo migration backfill `role_feature_permissions` để key mới có sẵn cho mọi role/shop (hợp strict mode). — File: `backend/scripts/rbac-gen.js`
+
+## [21/04/2026] - Multi-shop: role theo shop (không “lòi” role cross-shop)
+### Fixed
+- **Roles** — Thêm `roles.shop_id` để role custom thuộc từng shop; `GET /roles` chỉ trả role của shop hiện tại + role hệ thống; chặn sửa/xóa role hệ thống từ shop. — File: `backend/routes/roles.js`
+- **Users/Shop** — Chặn gán `role_id` không thuộc shop hiện tại khi tạo/sửa/gán quyền nhân viên; seed/admin-role hệ thống luôn lấy `shop_id=0` (fallback DB cũ). — Files: `backend/routes/users.js`, `backend/routes/shops.js`
+- **DB** — Migration thêm `roles.shop_id` và unique theo `(shop_id, code)` (custom role migrate về shop_id=1). — File: `migrations/022_roles_shop_id.sql`
+
+## [22/04/2026] - OrderForm: tổng kết hiển thị mã đơn + đổi nhãn NV chịu
+### Changed
+- **OrderForm** — Thêm 1 dòng “Mã ĐH” trong “Tổng kết đơn hàng” khi sửa đơn (fallback `#id`); giữ nguyên dòng “Tổng CK”; dòng “Tiền NV chịu” đổi mô tả từ “trừ HH sau” → “trừ vào Lương” (không đổi logic). — File: `src/pages/OrderForm.tsx`
+
+## [21/04/2026] - RBAC: Sales thấy lại “Hoa hồng CTV”
+### Fixed
+- **FE Menu/Routes** — Non-admin có `reports.view` sẽ thấy link `/reports/commissions/ctv` và route này cũng được bảo vệ bằng `reports.view` như các báo cáo khác. — Files: `src/components/Layout.tsx`, `src/App.tsx`
+
+## [21/04/2026] - RBAC: default permissions luôn đủ 32 quyền
+### Fixed
+- **Settings API** — Khi role chưa có dòng `role_permissions`, default trả về luôn full matrix 8 module × 4 action (32 rows) để UI toggle ổn định; tránh tạo role kho nhưng thiếu quyền → `_caps` rỗng → mất hết menu/403. — File: `backend/routes/settings.js`
+
+## [21/04/2026] - reports/commissions: sort lương cao→thấp + gộp cột HH & Ship/NV
+### Changed
+- **Reports API** — `GET /reports/salary` sort danh sách nhân viên theo `total_luong` giảm dần (để bảng “Hoa hồng nhân viên” hiển thị lương cao đến thấp). — File: `backend/routes/reports.js`
+- **CommissionReport UI** — Bảng “Hoa hồng nhân viên”: gộp `Số đơn` + `Doanh số` vào cột Nhân viên; đổi nhãn HH thành `Bán hàng / Từ CTV / Tổng`; gộp `Ship KH Trả` + `NV chịu` thành 1 cột nhiều dòng. Bảng “Chi tiết hoa hồng theo đơn”: gộp `Ngày` + `Nhóm BH` vào cột Mã đơn hàng và chuyển `Loại HH` sang cột `NHÂN VIÊN`; gộp Ship/NV để giảm tràn ngang. — File: `src/pages/CommissionReport.tsx`
+
+## [21/04/2026] - RBAC phase 1: kho/inventory enforce + UX Settings + seed quyền role mới
+### Changed
+- **Inventory API** — Các endpoint kho dùng `requirePermission('inventory', …)` thay vì `authorize('admin')`, để quyền trong `role_permissions` có hiệu lực thật (xem vs nhập/xuất). — File: `backend/routes/inventory.js`
+- **Roles API** — Khi tạo role mới, tự seed `role_permissions` cho shop hiện tại (copy template `shop_id=1`: admin-role copy theo admin, role khác copy theo sales) để tránh 403 khi role chưa có dòng permission. — File: `backend/routes/roles.js`
+- **FE** — Mở route `/inventory*` cho user role kho (theo `roles.code` chứa `kho/warehouse/inventory`); thêm menu sidebar riêng cho NV kho; default matrix trong Settings khớp backend cho mọi role không phải admin. — Files: `src/App.tsx`, `src/components/Layout.tsx`, `src/pages/Settings.tsx`
+- **Auth API + FE routing** — `GET /auth/me` trả `_caps` (quyền hiệu lực theo `role_permissions` + cùng rule bypass như `requirePermission`); `App.tsx`/`Layout.tsx` dùng `_caps` để mở `/inventory*`, `/reports/revenue`, `/cash-transactions` thay vì hardcode theo `roles.code`. — Files: `backend/routes/auth.js`, `src/App.tsx`, `src/components/Layout.tsx`
+- **Cash transactions + Revenue report API** — Bỏ `authorize('admin')` kiểu cũ; dùng `requirePermission('reports', …)` để role kiểu kế toán (có `reports.view/edit/delete`) dùng được khi được phân quyền. — Files: `backend/routes/cash-transactions.js`, `backend/routes/reports.js`
+
 ## [20/04/2026] - Profile: Sales bấm “Tài khoản” không bị 403 và luôn load dữ liệu mới nhất
 ### Fixed
 - **Users API** — Thêm `GET /users/me` để lấy profile hiện tại; bỏ `requireShop` khỏi `PUT /users/me` để user chưa gán shop vẫn cập nhật thông tin cá nhân (tránh 403 “không có quyền truy cập”). — File: `backend/routes/users.js`
@@ -1351,6 +1410,10 @@
 - **CommissionDetail bỏ "Hoa hồng trung bình"** → Thay bằng "Lương cơ bản" của nhân viên (dễ hiểu hơn)
 - **Commissions API** - Thêm `status`, `total_amount` vào response để hiển thị ngay trong bảng
 
+## [23/04/2026] - Menu Nhân sự: Nhóm nhân viên
+### Changed
+- **Nhóm nhân viên đưa vào menu Nhân sự** - Tách màn quản lý nhóm ra route riêng `/employees/groups` (submenu Nhân sự) và gỡ tab “Nhóm nhân viên” khỏi Settings. - Files: `src/components/Layout.tsx`, `src/App.tsx`, `src/pages/EmployeeGroups.tsx`, `src/pages/Settings.tsx`
+
 ## 05/04/2026 - Tách báo cáo doanh thu và hoa hồng
 ### Changed
 - **Tách 2 trang báo cáo riêng** - RevenueReport (admin only) và CommissionReport (admin + sales) thay vì gộp chung SalaryReport
@@ -1486,6 +1549,10 @@
 ## [15/04/2026] - [Docs: prompt RN native ít token]
 ### Changed
 - Chuẩn hoá `PROMPT_MOBILE.md` thành prompt gốc RN native + các task mẫu (setup/login/orders/detail) để mở agent nhanh và giảm token. - Files: `PROMPT_MOBILE.md`
+
+## [23/04/2026] - [DB: Final SQL bundle cho multi-shop + RBAC]
+### Added
+- Thêm script SQL “final bundle” (idempotent) để áp toàn bộ thay đổi multi-shop → RBAC/scope lên DB backup từ server, chạy 1 lần là đúng. - Files: `migrations/999_final_multishop_rbac.sql`
 
 ### Business Rules Implemented
 - Mã đơn hàng: `DH-YYYYMMDD-XXXX` (reset theo ngày)

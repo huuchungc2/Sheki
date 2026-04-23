@@ -50,6 +50,20 @@ project/
 - **Sales:** chỉ xem đơn/KH của mình (`created_by = user_id OR assigned_employee_id = user_id`)
 - Menu sidebar tự động ẩn/hiện theo role
 
+## 🔐 RBAC (module/action) + Scope theo module (own/shop)
+**Source of truth modules/actions:** `backend/rbac/modules.js`
+
+- **Quyền truy cập API**: gắn `requirePermission(module, action)` (source: `backend/middleware/requirePermission.js`)
+- **UI caps**: `_caps` từ `GET /auth/me` (compute trong `backend/routes/auth.js`)
+- **Phạm vi dữ liệu (own vs shop)**: bảng `role_module_scopes` (migration `migrations/025_role_module_scopes.sql`)
+  - Trong code backend: dùng `backend/utils/moduleScope.js` (`isOwnScope(req, module)` / `getModuleScope(req, module)`)
+  - **Không** tạo thêm cờ boolean trong `roles` để điều khiển scope
+
+**Khi thêm module mới (vd `zalo_chat`)**:
+- Khai báo module 1 lần trong `backend/rbac/modules.js` (và `SCOPE_MODULES` nếu cần scope)
+- Bảo vệ route backend bằng `requirePermission('zalo_chat', 'view'|'edit'...)`
+- UI menu/route check `_caps.zalo_chat.view`...
+
 ## 🔑 Tài khoản test
 Đăng nhập chỉ bằng **username** (cột `users.username`) — không đăng nhập bằng email.
 

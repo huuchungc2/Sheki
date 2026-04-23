@@ -87,7 +87,13 @@ async function createAdminAccountsForShop(conn, shopId, admins, adminRoleId) {
 }
 
 async function getAdminRoleId(conn) {
-  const [[r]] = await conn.query("SELECT id, code FROM roles WHERE code = 'admin' LIMIT 1");
+  let r = null;
+  try {
+    [[r]] = await conn.query("SELECT id, code FROM roles WHERE code = 'admin' AND shop_id = 0 LIMIT 1");
+  } catch (e) {
+    if (!e || e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+    [[r]] = await conn.query("SELECT id, code FROM roles WHERE code = 'admin' LIMIT 1");
+  }
   if (!r || String(r.code) !== 'admin') {
     const err = new Error('Thiếu role admin trong hệ thống (roles.code = admin)');
     err.status = 500;
@@ -97,7 +103,13 @@ async function getAdminRoleId(conn) {
 }
 
 async function getSalesRoleId(conn) {
-  const [[r]] = await conn.query("SELECT id, code FROM roles WHERE code = 'sales' LIMIT 1");
+  let r = null;
+  try {
+    [[r]] = await conn.query("SELECT id, code FROM roles WHERE code = 'sales' AND shop_id = 0 LIMIT 1");
+  } catch (e) {
+    if (!e || e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+    [[r]] = await conn.query("SELECT id, code FROM roles WHERE code = 'sales' LIMIT 1");
+  }
   if (!r || String(r.code) !== 'sales') {
     const err = new Error('Thiếu role sales trong hệ thống (roles.code = sales)');
     err.status = 500;
@@ -153,6 +165,120 @@ async function ensureDefaultWarehouseForShop(conn, shopId) {
     'INSERT INTO warehouses (shop_id, name, address, is_default, is_active) VALUES (?, ?, ?, 1, 1)',
     [shopId, 'Kho trung tâm', null]
   );
+}
+
+async function getDefaultWarehouseIdForShop(conn, shopId) {
+  const [[w]] = await conn.query(
+    'SELECT id FROM warehouses WHERE shop_id = ? AND is_default = 1 ORDER BY id ASC LIMIT 1',
+    [shopId]
+  );
+  if (w?.id) return w.id;
+  const [[anyW]] = await conn.query('SELECT id FROM warehouses WHERE shop_id = ? ORDER BY id ASC LIMIT 1', [shopId]);
+  return anyW?.id || null;
+}
+
+function buildSeedUsername(shopCode, suffix) {
+  const base = String(shopCode || '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '_');
+  const u = `${base}_${suffix}`.replace(/_+/g, '_');
+  return normalizeUsername(u).slice(0, 32);
+}
+
+function buildSeedEmail(username, shopCode) {
+  const base = String(shopCode || 'shop').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '');
+  const u = String(username || 'user').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '');
+  // Must match EMAIL_RE, be unique-ish, and not collide with real domains.
+  return `${u}@${base || 'shop'}.local`;
+}
+
+async function seedTestGroupUsersAndProductsForShop(conn, shopId, shopName, shopCode, salesRoleId) {
+  if (!shopId) return { group_id: null, users: [], products: [] };
+
+  const groupName = String(shopName || '').trim() || `Shop ${shopId}`;
+  const [gIns] = await conn.query(
+    'INSERT INTO groups (shop_id, name, description, is_active) VALUES (?, ?, ?, 1)',
+    [shopId, groupName, 'Auto-seed khi tạo shop (superadmin)']
+  );
+  const groupId = gIns.insertId;
+
+  const defaultWarehouseId = await getDefaultWarehouseIdForShop(conn, shopId);
+
+  // 2 sales users for testing
+  const seedUsers = [
+    {
+      full_name: `${groupName} - Test 1`,
+      username: buildSeedUsername(shopCode, 'test1'),
+    },
+    {
+      full_name: `${groupName} - Test 2`,
+      username: buildSeedUsername(shopCode, 'test2'),
+    },
+  ];
+
+  const users = [];
+  for (const u of seedUsers) {
+    const username = normalizeUsername(u.username);
+    if (!USERNAME_RE.test(username)) continue;
+
+    const email = buildSeedEmail(username, shopCode);
+    // If collides, add numeric tail.
+    let finalUsername = username;
+    let finalEmail = email;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const [dupU] = await conn.query('SELECT id FROM users WHERE username = ? LIMIT 1', [finalUsername]);
+      const [dupE] = await conn.query('SELECT id FROM users WHERE email = ? LIMIT 1', [finalEmail]);
+      if (!dupU.length && !dupE.length) break;
+      finalUsername = normalizeUsername(`${username}_${attempt + 2}`).slice(0, 32);
+      finalEmail = buildSeedEmail(finalUsername, shopCode);
+    }
+
+    const password_hash = await bcrypt.hash('abc123', 10);
+    const [ins] = await conn.query(
+      `INSERT INTO users (full_name, username, email, password_hash, role_id, is_super_admin, is_active)
+       VALUES (?, ?, ?, ?, ?, 0, 1)`,
+      [u.full_name, finalUsername, finalEmail, password_hash, salesRoleId]
+    );
+    const userId = ins.insertId;
+
+    await conn.query(
+      `INSERT INTO user_shops (user_id, shop_id, role_id) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)`,
+      [userId, shopId, salesRoleId]
+    );
+    await conn.query('INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)', [userId, groupId]);
+
+    users.push({ id: userId, full_name: u.full_name, username: finalUsername, email: finalEmail });
+  }
+
+  // 2 products for testing (with stock in default warehouse)
+  const productsToCreate = [
+    { name: 'Sản phẩm test 1', sku: `${String(shopCode).toUpperCase()}-TEST-1`, price: 100000, cost_price: 70000, qty: 50 },
+    { name: 'Sản phẩm test 2', sku: `${String(shopCode).toUpperCase()}-TEST-2`, price: 150000, cost_price: 90000, qty: 30 },
+  ];
+
+  const products = [];
+  for (const p of productsToCreate) {
+    const sku = String(p.sku || '').trim().slice(0, 50);
+    if (!sku) continue;
+    const [ins] = await conn.query(
+      `INSERT INTO products (shop_id, name, sku, unit, price, cost_price, stock_qty, available_stock, reserved_stock, low_stock_threshold, is_active)
+       VALUES (?, ?, ?, 'Cái', ?, ?, ?, ?, 0, 10, 1)`,
+      [shopId, p.name, sku, p.price, p.cost_price, p.qty, p.qty]
+    );
+    const productId = ins.insertId;
+
+    if (defaultWarehouseId) {
+      await conn.query(
+        `INSERT INTO warehouse_stock (shop_id, warehouse_id, product_id, stock_qty, available_stock, reserved_stock)
+         VALUES (?, ?, ?, ?, ?, 0)
+         ON DUPLICATE KEY UPDATE stock_qty = VALUES(stock_qty), available_stock = VALUES(available_stock)`,
+        [shopId, defaultWarehouseId, productId, p.qty, p.qty]
+      );
+    }
+
+    products.push({ id: productId, name: p.name, sku });
+  }
+
+  return { group_id: groupId, users, products };
 }
 
 function normalizeAdminsInput(body) {
@@ -336,6 +462,9 @@ router.post('/', auth, requireSuperAdmin, async (req, res, next) => {
     // Ensure at least one default warehouse for the new shop
     await ensureDefaultWarehouseForShop(conn, shopId);
 
+    // Auto seed: group theo tên shop + 2 user test + 2 sản phẩm test
+    const seeded = await seedTestGroupUsersAndProductsForShop(conn, shopId, name, code, salesRoleId);
+
     let admins_created = [];
     if (admins.length > 0) {
       admins_created = await createAdminAccountsForShop(conn, shopId, admins, adminRoleId);
@@ -348,7 +477,7 @@ router.post('/', auth, requireSuperAdmin, async (req, res, next) => {
       [shopId]
     );
     const [withAdmins] = await attachAdminsAndExpiry(pool, [row]);
-    res.status(201).json({ data: withAdmins, admins_created });
+    res.status(201).json({ data: withAdmins, admins_created, seeded });
   } catch (e) {
     if (conn) await conn.rollback();
     if (e.code === 'ER_DUP_ENTRY') {

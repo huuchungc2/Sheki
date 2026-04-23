@@ -3,20 +3,47 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
+const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
+const { getScope } = require('../utils/scope');
 
-router.get('/', auth, requireShop, async (req, res, next) => {
+async function loadUserGroupIds(pool, shopId, userId) {
+  const [rows] = await pool.query(
+    `SELECT ug.group_id
+     FROM user_groups ug
+     JOIN groups g ON g.id = ug.group_id
+     WHERE ug.user_id = ? AND g.shop_id = ? AND g.is_active = 1`,
+    [userId, shopId]
+  );
+  return rows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
+}
+
+router.get('/', auth, requireShop, requireFeature('reports.commissions'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { user_id, month, year, page = 1, limit = 20 } = req.query;
+    const { user_id, month, year, group_id, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
     const conditions = ['o.shop_id = ?'];
     const params = [req.shopId];
 
-    if (req.user.scope_own_data) {
+    const scope = await getScope(req, 'reports');
+    if (scope === 'own') {
       conditions.push('t.user_id = ?');
       params.push(req.user.id);
+    } else if (scope === 'group') {
+      let groupId = group_id != null && String(group_id).trim() !== '' ? parseInt(String(group_id), 10) : null;
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length) {
+        conditions.push('1=0');
+      } else {
+        if (groupId != null && !gids.includes(Number(groupId))) {
+          return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
+        }
+        if (groupId == null) groupId = Math.min(...gids);
+        conditions.push('o.group_id = ?');
+        params.push(groupId);
+      }
     } else if (user_id) {
       conditions.push('t.user_id = ?');
       params.push(parseInt(user_id));
@@ -79,16 +106,30 @@ router.get('/', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.get('/summary', auth, requireShop, async (req, res, next) => {
+router.get('/summary', auth, requireShop, requireFeature('reports.commissions'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { user_id, month, year } = req.query;
+    const { user_id, month, year, group_id } = req.query;
 
     const conditions = ['1=1'];
     const params = [req.shopId, req.shopId];
-    if (req.user.scope_own_data) {
+    const scope = await getScope(req, 'reports');
+    if (scope === 'own') {
       conditions.push('t.user_id = ?');
       params.push(req.user.id);
+    } else if (scope === 'group') {
+      let groupId = group_id != null && String(group_id).trim() !== '' ? parseInt(String(group_id), 10) : null;
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length) {
+        conditions.push('1=0');
+      } else {
+        if (groupId != null && !gids.includes(Number(groupId))) {
+          return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
+        }
+        if (groupId == null) groupId = Math.min(...gids);
+        conditions.push('o.group_id = ?');
+        params.push(groupId);
+      }
     } else if (user_id) {
       conditions.push('t.user_id = ?');
       params.push(parseInt(user_id));
@@ -117,7 +158,7 @@ router.get('/summary', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.get('/orders', auth, requireShop, async (req, res, next) => {
+router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { month, year, group_id, page = 1, limit = 20, user_id } = req.query;
@@ -128,10 +169,26 @@ router.get('/orders', auth, requireShop, async (req, res, next) => {
 
     // Sales: HH bán hàng (direct) + HH từ CTV (override cho user_id = mình).
     // Hoàn hàng tạo `commission_adjustments` (âm) nên phải tính cả adjustment để KPI khớp thực tế.
-    if (req.user.scope_own_data) {
+    const scope = await getScope(req, 'reports');
+    const isScoped = scope === 'own';
+    if (scope === 'own') {
       conditions.push('t.user_id = ?');
       conditions.push("(t.type = 'direct' OR t.type = 'override')");
       baseParams.push(req.user.id);
+    } else if (scope === 'group') {
+      // Group-scope: force group_id within user's groups
+      let gid = group_id != null && String(group_id).trim() !== '' ? parseInt(String(group_id), 10) : null;
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length) {
+        conditions.push('1=0');
+      } else {
+        if (gid != null && !gids.includes(Number(gid))) {
+          return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
+        }
+        if (gid == null) gid = Math.min(...gids);
+        conditions.push('o.group_id = ?');
+        baseParams.push(gid);
+      }
     } else if (user_id != null && String(user_id).trim() !== '') {
       // Admin: xem 1 nhân viên — cùng bộ lọc như «Hoa hồng của tôi» (bỏ qua nếu Sales gửi nhầm)
       const uid = parseInt(String(user_id), 10);
@@ -145,7 +202,8 @@ router.get('/orders', auth, requireShop, async (req, res, next) => {
     // để hoàn (adjustment) nằm đúng kỳ duyệt hoàn.
     if (month)    { conditions.push('MONTH(t.entry_date) = ?'); baseParams.push(parseInt(month)); }
     if (year)     { conditions.push('YEAR(t.entry_date) = ?');  baseParams.push(parseInt(year)); }
-    if (group_id) { conditions.push('o.group_id = ?');          baseParams.push(parseInt(group_id)); }
+    // group_id is enforced above for scope=group; for others, allow explicit filter
+    if (scope !== 'group' && group_id) { conditions.push('o.group_id = ?'); baseParams.push(parseInt(group_id)); }
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
@@ -216,9 +274,9 @@ router.get('/orders', auth, requireShop, async (req, res, next) => {
       ? parseInt(String(user_id), 10)
       : NaN;
     const adminEmployeeUid =
-      !req.user.scope_own_data && !Number.isNaN(parsedQueryUid) ? parsedQueryUid : null;
+      !isScoped && !Number.isNaN(parsedQueryUid) ? parsedQueryUid : null;
 
-    if (req.user.scope_own_data) {
+    if (isScoped) {
       const summaryConds = ['o.shop_id = ?', 't.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
       const summaryParams = [req.shopId, req.user.id];
       if (month) {
@@ -303,7 +361,7 @@ router.get('/orders', auth, requireShop, async (req, res, next) => {
 
     let totalKhachShip = 0;
     let totalNvChiu = 0;
-    if (req.user.scope_own_data && month && year) {
+    if (isScoped && month && year) {
       // Ship / NV chỉ theo đơn mình là salesperson (giống GET /reports/dashboard — không lấy ship đơn của CTV khi chỉ có override)
       const shipConds = [
         'o.shop_id = ?',
@@ -380,7 +438,7 @@ router.get('/orders', auth, requireShop, async (req, res, next) => {
     // - lọc theo kỳ phát sinh adjustment (ca.created_at)
     const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'o.shop_id = ?', 'MONTH(ca.created_at) = ?', 'YEAR(ca.created_at) = ?'];
     const retCommParams = [req.shopId, parseInt(month, 10), parseInt(year, 10)];
-    if (req.user.scope_own_data) {
+    if (isScoped) {
       retCommConds.push('o.salesperson_id = ?');
       retCommParams.push(req.user.id);
     } else if (adminEmployeeUid != null) {

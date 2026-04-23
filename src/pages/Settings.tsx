@@ -1,366 +1,375 @@
 import * as React from "react";
-import { 
-  Shield, Users, Package, ShoppingCart, Warehouse, BarChart3, UserCircle,
-  Lock, Check, X, Save, Loader2, AlertCircle, CheckCircle2, Plus, Trash2, Edit2
-} from "lucide-react";
+import { AlertCircle, CheckCircle2, Edit2, Loader2, Save, Trash2 } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 
-const API_URL =
-  (import.meta as any)?.env?.VITE_API_URL ||
-  "/api";
+const API_URL = (import.meta as any)?.env?.VITE_API_URL || "/api";
 
 type RoleRow = {
   id: number;
   code: string;
   name: string;
-  description?: string | null;
-  can_access_admin?: any;
-  scope_own_data?: any;
   is_system?: any;
+  can_access_admin?: any;
 };
 
-const MODULES = [
-  { id: "dashboard", name: "Tổng quan", icon: BarChart3 },
-  { id: "employees", name: "Nhân viên", icon: Users },
-  { id: "products", name: "Sản phẩm", icon: Package },
-  { id: "customers", name: "Khách hàng", icon: UserCircle },
-  { id: "orders", name: "Đơn hàng", icon: ShoppingCart },
-  { id: "inventory", name: "Kho bãi", icon: Warehouse },
-  { id: "reports", name: "Báo cáo", icon: BarChart3 },
-  { id: "settings", name: "Cài đặt", icon: Shield },
+type FeatureNode = {
+  key: string;
+  name: string;
+  children?: FeatureNode[];
+};
+
+type ScopeTarget = { id: string; name: string };
+type ScopeLevel = { id: "own" | "group" | "shop"; name: string };
+
+const DEFAULT_SCOPE_LEVELS: ScopeLevel[] = [
+  { id: "own", name: "Cá nhân" },
+  { id: "group", name: "Nhóm" },
+  { id: "shop", name: "Toàn shop" },
 ];
 
-const ACTIONS = [
-  { id: "view", name: "Xem" },
-  { id: "create", name: "Thêm" },
-  { id: "edit", name: "Sửa" },
-  { id: "delete", name: "Xóa" },
-];
-
-function getDefaultPermissions(role) {
-  const permissions = [];
-  MODULES.forEach(mod => {
-    ACTIONS.forEach(act => {
-      let allowed = false;
-      if (role === "admin") allowed = true;
-      else if (role === "sales") {
-        if (mod.id === "dashboard" && act.id === "view") allowed = true;
-        if (mod.id === "orders" && ["view", "create", "edit"].includes(act.id)) allowed = true;
-        if (mod.id === "customers" && ["view", "create", "edit"].includes(act.id)) allowed = true;
-        if (mod.id === "reports" && act.id === "view") allowed = true;
-        if (mod.id === "products" && act.id === "view") allowed = true;
-      }
-      permissions.push({ module: mod.id, action: act.id, allowed });
-    });
-  });
-  return permissions;
+function flattenNodes(nodes: FeatureNode[], depth = 0): { key: string; name: string; depth: number }[] {
+  const out: { key: string; name: string; depth: number }[] = [];
+  for (const n of nodes) {
+    if (n.key && n.key.includes(".")) out.push({ key: n.key, name: n.name, depth });
+    if (Array.isArray(n.children) && n.children.length) out.push(...flattenNodes(n.children, depth + (n.key.includes(".") ? 0 : 1)));
+  }
+  return out;
 }
 
 export function Settings() {
-  const [tab, setTab] = React.useState<"roles" | "groups">("roles");
+  const [tab, setTab] = React.useState<"permissions" | "scopes">("permissions");
+  const location = useLocation();
+  const navigate = useNavigate();
   const [roles, setRoles] = React.useState<RoleRow[]>([]);
-  const [selectedRoleId, setSelectedRoleId] = React.useState<number | null>(null);
-  const [permissions, setPermissions] = React.useState<any[]>([]);
+  const [features, setFeatures] = React.useState<{ key: string; name: string; depth: number }[]>([]);
+
+  const [matrix, setMatrix] = React.useState<Record<number, Record<string, boolean>>>({});
+  const [scopes, setScopes] = React.useState<Record<number, Record<string, "own" | "group" | "shop">>>({});
+  const [scopeTargets, setScopeTargets] = React.useState<ScopeTarget[]>([]);
+  const [scopeLevels, setScopeLevels] = React.useState<ScopeLevel[]>(DEFAULT_SCOPE_LEVELS);
+
   const [saving, setSaving] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
-  // Groups state
-  const [groups, setGroups] = React.useState<any[]>([]);
-  const [editingGroup, setEditingGroup] = React.useState<any>(null);
-  const [groupName, setGroupName] = React.useState("");
-  const [groupDesc, setGroupDesc] = React.useState("");
+  const loadAll = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
 
-  React.useEffect(() => {
-    fetchRoles();
-    fetchGroups();
+      const [fm, sm] = await Promise.all([
+        fetch(`${API_URL}/settings/feature-matrix`, { headers }),
+        fetch(`${API_URL}/settings/scope-matrix`, { headers }),
+      ]);
+
+      const fmJson = await fm.json();
+      const smJson = await sm.json();
+
+      const r: RoleRow[] = Array.isArray(fmJson?.data?.roles) ? fmJson.data.roles : [];
+      const ft: FeatureNode[] = Array.isArray(fmJson?.data?.feature_tree) ? fmJson.data.feature_tree : [];
+      setRoles(r);
+      setFeatures(flattenNodes(ft));
+      setMatrix(fmJson?.data?.matrix || {});
+
+      setScopes(smJson?.data?.matrix || {});
+      setScopeTargets(Array.isArray(smJson?.data?.scope_targets) ? smJson.data.scope_targets : []);
+      setScopeLevels(Array.isArray(smJson?.data?.scope_levels) ? smJson.data.scope_levels : DEFAULT_SCOPE_LEVELS);
+    } catch (e: any) {
+      setError(e?.message || "Không thể tải dữ liệu phân quyền");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   React.useEffect(() => {
-    if (selectedRoleId == null) return;
-    fetchPermissions();
-  }, [selectedRoleId]);
+    loadAll();
+  }, [loadAll]);
 
-  const fetchRoles = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/roles`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Không thể tải danh sách vai trò");
-      const json = await res.json();
-      const list: RoleRow[] = Array.isArray(json?.data) ? json.data : [];
-      setRoles(list);
-
-      // Pick default role: admin if exists, else first role
-      if (selectedRoleId == null) {
-        const admin = list.find((r) => String(r.code).toLowerCase() === "admin");
-        setSelectedRoleId(admin?.id ?? list[0]?.id ?? null);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Không thể tải danh sách vai trò");
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search || "");
+    const q = (params.get("tab") || "").toLowerCase();
+    if (q === "permissions" || q === "scopes") {
+      setTab(q as any);
     }
+  }, [location.search]);
+
+  const setTabAndSyncUrl = React.useCallback(
+    (next: "permissions" | "scopes") => {
+      setTab(next);
+      const params = new URLSearchParams(location.search || "");
+      params.set("tab", next);
+      navigate({ pathname: "/settings", search: `?${params.toString()}` }, { replace: true });
+    },
+    [location.search, navigate]
+  );
+
+  const toggle = (roleId: number, featureKey: string) => {
+    setMatrix((prev) => ({
+      ...prev,
+      [roleId]: {
+        ...(prev[roleId] || {}),
+        [featureKey]: !(prev[roleId] || {})[featureKey],
+      },
+    }));
   };
 
-  const fetchPermissions = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const rid = selectedRoleId;
-      if (rid == null) return;
-      const res = await fetch(`${API_URL}/settings/${rid}/permissions`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const json = await res.json();
-        const roleCode = String(json?.role || "").toLowerCase();
-        setPermissions(json.data || getDefaultPermissions(roleCode));
-      } else {
-        const roleCode = String(roles.find((r) => r.id === rid)?.code || "").toLowerCase();
-        setPermissions(getDefaultPermissions(roleCode));
-      }
-    } catch (err) {
-      const roleCode = String(roles.find((r) => r.id === selectedRoleId)?.code || "").toLowerCase();
-      setPermissions(getDefaultPermissions(roleCode));
-    }
+  const setScope = (roleId: number, target: string, value: "own" | "group" | "shop") => {
+    setScopes((prev) => ({
+      ...prev,
+      [roleId]: {
+        ...(prev[roleId] || {}),
+        [target]: value,
+      },
+    }));
   };
 
-  const fetchGroups = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/groups`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        const json = await res.json();
-        setGroups(json.data || []);
-      }
-    } catch (err) {
-      console.error("Failed to fetch groups", err);
-    }
-  };
-
-  const handleSavePermissions = async () => {
+  const savePermissions = async () => {
     setSaving(true);
     setError(null);
     setSuccess(false);
     try {
       const token = localStorage.getItem("token");
-      const rid = selectedRoleId;
-      if (rid == null) throw new Error("Chưa chọn vai trò");
-      const res = await fetch(`${API_URL}/settings/${rid}/permissions`, {
+      const res = await fetch(`${API_URL}/settings/feature-matrix`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ permissions })
+        body: JSON.stringify({
+          updates: roles.map((r) => ({
+            role_id: r.id,
+            permissions: matrix[r.id] || {},
+          })),
+        }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Lưu thất bại");
-      }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Lưu phân quyền thất bại");
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message);
+      setTimeout(() => setSuccess(false), 2500);
+      await loadAll();
+    } catch (e: any) {
+      setError(e?.message || "Lưu phân quyền thất bại");
     } finally {
       setSaving(false);
     }
   };
 
-  const togglePermission = (module: string, action: string) => {
-    setPermissions(prev => prev.map(p => 
-      p.module === module && p.action === action ? { ...p, allowed: !p.allowed } : p
-    ));
-  };
-
-  const handleSaveGroup = async () => {
-    if (!groupName.trim()) return;
+  const saveScopes = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
     try {
       const token = localStorage.getItem("token");
-      const method = editingGroup ? "PUT" : "POST";
-      const url = editingGroup ? `${API_URL}/groups/${editingGroup.id}` : `${API_URL}/groups`;
-      const res = await fetch(url, {
-        method,
+      const res = await fetch(`${API_URL}/settings/scope-matrix`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: groupName, description: groupDesc })
+        body: JSON.stringify({
+          updates: roles.map((r) => ({
+            role_id: r.id,
+            scopes: scopes[r.id] || {},
+          })),
+        }),
       });
-      if (!res.ok) throw new Error("Lưu nhóm thất bại");
-      setGroupName("");
-      setGroupDesc("");
-      setEditingGroup(null);
-      fetchGroups();
-    } catch (err: any) {
-      setError(err.message);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Lưu phạm vi thất bại");
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2500);
+      await loadAll();
+    } catch (e: any) {
+      setError(e?.message || "Lưu phạm vi thất bại");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteGroup = async (id: number) => {
-    if (!confirm("Bạn có chắc muốn xóa nhóm này?")) return;
+  const seedDefaultsForAll = async () => {
+    if (!confirm("Khởi tạo phân quyền mặc định cho TẤT CẢ vai trò?")) return;
+    setSaving(true);
+    setError(null);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/groups/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error("Xóa nhóm thất bại");
-      fetchGroups();
-    } catch (err: any) {
-      setError(err.message);
+      for (const r of roles) {
+        await fetch(`${API_URL}/settings/feature-seed-default/${r.id}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      await loadAll();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2500);
+    } catch (e: any) {
+      setError(e?.message || "Khởi tạo mặc định thất bại");
+    } finally {
+      setSaving(false);
     }
   };
-
-  const selectedRole = roles.find((r) => r.id === selectedRoleId) || roles[0];
-  const allowedCount = permissions.filter(p => p.allowed).length;
-  const totalCount = permissions.length;
 
   return (
-    <div className="min-h-screen bg-[#FFF5F5] -m-8 p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-12">
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Quản lý hệ thống</h1>
-          <nav className="flex items-center gap-8">
-            <button onClick={() => setTab("roles")} className={cn("text-sm font-bold pb-1 border-b-2 transition-all", tab === "roles" ? "text-red-600 border-red-600" : "text-slate-400 border-transparent hover:text-slate-900")}>Vai trò & Phân quyền</button>
-            <button onClick={() => setTab("groups")} className={cn("text-sm font-bold pb-1 border-b-2 transition-all", tab === "groups" ? "text-red-600 border-red-600" : "text-slate-400 border-transparent hover:text-slate-900")}>Nhóm nhân viên</button>
-          </nav>
+    <div className="min-h-screen bg-slate-50 -m-8 p-8">
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Phân quyền</h1>
+          <p className="text-sm text-slate-500 font-medium mt-1">
+            Lưu ý: hệ thống sẽ lưu phân quyền ngay theo dữ liệu bạn chọn bên dưới.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {tab === "permissions" && (
+            <button
+              onClick={seedDefaultsForAll}
+              disabled={saving || loading}
+              className="px-4 py-2 rounded-xl text-sm font-bold bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Khởi tạo phân quyền mặc định
+            </button>
+          )}
+          <button
+            onClick={tab === "permissions" ? savePermissions : saveScopes}
+            disabled={saving || loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? "Đang lưu..." : "Lưu"}
+          </button>
         </div>
       </div>
 
+      <div className="flex items-center gap-6 mb-4 border-b border-slate-200">
+        <button
+          onClick={() => setTabAndSyncUrl("permissions")}
+          className={cn(
+            "text-sm font-bold pb-2 border-b-2 -mb-px",
+            tab === "permissions" ? "text-blue-600 border-blue-600" : "text-slate-400 border-transparent"
+          )}
+        >
+          Phân quyền nhóm
+        </button>
+        <button
+          onClick={() => setTabAndSyncUrl("scopes")}
+          className={cn(
+            "text-sm font-bold pb-2 border-b-2 -mb-px",
+            tab === "scopes" ? "text-blue-600 border-blue-600" : "text-slate-400 border-transparent"
+          )}
+        >
+          Phân quyền xem dữ liệu
+        </button>
+      </div>
+
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold">
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold">
           <AlertCircle className="w-5 h-5 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+        <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
           <CheckCircle2 className="w-5 h-5 shrink-0" /> Lưu thành công!
         </div>
       )}
 
-      {tab === "roles" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          <div className="lg:col-span-4 space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight">Vai trò hệ thống</h2>
-              <span className="px-3 py-1 bg-red-100 text-red-600 text-[10px] font-black rounded-full uppercase tracking-widest">{roles.length} Vai trò</span>
-            </div>
-            <div className="space-y-4">
-              {roles.map((role) => {
-                const roleCode = String(role.code || "").toLowerCase();
-                const Icon = roleCode === "admin" ? Shield : ShoppingCart;
-                return (
-                  <button
-                    key={role.id}
-                    onClick={() => setSelectedRoleId(role.id)}
-                    className={cn(
-                      "w-full p-8 rounded-[32px] text-left transition-all relative group",
-                      selectedRoleId === role.id
-                        ? "bg-white shadow-2xl shadow-red-200/50 border-l-4 border-red-600"
-                        : "bg-white/50 hover:bg-white border-l-4 border-transparent"
-                    )}
-                  >
-                    <div className="flex items-center gap-3 mb-4">
-                      <Icon className={cn("w-5 h-5", selectedRoleId === role.id ? "text-red-600" : "text-slate-400")} />
-                      <span className={cn("text-xl font-black tracking-tight", selectedRoleId === role.id ? "text-red-600" : "text-slate-900")}>
-                        {role.name}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-slate-500 leading-relaxed">{role.description || "—"}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="lg:col-span-8 bg-white rounded-[48px] p-12 shadow-sm">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">{selectedRole?.name || "—"}</h2>
-                <p className="text-slate-500 font-medium mt-1">{selectedRole?.description || "—"}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-bold text-slate-400">{allowedCount}/{totalCount} quyền</span>
-                <button onClick={handleSavePermissions} disabled={saving} className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-2xl text-sm font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 disabled:opacity-50">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  {saving ? "Đang lưu..." : "Lưu phân quyền"}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              {MODULES.map(mod => {
-                const Icon = mod.icon;
-                const modPerms = permissions.filter(p => p.module === mod.id);
-                return (
-                  <div key={mod.id} className="bg-slate-50 rounded-3xl p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Icon className="w-5 h-5 text-red-600" />
-                      <h3 className="text-lg font-black text-slate-900">{mod.name}</h3>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {modPerms.map(perm => (
-                        <button key={`${perm.module}-${perm.action}`} onClick={() => togglePermission(perm.module, perm.action)} className={cn("flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-bold transition-all", perm.allowed ? "bg-red-600 text-white shadow-md shadow-red-600/20" : "bg-white text-slate-400 border border-slate-200 hover:border-red-200 hover:text-red-600")}>
-                          {perm.allowed ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                          {ACTIONS.find(a => a.id === perm.action)?.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+      {loading ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-slate-500 font-medium">
+          Đang tải...
         </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          <div className="lg:col-span-5 space-y-8">
-            <div className="bg-white rounded-[48px] p-12 shadow-sm">
-              <h2 className="text-2xl font-black text-slate-900 mb-6">{editingGroup ? "Sửa nhóm" : "Thêm nhóm mới"}</h2>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Tên nhóm *</label>
-                  <input type="text" value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="VD: TNK, SHEKI, KHA..." className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Mô tả</label>
-                  <textarea value={groupDesc} onChange={(e) => setGroupDesc(e.target.value)} placeholder="Mô tả nhóm..." rows={3} className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none resize-none" />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={handleSaveGroup} className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all">
-                    <Save className="w-4 h-4" /> {editingGroup ? "Cập nhật" : "Tạo nhóm"}
-                  </button>
-                  {editingGroup && (
-                    <button onClick={() => { setEditingGroup(null); setGroupName(""); setGroupDesc(""); }} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200">
-                      Hủy
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-7 bg-white rounded-[48px] p-12 shadow-sm">
-            <h2 className="text-2xl font-black text-slate-900 mb-6">Danh sách nhóm ({groups.length})</h2>
-            {groups.length === 0 ? (
-              <p className="text-center text-slate-400 py-12">Chưa có nhóm nào</p>
-            ) : (
-              <div className="space-y-3">
-                {groups.map(group => (
-                  <div key={group.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{group.name}</p>
-                      {group.description && <p className="text-xs text-slate-400 mt-1">{group.description}</p>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => { setEditingGroup(group); setGroupName(group.name); setGroupDesc(group.description || ""); }} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeleteGroup(group.id)} className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+      ) : tab === "permissions" ? (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="overflow-auto">
+            <table className="min-w-[980px] w-full text-sm">
+              <thead className="sticky top-0 bg-slate-50 z-10">
+                <tr>
+                  <th className="text-left px-4 py-3 font-black text-slate-700 border-b border-slate-200 w-[320px]">
+                    Chức năng
+                  </th>
+                  {roles.map((r) => (
+                    <th key={r.id} className="px-3 py-3 font-black text-slate-700 border-b border-slate-200 text-center">
+                      <div className="min-w-[110px]">
+                        <p className="text-xs">{r.name}</p>
+                        <p className="text-[10px] text-slate-400 font-extrabold uppercase mt-0.5">{String(r.code)}</p>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {features.map((f) => (
+                  <tr key={f.key} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 border-b border-slate-100">
+                      <div className="flex items-center gap-2" style={{ paddingLeft: Math.min(28, f.depth * 14) }}>
+                        <span className={cn("font-bold text-slate-800", f.depth ? "text-slate-700" : "text-slate-900")}>
+                          {f.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-semibold">{f.key}</span>
+                      </div>
+                    </td>
+                    {roles.map((r) => {
+                      const checked = !!matrix?.[r.id]?.[f.key];
+                      return (
+                        <td key={r.id} className="px-3 py-2 border-b border-slate-100 text-center">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggle(r.id, f.key)}
+                            className="h-4 w-4 accent-blue-600"
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
                 ))}
-              </div>
-            )}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
+      ) : tab === "scopes" ? (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="overflow-auto">
+            <table className="min-w-[980px] w-full text-sm">
+              <thead className="sticky top-0 bg-slate-50 z-10">
+                <tr>
+                  <th className="text-left px-4 py-3 font-black text-slate-700 border-b border-slate-200 w-[320px]">
+                    Dữ liệu
+                  </th>
+                  {roles.map((r) => (
+                    <th key={r.id} className="px-3 py-3 font-black text-slate-700 border-b border-slate-200 text-center">
+                      <div className="min-w-[110px]">
+                        <p className="text-xs">{r.name}</p>
+                        <p className="text-[10px] text-slate-400 font-extrabold uppercase mt-0.5">{String(r.code)}</p>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {scopeTargets.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 border-b border-slate-100 font-bold text-slate-800">
+                      {t.name} <span className="text-[10px] text-slate-400 font-semibold ml-2">{t.id}</span>
+                    </td>
+                    {roles.map((r) => {
+                      const v = scopes?.[r.id]?.[t.id] || "own";
+                      return (
+                        <td key={r.id} className="px-3 py-2 border-b border-slate-100 text-center">
+                          <select
+                            value={v}
+                            onChange={(e) => setScope(r.id, t.id, e.target.value as any)}
+                            className="text-xs font-bold bg-white border border-slate-200 rounded-lg px-2 py-1"
+                          >
+                            {scopeLevels.map((sl) => (
+                              <option key={sl.id} value={sl.id}>
+                                {sl.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

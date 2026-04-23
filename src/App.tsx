@@ -15,6 +15,7 @@ import { CustomerForm } from "./pages/CustomerForm";
 import { OrderList } from "./pages/OrderList";
 import { OrderForm } from "./pages/OrderForm";
 import { Settings } from "./pages/Settings";
+import { EmployeeGroups } from "./pages/EmployeeGroups";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { BulkImport } from "./pages/BulkImport";
@@ -43,6 +44,10 @@ function getStoredUser() {
   return raw ? JSON.parse(raw) : null;
 }
 
+function capTrue(u: any, mod: string, act: string) {
+  return !!u?._caps?.[mod]?.[act];
+}
+
 // Route /reports/commissions/ctv — Admin thấy toàn hệ thống, Sales thấy CTV của mình
 function CtvCommissionRoute() {
   if (isAdminUser(getStoredUser())) return <CollaboratorsCommissionsReportPage />;
@@ -60,6 +65,27 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
+}
+
+function InventoryViewRoute({ children }: { children: React.ReactNode }) {
+  const u = getStoredUser();
+  if (isAdminUser(u)) return <>{children}</>;
+  if (capTrue(u, "inventory", "view")) return <>{children}</>;
+  return <Navigate to="/" replace />;
+}
+
+function InventoryEditRoute({ children }: { children: React.ReactNode }) {
+  const u = getStoredUser();
+  if (isAdminUser(u)) return <>{children}</>;
+  if (capTrue(u, "inventory", "edit")) return <>{children}</>;
+  return <Navigate to="/" replace />;
+}
+
+function ReportsViewRoute({ children }: { children: React.ReactNode }) {
+  const u = getStoredUser();
+  if (isAdminUser(u)) return <>{children}</>;
+  if (capTrue(u, "reports", "view")) return <>{children}</>;
+  return <Navigate to="/" replace />;
 }
 
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
@@ -118,6 +144,7 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/employees" element={<AdminRoute><EmployeeList /></AdminRoute>} />
+                  <Route path="/employees/groups" element={<AdminRoute><EmployeeGroups /></AdminRoute>} />
                   <Route path="/employees/new" element={<AdminRoute><EmployeeForm /></AdminRoute>} />
                   <Route path="/employees/edit/:id" element={<AdminRoute><EmployeeForm /></AdminRoute>} />
                   <Route path="/employees/:id" element={<AdminRoute><EmployeeDetail /></AdminRoute>} />
@@ -137,21 +164,21 @@ export default function App() {
                   <Route path="/orders/new" element={<OrderForm />} />
                   <Route path="/orders/edit/:id" element={<OrderForm />} />
                   <Route path="/orders/search/*" element={<Navigate to="/orders" replace />} />
-                  <Route path="/inventory" element={<AdminRoute><InventoryHistory /></AdminRoute>} />
-                  <Route path="/inventory/import" element={<AdminRoute><InventoryImport /></AdminRoute>} />
-                  <Route path="/inventory/export" element={<AdminRoute><InventoryExport /></AdminRoute>} />
+                  <Route path="/inventory" element={<InventoryViewRoute><InventoryHistory /></InventoryViewRoute>} />
+                  <Route path="/inventory/import" element={<InventoryEditRoute><InventoryImport /></InventoryEditRoute>} />
+                  <Route path="/inventory/export" element={<InventoryEditRoute><InventoryExport /></InventoryEditRoute>} />
                   <Route path="/warehouses" element={<AdminRoute><Warehouses /></AdminRoute>} />
                   <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
                   <Route path="/logs" element={<AdminRoute><ActivityLog /></AdminRoute>} />
                   <Route path="/change-password" element={<ChangePassword />} />
                   <Route path="/profile" element={<Profile />} />
-                  <Route path="/reports/revenue" element={<AdminRoute><RevenueReport /></AdminRoute>} />
+                  <Route path="/reports/revenue" element={<ReportsViewRoute><RevenueReport /></ReportsViewRoute>} />
                   <Route path="/reports/commissions" element={<CommissionReport />} />
-                  <Route path="/reports/commissions/ctv" element={<CtvCommissionRoute />} />
+                  <Route path="/reports/commissions/ctv" element={<ReportsViewRoute><CtvCommissionRoute /></ReportsViewRoute>} />
                   <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionReport /></AdminRoute>} />
                   <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
-                  <Route path="/cash-transactions" element={<AdminRoute><CashTransactions /></AdminRoute>} />
+                  <Route path="/cash-transactions" element={<ReportsViewRoute><CashTransactions /></ReportsViewRoute>} />
                   <Route path="/roles" element={<AdminRoute><RolesPage /></AdminRoute>} />
                   <Route
                     path="/admin/shops"

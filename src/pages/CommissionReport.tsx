@@ -172,14 +172,21 @@ export function CommissionReport() {
         });
       }
 
-      // 3. Admin (bảng tổng toàn hệ thống): không gọi khi đang xem 1 NV — tránh nhầm với dữ liệu cá nhân
-      if (isAdmin && !employeeDrilldown) {
+      // 3. Bảng tổng hợp (theo menu Admin): luôn gọi khi không drilldown.
+      // - Admin => toàn shop
+      // - Non-admin (Sales) => scope own => API tự trả 1 dòng của chính mình
+      if (!employeeDrilldown) {
         const salaryParams = new URLSearchParams({ month, year });
         if (groupId) salaryParams.set("group_id", groupId);
 
         const [salaryRes, ctvRes] = await Promise.all([
           fetch(`${API_URL}/reports/salary?${salaryParams}`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API_URL}/collaborators/commissions/all?${salaryParams}`, { headers: { Authorization: `Bearer ${token}` } }),
+          // Admin: xem toàn hệ thống; Sales: chỉ xem cặp của mình (sales_id = current user)
+          (() => {
+            const p = new URLSearchParams(salaryParams);
+            if (!isAdmin && currentUser?.id != null) p.set("sales_id", String(currentUser.id));
+            return fetch(`${API_URL}/collaborators/commissions/all?${p}`, { headers: { Authorization: `Bearer ${token}` } });
+          })(),
         ]);
 
         if (salaryRes.ok) {
@@ -339,16 +346,12 @@ export function CommissionReport() {
             <h1 className="text-2xl font-bold text-slate-900 break-words">
               {employeeDrilldown
                 ? `Hoa hồng: ${subjectUserName || `Nhân viên #${subjectUserId}`}`
-                : isAdmin
-                  ? "Báo cáo hoa hồng toàn bộ"
-                  : "Hoa hồng của tôi"}
+                : "Báo cáo hoa hồng"}
             </h1>
             <p className="text-slate-500 text-sm mt-0.5 break-words">
               {employeeDrilldown
                 ? "Cùng cột KPI và bảng đơn như «Hoa hồng của tôi» — theo nhân viên đã chọn (lọc theo user_id trên URL)."
-                : isAdmin
-                  ? "Tổng hợp hoa hồng tất cả nhân viên."
-                  : "Xem chi tiết hoa hồng theo từng đơn hàng."}
+                : "Tổng hợp hoa hồng theo menu Admin; dữ liệu sẽ tự co theo phạm vi (cá nhân/nhóm/toàn shop)."}
             </p>
           </div>
         </div>
@@ -496,8 +499,8 @@ export function CommissionReport() {
         </div>
       </div>
 
-      {/* Admin: tabs Hoa hồng NV / Hoa hồng CTV — ẩn khi xem 1 NV (đã có bảng chi tiết đơn giống Sales) */}
-      {isAdmin && !employeeDrilldown && (
+      {/* Tabs (theo menu Admin): Hoa hồng NV / Hoa hồng CTV — ẩn khi xem 1 NV */}
+      {!employeeDrilldown && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
           {/* Tab header */}
           <div className="flex border-b border-slate-100">
@@ -539,13 +542,9 @@ export function CommissionReport() {
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Số đơn</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Doanh số</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">HH bán hàng</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">HH từ CTV</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng HH</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-sky-600 uppercase tracking-wide text-right whitespace-nowrap">Ship KH Trả</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-rose-600 uppercase tracking-wide text-right whitespace-nowrap">NV chịu</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right text-slate-700">Doanh số</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Ship / NV chịu</th>
                       <th className="px-5 py-3 text-xs font-semibold text-violet-600 uppercase tracking-wide text-right whitespace-nowrap">Tổng lương</th>
                       <th className="px-5 py-3 w-8"></th>
                     </tr>
@@ -555,20 +554,40 @@ export function CommissionReport() {
                       <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-5 py-3">
                           <p className="font-semibold text-slate-900">{item.full_name}</p>
-                          <p className="text-xs text-slate-400">{item.position || "Sales"}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{item.position || "Sales"}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">Số đơn:</span>{" "}
+                            <span className="font-semibold text-slate-600 tabular-nums">{item.total_orders || 0}</span>
+                          </p>
                         </td>
-                        <td className="px-5 py-3 text-center text-slate-700">{item.total_orders || 0}</td>
-                        <td className="px-5 py-3 text-right text-slate-700">{formatCurrency(item.total_sales || 0)}</td>
-                        <td className="px-5 py-3 text-right font-semibold text-emerald-600">{formatCurrency(item.direct_commission || 0)}</td>
-                        <td className="px-5 py-3 text-right font-semibold text-blue-600">{formatCurrency(item.override_commission || 0)}</td>
-                        <td className="px-5 py-3 text-right font-bold text-slate-900">
-                          {formatCurrency((item.direct_commission || 0) + (item.override_commission || 0))}
+                        <td className="px-5 py-3 text-right tabular-nums font-bold text-slate-900">
+                          {formatCurrency(item.total_sales || 0)}
                         </td>
-                        <td className="px-5 py-3 text-right font-semibold text-sky-800 tabular-nums">
-                          {formatCurrency(item.total_khach_ship || 0)}
+                        <td className="px-5 py-3 text-right tabular-nums">
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">Bán hàng:</span>{" "}
+                            <span className="font-semibold text-emerald-600">{formatCurrency(item.direct_commission || 0)}</span>
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">Từ CTV:</span>{" "}
+                            <span className="font-semibold text-blue-600">{formatCurrency(item.override_commission || 0)}</span>
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">Tổng:</span>{" "}
+                            <span className="font-bold text-slate-900">
+                              {formatCurrency((item.direct_commission || 0) + (item.override_commission || 0))}
+                            </span>
+                          </p>
                         </td>
-                        <td className="px-5 py-3 text-right font-semibold text-rose-800 tabular-nums">
-                          {formatCurrency(item.total_nv_chiu || 0)}
+                        <td className="px-5 py-3 text-right tabular-nums">
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">Ship KH trả:</span>{" "}
+                            <span className="font-semibold text-sky-800">{formatCurrency(item.total_khach_ship || 0)}</span>
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">NV chịu:</span>{" "}
+                            <span className="font-semibold text-rose-800">{formatCurrency(item.total_nv_chiu || 0)}</span>
+                          </p>
                         </td>
                         <td className="px-5 py-3 text-right font-bold text-violet-800 tabular-nums">
                           {formatCurrency(Number(item.total_luong) || 0)}
@@ -585,13 +604,24 @@ export function CommissionReport() {
                   <tfoot>
                     <tr className="bg-slate-800 text-white text-sm font-bold">
                       <td className="px-5 py-3">Tổng cộng</td>
-                      <td className="px-5 py-3 text-center">{salesData.reduce((s: number, i: any) => s + (i.total_orders || 0), 0)}</td>
-                      <td className="px-5 py-3 text-right">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_sales || 0), 0))}</td>
-                      <td className="px-5 py-3 text-right text-emerald-400">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.direct_commission || 0), 0))}</td>
-                      <td className="px-5 py-3 text-right text-blue-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.override_commission || 0), 0))}</td>
-                      <td className="px-5 py-3 text-right">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.direct_commission || 0) + (i.override_commission || 0), 0))}</td>
-                      <td className="px-5 py-3 text-right text-sky-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_khach_ship || 0), 0))}</td>
-                      <td className="px-5 py-3 text-right text-rose-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_nv_chiu || 0), 0))}</td>
+                      <td className="px-5 py-3 text-right tabular-nums font-bold text-slate-100">
+                        {formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_sales || 0), 0))}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="text-[11px] font-normal text-slate-300 mb-1">Bán hàng / Từ CTV / Tổng</div>
+                        <div className="flex flex-col gap-0.5 items-end">
+                          <div className="text-emerald-400 tabular-nums">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.direct_commission || 0), 0))}</div>
+                          <div className="text-blue-300 tabular-nums">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.override_commission || 0), 0))}</div>
+                          <div className="text-white tabular-nums">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.direct_commission || 0) + (i.override_commission || 0), 0))}</div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="text-[11px] font-normal text-slate-300 mb-1">Ship KH trả / NV chịu</div>
+                        <div className="flex flex-col gap-0.5 items-end">
+                          <div className="text-sky-300 tabular-nums">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_khach_ship || 0), 0))}</div>
+                          <div className="text-rose-300 tabular-nums">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_nv_chiu || 0), 0))}</div>
+                        </div>
+                      </td>
                       <td className="px-5 py-3 text-right text-violet-300">{formatCurrency(salesData.reduce((s: number, i: any) => s + (Number(i.total_luong) || 0), 0))}</td>
                       <td className="px-5 py-3"></td>
                     </tr>
@@ -766,24 +796,17 @@ export function CommissionReport() {
           <table className="w-full text-left border-collapse text-sm min-w-[720px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">NV bán</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Loại HH</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ngày</th>
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn hàng</th>
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">NHÂN VIÊN</th>
                 <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Khách hàng</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhóm BH</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng tiền</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
-                <th className="px-5 py-3 text-xs font-semibold text-sky-600 uppercase tracking-wide text-right whitespace-nowrap">Ship KH Trả</th>
-                <th className="px-5 py-3 text-xs font-semibold text-rose-600 uppercase tracking-wide text-right whitespace-nowrap">NV chịu</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
-                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Trạng thái</th>
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Ship / NV chịu</th>
+                <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Hoa hồng / Lương</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {orderCommissions.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-5 py-12 text-center text-slate-400">
+                  <td colSpan={5} className="px-5 py-12 text-center text-slate-400">
                     Chưa có hoa hồng trong tháng {month}/{year}
                     {groupId ? ` — nhóm đã chọn` : ""}
                   </td>
@@ -795,66 +818,99 @@ export function CommissionReport() {
                     className="hover:bg-blue-50/40 transition-colors cursor-pointer"
                     onClick={() => openOrderPopup(item)}>
                     <td className="px-5 py-3">
-                      <span className="font-bold text-blue-600 font-mono">{item.order_code}</span>
-                    </td>
-                    <td className="px-5 py-3 text-slate-700 font-medium">
-                      {item.salesperson_name || "—"}
+                      <div className="leading-snug">
+                        <div className="font-bold text-blue-600 font-mono">{item.order_code}</div>
+                        <div className="mt-1">
+                          <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold", st.color)}>
+                            {st.label}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
+                          <span>{formatDate(item.order_date)}</span>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-5 py-3">
-                      {String(item.entry_kind) === "adjustment"
-                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">Hoàn</span>
-                        : item.type === "direct"
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Bán hàng</span>
-                          : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">HH từ CTV{item.ctv_name ? ` (${item.ctv_name})` : ""}</span>
-                      }
+                      <div className="leading-snug">
+                        <p className="text-slate-700 font-medium">{item.salesperson_name || "—"}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          <span className="text-slate-400">Nhóm BH:</span>{" "}
+                          <span className="font-semibold text-slate-600">{item.group_name || "—"}</span>
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          <span className="text-slate-400">Loại BH:</span>{" "}
+                          <span className="font-semibold text-slate-600">
+                            {String(item.entry_kind) === "adjustment"
+                              ? "Hoàn"
+                              : item.type === "direct"
+                                ? "Bán hàng"
+                                : `Từ CTV${item.ctv_name ? ` (${item.ctv_name})` : ""}`}
+                          </span>
+                        </p>
+                      </div>
                     </td>
-                    <td className="px-5 py-3 text-slate-500">{formatDate(item.order_date)}</td>
-                    <td className="px-5 py-3 text-slate-700">{item.customer_name || "—"}</td>
-                    <td className="px-5 py-3">
-                      {item.group_name
-                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">{item.group_name}</span>
-                        : <span className="text-slate-300">—</span>
-                      }
+                    <td className="px-5 py-3 text-slate-700">
+                      <div className="leading-snug">
+                        <div>{item.customer_name || "—"}</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Tổng tiền: <span className="font-semibold text-slate-700 tabular-nums">{formatCurrency(item.total_amount)}</span>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-5 py-3 text-right font-semibold text-slate-900">{formatCurrency(item.total_amount)}</td>
-                    <td className={cn(
-                      "px-5 py-3 text-right font-bold",
-                      String(item.entry_kind) === "adjustment"
-                        ? (Number(item.commission_amount) < 0 ? "text-rose-600" : "text-emerald-600")
-                        : item.type === "override"
-                          ? "text-blue-700"
-                          : "text-emerald-600"
-                    )}>{formatCurrency(item.commission_amount)}</td>
-                    <td className={cn(
-                      "px-5 py-3 text-right font-semibold tabular-nums",
-                      String(item.entry_kind) === "adjustment"
-                        ? "text-slate-300"
-                        : (Number(item.khach_tra_ship) > 0 ? "text-sky-800" : "text-slate-300")
-                    )}>
-                      {String(item.entry_kind) === "adjustment"
-                        ? "—"
-                        : formatCurrency(Number(item.khach_tra_ship) || 0)}
+                    <td className="px-5 py-3 text-right tabular-nums">
+                      {String(item.entry_kind) === "adjustment" ? (
+                        <div className="leading-snug">
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">Ship KH trả:</span>{" "}
+                            <span className="font-semibold text-slate-300">—</span>
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">NV chịu:</span>{" "}
+                            <span className="font-semibold text-slate-300">—</span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="leading-snug">
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">Ship KH trả:</span>{" "}
+                            <span className={cn("font-semibold", (Number(item.khach_tra_ship) > 0 ? "text-sky-800" : "text-slate-300"))}>
+                              {formatCurrency(Number(item.khach_tra_ship) || 0)}
+                            </span>
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-slate-400">NV chịu:</span>{" "}
+                            <span className={cn("font-semibold", (Number(item.nv_chiu_display) > 0 ? "text-rose-700" : "text-slate-300"))}>
+                              {formatCurrency(Number(item.nv_chiu_display) || 0)}
+                            </span>
+                          </p>
+                        </div>
+                      )}
                     </td>
-                    <td className={cn(
-                      "px-5 py-3 text-right font-semibold tabular-nums",
-                      String(item.entry_kind) === "adjustment"
-                        ? "text-slate-300"
-                        : (Number(item.nv_chiu_display) > 0 ? "text-rose-700" : "text-slate-300")
-                    )}>
-                      {String(item.entry_kind) === "adjustment"
-                        ? "—"
-                        : formatCurrency(Number(item.nv_chiu_display) || 0)}
-                    </td>
-                    <td className={cn(
-                      "px-5 py-3 text-right font-bold",
-                      Number(item.luong) < 0 ? "text-red-600" : "text-violet-800"
-                    )}>
-                      {formatCurrency(Number(item.luong) || 0)}
-                    </td>
-                    <td className="px-5 py-3 text-center">
-                      <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold", st.color)}>
-                        {st.label}
-                      </span>
+                    <td className="px-5 py-3 text-right tabular-nums">
+                      <div className="leading-snug">
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          <span className="text-slate-400">Hoa hồng:</span>{" "}
+                          <span className={cn(
+                            "font-bold",
+                            String(item.entry_kind) === "adjustment"
+                              ? (Number(item.commission_amount) < 0 ? "text-rose-600" : "text-emerald-600")
+                              : item.type === "override"
+                                ? "text-blue-700"
+                                : "text-emerald-600"
+                          )}>
+                            {formatCurrency(item.commission_amount)}
+                          </span>
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          <span className="text-slate-400">Lương:</span>{" "}
+                          <span className={cn(
+                            "font-bold",
+                            Number(item.luong) < 0 ? "text-red-600" : "text-violet-800"
+                          )}>
+                            {formatCurrency(Number(item.luong) || 0)}
+                          </span>
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -863,40 +919,48 @@ export function CommissionReport() {
             {orderCommissions.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-800 text-white text-sm font-bold">
-                  <td className="px-5 py-3 align-top" colSpan={5}>
+                  <td className="px-5 py-3 align-top" colSpan={2}>
                     <span className="block">Tổng theo trang {commPage}</span>
                     <span className="block text-xs font-normal text-slate-400 mt-1 leading-snug">
                       Chỉ cộng các dòng đang hiển thị ({orderCommissions.length}/{commTotal} dòng trang này) — không phải tổng cả kỳ.
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-right align-top">
-                    {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.total_amount, 0))}
-                  </td>
-                  <td className="px-5 py-3 text-right text-emerald-400 align-top">
-                    {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.commission_amount, 0))}
-                  </td>
-                  <td className="px-5 py-3 text-right text-sky-300 tabular-nums align-top">
-                    {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.khach_tra_ship || 0), 0))}
-                  </td>
-                  <td className="px-5 py-3 text-right text-rose-300 tabular-nums align-top">
-                    {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.nv_chiu_display || 0), 0))}
-                  </td>
-                  <td className="px-5 py-3 text-right text-violet-200 align-top">
-                    <div className="text-[11px] font-normal text-violet-300/90 mb-1">Lương chỉ trang này</div>
-                    <div className="text-white tabular-nums">
-                      {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.luong || 0), 0))}
+                  <td className="px-5 py-3 text-right tabular-nums align-top">
+                    <div className="text-[11px] font-normal text-slate-300 mb-1">Tổng tiền</div>
+                    <div className="text-slate-200 tabular-nums">
+                      {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.total_amount, 0))}
                     </div>
                   </td>
-                  <td className="px-5 py-3"></td>
+                  <td className="px-5 py-3 text-right tabular-nums align-top">
+                    <div className="text-[11px] font-normal text-slate-300 mb-1">Ship KH trả / NV chịu</div>
+                    <div className="flex flex-col gap-0.5 items-end">
+                      <div className="text-sky-300 tabular-nums">
+                        {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.khach_tra_ship || 0), 0))}
+                      </div>
+                      <div className="text-rose-300 tabular-nums">
+                        {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.nv_chiu_display || 0), 0))}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums align-top">
+                    <div className="text-[11px] font-normal text-slate-300 mb-1">Hoa hồng / Lương</div>
+                    <div className="flex flex-col gap-0.5 items-end">
+                      <div className="text-emerald-400 tabular-nums">
+                        {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + i.commission_amount, 0))}
+                      </div>
+                      <div className="text-white tabular-nums">
+                        {formatCurrency(orderCommissions.reduce((s: number, i: any) => s + Number(i.luong || 0), 0))}
+                      </div>
+                    </div>
+                  </td>
                 </tr>
                 <tr className="bg-violet-50 border-t border-violet-100 text-sm text-slate-800">
-                  <td className="px-5 py-3 font-semibold" colSpan={9}>
+                  <td className="px-5 py-3 font-semibold" colSpan={4}>
                     Tổng lương cả kỳ (cùng số thẻ KPI phía trên — gồm mọi dòng, không phân trang)
                   </td>
                   <td className="px-5 py-3 text-right font-bold text-violet-800 tabular-nums text-base">
                     {formatCurrency(summary.total_luong || 0)}
                   </td>
-                  <td className="px-5 py-3"></td>
                 </tr>
               </tfoot>
             )}

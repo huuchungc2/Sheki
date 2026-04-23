@@ -27,6 +27,79 @@ const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
   "/api";
 
+function capTrue(caps: any, mod: string, act: string) {
+  return !!caps?.[mod]?.[act];
+}
+
+function cap2True(caps2: any, featureKey: string) {
+  return !!caps2?.[featureKey];
+}
+
+function buildNonAdminNavigation(caps: any) {
+  const items: any[] = [];
+  const caps2 = (caps as any)?._caps2 || (caps as any)?.caps2 || null;
+  const hasCaps2 = caps2 && typeof caps2 === "object";
+  const can = (featureKey: string, fallbackMod?: string, fallbackAct?: string) => {
+    if (hasCaps2) return cap2True(caps2, featureKey);
+    if (fallbackMod && fallbackAct) return capTrue(caps, fallbackMod, fallbackAct);
+    return false;
+  };
+
+  if (can("dashboard.view", "dashboard", "view")) {
+    items.push({ name: "Tổng quan", href: "/", icon: LayoutDashboard });
+  }
+
+  const salesChildren: { name: string; href: string }[] = [];
+  if (can("orders.list", "orders", "view")) {
+    salesChildren.push({ name: "Đơn hàng", href: "/orders" });
+  }
+  if (can("customers.list", "customers", "view")) {
+    salesChildren.push({ name: "Khách hàng", href: "/customers" });
+  }
+  if (can("orders.list", "orders", "view")) {
+    salesChildren.push({ name: "Đơn hoàn", href: "/returns" });
+  }
+  if (salesChildren.length) {
+    items.push({ name: "Bán hàng", icon: ShoppingCart, children: salesChildren });
+  }
+
+  const invChildren: { name: string; href: string }[] = [];
+  if (can("inventory.view", "inventory", "view")) {
+    invChildren.push({ name: "Nhập xuất & tồn", href: "/inventory" });
+  }
+  if (can("inventory.import", "inventory", "edit")) {
+    invChildren.push({ name: "Nhập kho", href: "/inventory/import" });
+    invChildren.push({ name: "Xuất kho", href: "/inventory/export" });
+  }
+  if (invChildren.length) {
+    items.push({ name: "Kho", icon: Warehouse, children: invChildren });
+  }
+
+  const reportChildren: { name: string; href: string }[] = [];
+  if (can("reports.revenue", "reports", "view")) {
+    reportChildren.push({ name: "Doanh thu", href: "/reports/revenue" });
+  }
+  if (can("reports.commissions", "reports", "view")) {
+    reportChildren.push({ name: "Hoa hồng", href: "/reports/commissions" });
+  }
+  if (can("reports.commissions_ctv", "reports", "view")) {
+    reportChildren.push({ name: "Hoa hồng CTV", href: "/reports/commissions/ctv" });
+  }
+  if (can("cash_transactions.view", "reports", "view")) {
+    reportChildren.push({ name: "Thu chi", href: "/cash-transactions" });
+  }
+  if (reportChildren.length) {
+    items.push({ name: "Báo cáo", icon: BarChart3, children: reportChildren });
+  }
+
+  // Fallback: nếu caps rỗng (token cũ / lỗi load) thì giữ menu sales tối thiểu để không “mất app”
+  if (items.length === 0) {
+    return navigationSales;
+  }
+
+  return items;
+}
+
 /** Menu Admin gọn: nhóm submenu, bớt mục trùng (Cài đặt chỉ ở cuối sidebar) */
 const navigationAdmin = [
   { name: "Tổng quan", href: "/", icon: LayoutDashboard },
@@ -53,6 +126,7 @@ const navigationAdmin = [
     children: [
       { name: "Nhân viên", href: "/employees" },
       { name: "Vai trò", href: "/roles" },
+      { name: "Nhóm nhân viên", href: "/employees/groups" },
     ],
   },
   {
@@ -290,12 +364,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [currentUser?.id]);
 
   const navigation = React.useMemo(() => {
-    if (!isAdminUser(currentUser)) return navigationSales;
-    if (currentUser?.is_super_admin) {
-      const rest = navigationAdmin.slice(1);
-      return [navigationAdmin[0], { name: "Quản lý shop", href: "/admin/shops", icon: Building2 }, ...rest];
+    if (isAdminUser(currentUser)) {
+      if (currentUser?.is_super_admin) {
+        const rest = navigationAdmin.slice(1);
+        return [navigationAdmin[0], { name: "Quản lý shop", href: "/admin/shops", icon: Building2 }, ...rest];
+      }
+      return navigationAdmin;
     }
-    return navigationAdmin;
+    // Pass both caps shapes to builder (legacy `_caps` + new `_caps2` on user)
+    const caps = (currentUser as any)?._caps;
+    const merged = { ...(caps || {}), _caps2: (currentUser as any)?._caps2 };
+    return buildNonAdminNavigation(merged);
   }, [currentUser]);
   const visibleNavigation = navigation.filter((item, idx, arr) =>
     arr.findIndex(i => i.name === item.name) === idx
@@ -304,9 +383,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   /** Trùng route con (vd /orders/edit) */
   const pathActive = React.useCallback((pathname: string, href: string) => {
-    if (pathname === href) return true;
-    if (href === "/") return false;
-    if (!pathname.startsWith(href + "/")) return false;
+    const baseHref = (href || "").split("?")[0].split("#")[0] || "/";
+    if (pathname === baseHref) return true;
+    if (baseHref === "/") return false;
+    if (!pathname.startsWith(baseHref + "/")) return false;
     return true;
   }, []);
 

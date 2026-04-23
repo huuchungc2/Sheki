@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
-const authorize = require('../middleware/authorize');
+const requirePermission = require('../middleware/requirePermission');
+const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
+const { getScope } = require('../utils/scope');
 
 const BASE_FROM = `
       FROM cash_transactions ct
@@ -12,13 +14,15 @@ const BASE_FROM = `
       JOIN users c ON ct.created_by = c.id
     `;
 
-function buildCashTxWhere(query, shopId) {
+async function buildCashTxWhere(query, shopId, reqUser, req) {
   let where = ' WHERE ct.shop_id = ? ';
   const params = [shopId];
 
-  if (query.user_id) {
+  const scope = req ? await getScope(req, 'reports') : (!!reqUser?.scope_own_data && !reqUser?.can_access_admin && !reqUser?.is_super_admin ? 'own' : 'shop');
+  const effUserId = scope === 'own' ? Number(reqUser.id) : (query.user_id ? parseInt(query.user_id, 10) : null);
+  if (effUserId) {
     where += ' AND ct.user_id = ? ';
-    params.push(parseInt(query.user_id, 10));
+    params.push(effUserId);
   }
   if (query.kind === 'income' || query.kind === 'expense') {
     where += ' AND ct.kind = ? ';
@@ -44,14 +48,14 @@ const SELECT_LIST = `SELECT ct.id, ct.user_id, ct.group_id, ct.kind, ct.amount, 
         c.full_name AS created_by_name`;
 
 /** Admin: thu chi nội bộ — danh sách (lọc theo tháng/năm + NV + loại) */
-router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.get('/', auth, requireShop, requirePermission('reports', 'view'), requireFeature('cash_transactions.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { page = 1, limit = 20 } = req.query;
     const offset = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, Math.max(1, parseInt(limit, 10)));
     const lim = Math.min(100, Math.max(1, parseInt(limit, 10)));
 
-    const { where, params } = buildCashTxWhere(req.query, req.shopId);
+    const { where, params } = await buildCashTxWhere(req.query, req.shopId, req.user, req);
 
     const [countRows] = await pool.query(
       `SELECT COUNT(*) AS total ${BASE_FROM} ${where}`,
@@ -81,10 +85,10 @@ router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) =>
 });
 
 /** Xuất toàn bộ bản ghi theo bộ lọc (không phân trang) — phục vụ Excel */
-router.get('/export', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.get('/export', auth, requireShop, requirePermission('reports', 'view'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { where, params } = buildCashTxWhere(req.query, req.shopId);
+    const { where, params } = await buildCashTxWhere(req.query, req.shopId, req.user, req);
     const [rows] = await pool.query(
       `${SELECT_LIST}
       ${BASE_FROM}
@@ -99,13 +103,14 @@ router.get('/export', auth, requireShop, authorize('admin'), async (req, res, ne
 });
 
 /** Admin: tạo phiếu thu/chi */
-router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post('/', auth, requireShop, requirePermission('reports', 'edit'), requireFeature('cash_transactions.edit'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const sid = req.shopId;
     const { user_id, group_id, kind, amount, note } = req.body;
 
-    const uid = parseInt(user_id, 10);
+    const scope = await getScope(req, 'reports');
+    const uid = scope === 'own' ? Number(req.user.id) : parseInt(user_id, 10);
     if (!uid || Number.isNaN(uid)) {
       return res.status(400).json({ error: 'Chọn nhân viên' });
     }
@@ -164,7 +169,7 @@ router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) =
 });
 
 /** Admin: xóa bản ghi (nhập nhầm) */
-router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, requirePermission('reports', 'delete'), requireFeature('cash_transactions.edit'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const id = parseInt(req.params.id, 10);

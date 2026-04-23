@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
-const authorize = require('../middleware/authorize');
+const requirePermission = require('../middleware/requirePermission');
+const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
 
 // GET: Thống kê nhập/xuất kho (tổng giá trị + số phiếu)
-router.get('/summary', auth, requireShop, async (req, res, next) => {
+router.get('/summary', auth, requireShop, requirePermission('inventory', 'view'), requireFeature('inventory.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { warehouse_id, date_from, date_to } = req.query;
@@ -66,7 +67,7 @@ router.get('/summary', auth, requireShop, async (req, res, next) => {
 });
 
 // GET: Lịch sử nhập/xuất kho
-router.get('/', auth, requireShop, async (req, res, next) => {
+router.get('/', auth, requireShop, requirePermission('inventory', 'view'), requireFeature('inventory.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, type, status, warehouse_id, date_from, date_to, page = 1, limit = 20 } = req.query;
@@ -140,7 +141,7 @@ router.get('/', auth, requireShop, async (req, res, next) => {
 });
 
 // GET: Tồn kho theo kho — dùng cho OrderForm khi chọn kho
-router.get('/stock-by-warehouse', auth, requireShop, async (req, res, next) => {
+router.get('/stock-by-warehouse', auth, requireShop, requirePermission('inventory', 'view'), requireFeature('inventory.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { warehouse_id, product_id } = req.query;
@@ -171,7 +172,7 @@ router.get('/stock-by-warehouse', auth, requireShop, async (req, res, next) => {
 });
 
 // POST: Nhập kho
-router.post('/import', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post('/import', auth, requireShop, requirePermission('inventory', 'edit'), requireFeature('inventory.import'), async (req, res, next) => {
   try {
     const { warehouse_id, items, reason, status } = req.body;
 
@@ -224,7 +225,7 @@ router.post('/import', auth, requireShop, authorize('admin'), async (req, res, n
 });
 
 // POST: Xuất kho
-router.post('/export', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post('/export', auth, requireShop, requirePermission('inventory', 'edit'), requireFeature('inventory.export'), async (req, res, next) => {
   try {
     const { warehouse_id, destination_warehouse_id, items, reason, status } = req.body;
 

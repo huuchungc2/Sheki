@@ -10,7 +10,7 @@ import {
   Download,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { cn, formatCurrency } from "../lib/utils";
+import { cn, formatCurrency, isAdminUser } from "../lib/utils";
 import { exportCashTransactions } from "../lib/exportExcel";
 
 type EmployeeRow = {
@@ -19,6 +19,19 @@ type EmployeeRow = {
   username: string;
   email?: string;
   phone?: string | null;
+};
+
+type CurrentUserLite = {
+  id: number;
+  full_name?: string;
+  username?: string;
+  email?: string;
+  phone?: string | null;
+  can_access_admin?: any;
+  role?: any;
+  role_name?: any;
+  scope_own_data?: any;
+  is_super_admin?: any;
 };
 
 /** Nhập/sửa số tiền VNĐ: chỉ số nguyên, hiển thị theo locale vi-VN */
@@ -218,6 +231,32 @@ export function CashTransactions() {
   const [note, setNote] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
 
+  const [currentUser, setCurrentUser] = React.useState<CurrentUserLite | null>(null);
+  const isAdmin = React.useMemo(() => isAdminUser(currentUser), [currentUser]);
+
+  const loadMe = React.useCallback(async () => {
+    // Prefer API truth; fallback to localStorage for robustness
+    try {
+      const res: any = await api.get("/auth/me");
+      const me = res?.data as CurrentUserLite | undefined;
+      if (me?.id) {
+        setCurrentUser(me);
+        return me;
+      }
+    } catch {
+      // ignore; fallback below
+    }
+    try {
+      const raw = localStorage.getItem("user");
+      const u = raw ? (JSON.parse(raw) as CurrentUserLite) : null;
+      if (u?.id) setCurrentUser(u);
+      return u;
+    } catch {
+      setCurrentUser(null);
+      return null;
+    }
+  }, []);
+
   const loadEmployees = React.useCallback(async () => {
     try {
       const res: any = await api.get("/users?limit=500&active_only=1");
@@ -267,18 +306,53 @@ export function CashTransactions() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      await loadEmployees();
+      const me = await loadMe();
+      const admin = isAdminUser(me);
+      if (!admin) {
+        // Nhân viên: mặc định xem/ghi thu chi của chính mình
+        const myId = me?.id ? String(me.id) : "";
+        if (myId) {
+          setUserId(myId);
+          setFilterUserId(myId);
+        }
+        // Không cần load toàn bộ nhân viên (thường bị giới hạn quyền / không cần thiết)
+        if (myId) {
+          setEmployees([
+            {
+              id: Number(myId),
+              full_name: me?.full_name || "—",
+              username: me?.username || "",
+              email: me?.email,
+              phone: me?.phone ?? null,
+            },
+          ]);
+        } else {
+          setEmployees([]);
+        }
+      } else {
+        await loadEmployees();
+      }
       if (!cancelled) setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [loadEmployees]);
+  }, [loadEmployees, loadMe]);
 
   React.useEffect(() => {
     if (loading) return;
     fetchList();
   }, [loading, fetchList]);
+
+  // Nếu là nhân viên: khóa filter theo chính mình (tránh state bị clear do UI)
+  React.useEffect(() => {
+    if (loading) return;
+    if (isAdmin) return;
+    const myId = currentUser?.id ? String(currentUser.id) : "";
+    if (!myId) return;
+    if (filterUserId !== myId) setFilterUserId(myId);
+    if (userId !== myId) setUserId(myId);
+  }, [loading, isAdmin, currentUser?.id, filterUserId, userId]);
 
   React.useEffect(() => {
     loadGroupsForUser(userId);
@@ -308,8 +382,10 @@ export function CashTransactions() {
       });
       setAmount("");
       setNote("");
-      setUserId("");
-      setEmpSearchReset((k) => k + 1);
+      if (isAdmin) {
+        setUserId("");
+        setEmpSearchReset((k) => k + 1);
+      }
       setPage(1);
       await fetchList();
     } catch (e: any) {
@@ -368,7 +444,9 @@ export function CashTransactions() {
       <div>
         <h1 className="text-xl font-bold text-slate-900">Thu chi</h1>
         <p className="text-slate-500 text-sm mt-1">
-          Ghi nhận thu/chi theo nhân viên và nhóm bán hàng (chỉ Admin).
+          {isAdmin
+            ? "Ghi nhận thu/chi theo nhân viên và nhóm bán hàng."
+            : "Thu chi của bạn (mặc định theo tài khoản đăng nhập)."}
         </p>
       </div>
 
@@ -387,13 +465,24 @@ export function CashTransactions() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="md:col-span-2 lg:col-span-1">
             <label className="block text-xs font-medium text-slate-600 mb-1">Nhân viên *</label>
-            <EmployeeSearchCombo
-              employees={employees}
-              valueId={userId}
-              onChangeId={setUserId}
-              resetSignal={empSearchReset}
-              placeholder="Gõ tên, username, email, SĐT..."
-            />
+            {isAdmin ? (
+              <EmployeeSearchCombo
+                employees={employees}
+                valueId={userId}
+                onChangeId={setUserId}
+                resetSignal={empSearchReset}
+                placeholder="Gõ tên, username, email, SĐT..."
+              />
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 sm:py-2 text-sm min-h-[44px] flex items-center">
+                <div className="min-w-0">
+                  <div className="font-medium text-slate-900 truncate">
+                    {currentUser?.full_name || "—"}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">{currentUser?.username || ""}</div>
+                </div>
+              </div>
+            )}
             {userId ? (
               <div className="mt-2">
                 {userGroups.length > 0 ? (
@@ -508,17 +597,19 @@ export function CashTransactions() {
             </button>
           </div>
           <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-center">
-            <div className="w-full sm:w-auto sm:min-w-[240px]">
-              <EmployeeSearchCombo
-                employees={employees}
-                valueId={filterUserId}
-                onChangeId={(id) => {
-                  setFilterUserId(id);
-                  setPage(1);
-                }}
-                placeholder="Lọc theo nhân viên..."
-              />
-            </div>
+            {isAdmin ? (
+              <div className="w-full sm:w-auto sm:min-w-[240px]">
+                <EmployeeSearchCombo
+                  employees={employees}
+                  valueId={filterUserId}
+                  onChangeId={(id) => {
+                    setFilterUserId(id);
+                    setPage(1);
+                  }}
+                  placeholder="Lọc theo nhân viên..."
+                />
+              </div>
+            ) : null}
             <select
               value={filterKind}
               onChange={(e) => {

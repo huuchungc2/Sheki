@@ -4,6 +4,7 @@ const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
+const { getScope } = require('../utils/scope');
 
 // GET /api/collaborators/my-managers — CTV xem quản lý; ?group_id= chỉ quản lý thuộc nhóm đó (user_groups)
 // ?include_user_ids=1,2 — thêm user (vd. quản lý đơn đang sửa) nếu chưa có trong danh sách lọc
@@ -202,6 +203,7 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
     const pool = await getPool();
     const sid = req.shopId;
     const { month, year, group_id, sales_id } = req.query;
+    const scope = await getScope(req, 'reports');
 
     // Filter theo kỳ phát sinh dòng HH/điều chỉnh (created_at của commission/adjustment)
     // để hoàn hàng (commission_adjustments) nằm đúng kỳ duyệt hoàn.
@@ -213,15 +215,41 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
 
     const orderFilterConds = [];
     const orderFilterParams = [];
-    if (group_id) { orderFilterConds.push('o.group_id = ?'); orderFilterParams.push(parseInt(group_id)); }
+    let groupId = group_id ? parseInt(group_id) : null;
+
+    // Group-scope: force group_id within user's groups (same pattern as reports routes)
+    if (scope === 'group') {
+      const [grows] = await pool.query(
+        `SELECT ug.group_id
+         FROM user_groups ug
+         JOIN groups g ON g.id = ug.group_id
+         WHERE ug.user_id = ? AND g.shop_id = ? AND g.is_active = 1`,
+        [req.user.id, sid]
+      );
+      const gids = grows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
+      if (!gids.length) {
+        return res.json({ data: { pairs: [], orders: [], totals: { total_override: 0, total_orders: 0 } } });
+      }
+      if (groupId != null && !gids.includes(Number(groupId))) {
+        return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
+      }
+      if (groupId == null) groupId = Math.min(...gids);
+    }
+
+    if (groupId) { orderFilterConds.push('o.group_id = ?'); orderFilterParams.push(parseInt(groupId)); }
     const orderWhereExtra = orderFilterConds.length ? ' AND ' + orderFilterConds.join(' AND ') : '';
 
     // IMPORTANT: group filter must constrain transactions (t) too.
     // If we only filter the joined `orders o` in an ON clause, SUM(t.amount) still includes out-of-group rows.
     const txJoinOrders = orderFilterConds.length ? ' JOIN orders o_tx ON o_tx.id = t.order_id' : '';
     const txOrderWhereExtra = orderFilterConds.length ? ' AND o_tx.group_id = ?' : '';
-    const salesFilter = sales_id ? ' AND cr.sales_id = ?' : '';
-    const salesParam  = sales_id ? [parseInt(sales_id)] : [];
+    // Own-scope: only the logged-in sales can view their own pairs
+    const effectiveSalesId =
+      scope === 'own'
+        ? req.user.id
+        : (sales_id ? parseInt(sales_id) : null);
+    const salesFilter = effectiveSalesId ? ' AND cr.sales_id = ?' : '';
+    const salesParam = effectiveSalesId ? [parseInt(effectiveSalesId)] : [];
 
     const txFrom = `
       FROM (

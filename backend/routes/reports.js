@@ -2,7 +2,10 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
+const requirePermission = require('../middleware/requirePermission');
+const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
+const { getScope } = require('../utils/scope');
 const {
   getReturnRevenueAndOrdersByMonthYear,
   getReturnRevenueByRange,
@@ -12,7 +15,18 @@ const {
 } = require('../services/returnMetrics');
 const { getCommissionMonthKpi } = require('../services/commissionKpi');
 
-router.get('/dashboard', auth, requireShop, async (req, res, next) => {
+async function loadUserGroupIds(pool, shopId, userId) {
+  const [rows] = await pool.query(
+    `SELECT ug.group_id
+     FROM user_groups ug
+     JOIN groups g ON g.id = ug.group_id
+     WHERE ug.user_id = ? AND g.shop_id = ? AND g.is_active = 1`,
+    [userId, shopId]
+  );
+  return rows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
+}
+
+router.get('/dashboard', auth, requireShop, requireFeature('reports.dashboard'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const shopId = req.shopId;
@@ -22,16 +36,42 @@ router.get('/dashboard', auth, requireShop, async (req, res, next) => {
     const firstDayLastMonth = new Date(y, m - 1, 1);
     const lastDayLastMonth  = new Date(y, m, 0);
     const todayStart = new Date(y, m, now.getDate());
-    const isSales = !!req.user.scope_own_data;
+    const scope = await getScope(req, 'reports');
+    const isScoped = scope !== 'shop';
     const uid = req.user.id;
 
     // Helper: build salesperson filter
-    const spFilter = isSales ? ' AND salesperson_id = ?' : '';
-    const spParam  = isSales ? [uid] : [];
-    const spFilterOrdersAlias = isSales ? ' AND o.salesperson_id = ?' : '';
-    const spFilterOrdersAliasParam = isSales ? [uid] : [];
+    let spFilter = '';
+    let spParam = [];
+    let spFilterOrdersAlias = '';
+    let spFilterOrdersAliasParam = [];
+    if (scope === 'own') {
+      spFilter = ' AND salesperson_id = ?';
+      spParam = [uid];
+      spFilterOrdersAlias = ' AND o.salesperson_id = ?';
+      spFilterOrdersAliasParam = [uid];
+    } else if (scope === 'group') {
+      const [grows] = await pool.query(
+        `SELECT ug.group_id
+         FROM user_groups ug
+         JOIN groups g ON g.id = ug.group_id
+         WHERE ug.user_id = ? AND g.shop_id = ? AND g.is_active = 1`,
+        [uid, shopId]
+      );
+      const gids = grows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
+      if (!gids.length) {
+        spFilter = ' AND 1=0';
+        spFilterOrdersAlias = ' AND 1=0';
+      } else {
+        const ph = gids.map(() => '?').join(',');
+        spFilter = ` AND group_id IN (${ph})`;
+        spParam = gids;
+        spFilterOrdersAlias = ` AND o.group_id IN (${ph})`;
+        spFilterOrdersAliasParam = gids;
+      }
+    }
 
-    const salespersonIdForScope = isSales ? uid : null;
+    const salespersonIdForScope = scope === 'own' ? uid : null;
 
     // Doanh thu = tổng tiền bán hàng (orders.subtotal / Tạm tính), không dùng total_amount (thu khách).
     // Không cộng đơn đã hủy.
@@ -105,13 +145,13 @@ router.get('/dashboard', auth, requireShop, async (req, res, next) => {
     const returnCommissionThisMonth = await getReturnCommissionByRange(pool, {
       from: firstDayThisMonth,
       to: new Date(y, m + 1, 1),
-      userId: isSales ? uid : null,
+      userId: isScoped ? uid : null,
       shopId,
     });
     const returnCommissionToday = await getReturnCommissionByRange(pool, {
       from: todayStart,
       to: null,
-      userId: isSales ? uid : null,
+      userId: isScoped ? uid : null,
       shopId,
     });
 
@@ -120,14 +160,14 @@ router.get('/dashboard', auth, requireShop, async (req, res, next) => {
     let totalNvChiu = 0;
     const totalReturnCommMonth = returnCommissionThisMonth || 0; // negative
 
-    const monthKpi = isSales
+    const monthKpi = isScoped
       ? await getCommissionMonthKpi(pool, { month: m + 1, year: y, userId: uid, shopId })
       : await getCommissionMonthKpi(pool, { month: m + 1, year: y, shopId });
     const directGrossMonth = monthKpi.directGross;
     const overrideNetMonth = monthKpi.overrideNet;
     const totalCommGrossMonth = monthKpi.totalHH;
 
-    if (isSales) {
+    if (isScoped) {
       const [shipNvMonth] = await pool.query(
         `SELECT
            COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
@@ -164,14 +204,14 @@ router.get('/dashboard', auth, requireShop, async (req, res, next) => {
       totalCommGrossMonth - Math.abs(totalReturnCommMonth) + totalKhachShip - totalNvChiu;
 
     // ── Khách hàng ──
-    const custFilter = isSales ? ' AND created_by = ?' : '';
+    const custFilter = isScoped ? ' AND created_by = ?' : '';
     const [custTotal] = await pool.query(
       `SELECT COUNT(*) as total FROM customers WHERE shop_id = ?${custFilter}`,
-      isSales ? [shopId, uid] : [shopId]
+      isScoped ? [shopId, uid] : [shopId]
     );
     const [custNew] = await pool.query(
       `SELECT COUNT(*) as total FROM customers WHERE shop_id = ? AND created_at >= ?${custFilter}`,
-      [shopId, firstDayThisMonth, ...(isSales ? [uid] : [])]
+      [shopId, firstDayThisMonth, ...(isScoped ? [uid] : [])]
     );
 
     // ── Sản phẩm ──
@@ -224,7 +264,7 @@ router.get('/dashboard', auth, requireShop, async (req, res, next) => {
 
     // ── Top nhân viên tháng này (admin only) ──
     let topSales = [];
-    if (!isSales) {
+    if (!isScoped) {
       const [rows] = await pool.query(
         `SELECT
            u.id, u.full_name,
@@ -352,7 +392,7 @@ router.get('/dashboard', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.get('/salary', auth, requireShop, async (req, res, next) => {
+router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const shopId = req.shopId;
@@ -363,8 +403,41 @@ router.get('/salary', auth, requireShop, async (req, res, next) => {
 
     // Lọc theo "Nhóm BH" của đơn hàng (orders.group_id), KHÔNG dựa trên user_groups.
     // Vì báo cáo hoa hồng theo nhóm đang hiển thị theo o.group_id (CommissionReport).
-    const groupId = group_id ? parseInt(group_id) : null;
+    let groupId = group_id ? parseInt(group_id) : null;
+    const scope = await getScope(req, 'reports');
+    const isScoped = scope !== 'shop';
+
+    // Group-scope: force group_id within user's groups (reuse existing group filter logic)
+    if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, shopId, req.user.id);
+      if (!gids.length) {
+        return res.json({
+          data: {
+            salesData: [],
+            summary: {
+              totalSales: 0,
+              totalCommission: 0,
+              totalOrdersAll: 0,
+              totalEmployees: 0,
+              kpi_direct_gross: 0,
+              kpi_override_net: 0,
+              kpi_total_hh: 0,
+              kpi_return_commission: 0,
+              kpi_total_khach_ship: 0,
+              kpi_total_nv_chiu: 0,
+              kpi_total_luong: 0,
+            },
+          },
+        });
+      }
+      if (groupId != null && !gids.includes(Number(groupId))) {
+        return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
+      }
+      if (groupId == null) groupId = Math.min(...gids);
+    }
+
     const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
+    const scopedUserId = scope === 'own' ? Number(req.user.id) : null;
     const [salesData] = await pool.query(
       `SELECT
         u.id,
@@ -467,6 +540,7 @@ router.get('/salary', auth, requireShop, async (req, res, next) => {
          GROUP BY salesperson_id
        ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE us.shop_id = ? AND u.is_active = 1
+         ${isScoped ? ' AND u.id = ?' : ''}
        ORDER BY total_sales DESC`,
       [
         // o_stats
@@ -485,18 +559,31 @@ router.get('/salary', auth, requireShop, async (req, res, next) => {
         shopId, currentMonth, currentYear, ...(groupId ? [groupId] : []),
         // us.shop_id
         shopId,
+        ...(isScoped ? [scopedUserId] : []),
       ]
     );
 
     // KPI “Số đơn hàng” (Admin): đếm theo orders, không phụ thuộc user active/role
+    const ordersAllWhere = [
+      'o.shop_id = ?',
+      'MONTH(o.created_at) = ?',
+      'YEAR(o.created_at) = ?',
+      "o.status != 'cancelled'",
+    ];
+    const ordersAllParams = [shopId, currentMonth, currentYear];
+    if (groupId) {
+      ordersAllWhere.push('o.group_id = ?');
+      ordersAllParams.push(groupId);
+    }
+    if (isScoped) {
+      ordersAllWhere.push('o.salesperson_id = ?');
+      ordersAllParams.push(scopedUserId);
+    }
     const [[ordersAll]] = await pool.query(
       `SELECT COUNT(*) AS total_orders
        FROM orders o
-       WHERE o.shop_id = ? AND MONTH(o.created_at) = ?
-         AND YEAR(o.created_at) = ?
-         AND o.status != 'cancelled'
-         ${groupId ? ' AND o.group_id = ?' : ''}`,
-      [shopId, currentMonth, currentYear, ...(groupId ? [groupId] : [])]
+       WHERE ${ordersAllWhere.join(' AND ')}`,
+      ordersAllParams
     );
 
     // Convert DECIMAL strings to numbers
@@ -542,17 +629,28 @@ router.get('/salary', auth, requireShop, async (req, res, next) => {
       return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0;
     });
 
+    // Sort theo tổng lương: cao → thấp (UI báo cáo hoa hồng nhân viên)
+    formattedSalesData.sort((a, b) => (Number(b.total_luong) || 0) - (Number(a.total_luong) || 0));
+
     const totalSales = formattedSalesData.reduce((sum, s) => sum + s.total_sales, 0);
     const totalCommission = formattedSalesData.reduce((sum, s) => sum + s.total_all_commission, 0);
 
     const cm = parseInt(String(currentMonth), 10);
     const cy = parseInt(String(currentYear), 10);
-    const kpiTotals = await getCommissionMonthKpi(pool, {
-      month: cm,
-      year: cy,
-      groupId: Number.isFinite(groupId) ? groupId : null,
-      shopId,
-    });
+    const kpiTotals = isScoped
+      ? await getCommissionMonthKpi(pool, {
+          month: cm,
+          year: cy,
+          userId: scopedUserId,
+          groupId: Number.isFinite(groupId) ? groupId : null,
+          shopId,
+        })
+      : await getCommissionMonthKpi(pool, {
+          month: cm,
+          year: cy,
+          groupId: Number.isFinite(groupId) ? groupId : null,
+          shopId,
+        });
 
     // KPI Tổng lương (Admin) phải khớp Dashboard:
     // Tổng lương = Tổng HH (direct gross + override net) − |HH hoàn direct| + Ship KH Trả − NV chịu
@@ -560,7 +658,7 @@ router.get('/salary', auth, requireShop, async (req, res, next) => {
     const kpiReturnCommission = await getReturnCommissionByMonthYear(pool, {
       month: cm,
       year: cy,
-      userId: null,
+      userId: isScoped ? scopedUserId : null,
       groupId: Number.isFinite(groupId) ? groupId : null,
       shopId,
     }); // negative
@@ -577,8 +675,9 @@ router.get('/salary', auth, requireShop, async (req, res, next) => {
         AND o.status <> 'cancelled'
         AND u.is_active = 1
         ${groupId ? ' AND o.group_id = ?' : ''}
+        ${isScoped ? ' AND o.salesperson_id = ?' : ''}
       `,
-      [shopId, cm, cy, ...(groupId ? [groupId] : [])]
+      [shopId, cm, cy, ...(groupId ? [groupId] : []), ...(isScoped ? [scopedUserId] : [])]
     );
     const kpiShip = parseFloat(shipNvAll?.total_khach_ship) || 0;
     const kpiNv = parseFloat(shipNvAll?.total_nv_chiu) || 0;
@@ -610,7 +709,7 @@ router.get('/salary', auth, requireShop, async (req, res, next) => {
 
 // Revenue report (gross) — giống Dashboard: doanh số bán gross, hoàn tách riêng.
 // GET /api/reports/revenue?month=MM&year=YYYY&group_id=
-router.get('/revenue', auth, requireShop, async (req, res, next) => {
+router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), requireFeature('reports.revenue'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const shopId = req.shopId;
@@ -619,7 +718,23 @@ router.get('/revenue', auth, requireShop, async (req, res, next) => {
     const currentMonth = month || new Date().getMonth() + 1;
     const currentYear = year || new Date().getFullYear();
 
-    const groupId = group_id ? parseInt(group_id) : null;
+    const scope = await getScope(req, 'reports');
+    const isScoped = scope !== 'shop';
+    const scopedUserId = scope === 'own' ? Number(req.user.id) : null;
+
+    let groupId = group_id ? parseInt(group_id) : null;
+
+    // Group-scope: force group_id within user's groups (reuse existing group filter logic)
+    if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, shopId, req.user.id);
+      if (!gids.length) {
+        return res.json({ data: { salesData: [], summary: { totalSales: 0, totalCommission: 0, totalReturns: 0, totalEmployees: 0 } } });
+      }
+      if (groupId != null && !gids.includes(Number(groupId))) {
+        return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
+      }
+      if (groupId == null) groupId = Math.min(...gids);
+    }
     const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
     const ordersExistsCond =
       groupId != null
@@ -704,7 +819,9 @@ router.get('/revenue', auth, requireShop, async (req, res, next) => {
            ${groupId ? ' AND group_id = ?' : ''}
          GROUP BY salesperson_id
        ) ship_nv ON u.id = ship_nv.salesperson_id
-      WHERE us.shop_id = ? AND COALESCE(o_stats.total_sales, 0) > 0
+       WHERE us.shop_id = ?
+         AND COALESCE(o_stats.total_sales, 0) > 0
+         ${isScoped ? ' AND u.id = ?' : ''}
        ORDER BY total_sales DESC`,
       [
         // o_stats
@@ -719,6 +836,7 @@ router.get('/revenue', auth, requireShop, async (req, res, next) => {
         shopId, currentMonth, currentYear, ...(groupId ? [groupId] : []),
         // us.shop_id
         shopId,
+        ...(isScoped ? [scopedUserId] : []),
       ]
     );
 
@@ -749,6 +867,10 @@ router.get('/revenue', auth, requireShop, async (req, res, next) => {
       summaryConds.push('o.group_id = ?');
       summaryParams.push(groupId);
     }
+    if (isScoped) {
+      summaryConds.push('o.salesperson_id = ?');
+      summaryParams.push(scopedUserId);
+    }
 
     const [[salesSum]] = await pool.query(
       `SELECT COALESCE(SUM(o.subtotal), 0) AS total_sales
@@ -776,10 +898,18 @@ router.get('/revenue', auth, requireShop, async (req, res, next) => {
          FROM order_items
          GROUP BY order_id, product_id
        ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
-       WHERE o.shop_id = ? AND MONTH(r.created_at) = ? AND YEAR(r.created_at) = ?${groupId != null ? ' AND o.group_id = ?' : ''}`,
-      groupId != null
-        ? [shopId, parseInt(currentMonth), parseInt(currentYear), groupId]
-        : [shopId, parseInt(currentMonth), parseInt(currentYear)]
+       WHERE o.shop_id = ?
+         AND MONTH(r.created_at) = ?
+         AND YEAR(r.created_at) = ?
+         ${groupId != null ? ' AND o.group_id = ?' : ''}
+         ${isScoped ? ' AND o.salesperson_id = ?' : ''}`,
+      [
+        shopId,
+        parseInt(currentMonth),
+        parseInt(currentYear),
+        ...(groupId != null ? [groupId] : []),
+        ...(isScoped ? [scopedUserId] : []),
+      ]
     );
 
     const totalSales = parseFloat(salesSum?.total_sales) || 0;
@@ -811,11 +941,24 @@ router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
     const { month, year, group_id, user_id } = req.query;
     const m = month ? parseInt(String(month), 10) : null;
     const y = year ? parseInt(String(year), 10) : null;
-    const groupId = group_id ? parseInt(String(group_id), 10) : null;
+    let groupId = group_id ? parseInt(String(group_id), 10) : null;
 
-    const isSales = !!req.user.scope_own_data;
+    const scope = await getScope(req, 'reports');
     const targetUserId =
-      isSales ? req.user.id : (user_id != null && String(user_id).trim() !== '' ? parseInt(String(user_id), 10) : null);
+      scope === 'own'
+        ? req.user.id
+        : (user_id != null && String(user_id).trim() !== '' ? parseInt(String(user_id), 10) : null);
+
+    if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, shopId, req.user.id);
+      if (!gids.length) {
+        return res.json({ data: { return_orders: 0, return_revenue: 0, return_commission: 0 } });
+      }
+      if (groupId != null && !gids.includes(Number(groupId))) {
+        return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
+      }
+      if (groupId == null) groupId = Math.min(...gids);
+    }
 
     if (!m || !y) return res.status(400).json({ error: 'Thiếu month/year' });
     const ret = await getReturnRevenueAndOrdersByMonthYear(pool, {

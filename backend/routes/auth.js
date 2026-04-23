@@ -97,6 +97,101 @@ function signToken(payload) {
   });
 }
 
+const { MODULE_ACTIONS, RBAC_MODULES, RBAC_ACTIONS, SCOPE_MODULES } = require('../rbac/modules');
+const { FEATURE_TREE, FEATURE_KEYS, SCOPE_TARGETS, SCOPE_LEVELS } = require('../rbac/features');
+const { computeFeatureCaps } = require('../middleware/requireFeature');
+
+function emptyCaps() {
+  const out = {};
+  for (const [mod, actions] of MODULE_ACTIONS) {
+    out[mod] = {};
+    for (const a of actions) out[mod][a] = false;
+  }
+  return out;
+}
+
+function allTrueCaps() {
+  const out = {};
+  for (const [mod, actions] of MODULE_ACTIONS) {
+    out[mod] = {};
+    for (const a of actions) out[mod][a] = true;
+  }
+  return out;
+}
+
+/**
+ * Caps phục vụ UI routing (không thay thế kiểm tra API đầy đủ).
+ * Logic cố gắng khớp `backend/middleware/requirePermission.js` ở mức "module có action view/edit...".
+ */
+async function computePermissionCaps(pool, reqUser) {
+  if (!reqUser) return emptyCaps();
+  if (reqUser.is_super_admin) return allTrueCaps();
+
+  const shopId = reqUser.shop_id ?? null;
+  const roleId = reqUser.role_id ?? null;
+  const roleCode = String(reqUser.role || '').trim().toLowerCase();
+
+  if (shopId == null || shopId === '') return emptyCaps();
+  if (!roleId && !roleCode) return emptyCaps();
+
+  let hasAny = false;
+  let legacyMode = false;
+
+  try {
+    if (!roleId) return emptyCaps();
+    const [[countRow]] = await pool.query(
+      'SELECT COUNT(*) AS c FROM role_permissions WHERE shop_id = ? AND role_id = ?',
+      [shopId, roleId]
+    );
+    hasAny = Number(countRow?.c || 0) > 0;
+  } catch (err) {
+    const code = (err && err.code) || '';
+    if (code !== 'ER_BAD_FIELD_ERROR') throw err;
+    legacyMode = true;
+    if (!roleCode) return emptyCaps();
+    const [[countRow]] = await pool.query(
+      'SELECT COUNT(*) AS c FROM role_permissions WHERE shop_id = ? AND role = ?',
+      [shopId, roleCode]
+    );
+    hasAny = Number(countRow?.c || 0) > 0;
+  }
+
+  // Match requirePermission: nếu chưa seed rows, admin-role được bypass full caps (tránh lockout)
+  if (!hasAny) {
+    if (reqUser.can_access_admin) return allTrueCaps();
+    return emptyCaps();
+  }
+
+  const caps = emptyCaps();
+  for (const [mod, actions] of MODULE_ACTIONS) {
+    for (const action of actions) {
+      let allowed = false;
+      if (!legacyMode) {
+        const [[row]] = await pool.query(
+          `SELECT allowed
+           FROM role_permissions
+           WHERE shop_id = ? AND role_id = ? AND module = ? AND action = ?
+           LIMIT 1`,
+          [shopId, roleId, mod, action]
+        );
+        allowed = !!row?.allowed;
+      } else {
+        const [[row]] = await pool.query(
+          `SELECT allowed
+           FROM role_permissions
+           WHERE shop_id = ? AND role = ? AND module = ? AND action = ?
+           LIMIT 1`,
+          [shopId, roleCode, mod, action]
+        );
+        allowed = !!row?.allowed;
+      }
+      caps[mod][action] = allowed;
+    }
+  }
+
+  return caps;
+}
+
 router.get('/me', auth, async (req, res, next) => {
   try {
     const pool = await getPool();
@@ -150,8 +245,20 @@ router.get('/me', auth, async (req, res, next) => {
       allShops = all;
     }
 
+    const effUser = {
+      ...row,
+      shop_id: req.user.shop_id,
+      role_id: row.role_id,
+      role: row.role,
+      can_access_admin: row.can_access_admin,
+      scope_own_data: row.scope_own_data,
+      is_super_admin: row.is_super_admin,
+    };
+    const caps = await computePermissionCaps(pool, effUser);
+    const caps2 = await computeFeatureCaps(pool, effUser);
+
     res.json({
-      data: row,
+      data: { ...row, _caps: caps, _caps2: caps2 },
       shops,
       all_shops: allShops,
       current_shop_id: req.user.shop_id != null ? Number(req.user.shop_id) : null,
@@ -159,6 +266,40 @@ router.get('/me', auth, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// Effective permission caps for current shop+role (for FE routing/menus)
+router.get('/effective-permissions', auth, async (req, res, next) => {
+  try {
+    const pool = await getPool();
+    const caps = await computePermissionCaps(pool, req.user);
+    res.json({ data: caps });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Expose RBAC module config for frontend Settings UI
+router.get('/modules', auth, (req, res) => {
+  res.json({
+    data: {
+      modules: RBAC_MODULES,
+      actions: RBAC_ACTIONS,
+      scope_modules: SCOPE_MODULES,
+    },
+  });
+});
+
+// Expose detailed RBAC feature tree + scope config for frontend Settings UI
+router.get('/features', auth, (req, res) => {
+  res.json({
+    data: {
+      feature_tree: FEATURE_TREE,
+      feature_keys: FEATURE_KEYS,
+      scope_targets: SCOPE_TARGETS,
+      scope_levels: SCOPE_LEVELS,
+    },
+  });
 });
 
 router.post('/login', async (req, res, next) => {

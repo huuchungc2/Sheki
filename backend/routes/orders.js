@@ -4,6 +4,7 @@ const router = express.Router();
 
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
+const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
 const {
   generateOrderCode,
@@ -22,10 +23,22 @@ const {
   sumDirectGrossAccrualForOrderFilters,
   tryParseFullCalendarMonthFromRange,
 } = require('../services/commissionKpi');
+const { getScope } = require('../utils/scope');
 
 const DEFAULT_LINE_COMMISSION_RATE = 10;
 
-router.get('/', auth, requireShop, async (req, res, next) => {
+async function loadUserGroupIds(pool, shopId, userId) {
+  const [rows] = await pool.query(
+    `SELECT ug.group_id
+     FROM user_groups ug
+     JOIN groups g ON g.id = ug.group_id
+     WHERE ug.user_id = ? AND g.shop_id = ? AND g.is_active = 1`,
+    [userId, shopId]
+  );
+  return rows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
+}
+
+router.get('/', auth, requireShop, requireFeature('orders.list'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, status, employee, warehouse, date_from, date_to, group_id, product, page = 1, limit = 20 } = req.query;
@@ -64,13 +77,28 @@ router.get('/', auth, requireShop, async (req, res, next) => {
     params.push(req.shopId);
     summaryParams.push(req.shopId);
 
-    if (req.user.scope_own_data) {
-      // Sales "Đơn hàng của tôi": CHỈ các đơn mình bán
+    const scope = await getScope(req, 'orders');
+    if (scope === 'own') {
+      // Sales: chỉ các đơn mình bán
       query += ' AND o.salesperson_id = ?';
       countQuery += ' AND salesperson_id = ?';
       summaryQuery += ' AND o.salesperson_id = ?';
       params.push(req.user.id);
       summaryParams.push(req.user.id);
+    } else if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length) {
+        query += ' AND 1=0';
+        countQuery += ' AND 1=0';
+        summaryQuery += ' AND 1=0';
+      } else {
+        const placeholders = gids.map(() => '?').join(',');
+        query += ` AND o.group_id IN (${placeholders})`;
+        countQuery += ` AND group_id IN (${placeholders})`;
+        summaryQuery += ` AND o.group_id IN (${placeholders})`;
+        params.push(...gids);
+        summaryParams.push(...gids);
+      }
     }
 
     if (search) {
@@ -180,14 +208,14 @@ router.get('/', auth, requireShop, async (req, res, next) => {
         month: fullMonth.month,
         year: fullMonth.year,
         groupId: group_id ? parseInt(String(group_id), 10) : null,
-        userId: req.user.scope_own_data ? req.user.id : null,
+        userId: scope === 'own' ? req.user.id : null,
         shopId: req.shopId,
       });
       totalCommissionDirect = kpi.directGross;
     } else {
       totalCommissionDirect = await sumDirectGrossAccrualForOrderFilters(pool, {
         shopId: req.shopId,
-        scopeOwnData: !!req.user.scope_own_data,
+        scopeOwnData: scope === 'own',
         userId: req.user.id,
         search,
         status,
@@ -236,7 +264,7 @@ router.get('/', auth, requireShop, async (req, res, next) => {
 
 // Export: chi tiết sản phẩm theo bộ lọc (phục vụ Excel)
 // GET /api/orders/export-items?search=&status=&employee=&warehouse=&date_from=&date_to=&group_id=
-router.get('/export-items', auth, requireShop, async (req, res, next) => {
+router.get('/export-items', auth, requireShop, requireFeature('orders.export_items'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, status, employee, warehouse, date_from, date_to, group_id, product } = req.query;
@@ -274,9 +302,18 @@ router.get('/export-items', auth, requireShop, async (req, res, next) => {
     query += ' AND o.shop_id = ?';
     params.push(req.shopId);
 
-    if (req.user.scope_own_data) {
+    const scope = await getScope(req, 'orders');
+    if (scope === 'own') {
       query += ' AND o.salesperson_id = ?';
       params.push(req.user.id);
+    } else if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length) {
+        query += ' AND 1=0';
+      } else {
+        query += ` AND o.group_id IN (${gids.map(() => '?').join(',')})`;
+        params.push(...gids);
+      }
     }
 
     if (search) {
@@ -335,7 +372,7 @@ router.get('/export-items', auth, requireShop, async (req, res, next) => {
 
 // Page items: trả danh sách sản phẩm theo list order_ids (phục vụ cột "Sản phẩm" trong OrderList)
 // GET /api/orders/page-items?order_ids=1,2,3
-router.get('/page-items', auth, requireShop, async (req, res, next) => {
+router.get('/page-items', auth, requireShop, requireFeature('orders.list'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const raw = String(req.query.order_ids || '');
@@ -349,9 +386,18 @@ router.get('/page-items', auth, requireShop, async (req, res, next) => {
     // Scope: Sales chỉ được xem items của đơn mình bán
     let scopeSql = '';
     const scopeParams = [];
-    if (req.user.scope_own_data) {
+    const scope = await getScope(req, 'orders');
+    if (scope === 'own') {
       scopeSql = ' AND o.salesperson_id = ?';
       scopeParams.push(req.user.id);
+    } else if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length) {
+        scopeSql = ' AND 1=0';
+      } else {
+        scopeSql = ` AND o.group_id IN (${gids.map(() => '?').join(',')})`;
+        scopeParams.push(...gids);
+      }
     }
 
     const placeholders = ids.map(() => '?').join(',');
@@ -385,7 +431,112 @@ router.get('/page-items', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.get('/:id', auth, requireShop, async (req, res, next) => {
+// Edit context: trả các dữ liệu phụ trợ theo "đơn đang sửa"
+// - groups của salesperson_id của đơn
+// - managers (collaborators) của salesperson_id của đơn, có thể filter theo group_id
+// GET /api/orders/:id/edit-context?group_id=&include_user_ids=
+router.get('/:id/edit-context', auth, requireShop, requireFeature('orders.view'), async (req, res, next) => {
+  try {
+    const pool = await getPool();
+
+    const [rows] = await pool.query(
+      'SELECT id, shop_id, group_id, salesperson_id FROM orders WHERE id = ? AND shop_id = ?',
+      [req.params.id, req.shopId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
+    }
+    const order = rows[0];
+
+    // Enforce same visibility as GET /:id
+    const scope = await getScope(req, 'orders');
+    if (scope === 'own' && order.salesperson_id !== req.user.id) {
+      const [[ov]] = await pool.query(
+        `SELECT 1 as ok
+         FROM commissions c
+         WHERE c.order_id = ? AND c.user_id = ? AND c.type = 'override' AND c.shop_id = ?
+         LIMIT 1`,
+        [order.id, req.user.id, req.shopId]
+      );
+      if (!ov?.ok) {
+        return res.status(403).json({ error: 'Không có quyền xem đơn hàng này' });
+      }
+    }
+    if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length || !gids.includes(Number(order.group_id))) {
+        return res.status(403).json({ error: 'Không có quyền xem đơn hàng này' });
+      }
+    }
+
+    // Groups of the salesperson (CTV)
+    const [grows] = await pool.query(
+      `SELECT g.*
+       FROM groups g
+       JOIN user_groups ug ON ug.group_id = g.id
+       WHERE g.shop_id = ? AND g.is_active = 1 AND ug.user_id = ?
+       ORDER BY g.name`,
+      [req.shopId, order.salesperson_id]
+    );
+
+    // Managers of the salesperson (CTV)
+    const groupIdRaw = req.query.group_id;
+    const groupId =
+      groupIdRaw !== undefined && groupIdRaw !== null && groupIdRaw !== ''
+        ? parseInt(groupIdRaw, 10)
+        : null;
+
+    let sql = `SELECT u.id, u.full_name, u.email, u.phone, u.commission_rate
+       FROM collaborators c
+       JOIN users u ON c.sales_id = u.id
+       WHERE c.shop_id = ? AND c.ctv_id = ? AND u.is_active = 1`;
+    const params = [req.shopId, order.salesperson_id];
+    if (groupId && Number.isFinite(groupId)) {
+      sql += ` AND EXISTS (
+        SELECT 1 FROM user_groups ug INNER JOIN groups g ON g.id = ug.group_id
+        WHERE ug.user_id = u.id AND ug.group_id = ? AND g.shop_id = ?
+      )`;
+      params.push(groupId, req.shopId);
+    }
+    sql += ` ORDER BY u.full_name`;
+    const [mrows] = await pool.query(sql, params);
+
+    const includeRaw = req.query.include_user_ids;
+    if (includeRaw && String(includeRaw).trim()) {
+      const wantIds = String(includeRaw)
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => Number.isFinite(n));
+      const have = new Set(mrows.map((r) => r.id));
+      for (const extraId of wantIds) {
+        if (have.has(extraId)) continue;
+        const [pair] = await pool.query(
+          'SELECT 1 FROM collaborators WHERE shop_id = ? AND sales_id = ? AND ctv_id = ? LIMIT 1',
+          [req.shopId, extraId, order.salesperson_id]
+        );
+        if (!pair.length) continue;
+        const [urows] = await pool.query(
+          'SELECT id, full_name, email, phone, commission_rate FROM users WHERE id = ? AND is_active = 1',
+          [extraId]
+        );
+        if (urows.length) mrows.push(urows[0]);
+      }
+      mrows.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name), 'vi'));
+    }
+
+    res.json({
+      data: {
+        salesperson_id: Number(order.salesperson_id),
+        groups: grows,
+        managers: mrows,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id', auth, requireShop, requireFeature('orders.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -404,10 +555,8 @@ router.get('/:id', auth, requireShop, async (req, res, next) => {
       return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
     }
 
-    if (
-      req.user.scope_own_data &&
-      rows[0].salesperson_id !== req.user.id
-    ) {
+    const scope = await getScope(req, 'orders');
+    if (scope === 'own' && rows[0].salesperson_id !== req.user.id) {
       // Cho phép quản lý xem chi tiết đơn nếu có hoa hồng override từ đơn đó
       // (Dùng cho popup chi tiết đơn ở /reports/commissions/ctv)
       const [[ov]] = await pool.query(
@@ -418,6 +567,12 @@ router.get('/:id', auth, requireShop, async (req, res, next) => {
         [rows[0].id, req.user.id, req.shopId]
       );
       if (!ov?.ok) {
+        return res.status(403).json({ error: 'Không có quyền xem đơn hàng này' });
+      }
+    }
+    if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length || !gids.includes(Number(rows[0].group_id))) {
         return res.status(403).json({ error: 'Không có quyền xem đơn hàng này' });
       }
     }
@@ -512,7 +667,7 @@ router.get('/:id', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.post('/', auth, requireShop, async (req, res, next) => {
+router.post('/', auth, requireShop, requireFeature('orders.create'), async (req, res, next) => {
   try {
     const {
       customer_id,
@@ -538,6 +693,14 @@ router.post('/', auth, requireShop, async (req, res, next) => {
     }
 
     const pool = await getPool();
+    const scope = await getScope(req, 'orders');
+    if (scope === 'group') {
+      const gid = group_id != null && group_id !== '' ? parseInt(group_id, 10) : null;
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gid || !gids.includes(gid)) {
+        return res.status(403).json({ error: 'Scope nhóm: phải chọn group_id thuộc nhóm của bạn' });
+      }
+    }
 
     const parsedMgrPost =
       manager_salesperson_id !== undefined && manager_salesperson_id !== null && manager_salesperson_id !== ''
@@ -697,7 +860,7 @@ router.post('/', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.put('/:id', auth, requireShop, async (req, res, next) => {
+router.put('/:id', auth, requireShop, requireFeature('orders.edit'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -708,17 +871,21 @@ router.put('/:id', auth, requireShop, async (req, res, next) => {
 
     const order = existing[0];
 
-    if (
-      req.user.scope_own_data &&
-      order.salesperson_id !== req.user.id
-    ) {
+    const scope = await getScope(req, 'orders');
+    if (scope === 'own' && order.salesperson_id !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
+    }
+    if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length || !gids.includes(Number(order.group_id))) {
+        return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
+      }
     }
 
     const isAdminOrderPut = req.user.can_access_admin === true || req.user.role === 'admin';
     if (
       !isAdminOrderPut &&
-      req.user.scope_own_data &&
+      scope === 'own' &&
       ['shipping', 'completed'].includes(String(order.status))
     ) {
       return res.status(403).json({ error: 'Không được sửa đơn đang giao hoặc đã giao' });
@@ -978,7 +1145,7 @@ router.put('/:id', auth, requireShop, async (req, res, next) => {
   }
 });
 
-router.delete('/:id', auth, requireShop, async (req, res, next) => {
+router.delete('/:id', auth, requireShop, requireFeature('orders.delete'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -989,17 +1156,21 @@ router.delete('/:id', auth, requireShop, async (req, res, next) => {
 
     const order = existing[0];
 
-    if (
-      req.user.scope_own_data &&
-      order.salesperson_id !== req.user.id
-    ) {
+    const scope = await getScope(req, 'orders');
+    if (scope === 'own' && order.salesperson_id !== req.user.id) {
       return res.status(403).json({ error: 'Không có quyền xóa đơn hàng này' });
+    }
+    if (scope === 'group') {
+      const gids = await loadUserGroupIds(pool, req.shopId, req.user.id);
+      if (!gids.length || !gids.includes(Number(order.group_id))) {
+        return res.status(403).json({ error: 'Không có quyền xóa đơn hàng này' });
+      }
     }
 
     const isAdminOrderDel = req.user.can_access_admin === true || req.user.role === 'admin';
     if (
       !isAdminOrderDel &&
-      req.user.scope_own_data &&
+      scope === 'own' &&
       ['shipping', 'completed'].includes(String(order.status))
     ) {
       return res.status(403).json({ error: 'Không được xóa đơn đang giao hoặc đã giao' });

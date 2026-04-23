@@ -4,12 +4,13 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
+const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
 
 
 
 // Admin: toàn bộ NV. Sales (scope_own_data): cần dropdown NV phụ trách ở form KH — không chỉ admin.
-router.get('/', auth, requireShop, (req, res, next) => {
+router.get('/', auth, requireShop, requireFeature('employees.list'), (req, res, next) => {
   if (req.user.can_access_admin || req.user.scope_own_data) return next();
   return res.status(403).json({ error: 'Không có quyền truy cập' });
 }, async (req, res, next) => {
@@ -254,10 +255,16 @@ router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) =
     if (!roleId) {
       return res.status(400).json({ error: 'Thiếu vai trò (role_id)' });
     }
-    const [[roleRow]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
-    if (!roleRow) {
-      return res.status(400).json({ error: 'Vai trò không hợp lệ' });
+    let roleRow = null;
+    try {
+      const [[rr]] = await pool.query('SELECT id, shop_id FROM roles WHERE id = ? AND shop_id IN (0, ?)', [roleId, req.shopId]);
+      roleRow = rr || null;
+    } catch (e) {
+      if (!e || e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+      const [[rr]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
+      roleRow = rr || null;
     }
+    if (!roleRow) return res.status(400).json({ error: 'Vai trò không hợp lệ (không thuộc shop hiện tại)' });
 
     const [existingEmail] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existingEmail.length > 0) {
@@ -304,10 +311,16 @@ router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next)
 
     const pool = await getPool();
 
-    const [[roleRow]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
-    if (!roleRow) {
-      return res.status(400).json({ error: 'Vai trò không hợp lệ' });
+    let roleRow = null;
+    try {
+      const [[rr]] = await pool.query('SELECT id, shop_id FROM roles WHERE id = ? AND shop_id IN (0, ?)', [roleId, req.shopId]);
+      roleRow = rr || null;
+    } catch (e) {
+      if (!e || e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+      const [[rr]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
+      roleRow = rr || null;
     }
+    if (!roleRow) return res.status(400).json({ error: 'Vai trò không hợp lệ (không thuộc shop hiện tại)' });
 
     const [existingEmail] = await pool.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, req.params.id]);
     if (existingEmail.length > 0) {
@@ -361,10 +374,16 @@ router.put('/:id/role', auth, requireShop, authorize('admin'), async (req, res, 
       return res.status(400).json({ error: 'Thiếu role_id' });
     }
     const pool = await getPool();
-    const [[r]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
-    if (!r) {
-      return res.status(400).json({ error: 'Vai trò không hợp lệ' });
+    let r = null;
+    try {
+      const [[rr]] = await pool.query('SELECT id, shop_id FROM roles WHERE id = ? AND shop_id IN (0, ?)', [roleId, req.shopId]);
+      r = rr || null;
+    } catch (e) {
+      if (!e || e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+      const [[rr]] = await pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
+      r = rr || null;
     }
+    if (!r) return res.status(400).json({ error: 'Vai trò không hợp lệ (không thuộc shop hiện tại)' });
     await pool.query('UPDATE users SET role_id = ? WHERE id = ?', [roleId, req.params.id]);
     await pool.query('UPDATE user_shops SET role_id = ? WHERE user_id = ? AND shop_id = ?', [roleId, req.params.id, req.shopId]);
     res.json({ message: 'Cập nhật quyền thành công' });

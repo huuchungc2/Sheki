@@ -97,7 +97,8 @@ export function OrderForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-  const [isEdit] = React.useState(!!id);
+  const isEdit = Boolean(id);
+  const [orderCode, setOrderCode] = React.useState<string>("");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [showResults, setShowResults] = React.useState(false);
   const [customerSearch, setCustomerSearch] = React.useState("Lê Hoàng");
@@ -112,7 +113,8 @@ export function OrderForm() {
   const fetchCustomerSuggestions = async (q: string) => {
     if (!q) { setCustomerSuggestions([]); return; }
     try {
-      const res = await api.get(`/customers/suggest?q=${encodeURIComponent(q)}`);
+      const extra = id ? `&order_id=${encodeURIComponent(String(id))}` : "";
+      const res = await api.get(`/customers/suggest?q=${encodeURIComponent(q)}${extra}`);
       const data = res?.data ?? [];
       setCustomerSuggestions(data.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone, address: c.address })));
     } catch {
@@ -128,7 +130,8 @@ export function OrderForm() {
 
     // Fetch đầy đủ địa chỉ để hiển thị shipping address full (số nhà + phường + quận + tỉnh)
     try {
-      const res: any = await api.get(`/customers/${customer.id}`);
+      const extra = id ? `?order_id=${encodeURIComponent(String(id))}` : "";
+      const res: any = await api.get(`/customers/${customer.id}${extra}`);
       const c = res?.data ?? res;
       const full = joinAddressParts([c?.address, c?.ward, c?.district, c?.city]);
       setSelectedCustomer((prev: any) => {
@@ -239,11 +242,33 @@ export function OrderForm() {
     }
   }, [id]);
 
+  // Load managers:
+  // - Create mode: theo user login (CTV) như cũ
+  // - Edit mode: theo salesperson của đơn đang sửa (backend suy ra từ order_id)
   React.useEffect(() => {
     if (isAdmin || !selectedGroupId) {
       setMyManagers([]);
       return;
     }
+
+    // Edit mode: bám theo order đang sửa
+    if (id) {
+      const qs = new URLSearchParams({ group_id: String(selectedGroupId) });
+      if (editIncludeManagerId != null) {
+        qs.set("include_user_ids", String(editIncludeManagerId));
+      }
+      api
+        .get(`/orders/${id}/edit-context?${qs.toString()}`)
+        .then((res: any) => {
+          const data = res?.data ?? {};
+          const list: any[] = Array.isArray(data?.managers) ? data.managers : [];
+          setMyManagers(list);
+        })
+        .catch(() => setMyManagers([]));
+      return;
+    }
+
+    // Create mode: theo user login
     const qs = new URLSearchParams({ group_id: String(selectedGroupId) });
     if (editIncludeManagerId != null) {
       qs.set("include_user_ids", String(editIncludeManagerId));
@@ -334,16 +359,40 @@ export function OrderForm() {
     })();
   }, [selectedWarehouseId, items.map(i => i.productId).join(',')]);
 
-  // Fetch groups
+  // Fetch groups:
+  // - Create mode: theo user login như cũ
+  // - Edit mode: theo salesperson của đơn đang sửa (backend suy ra từ order_id)
   React.useEffect(() => {
-    const userStr = localStorage.getItem('user');
+    const userStr = localStorage.getItem("user");
     const user = userStr ? JSON.parse(userStr) : null;
     if (!user?.id) return;
-    const endpoint = user?.can_access_admin || user?.role === "admin" ? "/groups" : `/groups/user/${user.id}`;
-    api.get(endpoint).then((res: any) => {
-      setGroups(res?.data ?? []);
-    }).catch(() => setGroups([]));
-  }, []);
+
+    if (user?.can_access_admin || user?.role === "admin") {
+      api
+        .get("/groups")
+        .then((res: any) => setGroups(res?.data ?? []))
+        .catch(() => setGroups([]));
+      return;
+    }
+
+    // Edit mode: lấy groups của salesperson_id của đơn
+    if (id) {
+      api
+        .get(`/orders/${id}/edit-context`)
+        .then((res: any) => {
+          const data = res?.data ?? {};
+          setGroups(Array.isArray(data?.groups) ? data.groups : []);
+        })
+        .catch(() => setGroups([]));
+      return;
+    }
+
+    // Create mode: groups của user login
+    api
+      .get(`/groups/user/${user.id}`)
+      .then((res: any) => setGroups(res?.data ?? []))
+      .catch(() => setGroups([]));
+  }, [id]);
 
   // Product suggestions
   const [productQuery, setProductQuery] = React.useState("");
@@ -381,6 +430,8 @@ export function OrderForm() {
           phone: order?.customer_phone ?? order?.customerPhone ?? '',
           address: order?.shipping_address ?? ''
         };
+        const code = String(order?.code ?? order?.order_code ?? order?.orderCode ?? "").trim();
+        setOrderCode(code);
         setSelectedCustomer(cust as any);
         setCustomerQuery(cust.name);
 
@@ -565,7 +616,8 @@ export function OrderForm() {
       }
       const listReturn = (location.state as { ordersListReturn?: string } | null)?.ordersListReturn;
       if (res?.id && !id) {
-        navigate(`/orders/edit/${res.id}`, { state: location.state });
+        // Sau khi tạo mới, điều hướng sang edit để có mã đơn hàng + load lại đầy đủ dữ liệu
+        navigate(`/orders/edit/${res.id}`, { state: location.state, replace: true });
       } else if (id && listReturn) {
         navigate(listReturn);
       } else {
@@ -1372,6 +1424,15 @@ export function OrderForm() {
             </div>
             <div className="space-y-1">
               <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
+                <div className="min-w-0 pr-2">
+                  <span className="text-slate-400">Mã ĐH</span>
+                  {!isEdit && (
+                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">Lưu đơn để tạo mã</p>
+                  )}
+                </div>
+                <span className="font-medium text-slate-800">{isEdit ? (orderCode || `#${id}`) : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
                 <span className="text-slate-400">Tổng CK</span>
                 <span className="font-medium text-red-600">
                   {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
@@ -1424,7 +1485,7 @@ export function OrderForm() {
               <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
                 <div className="min-w-0 pr-2">
                   <span className="text-slate-400">Tiền NV chịu</span>
-                  <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">NV tự bỏ ra, trừ HH sau</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">NV tự bỏ ra, trừ vào Lương</p>
                 </div>
                 <MoneyAmountField value={salespersonAbsorbedAmount} onChange={setSalespersonAbsorbedAmount} className="text-sm" />
               </div>
@@ -1584,6 +1645,11 @@ export function OrderForm() {
                 </button>
               </div>
               <div className="px-3 py-2 border-b border-slate-100 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-500">Mã ĐH</span>
+                  <span className="font-medium text-slate-800">{isEdit ? (orderCode || `#${id}`) : "—"}</span>
+                </div>
+                {!isEdit && <div className="text-[9px] text-slate-400 -mt-0.5">Lưu đơn để tạo mã</div>}
                 <div className="flex items-center justify-between text-[10px]">
                   <span className="text-slate-500">Tổng CK</span>
                   <span className="font-medium text-red-600">
