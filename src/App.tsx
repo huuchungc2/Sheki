@@ -105,6 +105,45 @@ export default function App() {
     setIsAuthReady(true);
   }, []);
 
+  // Global fetch guard: if token expired → clear session and return to /login
+  React.useEffect(() => {
+    const w = window as any;
+    if (w.__fetchWrappedForAuth) return;
+    w.__fetchWrappedForAuth = true;
+
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = (async (...args: any[]) => {
+      const res = await originalFetch(...args);
+      const clearSession = () => {
+        try {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("shops");
+          localStorage.removeItem("all_shops");
+        } catch {}
+        window.dispatchEvent(new Event("auth-change"));
+      };
+
+      // 401: token hết hạn/không hợp lệ
+      if (res?.status === 401) clearSession();
+
+      // 403: shop bị khóa/hết hạn/phiên shop không hợp lệ (chỉ bắt các code shop, không bắt 403 do thiếu quyền)
+      if (res?.status === 403) {
+        try {
+          const cloned = res.clone();
+          const data = await cloned.json();
+          const code = data?.code;
+          if (code === "SHOP_FORBIDDEN" || code === "SHOP_REQUIRED" || code === "SHOP_SESSION_INVALID") {
+            clearSession();
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+      return res;
+    }) as any;
+  }, []);
+
   // Listen for custom auth change events (login/logout)
   React.useEffect(() => {
     const handleAuthChange = () => {

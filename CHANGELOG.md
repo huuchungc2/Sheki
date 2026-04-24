@@ -2,6 +2,11 @@
 ### Fixed
 - **CashTransactions UI** — Nếu user không phải Admin thì tự mặc định `user_id`/bộ lọc theo chính user đang đăng nhập và khóa chọn nhân viên; Admin vẫn chọn/lọc theo nhân viên như cũ. — File: `src/pages/CashTransactions.tsx`
 
+## [24/04/2026] - Auth: JWT 30 ngày + auto về Login khi hết hạn
+### Changed
+- **JWT expiry** — Tăng thời hạn token mặc định từ 7 ngày lên 30 ngày (hỗ trợ cấu hình qua `JWT_EXPIRES_IN=30d`). — Files: `backend/routes/auth.js`, `backend/.env.example`
+- **Frontend session** — Bắt `401` toàn cục (token hết hạn/không hợp lệ) để xoá `localStorage` và phát `auth-change`, app tự quay về `/login` lấy token mới; đồng thời bắt `403` có `code` thuộc nhóm shop (`SHOP_FORBIDDEN`/`SHOP_REQUIRED`/`SHOP_SESSION_INVALID`) để tự thoát khi shop bị khóa/hết hạn. — File: `src/App.tsx`
+
 ## [23/04/2026] - Super Admin: tạo shop auto-seed group + user test + sản phẩm test
 ### Added
 - **Shops API** — Khi Super Admin tạo shop mới, hệ thống tự tạo 1 group theo tên shop, tạo 2 user sales test thuộc `user_shops` + `user_groups` (password `abc123`) và tạo 2 sản phẩm test kèm `warehouse_stock` ở kho mặc định để có thể lên đơn/nhập-xuất test ngay. — File: `backend/routes/shops.js`

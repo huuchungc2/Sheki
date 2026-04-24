@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Auth: tăng thời hạn JWT 30 ngày + tự về Login khi token hết hạn** — Set mặc định token 30d (env + fallback) và bắt 401 toàn cục ở FE để xóa phiên + quay về `/login`. — Files: `backend/routes/auth.js`, `backend/.env.example`, `src/App.tsx`
 - [x] **Gom 1 file SQL final (multi-shop → RBAC/scope) để chạy trên DB backup** — Tạo script idempotent gộp các migration multi-shop + roles.shop_id + scope tables + feature permissions + fix Sales/customer view. — File: `migrations/999_final_multishop_rbac.sql`
 
 - [x] **Thu chi: nhân viên mặc định theo chính mình** — Nhân viên vào màn Thu chi tự khóa theo user hiện tại (mặc định filter + thêm phiếu), Admin mới được chọn/lọc nhân viên. — File: `src/pages/CashTransactions.tsx`
