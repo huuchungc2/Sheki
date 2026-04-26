@@ -1051,16 +1051,13 @@ export function CommissionReport() {
                       <tr className="bg-slate-50 border-b border-slate-100">
                         <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-left">Sản phẩm</th>
                         <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-center">SL</th>
-                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Đơn giá</th>
-                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">CK</th>
                         <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">Thành tiền</th>
-                        <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-center">HH%</th>
                         <th className="px-5 py-3 text-xs font-semibold text-slate-500 text-right">HH</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {popupItems.length === 0 ? (
-                        <tr><td colSpan={7} className="px-5 py-8 text-center text-slate-400">Không có sản phẩm</td></tr>
+                        <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400">Không có sản phẩm</td></tr>
                       ) : popupItems.map((item: any, i: number) => {
                         const net = parseFloat(item.unit_price) * parseFloat(item.qty) - parseFloat(item.discount_amount || 0);
                         return (
@@ -1070,16 +1067,7 @@ export function CommissionReport() {
                               <p className="text-xs text-slate-400 font-mono">{item.sku}</p>
                             </td>
                             <td className="px-5 py-3 text-center text-slate-700">{parseFloat(item.qty)}</td>
-                            <td className="px-5 py-3 text-right text-slate-700">{formatCurrency(parseFloat(item.unit_price))}</td>
-                            <td className="px-5 py-3 text-right text-red-500">
-                              {parseFloat(item.discount_amount) > 0 ? `-${formatCurrency(parseFloat(item.discount_amount))}` : "—"}
-                            </td>
                             <td className="px-5 py-3 text-right font-semibold text-slate-900">{formatCurrency(net)}</td>
-                            <td className="px-5 py-3 text-center">
-                              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                {parseFloat(item.commission_rate)}%
-                              </span>
-                            </td>
                             <td className="px-5 py-3 text-right font-bold text-emerald-600">{formatCurrency(parseFloat(item.commission_amount))}</td>
                           </tr>
                         );

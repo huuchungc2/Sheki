@@ -699,15 +699,11 @@ export function OrderList() {
                     />
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Khách hàng</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sản phẩm</th>
-                  {isAdmin && !employeeId && (
-                    <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
-                  )}
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Tổng tiền</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Ship / NV / HH</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Trạng thái / TT</th>
                   <th className="px-4 py-3 w-24"></th>
                 </tr>
               </thead>
@@ -725,13 +721,11 @@ export function OrderList() {
                     <tr key={order.id}
                       className={cn(
                         "group transition-colors",
-                        rowCanMutate ? "cursor-pointer hover:bg-slate-50/60" : "cursor-default",
+                        "cursor-pointer hover:bg-slate-50/60",
                         isSelected && "bg-blue-50/60"
                       )}
                       onClick={
-                        rowCanMutate
-                          ? () => navigate(`/orders/edit/${order.id}`, { state: { ordersListReturn } })
-                          : undefined
+                        () => navigate(`/orders/edit/${order.id}`, { state: { ordersListReturn } })
                       }
                     >
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -749,11 +743,24 @@ export function OrderList() {
                             {isToday ? "Hôm nay" : (order.created_at ? formatDate(order.created_at) : "—")}
                             {order.created_at ? ` • ${new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : ""}
                           </p>
-                          {!isAdmin && order.group_name ? (
+                          <div className="mt-1">
+                            <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", st.color)}>
+                              <st.icon className="w-3 h-3" />
+                              {st.label}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="text-sm text-slate-700 font-medium">{order.salesperson_name || "—"}</p>
+                          {order.group_name ? (
                             <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">
                               {order.group_name}
                             </span>
-                          ) : null}
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -764,6 +771,16 @@ export function OrderList() {
                           <div>
                             <p className="font-semibold text-slate-900 text-sm leading-tight">{order.customer_name || "—"}</p>
                             <p className="text-xs text-slate-400">{order.customer_phone || ""}</p>
+                            <div className="mt-1 text-xs text-slate-400">
+                              Tổng tiền:{" "}
+                              <span className="font-semibold text-slate-900 tabular-nums">
+                                {formatCurrency(order.total_amount || 0)}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                              <pay.icon className="w-3.5 h-3.5 text-slate-300" />
+                              {pay.label}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -785,23 +802,6 @@ export function OrderList() {
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
                         )}
-                      </td>
-                      {isAdmin && !employeeId && (
-                        <td className="px-4 py-3">
-                          <div>
-                            <p className="text-sm text-slate-700 font-medium">{order.salesperson_name || "—"}</p>
-                            {order.group_name ? (
-                              <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">
-                                {order.group_name}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs">—</span>
-                            )}
-                          </div>
-                        </td>
-                      )}
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-bold text-slate-900">{formatCurrency(order.total_amount || 0)}</span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="space-y-0.5">
@@ -838,18 +838,6 @@ export function OrderList() {
                         >
                           {formatCurrency(luongDon)}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-1">
-                          <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", st.color)}>
-                            <st.icon className="w-3 h-3" />
-                            {st.label}
-                          </span>
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                            <pay.icon className="w-3.5 h-3.5 text-slate-300" />
-                            {pay.label}
-                          </div>
-                        </div>
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         {/* Luôn hiện: mobile/touch không có hover → trước đây opacity-0 khiến mất icon */}

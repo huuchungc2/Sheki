@@ -1,3 +1,8 @@
+## [26/04/2026] - OrderList: thanh toán nằm dưới khách hàng
+### Changed
+- **OrderList UI** — Giữ cột Sản phẩm cạnh cột Khách hàng; chuyển “Thanh toán” và “Tổng tiền” xuống dưới Khách hàng; chuyển “Trạng thái” xuống dưới Mã đơn; bỏ “Nhóm BH” khỏi cột Mã đơn (nhóm hiển thị trong cột Nhân viên); cột “Lương” giữ nguyên 1 dòng. — File: `src/pages/OrderList.tsx`
+- **CommissionReport UI** — Popup chi tiết đơn (bảng sản phẩm) giảm số cột để tránh tràn ngang, Sales/Admin cùng UI. — File: `src/pages/CommissionReport.tsx`
+
 ## [23/04/2026] - Thu chi: nhân viên mặc định theo chính mình
 ### Fixed
 - **CashTransactions UI** — Nếu user không phải Admin thì tự mặc định `user_id`/bộ lọc theo chính user đang đăng nhập và khóa chọn nhân viên; Admin vẫn chọn/lọc theo nhân viên như cũ. — File: `src/pages/CashTransactions.tsx`

@@ -11,6 +11,8 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **OrderList: gộp hiển thị (TT/Trạng thái/Tổng tiền) và đồng nhất Admin/Sales** — Trạng thái nằm dưới mã đơn; tổng tiền và thanh toán nằm dưới khách hàng; bỏ “Nhóm BH” khỏi cột đơn (nhóm chỉ hiển thị trong cột Nhân viên); cột Lương giữ nguyên 1 dòng. — File: `src/pages/OrderList.tsx`
+- [x] **CommissionReport: popup chi tiết đơn gọn cột** — Popup chi tiết đơn (bảng sản phẩm) giảm số cột để tránh tràn ngang, Sales/Admin cùng UI. — File: `src/pages/CommissionReport.tsx`
 - [x] **Auth: tăng thời hạn JWT 30 ngày + tự về Login khi token hết hạn** — Set mặc định token 30d (env + fallback) và bắt 401 toàn cục ở FE để xóa phiên + quay về `/login`. — Files: `backend/routes/auth.js`, `backend/.env.example`, `src/App.tsx`
 - [x] **Gom 1 file SQL final (multi-shop → RBAC/scope) để chạy trên DB backup** — Tạo script idempotent gộp các migration multi-shop + roles.shop_id + scope tables + feature permissions + fix Sales/customer view. — File: `migrations/999_final_multishop_rbac.sql`
 
