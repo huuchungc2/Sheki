@@ -20,7 +20,11 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 
 // ---------- Date preset helpers ----------
 function toDateStr(d: Date) {
-  return d.toISOString().slice(0, 10);
+  // Format theo local time để không bị lệch ngày do UTC (VN UTC+7)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 type DatePreset = "today" | "week" | "month" | "last_month" | "last_year" | "custom" | "all";
 

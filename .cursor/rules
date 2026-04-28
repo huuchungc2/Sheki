@@ -1,22 +1,67 @@
 # ERP SHEKI - CURSOR RULES
 
-Luôn đọc các file sau trước khi làm việc:
-- TODO.md (Task hiện tại)
-- RULES.md (Quy tắc code)
-- CLAUDE.md (Cấu trúc dự án)
+## CONTEXT
+Luôn đọc trước (theo thứ tự):
+1. @TODO.md — chỉ làm task ở mục ĐANG LÀM
+2. @CLAUDE.md — cấu trúc project, business rules
 
-STACk KỸ THUẬT:
-- Web: React 19, Vite, Tailwind, TypeScript.
-- Mobile: Expo, React Native, TypeScript, StyleSheet (KHÔNG dùng Tailwind).
-- Backend: Node.js, Express, MySQL (Port 3000).
+KHÔNG tự đọc file nào khác. Cần file khác → hỏi 1 câu rồi dừng.
 
-QUY TẮC:
-- Không tự ý cài package mới.
-- Không sửa file ngoài phạm vi task.
-- Luôn báo nguyên nhân bug trước khi fix.
-- Sau khi xong: Update TODO.md và CHANGELOG.md.
+---
 
-KHI LÀM MOBILE:
-- Đọc thêm @FEATURE_MOBILE_RN.md và @PROMPT_MOBILE.md.
-- Sử dụng SafeAreaView, SecureStore (thay cho localStorage), và FlatList.
-- Style phải dùng StyleSheet.create().
+## TECH STACK
+- Web: React 19, Vite, TailwindCSS, TypeScript
+- Mobile: Expo, React Native, TypeScript (StyleSheet ONLY - NO Tailwind)
+- Backend: Node.js, Express, MySQL (Port 3000)
+
+---
+
+## GLOBAL RULES
+- KHÔNG cài thêm package
+- KHÔNG sửa ngoài scope task
+- ƯU TIÊN reuse component có sẵn
+- KHÔNG tạo file mới nếu không cần thiết
+- GIỮ NGUYÊN logic, chỉ thay đổi UI khi được yêu cầu
+
+---
+
+## OUTPUT RULES
+- Response tối đa 15 dòng trừ khi task yêu cầu code dài
+- KHÔNG giải thích dài dòng
+- CHỈ trả về:
+  1. Nguyên nhân (nếu có bug)
+  2. Code đã sửa
+- KHÔNG viết lại toàn bộ file nếu chỉ sửa 1 phần
+- KHÔNG comment dư thừa
+
+---
+
+## TAILWIND RULES (WEB ONLY)
+- Dùng spacing theo scale: 4, 6, 8, 12, 16
+- Không inline style
+- Ưu tiên class có sẵn
+- UI phải đồng nhất (border, radius, shadow)
+
+---
+
+## COMPONENT RULES
+- Tách component nếu lặp lại >2 lần
+- Đặt trong /components/ui
+- Tên rõ nghĩa
+
+---
+
+## MOBILE RULES
+- BẮT BUỘC dùng StyleSheet.create()
+- KHÔNG dùng Tailwind
+- Dùng SafeAreaView, FlatList, SecureStore (thay localStorage)
+- Đọc thêm khi làm mobile: @FEATURE_MOBILE_RN.md và @PROMPT_MOBILE.md
+
+---
+
+## WORKFLOW
+1. Đọc TODO.md → xác định task ĐANG LÀM
+2. Xác định scope (file nào được sửa)
+3. Phân tích trước khi code
+4. Code đúng rule
+5. Sau khi xong: update TODO.md + CHANGELOG.md

@@ -11,6 +11,9 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **KPI hoa hồng theo tháng: đồng nhất theo ngày tạo đơn** — Dashboard + báo cáo HH/CTV lọc theo `orders.created_at` (không còn “chuyển kỳ” khi sửa đơn/recalc). — Files: `backend/services/commissionKpi.js`, `backend/services/returnMetrics.js`, `backend/routes/reports.js`, `backend/routes/commissions.js`, `backend/routes/users.js`, `backend/routes/collaborators.js`
+- [x] **EmployeeDetail: lọc “Tuần này” không lệch ngày** — Date preset dùng format local (không dùng `toISOString()` UTC) để tránh lệch phạm vi ngày ở VN làm KPI hoa hồng/đơn bị sai. — File: `src/pages/EmployeeDetail.tsx`
+- [x] **OrderList: KPI “Tổng hoa hồng” khớp bộ lọc tuần** — Summary “Tổng hoa hồng” trong danh sách đơn lọc theo `DATE(orders.created_at)` (khớp bộ lọc tuần/tháng/tùy chọn), tránh lệch khi hoa hồng phát sinh muộn do sửa đơn/recalc. — Files: `backend/routes/orders.js`, `backend/services/commissionKpi.js`
 - [x] **OrderList: gộp hiển thị (TT/Trạng thái/Tổng tiền) và đồng nhất Admin/Sales** — Trạng thái nằm dưới mã đơn; tổng tiền và thanh toán nằm dưới khách hàng; bỏ “Nhóm BH” khỏi cột đơn (nhóm chỉ hiển thị trong cột Nhân viên); cột Lương giữ nguyên 1 dòng. — File: `src/pages/OrderList.tsx`
 - [x] **CommissionReport: popup chi tiết đơn gọn cột** — Popup chi tiết đơn (bảng sản phẩm) giảm số cột để tránh tràn ngang, Sales/Admin cùng UI. — File: `src/pages/CommissionReport.tsx`
 - [x] **Auth: tăng thời hạn JWT 30 ngày + tự về Login khi token hết hạn** — Set mặc định token 30d (env + fallback) và bắt 401 toàn cục ở FE để xóa phiên + quay về `/login`. — Files: `backend/routes/auth.js`, `backend/.env.example`, `src/App.tsx`

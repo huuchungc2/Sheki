@@ -1,6 +1,7 @@
 /**
- * KPI hoa hồng thống nhất (CLAUDE.md): direct gross + override net theo kỳ phát sinh (commissions.created_at).
- * Dùng chung Dashboard, /reports/salary summary, đối soát đơn hàng.
+ * KPI hoa hồng thống nhất:
+ * - Dashboard/Báo cáo hoa hồng theo THÁNG: bám theo kỳ tạo đơn (orders.created_at)
+ *   để không bị "chuyển kỳ" khi sửa đơn/recalc.
  */
 
 /**
@@ -17,6 +18,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
   const userCond = uid != null && Number.isFinite(uid) ? ' AND c.user_id = ?' : '';
   const userCondAdj = uid != null && Number.isFinite(uid) ? ' AND ca.user_id = ?' : '';
 
+  // KPI theo kỳ tạo đơn (orders.created_at)
   const baseParams = [month, year];
   const directParams = [...baseParams];
   const ovParams = [...baseParams];
@@ -41,7 +43,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
     `SELECT COALESCE(SUM(c.commission_amount), 0) AS v
      FROM commissions c
      JOIN orders o ON c.order_id = o.id
-     WHERE MONTH(c.created_at) = ? AND YEAR(c.created_at) = ?
+     WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
        AND c.type = 'direct' AND o.status != 'cancelled'${shopCond}${groupCond}${userCond}`,
     directParams
   );
@@ -49,7 +51,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
     `SELECT COALESCE(SUM(c.commission_amount), 0) AS v
      FROM commissions c
      JOIN orders o ON c.order_id = o.id
-     WHERE MONTH(c.created_at) = ? AND YEAR(c.created_at) = ?
+     WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
        AND c.type = 'override' AND o.status != 'cancelled'${shopCond}${groupCond}${userCond}`,
     ovParams
   );
@@ -57,7 +59,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
     `SELECT COALESCE(SUM(ca.amount), 0) AS v
      FROM commission_adjustments ca
      JOIN orders o ON ca.order_id = o.id
-     WHERE MONTH(ca.created_at) = ? AND YEAR(ca.created_at) = ?
+     WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
        AND ca.type = 'override' AND o.status != 'cancelled'${shopCond}${groupCond}${userCondAdj}`,
     adjParams
   );
@@ -147,6 +149,75 @@ async function sumDirectGrossAccrualForOrderFilters(pool, {
 }
 
 /**
+ * Tổng HH direct (gross) theo bộ lọc danh sách đơn — lọc theo thời gian tạo đơn (DATE(o.created_at)),
+ * để KPI "theo bộ lọc hiện tại" khớp danh sách đơn trên OrderList.
+ */
+async function sumDirectGrossForOrderFiltersByOrderCreatedAt(pool, {
+  shopId,
+  scopeOwnData,
+  userId,
+  search,
+  status,
+  employee,
+  warehouse,
+  date_from,
+  date_to,
+  group_id,
+}) {
+  const params = [];
+  let sql = `
+    SELECT COALESCE(SUM(c.commission_amount), 0) AS v
+    FROM commissions c
+    INNER JOIN orders o ON c.order_id = o.id
+    LEFT JOIN customers cu ON o.customer_id = cu.id
+    WHERE c.type = 'direct'
+      AND o.status != 'cancelled'
+  `;
+
+  if (shopId != null) {
+    sql += ' AND o.shop_id = ?';
+    params.push(shopId);
+  }
+
+  if (scopeOwnData && userId) {
+    sql += ' AND o.salesperson_id = ?';
+    params.push(userId);
+  }
+  if (search) {
+    const like = `%${search}%`;
+    sql += ' AND (o.code LIKE ? OR cu.name LIKE ?)';
+    params.push(like, like);
+  }
+  if (status) {
+    sql += ' AND o.status = ?';
+    params.push(status);
+  }
+  if (employee) {
+    sql += ' AND o.salesperson_id = ?';
+    params.push(employee);
+  }
+  if (warehouse) {
+    sql += ' AND o.warehouse_id = ?';
+    params.push(warehouse);
+  }
+  if (group_id) {
+    sql += ' AND o.group_id = ?';
+    params.push(parseInt(group_id, 10));
+  }
+  if (date_from) {
+    sql += ' AND DATE(o.created_at) >= ?';
+    params.push(date_from);
+  }
+  if (date_to) {
+    sql += ' AND DATE(o.created_at) <= ?';
+    params.push(date_to);
+  }
+
+  const [[row]] = await pool.query(sql, params);
+  return parseFloat(row?.v) || 0;
+}
+
+/**
  * Khi date_from = ngày 1 và date_to = cuối tháng cùng năm/tháng → trả { month, year } để dùng chung SQL với báo cáo (MONTH/YEAR).
  * Không khớp (tuần, tuỳ chọn, lệch ngày) → null.
  */
@@ -170,5 +241,6 @@ function tryParseFullCalendarMonthFromRange(date_from, date_to) {
 module.exports = {
   getCommissionMonthKpi,
   sumDirectGrossAccrualForOrderFilters,
+  sumDirectGrossForOrderFiltersByOrderCreatedAt,
   tryParseFullCalendarMonthFromRange,
 };

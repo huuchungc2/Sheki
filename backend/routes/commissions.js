@@ -48,8 +48,9 @@ router.get('/', auth, requireShop, requireFeature('reports.commissions'), async 
       conditions.push('t.user_id = ?');
       params.push(parseInt(user_id));
     }
-    if (month) { conditions.push('MONTH(t.entry_date) = ?'); params.push(parseInt(month)); }
-    if (year)  { conditions.push('YEAR(t.entry_date) = ?');  params.push(parseInt(year)); }
+    // Kỳ lọc theo thời điểm tạo đơn (orders.created_at) để đồng nhất toàn hệ thống
+    if (month) { conditions.push('MONTH(o.created_at) = ?'); params.push(parseInt(month)); }
+    if (year)  { conditions.push('YEAR(o.created_at) = ?');  params.push(parseInt(year)); }
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
@@ -112,7 +113,8 @@ router.get('/summary', auth, requireShop, requireFeature('reports.commissions'),
     const { user_id, month, year, group_id } = req.query;
 
     const conditions = ['1=1'];
-    const params = [req.shopId, req.shopId];
+    // 2 params for UNION (commissions/adjustments) + 1 param for JOIN orders o.shop_id
+    const params = [req.shopId, req.shopId, req.shopId];
     const scope = await getScope(req, 'reports');
     if (scope === 'own') {
       conditions.push('t.user_id = ?');
@@ -134,8 +136,9 @@ router.get('/summary', auth, requireShop, requireFeature('reports.commissions'),
       conditions.push('t.user_id = ?');
       params.push(parseInt(user_id));
     }
-    if (month) { conditions.push('MONTH(t.entry_date) = ?'); params.push(parseInt(month)); }
-    if (year)  { conditions.push('YEAR(t.entry_date) = ?');  params.push(parseInt(year)); }
+    // Kỳ lọc theo thời điểm tạo đơn (orders.created_at)
+    if (month) { conditions.push('MONTH(o.created_at) = ?'); params.push(parseInt(month)); }
+    if (year)  { conditions.push('YEAR(o.created_at) = ?');  params.push(parseInt(year)); }
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
     const [summary] = await pool.query(
@@ -148,6 +151,7 @@ router.get('/summary', auth, requireShop, requireFeature('reports.commissions'),
          UNION ALL
          SELECT order_id, user_id, amount, created_at as entry_date FROM commission_adjustments WHERE shop_id = ?
        ) t
+       JOIN orders o ON o.id = t.order_id AND o.shop_id = ?
        ${whereClause}`,
       params
     );
@@ -198,10 +202,9 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
         baseParams.push(uid);
       }
     }
-    // Kỳ lọc theo **thời điểm phát sinh dòng hoa hồng/điều chỉnh** (t.entry_date),
-    // để hoàn (adjustment) nằm đúng kỳ duyệt hoàn.
-    if (month)    { conditions.push('MONTH(t.entry_date) = ?'); baseParams.push(parseInt(month)); }
-    if (year)     { conditions.push('YEAR(t.entry_date) = ?');  baseParams.push(parseInt(year)); }
+    // Kỳ lọc theo thời điểm tạo đơn (orders.created_at)
+    if (month)    { conditions.push('MONTH(o.created_at) = ?'); baseParams.push(parseInt(month)); }
+    if (year)     { conditions.push('YEAR(o.created_at) = ?');  baseParams.push(parseInt(year)); }
     // group_id is enforced above for scope=group; for others, allow explicit filter
     if (scope !== 'group' && group_id) { conditions.push('o.group_id = ?'); baseParams.push(parseInt(group_id)); }
 
@@ -435,8 +438,8 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
     // Tổng HH hoàn (âm) — CHỈ tính phần sale lên đơn trực tiếp:
     // - ca.type='direct'
     // - ca.user_id = o.salesperson_id
-    // - lọc theo kỳ phát sinh adjustment (ca.created_at)
-    const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'o.shop_id = ?', 'MONTH(ca.created_at) = ?', 'YEAR(ca.created_at) = ?'];
+    // - lọc theo kỳ tạo đơn (o.created_at)
+    const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'o.shop_id = ?', 'MONTH(o.created_at) = ?', 'YEAR(o.created_at) = ?'];
     const retCommParams = [req.shopId, parseInt(month, 10), parseInt(year, 10)];
     if (isScoped) {
       retCommConds.push('o.salesperson_id = ?');

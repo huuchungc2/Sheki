@@ -139,7 +139,7 @@ router.get('/dashboard', auth, requireShop, requireFeature('reports.dashboard'),
     const byStatus = { pending:0, shipping:0, completed:0, cancelled:0 };
     statusStats.forEach(r => { if (byStatus[r.status] !== undefined) byStatus[r.status] = r.cnt; });
 
-    // ── Hoa hồng tháng này — KPI thống nhất: phát sinh theo commissions.created_at (commissionKpi.js) ──
+    // ── Hoa hồng tháng này — KPI thống nhất: bám theo orders.created_at (commissionKpi.js) ──
 
     // ── Hoa hồng hoàn (commission_adjustments) ──
     const returnCommissionThisMonth = await getReturnCommissionByRange(pool, {

@@ -205,12 +205,11 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
     const { month, year, group_id, sales_id } = req.query;
     const scope = await getScope(req, 'reports');
 
-    // Filter theo kỳ phát sinh dòng HH/điều chỉnh (created_at của commission/adjustment)
-    // để hoàn hàng (commission_adjustments) nằm đúng kỳ duyệt hoàn.
+    // Filter theo kỳ tạo đơn (orders.created_at) để đồng nhất toàn hệ thống.
     const txFilterConds = [];
     const txFilterParams = [];
-    if (month) { txFilterConds.push('MONTH(t.entry_date) = ?'); txFilterParams.push(parseInt(month)); }
-    if (year)  { txFilterConds.push('YEAR(t.entry_date) = ?');  txFilterParams.push(parseInt(year)); }
+    if (month) { txFilterConds.push('MONTH(o_tx.created_at) = ?'); txFilterParams.push(parseInt(month)); }
+    if (year)  { txFilterConds.push('YEAR(o_tx.created_at) = ?');  txFilterParams.push(parseInt(year)); }
     const txWhereExtra = txFilterConds.length ? ' AND ' + txFilterConds.join(' AND ') : '';
 
     const orderFilterConds = [];
@@ -241,7 +240,7 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
 
     // IMPORTANT: group filter must constrain transactions (t) too.
     // If we only filter the joined `orders o` in an ON clause, SUM(t.amount) still includes out-of-group rows.
-    const txJoinOrders = orderFilterConds.length ? ' JOIN orders o_tx ON o_tx.id = t.order_id' : '';
+    const txJoinOrders = ' JOIN orders o_tx ON o_tx.id = t.order_id';
     const txOrderWhereExtra = orderFilterConds.length ? ' AND o_tx.group_id = ?' : '';
     // Own-scope: only the logged-in sales can view their own pairs
     const effectiveSalesId =

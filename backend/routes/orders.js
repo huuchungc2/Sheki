@@ -21,6 +21,7 @@ const { computeOrderCollects, round2 } = require('../utils/orderCollect');
 const {
   getCommissionMonthKpi,
   sumDirectGrossAccrualForOrderFilters,
+  sumDirectGrossForOrderFiltersByOrderCreatedAt,
   tryParseFullCalendarMonthFromRange,
 } = require('../services/commissionKpi');
 const { getScope } = require('../utils/scope');
@@ -213,7 +214,9 @@ router.get('/', auth, requireShop, requireFeature('orders.list'), async (req, re
       });
       totalCommissionDirect = kpi.directGross;
     } else {
-      totalCommissionDirect = await sumDirectGrossAccrualForOrderFilters(pool, {
+      // OrderList KPI phải khớp bộ lọc danh sách đơn (lọc theo o.created_at),
+      // tránh lệch khi commissions phát sinh sau do sửa đơn/recalc.
+      totalCommissionDirect = await sumDirectGrossForOrderFiltersByOrderCreatedAt(pool, {
         shopId: req.shopId,
         scopeOwnData: scope === 'own',
         userId: req.user.id,
