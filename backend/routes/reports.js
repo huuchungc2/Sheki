@@ -14,6 +14,7 @@ const {
   getReturnCommissionByRange,
 } = require('../services/returnMetrics');
 const { getCommissionMonthKpi } = require('../services/commissionKpi');
+const { ensureOpenPayrollPeriod } = require('../services/payrollPeriod');
 
 async function loadUserGroupIds(pool, shopId, userId) {
   const [rows] = await pool.query(
@@ -396,7 +397,7 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
   try {
     const pool = await getPool();
     const shopId = req.shopId;
-    const { month, year, group_id } = req.query;
+    const { month, year, group_id, payroll_period_id } = req.query;
 
     const currentMonth = month || new Date().getMonth() + 1;
     const currentYear = year || new Date().getFullYear();
@@ -434,6 +435,342 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
         return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
       }
       if (groupId == null) groupId = Math.min(...gids);
+    }
+
+    // New mode: payroll_period_id (default: current open period)
+    // If caller provides payroll_period_id → ignore month/year (keep month/year mode for backward compatibility).
+    const reqPeriodId =
+      payroll_period_id !== undefined && payroll_period_id !== null && String(payroll_period_id).trim() !== ''
+        ? parseInt(String(payroll_period_id), 10)
+        : null;
+
+    if (reqPeriodId != null || String(req.query?.mode || '') === 'payroll') {
+      const periodId =
+        reqPeriodId != null && Number.isFinite(reqPeriodId)
+          ? reqPeriodId
+          : await ensureOpenPayrollPeriod(pool, { shopId, userId: req.user.id });
+
+      const [[p]] = await pool.query(
+        `SELECT id, status FROM payroll_periods WHERE shop_id = ? AND id = ? LIMIT 1`,
+        [shopId, periodId]
+      );
+      if (!p) return res.status(404).json({ error: 'Không tìm thấy kỳ lương' });
+
+      const scopedUserId = scope === 'own' ? Number(req.user.id) : null;
+      const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
+
+      // Total orders KPI for this payroll period
+      const ordersAllWhere = [
+        'o.shop_id = ?',
+        'o.payroll_period_id = ?',
+        "o.status != 'cancelled'",
+      ];
+      const ordersAllParams = [shopId, periodId];
+      if (groupId) {
+        ordersAllWhere.push('o.group_id = ?');
+        ordersAllParams.push(groupId);
+      }
+      if (scope === 'own') {
+        ordersAllWhere.push('o.salesperson_id = ?');
+        ordersAllParams.push(scopedUserId);
+      }
+      const [[ordersAll]] = await pool.query(
+        `SELECT COUNT(*) AS total_orders FROM orders o WHERE ${ordersAllWhere.join(' AND ')}`,
+        ordersAllParams
+      );
+
+      // Closed period => read snapshot settlements (payroll_settlements)
+      if (String(p.status) === 'closed') {
+        const conds = ['s.shop_id = ?', 's.payroll_period_id = ?'];
+        const params = [shopId, periodId];
+        if (scope === 'own') {
+          conds.push('s.user_id = ?');
+          params.push(scopedUserId);
+        }
+
+        const [rows] = await pool.query(
+          `SELECT s.user_id AS id, u.full_name,
+                  0 AS commission_rate, 0 AS salary,
+                  0 AS total_sales,
+                  0 AS direct_adjustment,
+                  0 AS override_adjustment,
+                  s.direct_commission,
+                  s.override_commission,
+                  s.return_commission_abs,
+                  s.ship_khach_tra AS total_khach_ship,
+                  s.nv_chiu AS total_nv_chiu,
+                  s.total_luong
+           FROM payroll_settlements s
+           JOIN users u ON u.id = s.user_id
+           WHERE ${conds.join(' AND ')}
+           ORDER BY s.total_luong DESC`,
+          params
+        );
+
+        // order stats per user (total_orders + total_sales) from orders table
+        const osConds = ['o.shop_id = ?', 'o.payroll_period_id = ?', "o.status != 'cancelled'"];
+        const osParams = [shopId, periodId];
+        if (groupId) {
+          osConds.push('o.group_id = ?');
+          osParams.push(groupId);
+        }
+        if (scope === 'own') {
+          osConds.push('o.salesperson_id = ?');
+          osParams.push(scopedUserId);
+        }
+        const [oStats] = await pool.query(
+          `SELECT o.salesperson_id AS user_id, COUNT(*) AS total_orders, COALESCE(SUM(o.subtotal),0) AS total_sales
+           FROM orders o
+           WHERE ${osConds.join(' AND ')}
+           GROUP BY o.salesperson_id`,
+          osParams
+        );
+        const statMap = new Map(oStats.map((r) => [Number(r.user_id), r]));
+
+        const formattedSalesDataAll = rows.map((r) => {
+          const uid = Number(r.id);
+          const st = statMap.get(uid);
+          const totalOrders = parseInt(String(st?.total_orders ?? 0), 10) || 0;
+          const totalSales = parseFloat(st?.total_sales) || 0;
+          const directGross = parseFloat(r.direct_commission) || 0;
+          const overrideNet = parseFloat(r.override_commission) || 0;
+          const returnAbs = parseFloat(r.return_commission_abs) || 0;
+          const khach = parseFloat(r.total_khach_ship) || 0;
+          const nv = parseFloat(r.total_nv_chiu) || 0;
+          const totalHH = directGross + overrideNet;
+          const totalLuong = parseFloat(r.total_luong) || (totalHH - returnAbs + khach - nv);
+          return {
+            id: uid,
+            full_name: r.full_name,
+            commission_rate: 0,
+            salary: 0,
+            total_orders: totalOrders,
+            total_sales: totalSales,
+            direct_commission: directGross,
+            direct_adjustment: -returnAbs, // keep sign (negative) for legacy UI fields
+            total_commission: directGross,
+            override_commission: overrideNet,
+            total_all_commission: totalHH,
+            total_khach_ship: khach,
+            total_nv_chiu: nv,
+            total_luong: totalLuong,
+            total_return_commission_abs: returnAbs,
+          };
+        });
+
+        const formattedSalesData = formattedSalesDataAll.filter((s) => {
+          const totalAll = Number(s.total_all_commission) || 0;
+          const ship = Number(s.total_khach_ship) || 0;
+          const nv = Number(s.total_nv_chiu) || 0;
+          const orders = Number(s.total_orders) || 0;
+          return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0;
+        });
+
+        const summary = {
+          totalSales: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_sales) || 0), 0),
+          totalCommission: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_all_commission) || 0), 0),
+          totalOrdersAll: parseInt(String(ordersAll?.total_orders ?? 0), 10) || 0,
+          totalEmployees: formattedSalesData.length,
+          kpi_direct_gross: formattedSalesData.reduce((sum, s) => sum + (Number(s.direct_commission) || 0), 0),
+          kpi_override_net: formattedSalesData.reduce((sum, s) => sum + (Number(s.override_commission) || 0), 0),
+          kpi_total_hh: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_all_commission) || 0), 0),
+          kpi_return_commission: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_return_commission_abs) || 0), 0),
+          kpi_total_khach_ship: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_khach_ship) || 0), 0),
+          kpi_total_nv_chiu: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_nv_chiu) || 0), 0),
+          kpi_total_luong: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_luong) || 0), 0),
+          payroll_period_id: periodId,
+          payroll_period_status: 'closed',
+        };
+
+        return res.json({ data: { salesData: formattedSalesData, summary } });
+      }
+
+      // Open period => compute realtime from orders/commissions + include payroll_adjustments (to_period_id)
+      const [rows] = await pool.query(
+        `
+        SELECT
+          u.id,
+          u.full_name,
+          u.commission_rate,
+          u.salary,
+          COALESCE(o_stats.total_orders, 0) AS total_orders,
+          COALESCE(o_stats.total_sales, 0) - COALESCE(r_stats.total_returns, 0) AS total_sales,
+          COALESCE(c_direct.direct_commission, 0) AS direct_commission,
+          COALESCE(a_direct.direct_adjustment, 0) AS direct_adjustment,
+          COALESCE(c_override.override_commission, 0) + COALESCE(a_override.override_adjustment, 0) AS override_commission,
+          COALESCE(ship_nv.total_khach_ship, 0) AS total_khach_ship,
+          COALESCE(ship_nv.total_nv_chiu, 0) AS total_nv_chiu,
+          COALESCE(pa.adjustments, 0) AS payroll_adjustments
+        FROM user_shops us
+        JOIN users u ON u.id = us.user_id
+        LEFT JOIN (
+          SELECT salesperson_id, COUNT(*) AS total_orders, COALESCE(SUM(subtotal), 0) AS total_sales
+          FROM orders
+          WHERE shop_id = ? AND payroll_period_id = ?
+            AND status != 'cancelled'
+            ${groupId ? ' AND group_id = ?' : ''}
+          GROUP BY salesperson_id
+        ) o_stats ON u.id = o_stats.salesperson_id
+        LEFT JOIN (
+          SELECT
+            o.salesperson_id,
+            COALESCE(SUM(ri.qty * ((oi.gross_total - oi.discount_total) / NULLIF(oi.qty_total, 0))), 0) AS total_returns
+          FROM returns r
+          JOIN orders o ON r.order_id = o.id
+          JOIN return_items ri ON ri.return_id = r.id
+          JOIN (
+            SELECT order_id, product_id,
+                   SUM(qty) AS qty_total,
+                   SUM(unit_price * qty) AS gross_total,
+                   SUM(discount_amount) AS discount_total
+            FROM order_items
+            GROUP BY order_id, product_id
+          ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
+          WHERE o.shop_id = ? AND o.payroll_period_id = ?
+            ${groupId ? ' AND o.group_id = ?' : ''}
+          GROUP BY o.salesperson_id
+        ) r_stats ON u.id = r_stats.salesperson_id
+        LEFT JOIN (
+          SELECT c.user_id, COALESCE(SUM(c.commission_amount),0) AS direct_commission
+          FROM commissions c
+          JOIN orders o ON c.order_id = o.id
+          WHERE o.shop_id = ? AND o.payroll_period_id = ?
+            AND o.status <> 'cancelled'
+            AND c.type = 'direct'
+            ${orderGroupCond}
+          GROUP BY c.user_id
+        ) c_direct ON u.id = c_direct.user_id
+        LEFT JOIN (
+          SELECT ca.user_id, COALESCE(SUM(ca.amount),0) AS direct_adjustment
+          FROM commission_adjustments ca
+          JOIN orders o ON ca.order_id = o.id
+          WHERE o.shop_id = ? AND o.payroll_period_id = ?
+            AND o.status <> 'cancelled'
+            AND ca.type = 'direct'
+            AND ca.user_id = o.salesperson_id
+            ${orderGroupCond}
+          GROUP BY ca.user_id
+        ) a_direct ON u.id = a_direct.user_id
+        LEFT JOIN (
+          SELECT c.user_id, COALESCE(SUM(c.commission_amount),0) AS override_commission
+          FROM commissions c
+          JOIN orders o ON c.order_id = o.id
+          WHERE o.shop_id = ? AND o.payroll_period_id = ?
+            AND o.status <> 'cancelled'
+            AND c.type = 'override'
+            ${orderGroupCond}
+          GROUP BY c.user_id
+        ) c_override ON u.id = c_override.user_id
+        LEFT JOIN (
+          SELECT ca.user_id, COALESCE(SUM(ca.amount),0) AS override_adjustment
+          FROM commission_adjustments ca
+          JOIN orders o ON ca.order_id = o.id
+          WHERE o.shop_id = ? AND o.payroll_period_id = ?
+            AND o.status <> 'cancelled'
+            AND ca.type = 'override'
+            ${orderGroupCond}
+          GROUP BY ca.user_id
+        ) a_override ON u.id = a_override.user_id
+        LEFT JOIN (
+          SELECT salesperson_id,
+                 COALESCE(SUM(CASE WHEN ship_payer='shop' THEN 0 ELSE shipping_fee END),0) AS total_khach_ship,
+                 COALESCE(SUM(salesperson_absorbed_amount),0) AS total_nv_chiu
+          FROM orders
+          WHERE shop_id = ? AND payroll_period_id = ?
+            AND status <> 'cancelled'
+            ${groupId ? ' AND group_id = ?' : ''}
+          GROUP BY salesperson_id
+        ) ship_nv ON u.id = ship_nv.salesperson_id
+        LEFT JOIN (
+          SELECT user_id, COALESCE(SUM(amount),0) AS adjustments
+          FROM payroll_adjustments
+          WHERE shop_id = ? AND to_period_id = ?
+          GROUP BY user_id
+        ) pa ON u.id = pa.user_id
+        WHERE us.shop_id = ? AND u.is_active = 1
+          ${scope === 'own' ? ' AND u.id = ?' : ''}
+        `,
+        [
+          // o_stats
+          shopId, periodId, ...(groupId ? [groupId] : []),
+          // r_stats
+          shopId, periodId, ...(groupId ? [groupId] : []),
+          // c_direct
+          shopId, periodId, ...(groupId ? [groupId] : []),
+          // a_direct
+          shopId, periodId, ...(groupId ? [groupId] : []),
+          // c_override
+          shopId, periodId, ...(groupId ? [groupId] : []),
+          // a_override
+          shopId, periodId, ...(groupId ? [groupId] : []),
+          // ship_nv
+          shopId, periodId, ...(groupId ? [groupId] : []),
+          // payroll_adjustments
+          shopId, periodId,
+          // us
+          shopId,
+          ...(scope === 'own' ? [scopedUserId] : []),
+        ]
+      );
+
+      const formattedSalesDataAll = rows.map((s) => {
+        const directGross = parseFloat(s.direct_commission) || 0;
+        const overrideNet = parseFloat(s.override_commission) || 0;
+        const returnDirectAdj = parseFloat(s.direct_adjustment) || 0; // negative
+        const khach = parseFloat(s.total_khach_ship) || 0;
+        const nv = parseFloat(s.total_nv_chiu) || 0;
+        const payAdj = parseFloat(s.payroll_adjustments) || 0;
+        const returnAbs = Math.abs(returnDirectAdj);
+        const totalHH = directGross + overrideNet;
+        const totalLuong = totalHH - returnAbs + khach - nv + payAdj;
+        return {
+          ...s,
+          total_orders: parseInt(s.total_orders) || 0,
+          total_sales: parseFloat(s.total_sales) || 0,
+          direct_commission: directGross,
+          direct_adjustment: returnDirectAdj,
+          total_commission: directGross,
+          override_commission: overrideNet,
+          total_all_commission: totalHH,
+          total_khach_ship: khach,
+          total_nv_chiu: nv,
+          total_luong: totalLuong,
+          salary: parseFloat(s.salary) || 0,
+          commission_rate: parseFloat(s.commission_rate) || 0,
+          total_return_commission_abs: returnAbs,
+          payroll_adjustments: payAdj,
+        };
+      });
+
+      const formattedSalesData = formattedSalesDataAll.filter((s) => {
+        const totalAll = Number(s.total_all_commission) || 0;
+        const ship = Number(s.total_khach_ship) || 0;
+        const nv = Number(s.total_nv_chiu) || 0;
+        const orders = Number(s.total_orders) || 0;
+        const adj = Number(s.payroll_adjustments) || 0;
+        return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0 || adj !== 0;
+      });
+
+      formattedSalesData.sort((a, b) => (Number(b.total_luong) || 0) - (Number(a.total_luong) || 0));
+
+      const summary = {
+        totalSales: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_sales) || 0), 0),
+        totalCommission: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_all_commission) || 0), 0),
+        totalOrdersAll: parseInt(String(ordersAll?.total_orders ?? 0), 10) || 0,
+        totalEmployees: formattedSalesData.length,
+        kpi_direct_gross: formattedSalesData.reduce((sum, s) => sum + (Number(s.direct_commission) || 0), 0),
+        kpi_override_net: formattedSalesData.reduce((sum, s) => sum + (Number(s.override_commission) || 0), 0),
+        kpi_total_hh: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_all_commission) || 0), 0),
+        kpi_return_commission: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_return_commission_abs) || 0), 0),
+        kpi_total_khach_ship: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_khach_ship) || 0), 0),
+        kpi_total_nv_chiu: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_nv_chiu) || 0), 0),
+        kpi_total_luong: formattedSalesData.reduce((sum, s) => sum + (Number(s.total_luong) || 0), 0),
+        kpi_payroll_adjustments: formattedSalesData.reduce((sum, s) => sum + (Number(s.payroll_adjustments) || 0), 0),
+        payroll_period_id: periodId,
+        payroll_period_status: 'open',
+      };
+
+      return res.json({ data: { salesData: formattedSalesData, summary } });
     }
 
     const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
@@ -933,12 +1270,12 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
 });
 
 // Returns summary for commission period filters
-// GET /api/reports/returns-summary?month=MM&year=YYYY&group_id=&user_id=
+// GET /api/reports/returns-summary?month=MM&year=YYYY&group_id=&user_id=&payroll_period_id=
 router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const shopId = req.shopId;
-    const { month, year, group_id, user_id } = req.query;
+    const { month, year, group_id, user_id, payroll_period_id } = req.query;
     const m = month ? parseInt(String(month), 10) : null;
     const y = year ? parseInt(String(year), 10) : null;
     let groupId = group_id ? parseInt(String(group_id), 10) : null;
@@ -960,21 +1297,91 @@ router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
       if (groupId == null) groupId = Math.min(...gids);
     }
 
-    if (!m || !y) return res.status(400).json({ error: 'Thiếu month/year' });
-    const ret = await getReturnRevenueAndOrdersByMonthYear(pool, {
-      month: m,
-      year: y,
-      salespersonId: targetUserId,
-      groupId,
-      shopId,
-    });
-    const returnCommission = await getReturnCommissionByMonthYear(pool, {
-      month: m,
-      year: y,
-      userId: targetUserId,
-      groupId,
-      shopId,
-    });
+    const periodId =
+      payroll_period_id != null && String(payroll_period_id).trim() !== ''
+        ? parseInt(String(payroll_period_id), 10)
+        : null;
+
+    let ret;
+    let returnCommission;
+
+    if (periodId != null && Number.isFinite(periodId)) {
+      const conds = ['o.shop_id = ?', 'o.payroll_period_id = ?'];
+      const params = [shopId, periodId];
+      if (targetUserId) {
+        conds.push('o.salesperson_id = ?');
+        params.push(targetUserId);
+      }
+      if (groupId) {
+        conds.push('o.group_id = ?');
+        params.push(groupId);
+      }
+
+      const [[row]] = await pool.query(
+        `
+        SELECT
+          COALESCE(COUNT(DISTINCT r.id), 0) AS return_orders,
+          COALESCE(SUM(ri.qty * ((oi.gross_total - oi.discount_total) / NULLIF(oi.qty_total, 0))), 0) AS return_revenue
+        FROM returns r
+        JOIN orders o ON r.order_id = o.id
+        JOIN return_items ri ON ri.return_id = r.id
+        JOIN (
+          SELECT order_id, product_id,
+                 SUM(qty) AS qty_total,
+                 SUM(unit_price * qty) AS gross_total,
+                 SUM(discount_amount) AS discount_total
+          FROM order_items
+          GROUP BY order_id, product_id
+        ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
+        WHERE ${conds.join(' AND ')}
+        `,
+        params
+      );
+
+      const commConds = [
+        "ca.type='direct'",
+        'ca.user_id = o.salesperson_id',
+        'o.shop_id = ?',
+        'o.payroll_period_id = ?',
+      ];
+      const commParams = [shopId, periodId];
+      if (targetUserId) {
+        commConds.push('o.salesperson_id = ?');
+        commParams.push(targetUserId);
+      }
+      if (groupId) {
+        commConds.push('o.group_id = ?');
+        commParams.push(groupId);
+      }
+      const [[cRow]] = await pool.query(
+        `
+        SELECT COALESCE(SUM(ABS(ca.amount)), 0) AS v
+        FROM commission_adjustments ca
+        JOIN orders o ON o.id = ca.order_id
+        WHERE ${commConds.join(' AND ')}
+        `,
+        commParams
+      );
+
+      ret = { return_orders: Number(row?.return_orders) || 0, return_revenue: Number(row?.return_revenue) || 0 };
+      returnCommission = Number(cRow?.v) || 0;
+    } else {
+      if (!m || !y) return res.status(400).json({ error: 'Thiếu month/year' });
+      ret = await getReturnRevenueAndOrdersByMonthYear(pool, {
+        month: m,
+        year: y,
+        salespersonId: targetUserId,
+        groupId,
+        shopId,
+      });
+      returnCommission = await getReturnCommissionByMonthYear(pool, {
+        month: m,
+        year: y,
+        userId: targetUserId,
+        groupId,
+        shopId,
+      });
+    }
 
     res.json({
       data: {

@@ -15,6 +15,53 @@
 ### Changed
 - **KPI hoa hồng/hoàn theo tháng** — Đồng nhất lọc theo `orders.created_at` cho Dashboard + báo cáo hoa hồng + báo cáo CTV (không còn “chuyển kỳ” khi sửa đơn/recalc). — Files: `backend/services/commissionKpi.js`, `backend/services/returnMetrics.js`, `backend/routes/reports.js`, `backend/routes/commissions.js`, `backend/routes/users.js`, `backend/routes/collaborators.js`
 
+## [28/04/2026] - Payroll periods: chốt kỳ lương theo thời điểm
+### Added
+- **Kỳ lương (backend)** — Thêm `payroll_periods` và gắn `orders.payroll_period_id` khi tạo đơn; API list/current/close kỳ để chốt lương tại thời điểm bất kỳ. Chặn hủy/xóa đơn thuộc kỳ đã chốt để tránh lật lương đã trả. — Files: `migrations/031_payroll_periods.sql`, `backend/routes/payroll.js`, `backend/services/payrollPeriod.js`, `backend/routes/orders.js`, `backend/server.js`
+
+## [28/04/2026] - Payroll periods: UI chốt kỳ lương
+### Added
+- **UI chốt kỳ** — Thêm trang `/reports/payroll-periods` để xem kỳ hiện tại, chốt kỳ, và xem preview lương theo kỳ. — Files: `src/pages/PayrollPeriods.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
+
+## [28/04/2026] - Payroll periods: tích hợp báo cáo lương + hủy đơn đã chốt
+### Changed
+- **Salary report** — `/reports/salary` hỗ trợ `payroll_period_id` (mặc định kỳ mở) và cộng `payroll_adjustments` vào Tổng lương; kỳ `closed` đọc snapshot từ `payroll_settlements`. — File: `backend/routes/reports.js`
+### Added
+- **OrderForm (Admin)** — Khi đơn thuộc kỳ đã chốt, hiển thị nút “Hủy đơn (tạo điều chỉnh lương)” gọi API điều chỉnh lương. Đồng thời `/orders/:id` trả thêm `payroll_period_status`. — Files: `src/pages/OrderForm.tsx`, `backend/routes/orders.js`
+
+## [28/04/2026] - Payroll periods: chỉ Admin thấy menu chốt kỳ
+### Fixed
+- **Sidebar** — Sales không còn thấy mục “Chốt kỳ lương”; chỉ Admin (menu hardcode) hiển thị. — File: `src/components/Layout.tsx`
+
+## [28/04/2026] - Payroll periods: UI chọn kỳ cho báo cáo hoa hồng
+### Added
+- **CommissionReport** — Thêm chế độ lọc “Kỳ lương” + dropdown chọn kỳ (Admin/Sales). Khi chọn kỳ, tất cả API chính dùng `payroll_period_id` thay vì month/year. — Files: `src/pages/CommissionReport.tsx`, `backend/routes/commissions.js`, `backend/routes/reports.js`, `backend/routes/collaborators.js`
+### Fixed
+- **Sync kỳ đang mở** — Báo cáo hoa hồng tự sync về kỳ open hiện tại sau khi chốt, tránh chọn nhầm “kỳ mở” cũ dẫn đến lấy dữ liệu sai. — File: `src/pages/CommissionReport.tsx`
+- **Default theo tháng** — Mặc định vào trang theo Tháng (ổn định), chỉ khi chuyển sang Kỳ lương mới load/sync kỳ open để tránh trạng thái “vào trang sai, chọn qua chọn lại mới đúng”. — File: `src/pages/CommissionReport.tsx`
+
+## [28/04/2026] - Payroll periods: backfill đơn cũ vào kỳ mở đầu tiên
+### Fixed
+- **ensureOpenPayrollPeriod** — Tự động gán `orders.payroll_period_id` cho các đơn legacy bị NULL để lọc theo kỳ không bị 0. — File: `backend/services/payrollPeriod.js`
+
+## [28/04/2026] - Payroll periods: reindex đơn theo khoảng kỳ
+### Added
+- **Reindex orders** — Thêm hàm gán lại `orders.payroll_period_id` theo `orders.created_at` nằm trong khoảng `[period.from_at, period.to_at)` và endpoint admin để chạy lại khi kỳ đã chốt bị 0. Đồng thời auto reindex trước khi chốt để snapshot đúng. — Files: `backend/services/payrollPeriod.js`, `backend/routes/payroll.js`, `src/pages/PayrollPeriods.tsx`
+### Fixed
+- **Open period không dồn lịch sử** — Bỏ backfill kiểu gán tất cả đơn NULL vào kỳ đang mở; kỳ đầu tiên lấy `from_at` theo `MIN(orders.created_at)` và reindex theo khoảng kỳ. — File: `backend/services/payrollPeriod.js`
+
+## [28/04/2026] - Payroll periods: chốt theo mốc thời điểm (cutoff)
+### Changed
+- **Close payroll period** — Khi chốt tại thời điểm \(T\), hệ thống gom toàn bộ đơn “chưa chốt” trước \(T\) vào kỳ vừa chốt và các đơn sau \(T\) vào kỳ mở mới (cutoff-based), tránh kỳ đã chốt rỗng/đơn rơi sai kỳ. — File: `backend/services/payrollPeriod.js`
+
+## [28/04/2026] - Payroll periods: chặn hủy/xóa đơn đã chốt
+### Changed
+- **Orders** — Đơn thuộc kỳ lương đã chốt bị chặn hủy/xóa; hướng dẫn xử lý bằng “đơn hoàn (returns)”. Gỡ luồng `cancel-with-payroll-adjustment` khỏi UI. — Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`
+
+## [28/04/2026] - Payroll periods: chặn sửa đơn đã chốt
+### Changed
+- **Orders** — Đơn thuộc kỳ lương đã chốt bị chặn sửa (PUT), UI khóa nút lưu và hiển thị cảnh báo. — Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`
+
 ## [23/04/2026] - Thu chi: nhân viên mặc định theo chính mình
 ### Fixed
 - **CashTransactions UI** — Nếu user không phải Admin thì tự mặc định `user_id`/bộ lọc theo chính user đang đăng nhập và khóa chọn nhân viên; Admin vẫn chọn/lọc theo nhân viên như cũ. — File: `src/pages/CashTransactions.tsx`

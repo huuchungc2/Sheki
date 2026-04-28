@@ -25,6 +25,7 @@ const {
   tryParseFullCalendarMonthFromRange,
 } = require('../services/commissionKpi');
 const { getScope } = require('../utils/scope');
+const { ensureOpenPayrollPeriod, getOrderPayrollPeriod } = require('../services/payrollPeriod');
 
 const DEFAULT_LINE_COMMISSION_RATE = 10;
 
@@ -544,8 +545,11 @@ router.get('/:id', auth, requireShop, requireFeature('orders.view'), async (req,
     const pool = await getPool();
 
     const [rows] = await pool.query(
-      `SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email, c.city as customer_city, c.district as customer_district, c.ward as customer_ward, c.tier as customer_tier, u.full_name as salesperson_name, w.name as warehouse_name, g.name as group_name
+      `SELECT o.*, p.status AS payroll_period_status,
+              c.name as customer_name, c.phone as customer_phone, c.email as customer_email, c.city as customer_city, c.district as customer_district, c.ward as customer_ward, c.tier as customer_tier,
+              u.full_name as salesperson_name, w.name as warehouse_name, g.name as group_name
        FROM orders o
+       LEFT JOIN payroll_periods p ON p.id = o.payroll_period_id
        LEFT JOIN customers c ON o.customer_id = c.id
        LEFT JOIN users u ON o.salesperson_id = u.id
        LEFT JOIN warehouses w ON o.warehouse_id = w.id
@@ -748,6 +752,7 @@ router.post('/', auth, requireShop, requireFeature('orders.create'), async (req,
     }
 
     const code = await generateOrderCode(req.shopId);
+    const payrollPeriodId = await ensureOpenPayrollPeriod(pool, { shopId: req.shopId, userId: req.user.id });
 
     // Validate stock: qty <= available_stock in this warehouse (server-side, cannot bypass)
     for (const it of items) {
@@ -796,10 +801,11 @@ router.post('/', auth, requireShop, requireFeature('orders.create'), async (req,
     const orderStatus = req.body.status || 'pending';
 
     const [orderResult] = await pool.query(
-      `INSERT INTO orders (shop_id, code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, ship_payer, deposit, customer_collect, shop_collect, salesperson_absorbed_amount, payment_method, subtotal, discount, total_amount, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO orders (shop_id, payroll_period_id, code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, ship_payer, deposit, customer_collect, shop_collect, salesperson_absorbed_amount, payment_method, subtotal, discount, total_amount, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.shopId,
+        payrollPeriodId,
         code,
         customer_id,
         finalSalespersonId,
@@ -873,6 +879,13 @@ router.put('/:id', auth, requireShop, requireFeature('orders.edit'), async (req,
     }
 
     const order = existing[0];
+    // Nếu đơn thuộc kỳ lương đã chốt: chặn sửa tuyệt đối (không lật số kỳ đã trả).
+    const p = await getOrderPayrollPeriod(pool, { shopId: req.shopId, orderId: parseInt(req.params.id, 10) });
+    if (p?.status === 'closed') {
+      return res.status(400).json({
+        error: 'Kỳ lương của đơn này đã chốt. Không thể sửa/hủy/xóa; hãy tạo đơn hoàn (returns).',
+      });
+    }
 
     const scope = await getScope(req, 'orders');
     if (scope === 'own' && order.salesperson_id !== req.user.id) {
@@ -1148,6 +1161,16 @@ router.put('/:id', auth, requireShop, requireFeature('orders.edit'), async (req,
   }
 });
 
+// POST /api/orders/:id/cancel-with-payroll-adjustment
+// Admin/kế toán: hủy đơn thuộc kỳ đã chốt bằng cách tạo payroll_adjustments (âm) sang kỳ đang mở.
+router.post('/:id/cancel-with-payroll-adjustment', auth, requireShop, requireFeature('orders.edit'), async (req, res, next) => {
+  try {
+    return res.status(400).json({
+      error: 'Đơn thuộc kỳ lương đã chốt không được hủy. Vui lòng tạo đơn hoàn (returns).',
+    });
+  } catch (e) { next(e); }
+});
+
 router.delete('/:id', auth, requireShop, requireFeature('orders.delete'), async (req, res, next) => {
   try {
     const pool = await getPool();
@@ -1157,7 +1180,18 @@ router.delete('/:id', auth, requireShop, requireFeature('orders.delete'), async 
       return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
     }
 
+    const isAdminOrderDel = req.user.can_access_admin === true || req.user.role === 'admin';
+    if (!isAdminOrderDel) {
+      return res.status(403).json({ error: 'Không có quyền xóa đơn hàng' });
+    }
+
     const order = existing[0];
+    const p = await getOrderPayrollPeriod(pool, { shopId: req.shopId, orderId: parseInt(req.params.id, 10) });
+    if (p?.status === 'closed') {
+      return res.status(400).json({
+        error: 'Kỳ lương của đơn này đã chốt. Không thể xóa đơn; hãy tạo đơn hoàn (returns).',
+      });
+    }
 
     const scope = await getScope(req, 'orders');
     if (scope === 'own' && order.salesperson_id !== req.user.id) {
@@ -1170,9 +1204,7 @@ router.delete('/:id', auth, requireShop, requireFeature('orders.delete'), async 
       }
     }
 
-    const isAdminOrderDel = req.user.can_access_admin === true || req.user.role === 'admin';
     if (
-      !isAdminOrderDel &&
       scope === 'own' &&
       ['shipping', 'completed'].includes(String(order.status))
     ) {

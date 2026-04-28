@@ -11,6 +11,14 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **UI: Chốt kỳ lương** — Trang `/reports/payroll-periods` để chốt kỳ và xem preview lương theo kỳ. — Files: `src/pages/PayrollPeriods.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
+- [x] **Payroll periods: tích hợp báo cáo lương + hủy đơn đã chốt** — `/reports/salary` hỗ trợ `payroll_period_id` (mặc định kỳ mở) và `OrderForm` có nút hủy đơn tạo điều chỉnh lương khi kỳ đã chốt. — Files: `backend/routes/reports.js`, `backend/routes/orders.js`, `src/pages/OrderForm.tsx`
+- [x] **Payroll periods: Sales không thấy chốt kỳ** — Ẩn menu “Chốt kỳ lương” khỏi non-admin sidebar. — File: `src/components/Layout.tsx`
+- [x] **Payroll periods: UI chọn kỳ cho báo cáo hoa hồng** — CommissionReport (Admin/Sales) có dropdown chọn kỳ lương; API filter theo `payroll_period_id`. — Files: `src/pages/CommissionReport.tsx`, `backend/routes/commissions.js`, `backend/routes/reports.js`, `backend/routes/collaborators.js`
+- [x] **Payroll periods: reindex đơn theo khoảng kỳ** — Gán lại `orders.payroll_period_id` theo khoảng thời gian kỳ; thêm nút “Reindex đơn” để sửa trường hợp kỳ đã chốt ra 0. — Files: `backend/services/payrollPeriod.js`, `backend/routes/payroll.js`, `src/pages/PayrollPeriods.tsx`
+- [x] **Payroll periods: chặn hủy/xóa đơn đã chốt** — Không cho hủy/xóa đơn thuộc kỳ đã chốt; hướng dẫn tạo đơn hoàn. — Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`
+- [x] **Payroll periods: chặn sửa đơn đã chốt** — Không cho sửa đơn thuộc kỳ đã chốt (PUT), UI khóa lưu. — Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`
+- [x] **Payroll periods: chốt kỳ lương theo thời điểm** — Thêm `payroll_periods`, gắn `orders.payroll_period_id` khi tạo đơn; API list/current/close kỳ; chặn hủy/xóa đơn thuộc kỳ đã chốt. — Files: `migrations/031_payroll_periods.sql`, `backend/routes/payroll.js`, `backend/services/payrollPeriod.js`, `backend/routes/orders.js`, `backend/server.js`
 - [x] **KPI hoa hồng theo tháng: đồng nhất theo ngày tạo đơn** — Dashboard + báo cáo HH/CTV lọc theo `orders.created_at` (không còn “chuyển kỳ” khi sửa đơn/recalc). — Files: `backend/services/commissionKpi.js`, `backend/services/returnMetrics.js`, `backend/routes/reports.js`, `backend/routes/commissions.js`, `backend/routes/users.js`, `backend/routes/collaborators.js`
 - [x] **EmployeeDetail: lọc “Tuần này” không lệch ngày** — Date preset dùng format local (không dùng `toISOString()` UTC) để tránh lệch phạm vi ngày ở VN làm KPI hoa hồng/đơn bị sai. — File: `src/pages/EmployeeDetail.tsx`
 - [x] **OrderList: KPI “Tổng hoa hồng” khớp bộ lọc tuần** — Summary “Tổng hoa hồng” trong danh sách đơn lọc theo `DATE(orders.created_at)` (khớp bộ lọc tuần/tháng/tùy chọn), tránh lệch khi hoa hồng phát sinh muộn do sửa đơn/recalc. — Files: `backend/routes/orders.js`, `backend/services/commissionKpi.js`

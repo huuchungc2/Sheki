@@ -27,6 +27,7 @@ import { ActivityLog } from "./pages/ActivityLog";
 import { OrderCommissionDetail } from "./pages/OrderCommissionDetail";
 import { RevenueReport } from "./pages/RevenueReport";
 import { CommissionReport } from "./pages/CommissionReport";
+import { PayrollPeriods } from "./pages/PayrollPeriods";
 import CommissionRules from "./pages/CommissionRules";
 import CollaboratorsCommissionsReportPage from "./pages/CollaboratorsCommissionsReport";
 import { ChangePassword } from "./pages/ChangePassword";
@@ -213,6 +214,7 @@ export default function App() {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/reports/revenue" element={<ReportsViewRoute><RevenueReport /></ReportsViewRoute>} />
                   <Route path="/reports/commissions" element={<CommissionReport />} />
+                  <Route path="/reports/payroll-periods" element={<AdminRoute><PayrollPeriods /></AdminRoute>} />
                   <Route path="/reports/commissions/ctv" element={<ReportsViewRoute><CtvCommissionRoute /></ReportsViewRoute>} />
                   <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionReport /></AdminRoute>} />
                   <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />

@@ -85,6 +85,7 @@ function buildNonAdminNavigation(caps: any) {
   if (can("reports.commissions_ctv", "reports", "view")) {
     reportChildren.push({ name: "Hoa hồng CTV", href: "/reports/commissions/ctv" });
   }
+  // Chốt kỳ lương: chỉ Admin/Super Admin (Sales không bao giờ được chốt)
   if (can("cash_transactions.view", "reports", "view")) {
     reportChildren.push({ name: "Thu chi", href: "/cash-transactions" });
   }
@@ -143,6 +144,7 @@ const navigationAdmin = [
     children: [
       { name: "Doanh thu", href: "/reports/revenue" },
       { name: "Hoa hồng", href: "/reports/commissions" },
+      { name: "Chốt kỳ lương", href: "/reports/payroll-periods" },
       { name: "Quy tắc hoa hồng", href: "/commission-rules" },
       { name: "Thu chi", href: "/cash-transactions" },
     ],

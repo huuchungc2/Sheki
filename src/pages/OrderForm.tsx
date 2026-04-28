@@ -195,6 +195,7 @@ export function OrderForm() {
   const [groups, setGroups] = React.useState<any[]>([]);
   /** Tên NV bán trên đơn (`salesperson_id`) — từ API khi sửa; đơn mới = người đang đăng nhập */
   const [orderSalespersonName, setOrderSalespersonName] = React.useState<string | null>(null);
+  const [payrollPeriodStatus, setPayrollPeriodStatus] = React.useState<string | null>(null);
 
   const currentUser = React.useMemo(() => {
     const u = localStorage.getItem("user");
@@ -458,6 +459,7 @@ export function OrderForm() {
         setSalespersonAbsorbedAmount(Number(order?.salesperson_absorbed_amount ?? 0));
         setPaymentMethod(order?.payment_method ?? 'cash');
         setOrderStatus(order?.status ?? 'pending');
+        setPayrollPeriodStatus(order?.payroll_period_status ?? null);
         setSelectedGroupId(order?.group_id ?? null);
         setInitialOrderSourceType(order?.source_type ?? "sales");
         // NEW semantics: source_type=collaborator => collaborator_user_id là quản lý được chọn
@@ -488,9 +490,17 @@ export function OrderForm() {
     })();
   }, [id, isAdmin, currentUser?.scope_own_data, navigate, location.state]);
 
+  // Note: đơn thuộc kỳ lương đã chốt không được hủy/xóa. Nếu cần xử lý, hãy tạo đơn hoàn (returns).
+
   // Submit
   const submitOrder = async () => {
     setFormError("");
+
+    if (isEdit && payrollPeriodStatus === "closed") {
+      setFormError("Đơn thuộc kỳ lương đã chốt: không được sửa/hủy/xóa. Vui lòng tạo đơn hoàn (returns).");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
 
     if (!selectedCustomer?.id) {
       setFormError('Vui lòng chọn khách hàng');
@@ -735,7 +745,8 @@ export function OrderForm() {
           <button
             type="button"
             onClick={submitOrder}
-            className="hidden sm:flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
+            disabled={isEdit && payrollPeriodStatus === "closed"}
+            className="hidden sm:flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
@@ -1553,6 +1564,11 @@ export function OrderForm() {
                 <option value="completed">Đã giao</option>
                 <option value="cancelled">Đã hủy</option>
               </select>
+              {isEdit && isAdmin && payrollPeriodStatus === "closed" ? (
+                <div className="mt-2 w-full px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold">
+                  Đơn thuộc kỳ lương đã chốt: không được hủy/xóa. Nếu cần, hãy tạo đơn hoàn (returns).
+                </div>
+              ) : null}
             </div>
 
             <div>
@@ -1590,6 +1606,7 @@ export function OrderForm() {
           <button
             type="button"
             onClick={submitOrder}
+            disabled={isEdit && payrollPeriodStatus === "closed"}
             className="hidden lg:flex w-full items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
           >
             <Save className="w-4 h-4" />

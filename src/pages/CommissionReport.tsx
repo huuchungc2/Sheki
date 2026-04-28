@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   DollarSign, TrendingUp, Users, Download,
-  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign, ArrowLeft
+  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign, ArrowLeft, RefreshCcw
 } from "lucide-react";
 import { formatCurrency, formatDate, cn, isAdminUser } from "../lib/utils";
 import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel";
@@ -70,6 +70,12 @@ export function CommissionReport() {
   const [year, setYear]       = React.useState(String(new Date().getFullYear()));
   const [groupId, setGroupId] = React.useState("");
   const [groups, setGroups]   = React.useState<any[]>([]);
+  // Default to month view for stability; payroll mode depends on periods/current-open sync.
+  const [filterMode, setFilterMode] = React.useState<"payroll" | "month">("month");
+  const [payrollPeriods, setPayrollPeriods] = React.useState<any[]>([]);
+  const [payrollPeriodId, setPayrollPeriodId] = React.useState<string>("");
+  const [periodTouched, setPeriodTouched] = React.useState(false);
+  const [payrollReady, setPayrollReady] = React.useState(false);
 
   // Sales view data (từ /commissions/orders)
   const [orderCommissions, setOrderCommissions] = React.useState<any[]>([]);
@@ -113,6 +119,41 @@ export function CommissionReport() {
       .then(r => r.json()).then(j => setGroups(j.data || [])).catch(() => {});
   }, [isAdmin, currentUser?.id]);
 
+  const fetchPayrollPeriods = React.useCallback(async () => {
+    try {
+      setPayrollReady(false);
+      const token = localStorage.getItem("token");
+      const [curRes, listRes] = await Promise.all([
+        fetch(`${API_URL}/payroll/periods/current`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/payroll/periods`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (!curRes.ok || !listRes.ok) return;
+      const curJ = await curRes.json();
+      const listJ = await listRes.json();
+      const cur = curJ?.data;
+      const list = listJ?.data || [];
+      const openId = cur?.id != null ? String(cur.id) : "";
+      setPayrollPeriods(list);
+
+      // If user hasn't manually chosen a period, always follow current open period.
+      // Also heal stale selection (e.g. after closing periods).
+      const ids = new Set(list.map((p: any) => String(p.id)));
+      const openExists = openId && ids.has(openId);
+      setPayrollPeriodId((prev) => {
+        const prevOk = prev && ids.has(prev);
+        if (!prevOk) return openExists ? openId : prev;
+        if (!periodTouched) return openExists ? openId : prev;
+        return prev;
+      });
+      setPayrollReady(true);
+    } catch {}
+  }, [periodTouched]);
+
+  // Fetch payroll periods (for Admin + Sales) — refresh when user/shop changes too
+  React.useEffect(() => {
+    fetchPayrollPeriods();
+  }, [fetchPayrollPeriods, currentUser?.id]);
+
   const fetchReport = React.useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -129,7 +170,21 @@ export function CommissionReport() {
     setReturnsSummary({ return_orders: 0, return_revenue: 0, return_commission: 0 });
     try {
       const token = localStorage.getItem("token");
-      const params = new URLSearchParams({ month, year, page: String(commPage), limit: String(commLimit) });
+      const params = new URLSearchParams({ page: String(commPage), limit: String(commLimit) });
+      if (filterMode === "payroll") {
+        // Ensure we have a valid period before fetching.
+        if (!payrollReady || !payrollPeriodId) {
+          await fetchPayrollPeriods();
+          if (!payrollPeriodId) {
+            // still not ready
+            return;
+          }
+        }
+        params.set("payroll_period_id", String(payrollPeriodId));
+      } else {
+        params.set("month", month);
+        params.set("year", year);
+      }
       if (groupId) params.set("group_id", groupId);
       if (employeeDrilldown && subjectUserId != null) params.set("user_id", String(subjectUserId));
 
@@ -176,7 +231,13 @@ export function CommissionReport() {
       // - Admin => toàn shop
       // - Non-admin (Sales) => scope own => API tự trả 1 dòng của chính mình
       if (!employeeDrilldown) {
-        const salaryParams = new URLSearchParams({ month, year });
+        const salaryParams = new URLSearchParams();
+        if (filterMode === "payroll" && payrollPeriodId) {
+          salaryParams.set("payroll_period_id", String(payrollPeriodId));
+        } else {
+          salaryParams.set("month", month);
+          salaryParams.set("year", year);
+        }
         if (groupId) salaryParams.set("group_id", groupId);
 
         const [salaryRes, ctvRes] = await Promise.all([
@@ -238,10 +299,10 @@ export function CommissionReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, year, groupId, commPage, commLimit, isAdmin, currentUser?.id, employeeDrilldown, subjectUserId]);
+  }, [month, year, groupId, commPage, commLimit, isAdmin, currentUser?.id, employeeDrilldown, subjectUserId, filterMode, payrollPeriodId]);
 
   // Reset page khi filter hoặc limit / NV thay đổi
-  React.useEffect(() => { setCommPage(1); }, [month, year, groupId, commLimit, subjectUserId]);
+  React.useEffect(() => { setCommPage(1); }, [month, year, groupId, commLimit, subjectUserId, filterMode, payrollPeriodId]);
 
   React.useEffect(() => { fetchReport(); }, [fetchReport]);
 
@@ -269,7 +330,13 @@ export function CommissionReport() {
       const groupName = groups.find(g => String(g.id) === groupId)?.name || "";
 
       // Fetch toàn bộ data (limit=9999, không phân trang)
-      const allParams = new URLSearchParams({ month, year, page: "1", limit: "9999" });
+      const allParams = new URLSearchParams({ page: "1", limit: "9999" });
+      if (filterMode === "payroll" && payrollPeriodId) {
+        allParams.set("payroll_period_id", String(payrollPeriodId));
+      } else {
+        allParams.set("month", month);
+        allParams.set("year", year);
+      }
       if (groupId) allParams.set("group_id", groupId);
       if (employeeDrilldown && subjectUserId != null) allParams.set("user_id", String(subjectUserId));
       const allRes = await fetch(`${API_URL}/commissions/orders?${allParams}`, {
@@ -361,16 +428,73 @@ export function CommissionReport() {
             <option value="">Tất cả nhóm</option>
             {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
-          <select value={month} onChange={(e) => setMonth(e.target.value)}
-            className="shrink-0 min-w-[5.5rem] px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={String(i + 1).padStart(2, "0")}>Tháng {i + 1}</option>
-            ))}
-          </select>
-          <select value={year} onChange={(e) => setYear(e.target.value)}
-            className="shrink-0 min-w-[4.25rem] px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
-            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <div className="shrink-0 flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-1.5 py-1">
+            <button
+              type="button"
+              onClick={() => setFilterMode("payroll")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-semibold",
+                filterMode === "payroll"
+                  ? "bg-white border border-slate-200 text-slate-900"
+                  : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              Kỳ lương
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode("month")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-semibold",
+                filterMode === "month"
+                  ? "bg-white border border-slate-200 text-slate-900"
+                  : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              Tháng
+            </button>
+          </div>
+
+          {filterMode === "payroll" ? (
+            <select
+              value={payrollPeriodId}
+              onChange={(e) => {
+                setPeriodTouched(true);
+                setPayrollPeriodId(e.target.value);
+              }}
+              className="shrink-0 min-w-[12rem] px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              {payrollPeriods.map((p: any) => (
+                <option key={p.id} value={String(p.id)}>
+                  #{p.id} • {p.status === "open" ? "Đang mở" : "Đã chốt"} • {formatDate(p.from_at)}
+                  {p.to_at ? ` → ${formatDate(p.to_at)}` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <select value={month} onChange={(e) => setMonth(e.target.value)}
+                className="shrink-0 min-w-[5.5rem] px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={String(i + 1).padStart(2, "0")}>Tháng {i + 1}</option>
+                ))}
+              </select>
+              <select value={year} onChange={(e) => setYear(e.target.value)}
+                className="shrink-0 min-w-[4.25rem] px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100">
+                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </>
+          )}
+          {filterMode === "payroll" ? (
+            <button
+              type="button"
+              onClick={() => fetchPayrollPeriods()}
+              className="inline-flex shrink-0 items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
+              title="Làm mới danh sách kỳ lương"
+            >
+              <RefreshCcw className="w-4 h-4" />
+            </button>
+          ) : null}
           <button
             onClick={handleExport}
             disabled={loading || exporting}

@@ -28,6 +28,7 @@ const returnsRouter = require('./routes/returns');
 const rolesRouter = require('./routes/roles');
 const cashTransactionsRouter = require('./routes/cash-transactions');
 const shopsRouter = require('./routes/shops');
+const payrollRouter = require('./routes/payroll');
 const { logMiddleware } = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -132,6 +133,7 @@ app.use('/api/returns', returnsRouter);
 app.use('/api/roles', rolesRouter);
 app.use('/api/cash-transactions', cashTransactionsRouter);
 app.use('/api/shops', shopsRouter);
+app.use('/api/payroll', payrollRouter);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

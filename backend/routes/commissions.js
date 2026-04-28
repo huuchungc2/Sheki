@@ -165,7 +165,7 @@ router.get('/summary', auth, requireShop, requireFeature('reports.commissions'),
 router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { month, year, group_id, page = 1, limit = 20, user_id } = req.query;
+    const { month, year, group_id, payroll_period_id, page = 1, limit = 20, user_id } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const conditions = ['o.shop_id = ?'];
@@ -202,9 +202,16 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
         baseParams.push(uid);
       }
     }
-    // Kỳ lọc theo thời điểm tạo đơn (orders.created_at)
-    if (month)    { conditions.push('MONTH(o.created_at) = ?'); baseParams.push(parseInt(month)); }
-    if (year)     { conditions.push('YEAR(o.created_at) = ?');  baseParams.push(parseInt(year)); }
+    // Kỳ lọc theo thời điểm tạo đơn (orders.created_at) hoặc theo payroll_period_id
+    const pidRaw = payroll_period_id != null && String(payroll_period_id).trim() !== '' ? parseInt(String(payroll_period_id), 10) : null;
+    const pid = pidRaw != null && Number.isFinite(pidRaw) ? pidRaw : null;
+    if (pid != null) {
+      conditions.push('o.payroll_period_id = ?');
+      baseParams.push(pid);
+    } else {
+      if (month)    { conditions.push('MONTH(o.created_at) = ?'); baseParams.push(parseInt(month)); }
+      if (year)     { conditions.push('YEAR(o.created_at) = ?');  baseParams.push(parseInt(year)); }
+    }
     // group_id is enforced above for scope=group; for others, allow explicit filter
     if (scope !== 'group' && group_id) { conditions.push('o.group_id = ?'); baseParams.push(parseInt(group_id)); }
 
@@ -282,13 +289,12 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
     if (isScoped) {
       const summaryConds = ['o.shop_id = ?', 't.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
       const summaryParams = [req.shopId, req.user.id];
-      if (month) {
-        summaryConds.push('MONTH(t.entry_date) = ?');
-        summaryParams.push(parseInt(month, 10));
-      }
-      if (year) {
-        summaryConds.push('YEAR(t.entry_date) = ?');
-        summaryParams.push(parseInt(year, 10));
+      if (pid != null) {
+        summaryConds.push('o.payroll_period_id = ?');
+        summaryParams.push(pid);
+      } else {
+        if (month) { summaryConds.push('MONTH(o.created_at) = ?'); summaryParams.push(parseInt(month, 10)); }
+        if (year) { summaryConds.push('YEAR(o.created_at) = ?'); summaryParams.push(parseInt(year, 10)); }
       }
       if (group_id) {
         summaryConds.push('o.group_id = ?');
@@ -315,13 +321,12 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
     } else if (adminEmployeeUid != null) {
       const summaryConds = ['o.shop_id = ?', 't.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
       const summaryParams = [req.shopId, adminEmployeeUid];
-      if (month) {
-        summaryConds.push('MONTH(t.entry_date) = ?');
-        summaryParams.push(parseInt(month, 10));
-      }
-      if (year) {
-        summaryConds.push('YEAR(t.entry_date) = ?');
-        summaryParams.push(parseInt(year, 10));
+      if (pid != null) {
+        summaryConds.push('o.payroll_period_id = ?');
+        summaryParams.push(pid);
+      } else {
+        if (month) { summaryConds.push('MONTH(o.created_at) = ?'); summaryParams.push(parseInt(month, 10)); }
+        if (year) { summaryConds.push('YEAR(o.created_at) = ?'); summaryParams.push(parseInt(year, 10)); }
       }
       if (group_id) {
         summaryConds.push('o.group_id = ?');
@@ -364,16 +369,23 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
 
     let totalKhachShip = 0;
     let totalNvChiu = 0;
-    if (isScoped && month && year) {
+    if (isScoped && (pid != null || (month && year))) {
       // Ship / NV chỉ theo đơn mình là salesperson (giống GET /reports/dashboard — không lấy ship đơn của CTV khi chỉ có override)
       const shipConds = [
         'o.shop_id = ?',
-        'MONTH(o.created_at) = ?',
-        'YEAR(o.created_at) = ?',
         'o.salesperson_id = ?',
         "o.status <> 'cancelled'",
       ];
-      const shipParams = [req.shopId, parseInt(month), parseInt(year), req.user.id];
+      const shipParams = [req.shopId, req.user.id];
+      if (pid != null) {
+        shipConds.push('o.payroll_period_id = ?');
+        shipParams.push(pid);
+      } else {
+        shipConds.push('MONTH(o.created_at) = ?');
+        shipConds.push('YEAR(o.created_at) = ?');
+        shipParams.splice(1, 0, parseInt(month));
+        shipParams.splice(2, 0, parseInt(year));
+      }
       if (group_id) {
         shipConds.push('o.group_id = ?');
         shipParams.push(parseInt(group_id));
@@ -388,15 +400,22 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
       );
       totalKhachShip = parseFloat(shipRows[0]?.total_khach_ship) || 0;
       totalNvChiu = parseFloat(shipRows[0]?.total_nv_chiu) || 0;
-    } else if (adminEmployeeUid != null && month && year) {
+    } else if (adminEmployeeUid != null && (pid != null || (month && year))) {
       const shipConds = [
         'o.shop_id = ?',
-        'MONTH(o.created_at) = ?',
-        'YEAR(o.created_at) = ?',
         'o.salesperson_id = ?',
         "o.status <> 'cancelled'",
       ];
-      const shipParams = [req.shopId, parseInt(month, 10), parseInt(year, 10), adminEmployeeUid];
+      const shipParams = [req.shopId, adminEmployeeUid];
+      if (pid != null) {
+        shipConds.push('o.payroll_period_id = ?');
+        shipParams.splice(1, 0, pid);
+      } else {
+        shipConds.push('MONTH(o.created_at) = ?');
+        shipConds.push('YEAR(o.created_at) = ?');
+        shipParams.splice(1, 0, parseInt(month, 10));
+        shipParams.splice(2, 0, parseInt(year, 10));
+      }
       if (group_id) {
         shipConds.push('o.group_id = ?');
         shipParams.push(parseInt(group_id, 10));
@@ -439,8 +458,16 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
     // - ca.type='direct'
     // - ca.user_id = o.salesperson_id
     // - lọc theo kỳ tạo đơn (o.created_at)
-    const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'o.shop_id = ?', 'MONTH(o.created_at) = ?', 'YEAR(o.created_at) = ?'];
-    const retCommParams = [req.shopId, parseInt(month, 10), parseInt(year, 10)];
+    const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'o.shop_id = ?'];
+    const retCommParams = [req.shopId];
+    if (pid != null) {
+      retCommConds.push('o.payroll_period_id = ?');
+      retCommParams.push(pid);
+    } else {
+      retCommConds.push('MONTH(o.created_at) = ?');
+      retCommConds.push('YEAR(o.created_at) = ?');
+      retCommParams.push(parseInt(month, 10), parseInt(year, 10));
+    }
     if (isScoped) {
       retCommConds.push('o.salesperson_id = ?');
       retCommParams.push(req.user.id);

@@ -202,14 +202,21 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
     const sid = req.shopId;
-    const { month, year, group_id, sales_id } = req.query;
+    const { month, year, group_id, sales_id, payroll_period_id } = req.query;
     const scope = await getScope(req, 'reports');
 
     // Filter theo kỳ tạo đơn (orders.created_at) để đồng nhất toàn hệ thống.
     const txFilterConds = [];
     const txFilterParams = [];
-    if (month) { txFilterConds.push('MONTH(o_tx.created_at) = ?'); txFilterParams.push(parseInt(month)); }
-    if (year)  { txFilterConds.push('YEAR(o_tx.created_at) = ?');  txFilterParams.push(parseInt(year)); }
+    const pidRaw = payroll_period_id != null && String(payroll_period_id).trim() !== '' ? parseInt(String(payroll_period_id), 10) : null;
+    const pid = pidRaw != null && Number.isFinite(pidRaw) ? pidRaw : null;
+    if (pid != null) {
+      txFilterConds.push('o_tx.payroll_period_id = ?');
+      txFilterParams.push(pid);
+    } else {
+      if (month) { txFilterConds.push('MONTH(o_tx.created_at) = ?'); txFilterParams.push(parseInt(month)); }
+      if (year)  { txFilterConds.push('YEAR(o_tx.created_at) = ?');  txFilterParams.push(parseInt(year)); }
+    }
     const txWhereExtra = txFilterConds.length ? ' AND ' + txFilterConds.join(' AND ') : '';
 
     const orderFilterConds = [];
@@ -236,12 +243,15 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
     }
 
     if (groupId) { orderFilterConds.push('o.group_id = ?'); orderFilterParams.push(parseInt(groupId)); }
+    if (pid != null) { orderFilterConds.push('o.payroll_period_id = ?'); orderFilterParams.push(pid); }
     const orderWhereExtra = orderFilterConds.length ? ' AND ' + orderFilterConds.join(' AND ') : '';
 
     // IMPORTANT: group filter must constrain transactions (t) too.
     // If we only filter the joined `orders o` in an ON clause, SUM(t.amount) still includes out-of-group rows.
     const txJoinOrders = ' JOIN orders o_tx ON o_tx.id = t.order_id';
-    const txOrderWhereExtra = orderFilterConds.length ? ' AND o_tx.group_id = ?' : '';
+    const txOrderWhereExtra = orderFilterConds.length
+      ? ' AND ' + orderFilterConds.map((c) => c.replace(/^o\./, 'o_tx.')).join(' AND ')
+      : '';
     // Own-scope: only the logged-in sales can view their own pairs
     const effectiveSalesId =
       scope === 'own'
@@ -290,9 +300,7 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
       sid,
       sid,
       ...txFilterParams,
-      // txOrderWhereExtra (if any)
       ...(orderFilterParams.length ? orderFilterParams : []),
-      // orderWhereExtra (if any)
       ...(orderFilterParams.length ? orderFilterParams : []),
       sid,
       ...salesParam,
