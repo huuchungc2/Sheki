@@ -15,13 +15,13 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      chunkSizeWarningLimit: Infinity,
+    },
     server: {
-      // Lắng nghe mọi interface để truy cập từ điện thoại/máy khác: http://192.168.x.x:5173
       host: '0.0.0.0',
       port: 5173,
       strictPort: true,
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr:
         process.env.DISABLE_HMR === 'true'
           ? false
@@ -32,7 +32,6 @@ export default defineConfig(({mode}) => {
                 clientPort: 5173,
               }
             : true,
-      // Dùng 127.0.0.1 thay vì localhost để tránh một số máy Windows ưu tiên IPv6 (::1) trong khi Node chỉ bind IPv4
       proxy: {
         "/api": {
           target: "http://127.0.0.1:3000",
