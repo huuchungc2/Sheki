@@ -12,6 +12,7 @@ import {
   BarChart3,
   CalendarRange,
   Filter,
+  RefreshCcw,
 } from "lucide-react";
 import {
   BarChart,
@@ -23,7 +24,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { formatCurrency, cn } from "../lib/utils";
+import { formatCurrency, cn, formatDate } from "../lib/utils";
 import { exportRevenueReport } from "../lib/exportExcel";
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -54,6 +55,10 @@ export function RevenueReport() {
   const [groupId, setGroupId] = React.useState("");
   const [groups, setGroups] = React.useState<any[]>([]);
   const [token, setToken] = React.useState<string>(() => localStorage.getItem("token") || "");
+  const [filterMode, setFilterMode] = React.useState<"payroll" | "month">("month");
+  const [payrollPeriods, setPayrollPeriods] = React.useState<any[]>([]);
+  const [payrollPeriodId, setPayrollPeriodId] = React.useState<string>("");
+  const [periodTouched, setPeriodTouched] = React.useState(false);
 
   const yearOptions = React.useMemo(() => {
     const y = new Date().getFullYear();
@@ -87,17 +92,56 @@ export function RevenueReport() {
     };
   }, []);
 
+  const fetchPayrollPeriods = React.useCallback(async (): Promise<string | null> => {
+    try {
+      const t = localStorage.getItem("token") || "";
+      const [curRes, listRes] = await Promise.all([
+        fetch(`${API_URL}/payroll/periods/current`, { headers: { Authorization: `Bearer ${t}` } }),
+        fetch(`${API_URL}/payroll/periods`, { headers: { Authorization: `Bearer ${t}` } }),
+      ]);
+      if (!curRes.ok || !listRes.ok) return null;
+      const curJ = await curRes.json();
+      const listJ = await listRes.json();
+      const cur = curJ?.data;
+      const list = listJ?.data || [];
+      const openId = cur?.id != null ? String(cur.id) : "";
+      const ids = new Set(list.map((p: any) => String(p.id)));
+      const openExists = Boolean(openId && ids.has(openId));
+      setPayrollPeriods(list);
+      let nextId = payrollPeriodId;
+      if (!nextId || !ids.has(nextId)) {
+        nextId = openExists ? openId : list[0] ? String(list[0].id) : "";
+      }
+      if (!periodTouched && openExists) nextId = openId;
+      setPayrollPeriodId(nextId);
+      return nextId || null;
+    } catch {
+      return null;
+    }
+  }, [payrollPeriodId, periodTouched]);
+
   const fetchReport = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       if (!token) throw new Error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
-      const params = new URLSearchParams({ month, year });
+      const params = new URLSearchParams();
+      if (filterMode === "payroll") {
+        const pid = await fetchPayrollPeriods();
+        if (!pid) throw new Error("Chưa có kỳ lương để lọc.");
+        params.set("payroll_period_id", pid);
+      } else {
+        params.set("month", month);
+        params.set("year", year);
+      }
       if (groupId) params.set("group_id", groupId);
       const res = await fetch(`${API_URL}/reports/revenue?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("Không thể tải báo cáo");
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || "Không thể tải báo cáo");
+      }
       const json = await res.json();
       setSalesData(json.data.salesData || []);
       setSummary(json.data.summary || {});
@@ -106,7 +150,7 @@ export function RevenueReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, year, groupId, token]);
+  }, [month, year, groupId, token, filterMode, fetchPayrollPeriods]);
 
   React.useEffect(() => {
     fetchReport();
@@ -144,6 +188,24 @@ export function RevenueReport() {
 
   const groupName = groups.find((g) => String(g.id) === groupId)?.name;
 
+  const periodLabel = React.useMemo(() => {
+    if (filterMode === "payroll" && payrollPeriodId) {
+      const p = payrollPeriods.find((x: any) => String(x.id) === String(payrollPeriodId));
+      if (p) {
+        return `Kỳ #${p.id} (${p.status === "open" ? "đang mở" : "đã chốt"}) ${formatDate(p.from_at)}${
+          p.to_at ? ` → ${formatDate(p.to_at)}` : ""
+        }`;
+      }
+      return `Kỳ lương #${payrollPeriodId}`;
+    }
+    return `Tháng ${parseInt(month, 10)}/${year}`;
+  }, [filterMode, payrollPeriodId, payrollPeriods, month, year]);
+
+  const exportPeriodDescription =
+    filterMode === "payroll" && payrollPeriodId
+      ? `${periodLabel}${groupName ? ` — Nhóm: ${groupName}` : ""}`
+      : undefined;
+
   const handleExport = () => {
     setExporting(true);
     try {
@@ -153,13 +215,13 @@ export function RevenueReport() {
         month,
         year,
         groupName,
+        periodDescription: exportPeriodDescription,
+        payrollPeriodId: filterMode === "payroll" && payrollPeriodId ? payrollPeriodId : undefined,
       });
     } finally {
       setExporting(false);
     }
   };
-
-  const periodLabel = `Tháng ${parseInt(month, 10)}/${year}`;
 
   if (loading) {
     return (
@@ -202,7 +264,7 @@ export function RevenueReport() {
           </nav>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Báo cáo doanh thu</h1>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-            Doanh số và hoa hồng theo nhân viên trong kỳ (lọc theo nhóm bán hàng ghi trên đơn).
+            Doanh số và hoa hồng theo nhân viên — lọc theo tháng/năm hoặc kỳ lương (đơn bán theo kỳ đã gán trên đơn; giá trị hoàn theo ngày tạo đơn hoàn trong kỳ).
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -222,7 +284,7 @@ export function RevenueReport() {
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-900">Lọc báo cáo</p>
-            <p className="text-xs text-slate-500">Chọn nhóm, tháng và năm</p>
+            <p className="text-xs text-slate-500">Chọn nhóm và kỳ (tháng/năm hoặc kỳ lương)</p>
           </div>
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -238,26 +300,87 @@ export function RevenueReport() {
                 ))}
               </select>
             </label>
-            <label className="flex min-w-0 flex-col gap-1.5 lg:w-[140px]">
-              <span className="text-xs font-medium text-slate-600">Tháng</span>
-              <select value={month} onChange={(e) => setMonth(e.target.value)} className={selectCls}>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
-                    Tháng {i + 1}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex min-w-0 flex-col gap-1.5 lg:w-[120px]">
-              <span className="text-xs font-medium text-slate-600">Năm</span>
-              <select value={year} onChange={(e) => setYear(e.target.value)} className={selectCls}>
-                {yearOptions.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="text-xs font-medium text-slate-600">Cách lọc kỳ</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode("payroll")}
+                    className={cn(
+                      "rounded-lg px-3 py-2 text-xs font-semibold transition",
+                      filterMode === "payroll"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    Kỳ lương
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode("month")}
+                    className={cn(
+                      "rounded-lg px-3 py-2 text-xs font-semibold transition",
+                      filterMode === "month"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    Tháng
+                  </button>
+                </div>
+                {filterMode === "payroll" ? (
+                  <>
+                    <select
+                      value={payrollPeriodId}
+                      onChange={(e) => {
+                        setPeriodTouched(true);
+                        setPayrollPeriodId(e.target.value);
+                      }}
+                      className={cn(selectCls, "min-w-[12rem] flex-1")}
+                    >
+                      {payrollPeriods.map((p: any) => (
+                        <option key={p.id} value={String(p.id)}>
+                          #{p.id} • {p.status === "open" ? "Đang mở" : "Đã chốt"} • {formatDate(p.from_at)}
+                          {p.to_at ? ` → ${formatDate(p.to_at)}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      title="Làm mới danh sách kỳ"
+                      onClick={() => void fetchPayrollPeriods()}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    >
+                      <RefreshCcw className="h-4 w-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <label className="flex min-w-0 flex-col gap-1 lg:w-[140px]">
+                      <span className="sr-only">Tháng</span>
+                      <select value={month} onChange={(e) => setMonth(e.target.value)} className={selectCls}>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
+                            Tháng {i + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-1 lg:w-[120px]">
+                      <span className="sr-only">Năm</span>
+                      <select value={year} onChange={(e) => setYear(e.target.value)} className={selectCls}>
+                        {yearOptions.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
           <button
             type="button"
@@ -462,7 +585,7 @@ export function RevenueReport() {
           <p className="text-base font-semibold text-slate-900">Chưa có dữ liệu doanh thu</p>
           <p className="mt-1 max-w-md text-sm text-slate-500">
             Trong kỳ {periodLabel}
-            {groupName ? ` — nhóm «${groupName}»` : ""} chưa ghi nhận đơn hoàn thành phân bổ cho nhân viên. Thử đổi tháng/năm hoặc nhóm.
+            {groupName ? ` — nhóm «${groupName}»` : ""} chưa ghi nhận đơn hoàn thành phân bổ cho nhân viên. Thử đổi kỳ lương / tháng-năm hoặc nhóm.
           </p>
         </div>
       )}

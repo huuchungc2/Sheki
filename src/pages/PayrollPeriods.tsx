@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Loader2, Calendar, Lock, Unlock, RefreshCcw } from "lucide-react";
-import { cn, formatDate } from "../lib/utils";
+import { cn, formatCurrency, formatDate } from "../lib/utils";
 
 const API_URL = (import.meta as any)?.env?.VITE_API_URL || "/api";
 
@@ -268,7 +268,12 @@ export function PayrollPeriods() {
                   <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Nhân viên</th>
                   <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">HH direct</th>
                   <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">HH override</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">HH hoàn (abs)</th>
+                  <th
+                    className="px-5 py-3 text-right text-xs font-semibold text-red-600"
+                    title="Tổng HH bị trừ do hoàn: NV (direct) + quản lý (override). Số âm đỏ; chi tiết từng dòng bên dưới nếu có."
+                  >
+                    HH hoàn (trừ)
+                  </th>
                   <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">Ship KH trả</th>
                   <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">NV chịu</th>
                   <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">Điều chỉnh</th>
@@ -281,7 +286,34 @@ export function PayrollPeriods() {
                     <td className="px-5 py-3 font-semibold text-slate-800">{r.full_name}</td>
                     <td className="px-5 py-3 text-right tabular-nums">{(Number(r.direct_commission) || 0).toLocaleString("vi-VN")}</td>
                     <td className="px-5 py-3 text-right tabular-nums">{(Number(r.override_commission) || 0).toLocaleString("vi-VN")}</td>
-                    <td className="px-5 py-3 text-right tabular-nums">{(Number(r.return_commission_abs) || 0).toLocaleString("vi-VN")}</td>
+                    <td className="px-5 py-3 text-right tabular-nums align-top">
+                      {(() => {
+                        const total = Number(r.return_commission_abs) || 0;
+                        const hasSplit =
+                          r.return_commission_direct_abs != null &&
+                          r.return_commission_override_abs != null;
+                        const directAbs = hasSplit ? Number(r.return_commission_direct_abs) || 0 : 0;
+                        const overrideAbs = hasSplit ? Number(r.return_commission_override_abs) || 0 : 0;
+                        if (total <= 0) {
+                          return <span className="text-slate-400 tabular-nums">0</span>;
+                        }
+                        return (
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="font-semibold text-red-600">{formatCurrency(-total)}</span>
+                            {hasSplit && directAbs > 0 ? (
+                              <span className="text-[11px] text-slate-500 font-normal">
+                                NV bán (direct): <span className="text-red-600 font-medium">−{formatCurrency(directAbs)}</span>
+                              </span>
+                            ) : null}
+                            {hasSplit && overrideAbs > 0 ? (
+                              <span className="text-[11px] text-slate-500 font-normal">
+                                Quản lý (override): <span className="text-red-600 font-medium">−{formatCurrency(overrideAbs)}</span>
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-5 py-3 text-right tabular-nums">{(Number(r.ship_khach_tra) || 0).toLocaleString("vi-VN")}</td>
                     <td className="px-5 py-3 text-right tabular-nums">{(Number(r.nv_chiu) || 0).toLocaleString("vi-VN")}</td>
                     <td className="px-5 py-3 text-right tabular-nums">{(Number(r.adjustments) || 0).toLocaleString("vi-VN")}</td>

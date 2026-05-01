@@ -48,9 +48,19 @@ router.get('/', auth, requireShop, requireFeature('reports.commissions'), async 
       conditions.push('t.user_id = ?');
       params.push(parseInt(user_id));
     }
-    // Kỳ lọc theo thời điểm tạo đơn (orders.created_at) để đồng nhất toàn hệ thống
-    if (month) { conditions.push('MONTH(o.created_at) = ?'); params.push(parseInt(month)); }
-    if (year)  { conditions.push('YEAR(o.created_at) = ?');  params.push(parseInt(year)); }
+    // Đơn bán: tháng theo orders.created_at; bút toán hoàn: tháng theo t.entry_date (= commission_adjustments.created_at)
+    if (month) {
+      conditions.push(
+        '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o.created_at) = ?))'
+      );
+      params.push(parseInt(month, 10), parseInt(month, 10));
+    }
+    if (year) {
+      conditions.push(
+        '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o.created_at) = ?))'
+      );
+      params.push(parseInt(year, 10), parseInt(year, 10));
+    }
 
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
@@ -136,9 +146,18 @@ router.get('/summary', auth, requireShop, requireFeature('reports.commissions'),
       conditions.push('t.user_id = ?');
       params.push(parseInt(user_id));
     }
-    // Kỳ lọc theo thời điểm tạo đơn (orders.created_at)
-    if (month) { conditions.push('MONTH(o.created_at) = ?'); params.push(parseInt(month)); }
-    if (year)  { conditions.push('YEAR(o.created_at) = ?');  params.push(parseInt(year)); }
+    if (month) {
+      conditions.push(
+        '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o.created_at) = ?))'
+      );
+      params.push(parseInt(month, 10), parseInt(month, 10));
+    }
+    if (year) {
+      conditions.push(
+        '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o.created_at) = ?))'
+      );
+      params.push(parseInt(year, 10), parseInt(year, 10));
+    }
     const whereClause = 'WHERE ' + conditions.join(' AND ');
 
     const [summary] = await pool.query(
@@ -147,9 +166,9 @@ router.get('/summary', auth, requireShop, requireFeature('reports.commissions'),
         COALESCE(SUM(t.amount), 0) as total_commission,
         COALESCE(AVG(t.amount), 0) as avg_commission
        FROM (
-         SELECT order_id, user_id, commission_amount as amount, created_at as entry_date FROM commissions WHERE shop_id = ?
+         SELECT order_id, user_id, commission_amount as amount, created_at as entry_date, 'commission' as entry_kind FROM commissions WHERE shop_id = ?
          UNION ALL
-         SELECT order_id, user_id, amount, created_at as entry_date FROM commission_adjustments WHERE shop_id = ?
+         SELECT order_id, user_id, amount, created_at as entry_date, 'adjustment' as entry_kind FROM commission_adjustments WHERE shop_id = ?
        ) t
        JOIN orders o ON o.id = t.order_id AND o.shop_id = ?
        ${whereClause}`,
@@ -202,15 +221,32 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
         baseParams.push(uid);
       }
     }
-    // Kỳ lọc theo thời điểm tạo đơn (orders.created_at) hoặc theo payroll_period_id
+    // Đơn bán: payroll_period_id / tháng tạo đơn; hoàn: kỳ theo ngày bút toán (entry_date) hoặc khoảng payroll_periods
     const pidRaw = payroll_period_id != null && String(payroll_period_id).trim() !== '' ? parseInt(String(payroll_period_id), 10) : null;
     const pid = pidRaw != null && Number.isFinite(pidRaw) ? pidRaw : null;
     if (pid != null) {
-      conditions.push('o.payroll_period_id = ?');
-      baseParams.push(pid);
+      conditions.push(
+        `((t.entry_kind = 'commission' AND o.payroll_period_id = ?) OR (t.entry_kind = 'adjustment' AND EXISTS (
+          SELECT 1 FROM payroll_periods pp
+          WHERE pp.id = ? AND pp.shop_id = o.shop_id
+            AND t.entry_date >= pp.from_at
+            AND (pp.to_at IS NULL OR t.entry_date <= pp.to_at)
+        )))`
+      );
+      baseParams.push(pid, pid);
     } else {
-      if (month)    { conditions.push('MONTH(o.created_at) = ?'); baseParams.push(parseInt(month)); }
-      if (year)     { conditions.push('YEAR(o.created_at) = ?');  baseParams.push(parseInt(year)); }
+      if (month) {
+        conditions.push(
+          '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o.created_at) = ?))'
+        );
+        baseParams.push(parseInt(month, 10), parseInt(month, 10));
+      }
+      if (year) {
+        conditions.push(
+          '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o.created_at) = ?))'
+        );
+        baseParams.push(parseInt(year, 10), parseInt(year, 10));
+      }
     }
     // group_id is enforced above for scope=group; for others, allow explicit filter
     if (scope !== 'group' && group_id) { conditions.push('o.group_id = ?'); baseParams.push(parseInt(group_id)); }
@@ -290,11 +326,28 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
       const summaryConds = ['o.shop_id = ?', 't.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
       const summaryParams = [req.shopId, req.user.id];
       if (pid != null) {
-        summaryConds.push('o.payroll_period_id = ?');
-        summaryParams.push(pid);
+        summaryConds.push(
+          `((t.entry_kind = 'commission' AND o.payroll_period_id = ?) OR (t.entry_kind = 'adjustment' AND EXISTS (
+            SELECT 1 FROM payroll_periods pp
+            WHERE pp.id = ? AND pp.shop_id = o.shop_id
+              AND t.entry_date >= pp.from_at
+              AND (pp.to_at IS NULL OR t.entry_date <= pp.to_at)
+          )))`
+        );
+        summaryParams.push(pid, pid);
       } else {
-        if (month) { summaryConds.push('MONTH(o.created_at) = ?'); summaryParams.push(parseInt(month, 10)); }
-        if (year) { summaryConds.push('YEAR(o.created_at) = ?'); summaryParams.push(parseInt(year, 10)); }
+        if (month) {
+          summaryConds.push(
+            '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o.created_at) = ?))'
+          );
+          summaryParams.push(parseInt(month, 10), parseInt(month, 10));
+        }
+        if (year) {
+          summaryConds.push(
+            '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o.created_at) = ?))'
+          );
+          summaryParams.push(parseInt(year, 10), parseInt(year, 10));
+        }
       }
       if (group_id) {
         summaryConds.push('o.group_id = ?');
@@ -322,11 +375,28 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
       const summaryConds = ['o.shop_id = ?', 't.user_id = ?', "(t.type = 'direct' OR t.type = 'override')"];
       const summaryParams = [req.shopId, adminEmployeeUid];
       if (pid != null) {
-        summaryConds.push('o.payroll_period_id = ?');
-        summaryParams.push(pid);
+        summaryConds.push(
+          `((t.entry_kind = 'commission' AND o.payroll_period_id = ?) OR (t.entry_kind = 'adjustment' AND EXISTS (
+            SELECT 1 FROM payroll_periods pp
+            WHERE pp.id = ? AND pp.shop_id = o.shop_id
+              AND t.entry_date >= pp.from_at
+              AND (pp.to_at IS NULL OR t.entry_date <= pp.to_at)
+          )))`
+        );
+        summaryParams.push(pid, pid);
       } else {
-        if (month) { summaryConds.push('MONTH(o.created_at) = ?'); summaryParams.push(parseInt(month, 10)); }
-        if (year) { summaryConds.push('YEAR(o.created_at) = ?'); summaryParams.push(parseInt(year, 10)); }
+        if (month) {
+          summaryConds.push(
+            '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o.created_at) = ?))'
+          );
+          summaryParams.push(parseInt(month, 10), parseInt(month, 10));
+        }
+        if (year) {
+          summaryConds.push(
+            '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o.created_at) = ?))'
+          );
+          summaryParams.push(parseInt(year, 10), parseInt(year, 10));
+        }
       }
       if (group_id) {
         summaryConds.push('o.group_id = ?');
@@ -454,18 +524,18 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
     const overrideComm = parseFloat(s.override_commission) || 0;
     const totalCommissionAll = parseFloat(s.total_commission) || 0;
 
-    // Tổng HH hoàn (âm) — CHỈ tính phần sale lên đơn trực tiếp:
-    // - ca.type='direct'
-    // - ca.user_id = o.salesperson_id
-    // - lọc theo kỳ tạo đơn (o.created_at)
+    // Tổng HH hoàn (âm) — direct của NV bán; kỳ theo ngày bút toán (ca.created_at) hoặc khoảng kỳ lương
     const retCommConds = ["ca.type = 'direct'", 'ca.user_id = o.salesperson_id', 'o.shop_id = ?'];
     const retCommParams = [req.shopId];
     if (pid != null) {
-      retCommConds.push('o.payroll_period_id = ?');
+      retCommConds.push(
+        `EXISTS (SELECT 1 FROM payroll_periods pp WHERE pp.id = ? AND pp.shop_id = o.shop_id
+          AND ca.created_at >= pp.from_at AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at))`
+      );
       retCommParams.push(pid);
-    } else {
-      retCommConds.push('MONTH(o.created_at) = ?');
-      retCommConds.push('YEAR(o.created_at) = ?');
+    } else if (month && year) {
+      retCommConds.push('MONTH(ca.created_at) = ?');
+      retCommConds.push('YEAR(ca.created_at) = ?');
       retCommParams.push(parseInt(month, 10), parseInt(year, 10));
     }
     if (isScoped) {

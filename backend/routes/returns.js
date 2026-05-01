@@ -5,6 +5,7 @@ const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
+const { isShopDateTimeInClosedPayrollPeriod } = require('../services/payrollPeriod');
 
 // Helpers
 function normalizeItems(items) {
@@ -233,7 +234,7 @@ router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, ne
     await conn.beginTransaction();
 
     const [[ret]] = await conn.query(
-      `SELECT id, order_id, return_request_id, warehouse_id
+      `SELECT id, order_id, return_request_id, warehouse_id, created_at
        FROM returns
        WHERE id = ? AND shop_id = ?
        FOR UPDATE`,
@@ -242,6 +243,18 @@ router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, ne
     if (!ret) {
       await conn.rollback();
       return res.status(404).json({ error: 'Không tìm thấy đơn hoàn' });
+    }
+
+    const payrollClosed = await isShopDateTimeInClosedPayrollPeriod(conn, {
+      shopId: req.shopId,
+      at: ret.created_at,
+    });
+    if (payrollClosed) {
+      await conn.rollback();
+      return res.status(400).json({
+        error:
+          'Đơn hoàn thuộc kỳ lương đã chốt. Không thể xóa (giống đơn bán đã chốt kỳ).',
+      });
     }
 
     const [items] = await conn.query(
@@ -511,7 +524,7 @@ router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), asyn
     }
 
     const [orderRows] = await pool.query(
-      'SELECT id, code, warehouse_id, status, shop_id FROM orders WHERE id = ? AND shop_id = ? LIMIT 1',
+      'SELECT id, code, warehouse_id, status, shop_id, salesperson_id FROM orders WHERE id = ? AND shop_id = ? LIMIT 1',
       [rr.order_id, sid]
     );
     if (!orderRows.length) return res.status(404).json({ error: 'Không tìm thấy đơn gốc' });
@@ -528,7 +541,7 @@ router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), asyn
 
     // Load original order items with pricing to compute return amount + commissions by returned items (supports multi-tier)
     const [orderItems] = await pool.query(
-      'SELECT product_id, qty, unit_price, discount_amount, commission_rate FROM order_items WHERE order_id = ?',
+      'SELECT product_id, qty, unit_price, discount_amount FROM order_items WHERE order_id = ?',
       [rr.order_id]
     );
     const orderItemsByProduct = orderItems.reduce((acc, it) => {
@@ -537,6 +550,24 @@ router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), asyn
       return acc;
     }, {});
     const orderBaseTotal = orderItems.reduce((sum, it) => sum + computeOrderItemBaseAmount(it), 0);
+
+    const [commRows] = await pool.query(
+      'SELECT user_id, type, ctv_user_id, commission_amount FROM commissions WHERE order_id = ?',
+      [rr.order_id]
+    );
+    const directRow = commRows.find((c) => String(c.type) === 'direct');
+    // HH khi hoàn: % NV (users.commission_rate) tại thời điểm duyệt hoàn; tier quản lý lấy từ commission_tiers hiện tại với mốc % CTV hiện tại.
+    const rateUserId = directRow
+      ? parseInt(directRow.user_id, 10)
+      : parseInt(order.salesperson_id, 10);
+    let currentCommissionRate = 0;
+    if (Number.isFinite(rateUserId)) {
+      const [[ur]] = await pool.query(
+        'SELECT commission_rate FROM users WHERE id = ? LIMIT 1',
+        [rateUserId]
+      );
+      currentCommissionRate = parseFloat(ur?.commission_rate) || 0;
+    }
 
     let returnBaseTotal = 0;
     let directReturnCommission = 0;
@@ -568,9 +599,8 @@ router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), asyn
           const returnNet = computeReturnAmountForItem(line, take);
           returnBaseTotal += returnNet;
 
-          const directRate = parseFloat(line.commission_rate) || 0;
-          if (directRate > 0) {
-            directReturnCommission += (returnNet * directRate) / 100;
+          if (currentCommissionRate > 0) {
+            directReturnCommission += (returnNet * currentCommissionRate) / 100;
           }
           remaining -= take;
         }
@@ -584,11 +614,6 @@ router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), asyn
       await recalculateStock(it.product_id, order.warehouse_id);
     }
 
-    // Determine which commission rows exist to adjust (sale direct + manager override rows)
-    const [commRows] = await pool.query(
-      'SELECT user_id, type, ctv_user_id, commission_amount FROM commissions WHERE order_id = ?',
-      [rr.order_id]
-    );
     const ratio = orderBaseTotal > 0 ? Math.min(1, Math.max(0, returnBaseTotal / orderBaseTotal)) : 0;
 
     const tierCache = new Map();
@@ -614,8 +639,7 @@ router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), asyn
           if (take <= 0) continue;
 
           const returnNet = computeReturnAmountForItem(line, take);
-          const ctvRate = parseFloat(line.commission_rate) || 0;
-          const ovRate = await getTier(ctvRate);
+          const ovRate = await getTier(currentCommissionRate);
           if (ovRate > 0) {
             const ovAmt = (returnNet * ovRate) / 100;
             for (const m of overrideManagers) {
@@ -637,7 +661,6 @@ router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), asyn
         ? `Hoàn hàng (full) đơn ${order.code}`
         : `Hoàn hàng (partial ${(ratio * 100).toFixed(1)}%) đơn ${order.code}`;
 
-    const directRow = commRows.find((c) => String(c.type) === 'direct');
     if (directRow) {
       const amt = Math.round(directReturnCommission * 100) / 100;
       if (amt !== 0) {

@@ -201,8 +201,17 @@ export function ProductForm() {
 
   const getImageUrl = (img: string) => {
     if (img.startsWith('http')) return img;
-    if (img.startsWith('/api')) return `${API_URL.replace('/api', '')}${img}`;
-    if (img.startsWith('/uploads')) return `${API_URL.replace('/api', '')}${img}`;
+    const origin =
+      typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : '';
+    // Dev: VITE_API_URL=/api → ảnh /uploads cùng origin (Vite proxy /uploads → BE)
+    const apiBase =
+      API_URL.startsWith('http')
+        ? API_URL.replace(/\/api\/?$/, '')
+        : origin;
+    if (img.startsWith('/api')) return `${apiBase}${img}`;
+    if (img.startsWith('/uploads')) return `${apiBase}${img}`;
     return img;
   };
 
@@ -216,11 +225,12 @@ export function ProductForm() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
+    setError(null);
+
     for (const file of Array.from(files)) {
       const formData = new FormData();
       formData.append('image', file as unknown as Blob);
-      
+
       try {
         const token = localStorage.getItem("token");
         const res = await fetch(`${API_URL}/uploads`, {
@@ -229,14 +239,26 @@ export function ProductForm() {
           body: formData
         });
         if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || "Upload thất bại");
+          let msg = "Upload thất bại";
+          const ct = res.headers.get("content-type") || "";
+          try {
+            if (ct.includes("application/json")) {
+              const j = await res.json();
+              msg = j.error || j.message || msg;
+            } else {
+              const txt = await res.text();
+              msg = (txt && txt.slice(0, 240)) || msg;
+            }
+          } catch {
+            msg = `Lỗi ${res.status}`;
+          }
+          throw new Error(msg);
         }
         const data = await res.json();
         if (data?.url) setImages(prev => [...prev, data.url]);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Upload failed", err);
-        setError("Tải ảnh lên thất bại. Vui lòng thử lại hoặc kiểm tra định dạng/kích thước ảnh.");
+        setError(err?.message || "Tải ảnh lên thất bại. Thử ảnh nhỏ hơn hoặc định dạng JPG/PNG.");
       }
     }
     // Reset input
@@ -365,7 +387,7 @@ export function ProductForm() {
               <input
                 type="file"
                 id="product-images"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif"
                 multiple
                 onChange={handleImageUpload}
                 className="hidden"
@@ -377,7 +399,7 @@ export function ProductForm() {
                   {images.map((img, i) => (
                     <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-slate-50 border border-slate-200 group">
                       <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" aria-label="Xóa ảnh">
                         <X className="w-3 h-3" />
                       </button>
                     </div>
@@ -394,7 +416,7 @@ export function ProductForm() {
                   <Plus className="w-6 h-6 text-slate-400 group-hover:text-blue-600" />
                 </div>
                 <p className="text-sm font-medium text-slate-600">Tải ảnh lên</p>
-                <p className="text-xs text-slate-400 mt-1">Nhấn để chọn từ máy tính</p>
+                <p className="text-xs text-slate-400 mt-1 text-center px-2">Chọn thư viện hoặc chụp ảnh (điện thoại)</p>
               </label>
               
               {/* Or paste URL */}

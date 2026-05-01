@@ -14,26 +14,56 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Configure multer for file uploads
+function extFromMime(mime) {
+  const m = String(mime || '').toLowerCase();
+  if (m === 'image/jpeg' || m === 'image/jpg' || m === 'image/pjpeg') return '.jpg';
+  if (m === 'image/png') return '.png';
+  if (m === 'image/gif') return '.gif';
+  if (m === 'image/webp') return '.webp';
+  if (m === 'image/heic' || m === 'image/heif') return '.heic';
+  return '';
+}
+
+function pickUploadExt(file) {
+  const fromName = path.extname(file.originalname || '');
+  if (fromName && fromName !== '.') return fromName;
+  const fromMime = extFromMime(file.mimetype);
+  if (fromMime) return fromMime;
+  return '.jpg';
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+    const ext = pickUploadExt(file);
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${ext}`;
     cb(null, uniqueName);
   }
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  // Ảnh chụp điện thoại dễ > 5MB; giữ mức vừa phải để tránh abuse
+  limits: { fileSize: 12 * 1024 * 1024 }, // 12MB max
   fileFilter: (req, file, cb) => {
-    const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
-    if (allowed.test(file.originalname)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Chỉ hỗ trợ file ảnh: jpg, jpeg, png, gif, webp'));
+    const mime = String(file.mimetype || '').toLowerCase();
+    const name = String(file.originalname || '');
+    const ext = path.extname(name).toLowerCase();
+    const extOk = /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(ext) || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(name);
+
+    // Mobile: hay gặp application/octet-stream hoặc tên không có đuôi nhưng mime là image/*
+    if (mime.startsWith('image/') && mime !== 'image/svg+xml') {
+      return cb(null, true);
     }
+    if (mime === 'application/octet-stream' && extOk) {
+      return cb(null, true);
+    }
+    if (extOk) {
+      return cb(null, true);
+    }
+    cb(new Error('Chỉ hỗ trợ file ảnh: jpg, jpeg, png, gif, webp, heic, heif'));
   }
 });
 

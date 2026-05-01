@@ -1,3 +1,62 @@
+## [01/05/2026] - Báo cáo HH: chi tiết khớp kỳ/tháng (fetch đầu + URL kỳ lương)
+### Fixed
+- **CommissionReport** — Khởi tạo bộ lọc từ query (lazy) trước fetch đầu tiên (không còn một nhịp sai tháng/năm mặc định); `fetchPayrollPeriods` đọc `periodTouched` qua ref để không ghi đè `payroll_period_id` trên URL bằng kỳ đang mở khi response tới trễ. — File: `src/pages/CommissionReport.tsx`
+
+## [01/05/2026] - OrderList: filter nhân viên có ô tìm kiếm
+### Changed
+- **Màn hình quản lý đơn hàng** — Filter “Nhân viên” (Admin) chuyển từ `<select>` load toàn bộ sang dropdown có ô gõ tìm kiếm (debounce 250ms, load 20 dòng) qua `GET /users?search=...`, giảm giật khi danh sách nhân viên lớn. — File: `src/pages/OrderList.tsx`
+
+## [01/05/2026] - Upload ảnh sản phẩm: tương thích mobile
+### Fixed
+- **Multer `/api/uploads`** — Không còn chỉ tin `originalname` có đuôi (Android hay `application/octet-stream` / tên không đuôi); chấp nhận `image/*` (trừ SVG), bổ sung heic/heif, tự gắn đuôi từ MIME khi thiếu; tăng giới hạn upload 12MB. — File: `backend/routes/uploads.js`
+- **Lỗi upload** — `LIMIT_FILE_SIZE` / Multer trả JSON 413/400 thay vì 500 chung. — File: `backend/middleware/errorHandler.js`
+- **ProductForm** — `getImageUrl` khi `VITE_API_URL=/api` dùng `window.location.origin` để ảnh `/uploads` load đúng qua proxy khi mở bằng IP điện thoại; parse lỗi JSON từ API; nút xóa ảnh luôn thấy trên cảm ứng; gợi ý chọn/chụp ảnh. — File: `src/pages/ProductForm.tsx`
+
+## [01/05/2026] - Menu Sản phẩm: rút gọn “Danh mục”
+### Changed
+- **UI menu + tiêu đề trang** — “Danh mục sản phẩm” → “Danh mục” trong nhóm menu Sản phẩm và tiêu đề màn danh mục. — Files: `src/components/Layout.tsx`, `src/pages/Categories.tsx`
+
+## [01/05/2026] - Báo cáo doanh thu: lọc theo kỳ lương
+### Added
+- **`GET /reports/revenue?payroll_period_id=`** — Đơn/ship/HH theo `orders.payroll_period_id`; cột hoàn (`total_returns` + summary) theo `returns.created_at` trong khoảng kỳ (khớp returns-summary). — File: `backend/routes/reports.js`
+- **UI Báo cáo doanh thu** — Chuyển «Tháng / Kỳ lương», dropdown kỳ, làm mới danh sách kỳ; xuất Excel ghi kỳ và tên file `DoanhThu_Ky_{id}.xlsx`. — Files: `src/pages/RevenueReport.tsx`, `src/lib/exportExcel.ts`
+
+## [01/05/2026] - Đơn hoàn: chặn xóa khi thuộc kỳ lương đã chốt
+### Added
+- **`DELETE /returns/:id`** — Nếu `returns.created_at` nằm trong `[from_at, to_at]` của một `payroll_periods` **đã chốt** (`status='closed'`), trả 400 (cùng ý với đơn bán không xóa được sau chốt kỳ). — Files: `backend/services/payrollPeriod.js` (`isShopDateTimeInClosedPayrollPeriod`), `backend/routes/returns.js`, `LOGIC_BUSINESS.md`
+
+## [01/05/2026] - Preview chốt kỳ: HH hoàn quản lý (override) + snapshot rebuild
+### Fixed
+- **`GET /payroll/periods/:id/preview` + `rebuildPayrollSettlementsForPeriod`** — Cột HH hoàn gồm cả **trừ HH override** khi hoàn (`commission_adjustments` type `override`, `amount < 0`, theo `ca.user_id`); tách `return_commission_direct_abs` / `return_commission_override_abs` cho UI; `return_commission_abs` = tổng hiển thị. Công thức lương vẫn chỉ trừ thêm phần **direct** hoàn (phần override hoàn đã nằm trong **HH override** net). Rebuild gom đủ user từ override/hoàn, không chỉ `salesperson_id` trong kỳ. — Files: `backend/routes/payroll.js`, `backend/services/payrollPeriod.js`, `src/pages/PayrollPeriods.tsx`
+
+## [01/05/2026] - Chốt kỳ lương: HH hoàn hiển thị âm, màu đỏ
+### Changed
+- **Preview kỳ lương** — Cột đổi tên **HH hoàn (trừ)**; giá trị dùng `formatCurrency(-abs)` (dấu trừ rõ) + `text-red-600`; 0 hiển thị xám. — File: `src/pages/PayrollPeriods.tsx`
+
+## [01/05/2026] - Báo cáo hoa hồng: giữ bộ lọc khi vào chi tiết NV
+### Fixed
+- **Chi tiết NV** — Link “Chi tiết” trong tab “Hoa hồng nhân viên” đính kèm bộ lọc (tháng/năm hoặc kỳ lương + group) qua query string, nên mở chi tiết không bị nhảy về tháng hiện tại. Nút “Quay lại” cũng giữ đúng bộ lọc. — Files: `src/pages/CommissionReport.tsx`, `src/App.tsx`
+
+## [01/05/2026] - CommissionReport: hiện HH hoàn trên bảng NV + KPI từ salary
+### Changed
+- **Báo cáo hoa hồng** — Cột “Hoa hồng” (tab Hoa hồng nhân viên) hiển thị dòng **HH hoàn (trừ)** và tổng chân; chú thích cột; footer cộng HH hoàn; ô **Tổng lương** ghi rõ trừ HH hoàn direct; sau khi gọi `/reports/salary` đồng bộ `total_return_commission_abs` từ `kpi_return_commission`. — File: `src/pages/CommissionReport.tsx`
+
+## [01/05/2026] - Báo cáo lương: hiện NV chỉ có HH hoàn trong kỳ/tháng
+### Fixed
+- **`GET /reports/salary`** — Bảng “Hoa hồng nhân viên” không còn lọc mất dòng khi NV không có đơn/HH dương trong tháng (hoặc kỳ mở) nhưng có **HH hoàn direct** (`total_return_commission_abs > 0`); trước đây `total_all_commission` không gồm phần hoàn nên dòng bị ẩn, dễ hiểu nhầm “đơn hoàn vẫn nằm tháng 4”. — File: `backend/routes/reports.js`
+
+## [01/05/2026] - returns-summary: kỳ lương theo ngày hoàn / bút toán
+### Fixed
+- **`GET /reports/returns-summary?payroll_period_id=`** — Khi lọc theo kỳ lương, đơn hoàn và HH hoàn dùng `returns.created_at` / `commission_adjustments.created_at` trong khoảng `payroll_periods.from_at`–`to_at`, không còn `orders.payroll_period_id` (kỳ đơn gốc). — File: `backend/routes/reports.js`
+
+## [01/05/2026] - KPI hoàn / HH hoàn: theo tháng phát sinh hoàn (không theo đơn gốc)
+### Fixed
+- **Báo cáo & API** — Đếm đơn hoàn, doanh thu hoàn, `commission_adjustments` (direct + override) và UNION commission+adjustment lọc theo **`returns.created_at` / `ca.created_at`** (hoặc khoảng `payroll_periods` cho bút toán hoàn khi lọc theo kỳ lương), thay vì `orders.created_at` / `orders.payroll_period_id`. — Files: `backend/services/returnMetrics.js`, `backend/services/commissionKpi.js`, `backend/routes/commissions.js`, `backend/routes/collaborators.js`, `backend/routes/users.js`, `backend/routes/reports.js`, `backend/routes/payroll.js`, `backend/services/payrollPeriod.js`, `LOGIC_BUSINESS.md`
+
+## [01/05/2026] - Đơn hoàn: HH điều chỉnh theo % NV và tier hiện tại
+### Changed
+- **Duyệt hoàn (`POST /returns/requests/:id/approve`)** — Tiền hoa hồng trừ lại (direct + override quản lý) tính bằng `users.commission_rate` của người nhận HH direct tại thời điểm duyệt và `commission_tiers` hiện tại; không còn dùng `order_items.commission_rate` lúc tạo đơn. — Files: `backend/routes/returns.js`, `LOGIC_BUSINESS.md`
+
 ## [26/04/2026] - OrderList: thanh toán nằm dưới khách hàng
 ### Changed
 - **OrderList UI** — Giữ cột Sản phẩm cạnh cột Khách hàng; chuyển “Thanh toán” và “Tổng tiền” xuống dưới Khách hàng; chuyển “Trạng thái” xuống dưới Mã đơn; bỏ “Nhóm BH” khỏi cột Mã đơn (nhóm hiển thị trong cột Nhân viên); cột “Lương” giữ nguyên 1 dòng. — File: `src/pages/OrderList.tsx`

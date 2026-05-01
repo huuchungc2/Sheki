@@ -155,16 +155,21 @@ async function rebuildPayrollSettlementsForPeriod(pool, { shopId, periodId }) {
       FROM commission_adjustments ca
       JOIN orders o ON o.id = ca.order_id
       WHERE o.shop_id = ?
-        AND o.payroll_period_id = ?
         AND o.status <> 'cancelled'
         AND ca.type = 'override'
+        AND EXISTS (
+          SELECT 1 FROM payroll_periods pp
+          WHERE pp.id = ? AND pp.shop_id = o.shop_id
+            AND ca.created_at >= pp.from_at
+            AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+        )
     ) x
     GROUP BY x.user_id
     `,
     [shopId, pid, shopId, pid]
   );
 
-  const [retRows] = await pool.query(
+  const [retDirectRows] = await pool.query(
     `
     SELECT
       o.salesperson_id AS user_id,
@@ -172,26 +177,64 @@ async function rebuildPayrollSettlementsForPeriod(pool, { shopId, periodId }) {
     FROM commission_adjustments ca
     JOIN orders o ON o.id = ca.order_id
     WHERE o.shop_id = ?
-      AND o.payroll_period_id = ?
       AND o.status <> 'cancelled'
       AND ca.type='direct'
       AND ca.user_id = o.salesperson_id
+      AND EXISTS (
+        SELECT 1 FROM payroll_periods pp
+        WHERE pp.id = ? AND pp.shop_id = o.shop_id
+          AND ca.created_at >= pp.from_at
+          AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+      )
     GROUP BY o.salesperson_id
     `,
     [shopId, pid]
   );
 
-  const ovMap = new Map(ovRows.map((r) => [Number(r.user_id), parseFloat(r.override_net) || 0]));
-  const retMap = new Map(retRows.map((r) => [Number(r.user_id), parseFloat(r.return_abs) || 0]));
+  const [retOverrideRows] = await pool.query(
+    `
+    SELECT
+      ca.user_id AS user_id,
+      COALESCE(SUM(CASE WHEN ca.amount < 0 THEN -ca.amount ELSE 0 END), 0) AS return_override_abs
+    FROM commission_adjustments ca
+    JOIN orders o ON o.id = ca.order_id
+    WHERE o.shop_id = ?
+      AND o.status <> 'cancelled'
+      AND ca.type = 'override'
+      AND EXISTS (
+        SELECT 1 FROM payroll_periods pp
+        WHERE pp.id = ? AND pp.shop_id = o.shop_id
+          AND ca.created_at >= pp.from_at
+          AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+      )
+    GROUP BY ca.user_id
+    `,
+    [shopId, pid]
+  );
 
-  for (const r of aggRows) {
-    const uid = Number(r.user_id);
-    const direct = parseFloat(r.direct_commission) || 0;
+  const ovMap = new Map(ovRows.map((r) => [Number(r.user_id), parseFloat(r.override_net) || 0]));
+  const retDirectMap = new Map(retDirectRows.map((r) => [Number(r.user_id), parseFloat(r.return_abs) || 0]));
+  const retOverrideMap = new Map(retOverrideRows.map((r) => [Number(r.user_id), parseFloat(r.return_override_abs) || 0]));
+
+  const aggByUser = new Map(aggRows.map((r) => [Number(r.user_id), r]));
+  const allUserIds = new Set([
+    ...aggRows.map((r) => Number(r.user_id)),
+    ...ovRows.map((r) => Number(r.user_id)),
+    ...retDirectRows.map((r) => Number(r.user_id)),
+    ...retOverrideRows.map((r) => Number(r.user_id)),
+  ]);
+
+  for (const uid of allUserIds) {
+    if (!Number.isFinite(uid) || uid <= 0) continue;
+    const r = aggByUser.get(uid);
+    const direct = parseFloat(r?.direct_commission) || 0;
     const override = ovMap.get(uid) || 0;
-    const ship = parseFloat(r.ship_khach_tra) || 0;
-    const nv = parseFloat(r.nv_chiu) || 0;
-    const retAbs = retMap.get(uid) || 0;
-    const totalLuong = (direct + override) - retAbs + ship - nv;
+    const ship = parseFloat(r?.ship_khach_tra) || 0;
+    const nv = parseFloat(r?.nv_chiu) || 0;
+    const retDirectAbs = retDirectMap.get(uid) || 0;
+    const retOverrideAbs = retOverrideMap.get(uid) || 0;
+    const returnDisplayAbs = retDirectAbs + retOverrideAbs;
+    const totalLuong = (direct + override) - retDirectAbs + ship - nv;
 
     await pool.query(
       `
@@ -207,7 +250,7 @@ async function rebuildPayrollSettlementsForPeriod(pool, { shopId, periodId }) {
         nv_chiu = VALUES(nv_chiu),
         total_luong = VALUES(total_luong)
       `,
-      [shopId, pid, uid, direct, override, retAbs, ship, nv, totalLuong]
+      [shopId, pid, uid, direct, override, returnDisplayAbs, ship, nv, totalLuong]
     );
   }
 }
@@ -311,6 +354,22 @@ async function getOrderPayrollPeriod(pool, { shopId, orderId }) {
   };
 }
 
+/** Thời điểm (vd `returns.created_at`) nằm trong [from_at, to_at] của một kỳ lương đã chốt — dùng chặn xóa đơn hoàn giống đơn bán. */
+async function isShopDateTimeInClosedPayrollPeriod(poolOrConn, { shopId, at }) {
+  const [[row]] = await poolOrConn.query(
+    `SELECT 1 AS blocked
+     FROM payroll_periods
+     WHERE shop_id = ?
+       AND status = 'closed'
+       AND ? >= from_at
+       AND to_at IS NOT NULL
+       AND ? <= to_at
+     LIMIT 1`,
+    [shopId, at, at]
+  );
+  return !!row?.blocked;
+}
+
 module.exports = {
   ensureOpenPayrollPeriod,
   reindexOrdersToPayrollPeriods,
@@ -318,5 +377,6 @@ module.exports = {
   closeOpenPayrollPeriod,
   getPayrollPeriodById,
   getOrderPayrollPeriod,
+  isShopDateTimeInClosedPayrollPeriod,
 };
 

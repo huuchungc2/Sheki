@@ -11,6 +11,19 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Báo cáo hoa hồng: vào chi tiết không nhảy tháng/kỳ** — Query giữ tháng-năm hoặc `payroll_period_id`; bootstrap từ URL + ref `periodTouched` tránh lệch kỳ sau load danh sách kỳ; Sales không bị đá về Dashboard. — Files: `src/pages/CommissionReport.tsx`, `src/App.tsx`
+- [x] **OrderList: filter nhân viên có ô tìm kiếm** — Dropdown nhân viên (Admin) có input search + load theo keyword thay vì load hết option gây giật. — File: `src/pages/OrderList.tsx`
+- [x] **ProductForm: upload ảnh trên điện thoại** — Multer nhận MIME kiểu mobile + giới hạn file; hiển thị `/uploads` đúng origin khi dev qua IP; UX xóa ảnh cảm ứng. — Files: `backend/routes/uploads.js`, `backend/middleware/errorHandler.js`, `src/pages/ProductForm.tsx`
+- [x] **Menu Sản phẩm: đổi “Danh mục sản phẩm” → “Danh mục”** — Rút gọn nhãn menu và tiêu đề trang danh mục. — Files: `src/components/Layout.tsx`, `src/pages/Categories.tsx`
+- [x] **Báo cáo doanh thu: filter kỳ lương** — API + UI RevenueReport + export Excel. — Files: `backend/routes/reports.js`, `src/pages/RevenueReport.tsx`, `src/lib/exportExcel.ts`
+- [x] **Đơn hoàn: chặn xóa khi kỳ lương đã chốt** — `DELETE /returns/:id` kiểm `returns.created_at` trong kỳ `closed`. — Files: `backend/services/payrollPeriod.js`, `backend/routes/returns.js`, `LOGIC_BUSINESS.md`
+- [x] **Payroll preview: HH hoàn quản lý (override)** — Tính + hiển thị trừ HH override khi hoàn; rebuild snapshot đủ user. — Files: `backend/routes/payroll.js`, `backend/services/payrollPeriod.js`, `src/pages/PayrollPeriods.tsx`
+- [x] **PayrollPeriods: HH hoàn preview âm đỏ** — Quản lý thấy rõ số trừ lương (HH hoàn) khi xem preview chốt kỳ. — File: `src/pages/PayrollPeriods.tsx`
+- [x] **CommissionReport UI: HH hoàn trên bảng NV** — Cột hoa hồng + footer + KPI `total_return_commission_abs` khớp `/reports/salary`. — File: `src/pages/CommissionReport.tsx`
+- [x] **Báo cáo lương: hiện dòng NV chỉ có HH hoàn** — Filter `/reports/salary` thêm `total_return_commission_abs` (kỳ đóng, kỳ mở, lọc tháng/năm) để không ẩn NV chỉ phát sinh hoàn trong kỳ. — File: `backend/routes/reports.js`
+- [x] **returns-summary + kỳ lương** — `GET /reports/returns-summary?payroll_period_id=` gán đơn hoàn/HH hoàn theo ngày nằm trong kỳ (`r`/`ca` + `payroll_periods`), không theo `orders.payroll_period_id`. — File: `backend/routes/reports.js`, `LOGIC_BUSINESS.md`
+- [x] **KPI hoàn / HH hoàn: gán đúng tháng kỳ phát sinh** — Hoàn tháng 5 không còn bị tính vào tháng đơn gốc (tháng 4): `returns` + `commission_adjustments` theo ngày hoàn / ngày bút toán; lọc kỳ lương dùng `payroll_periods` cho phần điều chỉnh. — Files: `backend/services/returnMetrics.js`, `backend/services/commissionKpi.js`, `backend/routes/commissions.js`, `backend/routes/collaborators.js`, `backend/routes/users.js`, `backend/routes/reports.js`, `backend/routes/payroll.js`, `backend/services/payrollPeriod.js`, `LOGIC_BUSINESS.md`
+- [x] **Đơn hoàn: HH điều chỉnh theo thời điểm duyệt hoàn** — Trừ HH direct/override khi duyệt hoàn dùng `users.commission_rate` + `commission_tiers` hiện tại, không dùng % đã lưu trên dòng đơn gốc. — Files: `backend/routes/returns.js`, `LOGIC_BUSINESS.md`
 - [x] **UI: Chốt kỳ lương** — Trang `/reports/payroll-periods` để chốt kỳ và xem preview lương theo kỳ. — Files: `src/pages/PayrollPeriods.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
 - [x] **Payroll periods: tích hợp báo cáo lương + hủy đơn đã chốt** — `/reports/salary` hỗ trợ `payroll_period_id` (mặc định kỳ mở) và `OrderForm` có nút hủy đơn tạo điều chỉnh lương khi kỳ đã chốt. — Files: `backend/routes/reports.js`, `backend/routes/orders.js`, `src/pages/OrderForm.tsx`
 - [x] **Payroll periods: Sales không thấy chốt kỳ** — Ẩn menu “Chốt kỳ lương” khỏi non-admin sidebar. — File: `src/components/Layout.tsx`

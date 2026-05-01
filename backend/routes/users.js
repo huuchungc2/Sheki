@@ -623,11 +623,20 @@ router.get('/:id/collaborators/commissions', auth, requireShop, async (req, res,
     const targetUserId = parseInt(req.params.id);
     const { month, year, group_id } = req.query;
 
-    // Filter kỳ theo thời điểm tạo đơn (orders.created_at) để đồng nhất toàn hệ thống.
     const txFilterConds = [];
     const txFilterParams = [];
-    if (month) { txFilterConds.push('MONTH(o_tx.created_at) = ?'); txFilterParams.push(parseInt(month)); }
-    if (year)  { txFilterConds.push('YEAR(o_tx.created_at) = ?');  txFilterParams.push(parseInt(year)); }
+    if (month) {
+      txFilterConds.push(
+        '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o_tx.created_at) = ?))'
+      );
+      txFilterParams.push(parseInt(month, 10), parseInt(month, 10));
+    }
+    if (year) {
+      txFilterConds.push(
+        '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o_tx.created_at) = ?))'
+      );
+      txFilterParams.push(parseInt(year, 10), parseInt(year, 10));
+    }
     const txExtra = txFilterConds.length ? ' AND ' + txFilterConds.join(' AND ') : '';
 
     // Group filter lấy theo order
@@ -636,7 +645,7 @@ router.get('/:id/collaborators/commissions', auth, requireShop, async (req, res,
     if (group_id) { orderFilterConds.push('o.group_id = ?'); orderFilterParams.push(parseInt(group_id)); }
     const orderExtra = orderFilterConds.length ? ' AND ' + orderFilterConds.join(' AND ') : '';
 
-    // IMPORTANT: always join orders for period filter by orders.created_at (and group filter).
+    // JOIN orders (o_tx): lọc commission theo ngày đơn; adjustment theo t.entry_date (ngày bút toán hoàn). Group qua o_tx.
     const txJoinOrders = ' JOIN orders o_tx ON o_tx.id = t.order_id';
     const txOrderExtra = orderFilterConds.length ? ' AND o_tx.group_id = ?' : '';
     const groupIdInt = group_id ? parseInt(group_id) : null;

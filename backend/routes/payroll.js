@@ -204,16 +204,21 @@ router.get('/periods/:id/preview', auth, requireShop, requireFeature('reports.sa
         FROM commission_adjustments ca
         JOIN orders o ON o.id = ca.order_id
         WHERE o.shop_id = ?
-          AND o.payroll_period_id = ?
           AND o.status <> 'cancelled'
           AND ca.type = 'override'
+          AND EXISTS (
+            SELECT 1 FROM payroll_periods pp
+            WHERE pp.id = ? AND pp.shop_id = o.shop_id
+              AND ca.created_at >= pp.from_at
+              AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+          )
       ) x
       GROUP BY x.user_id
       `,
       [req.shopId, periodId, req.shopId, periodId]
     );
 
-    const [retRows] = await pool.query(
+    const [retDirectRows] = await pool.query(
       `
       SELECT
         o.salesperson_id AS user_id,
@@ -221,11 +226,38 @@ router.get('/periods/:id/preview', auth, requireShop, requireFeature('reports.sa
       FROM commission_adjustments ca
       JOIN orders o ON o.id = ca.order_id
       WHERE o.shop_id = ?
-        AND o.payroll_period_id = ?
         AND o.status <> 'cancelled'
         AND ca.type='direct'
         AND ca.user_id = o.salesperson_id
+        AND EXISTS (
+          SELECT 1 FROM payroll_periods pp
+          WHERE pp.id = ? AND pp.shop_id = o.shop_id
+            AND ca.created_at >= pp.from_at
+            AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+        )
       GROUP BY o.salesperson_id
+      `,
+      [req.shopId, periodId]
+    );
+
+    // Trừ HH override khi hoàn (quản lý): đã nằm trong override net; cần số abs riêng để hiển thị cột «HH hoàn»
+    const [retOverrideRows] = await pool.query(
+      `
+      SELECT
+        ca.user_id AS user_id,
+        COALESCE(SUM(CASE WHEN ca.amount < 0 THEN -ca.amount ELSE 0 END), 0) AS return_override_abs
+      FROM commission_adjustments ca
+      JOIN orders o ON o.id = ca.order_id
+      WHERE o.shop_id = ?
+        AND o.status <> 'cancelled'
+        AND ca.type = 'override'
+        AND EXISTS (
+          SELECT 1 FROM payroll_periods pp
+          WHERE pp.id = ? AND pp.shop_id = o.shop_id
+            AND ca.created_at >= pp.from_at
+            AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+        )
+      GROUP BY ca.user_id
       `,
       [req.shopId, periodId]
     );
@@ -241,13 +273,15 @@ router.get('/periods/:id/preview', auth, requireShop, requireFeature('reports.sa
     );
 
     const ovMap = new Map(ovRows.map((r) => [Number(r.user_id), parseFloat(r.override_net) || 0]));
-    const retMap = new Map(retRows.map((r) => [Number(r.user_id), parseFloat(r.return_abs) || 0]));
+    const retDirectMap = new Map(retDirectRows.map((r) => [Number(r.user_id), parseFloat(r.return_abs) || 0]));
+    const retOverrideMap = new Map(retOverrideRows.map((r) => [Number(r.user_id), parseFloat(r.return_override_abs) || 0]));
     const adjMap = new Map(adjRows.map((r) => [Number(r.user_id), parseFloat(r.adj) || 0]));
 
     const userIds = new Set([
       ...directShipRows.map((r) => Number(r.user_id)),
       ...ovRows.map((r) => Number(r.user_id)),
-      ...retRows.map((r) => Number(r.user_id)),
+      ...retDirectRows.map((r) => Number(r.user_id)),
+      ...retOverrideRows.map((r) => Number(r.user_id)),
       ...adjRows.map((r) => Number(r.user_id)),
     ]);
     const ids = [...userIds].filter((n) => Number.isFinite(n) && n > 0);
@@ -267,15 +301,20 @@ router.get('/periods/:id/preview', auth, requireShop, requireFeature('reports.sa
       const ship = parseFloat(b.ship_khach_tra) || 0;
       const nv = parseFloat(b.nv_chiu) || 0;
       const override = ovMap.get(uid) || 0;
-      const retAbs = retMap.get(uid) || 0;
+      const retDirectAbs = retDirectMap.get(uid) || 0;
+      const retOverrideAbs = retOverrideMap.get(uid) || 0;
+      const retDisplayAbs = retDirectAbs + retOverrideAbs;
       const adj = adjMap.get(uid) || 0;
-      const totalLuong = (direct + override) - retAbs + ship - nv + adj;
+      // Chỉ trừ lại HH direct khi hoàn (đã tách khỏi cột direct); phần override hoàn đã gộp trong override net
+      const totalLuong = (direct + override) - retDirectAbs + ship - nv + adj;
       return {
         user_id: uid,
         full_name: nameMap.get(uid) || `#${uid}`,
         direct_commission: direct,
         override_commission: override,
-        return_commission_abs: retAbs,
+        return_commission_abs: retDisplayAbs,
+        return_commission_direct_abs: retDirectAbs,
+        return_commission_override_abs: retOverrideAbs,
         ship_khach_tra: ship,
         nv_chiu: nv,
         adjustments: adj,

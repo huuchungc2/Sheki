@@ -205,17 +205,34 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
     const { month, year, group_id, sales_id, payroll_period_id } = req.query;
     const scope = await getScope(req, 'reports');
 
-    // Filter theo kỳ tạo đơn (orders.created_at) để đồng nhất toàn hệ thống.
+    // Đơn bán: kỳ theo đơn; bút toán hoàn override: kỳ theo entry_date / khoảng payroll_periods
     const txFilterConds = [];
     const txFilterParams = [];
     const pidRaw = payroll_period_id != null && String(payroll_period_id).trim() !== '' ? parseInt(String(payroll_period_id), 10) : null;
     const pid = pidRaw != null && Number.isFinite(pidRaw) ? pidRaw : null;
     if (pid != null) {
-      txFilterConds.push('o_tx.payroll_period_id = ?');
-      txFilterParams.push(pid);
+      txFilterConds.push(
+        `((t.entry_kind = 'commission' AND o_tx.payroll_period_id = ?) OR (t.entry_kind = 'adjustment' AND EXISTS (
+          SELECT 1 FROM payroll_periods pp
+          WHERE pp.id = ? AND pp.shop_id = o_tx.shop_id
+            AND t.entry_date >= pp.from_at
+            AND (pp.to_at IS NULL OR t.entry_date <= pp.to_at)
+        )))`
+      );
+      txFilterParams.push(pid, pid);
     } else {
-      if (month) { txFilterConds.push('MONTH(o_tx.created_at) = ?'); txFilterParams.push(parseInt(month)); }
-      if (year)  { txFilterConds.push('YEAR(o_tx.created_at) = ?');  txFilterParams.push(parseInt(year)); }
+      if (month) {
+        txFilterConds.push(
+          '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o_tx.created_at) = ?))'
+        );
+        txFilterParams.push(parseInt(month, 10), parseInt(month, 10));
+      }
+      if (year) {
+        txFilterConds.push(
+          '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o_tx.created_at) = ?))'
+        );
+        txFilterParams.push(parseInt(year, 10), parseInt(year, 10));
+      }
     }
     const txWhereExtra = txFilterConds.length ? ' AND ' + txFilterConds.join(' AND ') : '';
 
@@ -329,7 +346,8 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
       JOIN (
         SELECT t.tx_id, t.order_id, t.return_id, t.user_id, t.type, t.ctv_user_id, t.amount, t.entry_date, t.entry_kind
         ${txFrom}
-        WHERE 1=1 ${txWhereExtra}
+        ${txJoinOrders}
+        WHERE 1=1 ${txWhereExtra}${txOrderWhereExtra}
       ) t ON t.user_id = sal.id AND t.type = 'override' AND t.ctv_user_id = ctv.id
       JOIN orders o ON o.id = t.order_id AND o.salesperson_id = ctv.id ${orderWhereExtra}
       LEFT JOIN commissions c ON c.order_id = o.id AND c.user_id = sal.id AND c.type = 'override' AND c.ctv_user_id = ctv.id
@@ -362,7 +380,15 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
       LEFT JOIN customers cu ON o.customer_id = cu.id
       WHERE cr.shop_id = ? ${salesFilter}
       ORDER BY sal.full_name, ctv.full_name, t.entry_date DESC
-    `, [sid, sid, ...txFilterParams, ...orderFilterParams, sid, ...salesParam]);
+    `, [
+      sid,
+      sid,
+      ...txFilterParams,
+      ...(orderFilterParams.length ? orderFilterParams : []),
+      ...(orderFilterParams.length ? orderFilterParams : []),
+      sid,
+      ...salesParam,
+    ]);
 
     res.json({
       data: {

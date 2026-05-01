@@ -339,10 +339,16 @@ export function exportRevenueReport(opts: {
   month: string;
   year: string;
   groupName?: string;
+  /** Khi lọc theo kỳ lương — thay dòng «Tháng m/y» trong sheet */
+  periodDescription?: string;
+  /** Có thì tên file xuất `DoanhThu_Ky_{id}.xlsx` */
+  payrollPeriodId?: number | string;
 }) {
-  const { salesData, summary, month, year, groupName } = opts;
+  const { salesData, summary, month, year, groupName, periodDescription, payrollPeriodId } = opts;
   const wb = XLSX.utils.book_new();
-  const period = `Tháng ${parseInt(month, 10)}/${year}${groupName ? ` — Nhóm: ${groupName}` : ""}`;
+  const period =
+    periodDescription?.trim() ||
+    `Tháng ${parseInt(month, 10)}/${year}${groupName ? ` — Nhóm: ${groupName}` : ""}`;
 
   const rows: any[][] = [
     ["BÁO CÁO DOANH THU THEO NHÂN VIÊN"],
@@ -381,7 +387,11 @@ export function exportRevenueReport(opts: {
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws["!cols"] = [{ wch: 28 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, ws, "Doanh thu");
-  XLSX.writeFile(wb, `DoanhThu_T${parseInt(month, 10)}_${year}.xlsx`);
+  const fileName =
+    payrollPeriodId != null && String(payrollPeriodId).trim() !== ""
+      ? `DoanhThu_Ky_${payrollPeriodId}.xlsx`
+      : `DoanhThu_T${parseInt(month, 10)}_${year}.xlsx`;
+  XLSX.writeFile(wb, fileName);
 }
 
 /** Báo cáo Thu chi (Admin) */

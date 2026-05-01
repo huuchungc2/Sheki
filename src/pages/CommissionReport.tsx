@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   DollarSign, TrendingUp, Users, Download,
   Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign, ArrowLeft, RefreshCcw
@@ -18,7 +18,46 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   cancelled: { label: "Đã hủy",   color: "bg-red-50 text-red-500" },
 };
 
+/** Đọc query lần đầu (và deep link) để không fetch một nhịp với tháng/năm mặc định sai. */
+function initialCommissionReportFilterState(search: string) {
+  const sp = new URLSearchParams(search);
+  const mode = sp.get("mode");
+  const now = new Date();
+  const monthDefault = String(now.getMonth() + 1).padStart(2, "0");
+  const yearDefault = String(now.getFullYear());
+  const gidRaw = sp.get("group_id");
+  const groupId = gidRaw != null ? gidRaw : "";
+
+  if (mode === "payroll") {
+    const pid = sp.get("payroll_period_id");
+    const pidOk = pid && /^\d+$/.test(String(pid)) ? String(pid) : "";
+    return {
+      month: monthDefault,
+      year: yearDefault,
+      filterMode: "payroll" as const,
+      payrollPeriodId: pidOk,
+      periodTouched: Boolean(pidOk),
+      groupId,
+    };
+  }
+
+  const m = sp.get("month");
+  const y = sp.get("year");
+  return {
+    month: m && /^\d{1,2}$/.test(String(m)) ? String(m).padStart(2, "0") : monthDefault,
+    year: y && /^\d{4}$/.test(String(y)) ? String(y) : yearDefault,
+    filterMode: "month" as const,
+    payrollPeriodId: "",
+    periodTouched: false,
+    groupId,
+  };
+}
+
 export function CommissionReport() {
+  const location = useLocation();
+  const [bootstrapFilters] = React.useState(() =>
+    initialCommissionReportFilterState(location.search),
+  );
   const { userId: userIdFromRoute } = useParams();
   const subjectUserId = React.useMemo(() => {
     if (!userIdFromRoute || !/^\d+$/.test(String(userIdFromRoute))) return undefined;
@@ -65,17 +104,75 @@ export function CommissionReport() {
   const [loading, setLoading]   = React.useState(true);
   const [error, setError]       = React.useState<string | null>(null);
 
-  // Filter state
-  const [month, setMonth]     = React.useState(String(new Date().getMonth() + 1).padStart(2, "0"));
-  const [year, setYear]       = React.useState(String(new Date().getFullYear()));
-  const [groupId, setGroupId] = React.useState("");
+  // Filter state — bootstrap từ URL (lazy) để lần fetch đầu khớp tháng/năm hoặc kỳ lương trên link.
+  const [month, setMonth]     = React.useState(bootstrapFilters.month);
+  const [year, setYear]       = React.useState(bootstrapFilters.year);
+  const [groupId, setGroupId] = React.useState(bootstrapFilters.groupId);
   const [groups, setGroups]   = React.useState<any[]>([]);
-  // Default to month view for stability; payroll mode depends on periods/current-open sync.
-  const [filterMode, setFilterMode] = React.useState<"payroll" | "month">("month");
+  const [filterMode, setFilterMode] = React.useState<"payroll" | "month">(bootstrapFilters.filterMode);
   const [payrollPeriods, setPayrollPeriods] = React.useState<any[]>([]);
-  const [payrollPeriodId, setPayrollPeriodId] = React.useState<string>("");
-  const [periodTouched, setPeriodTouched] = React.useState(false);
+  const [payrollPeriodId, setPayrollPeriodId] = React.useState<string>(bootstrapFilters.payrollPeriodId);
+  const [periodTouched, setPeriodTouched] = React.useState(bootstrapFilters.periodTouched);
   const [payrollReady, setPayrollReady] = React.useState(false);
+
+  const periodTouchedRef = React.useRef(bootstrapFilters.periodTouched);
+  React.useEffect(() => {
+    periodTouchedRef.current = periodTouched;
+  }, [periodTouched]);
+
+  // Preserve filters when navigating list → detail (hoặc đổi query) — không ghi đè state khi search rỗng.
+  // Example: /reports/commissions/12?mode=month&month=04&year=2026&group_id=3
+  React.useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const mode = sp.get("mode");
+    const m = sp.get("month");
+    const y = sp.get("year");
+    const gid = sp.get("group_id");
+    const pid = sp.get("payroll_period_id");
+
+    if (gid != null) setGroupId(gid);
+    if (mode === "payroll") {
+      setFilterMode("payroll");
+      if (pid && /^\d+$/.test(String(pid))) {
+        setPeriodTouched(true);
+        setPayrollPeriodId(String(pid));
+      }
+      return;
+    }
+    if (mode === "month") setFilterMode("month");
+    if (m && /^\d{1,2}$/.test(m)) setMonth(String(m).padStart(2, "0"));
+    if (y && /^\d{4}$/.test(y)) setYear(String(y));
+  }, [location.search, subjectUserId]);
+
+  const buildEmployeeDetailUrl = React.useCallback((uid: number | string) => {
+    const sp = new URLSearchParams();
+    if (groupId) sp.set("group_id", groupId);
+    if (filterMode === "payroll") {
+      sp.set("mode", "payroll");
+      if (payrollPeriodId) sp.set("payroll_period_id", payrollPeriodId);
+    } else {
+      sp.set("mode", "month");
+      sp.set("month", month);
+      sp.set("year", year);
+    }
+    const qs = sp.toString();
+    return `/reports/commissions/${uid}${qs ? `?${qs}` : ""}`;
+  }, [filterMode, groupId, month, payrollPeriodId, year]);
+
+  const buildListUrl = React.useCallback(() => {
+    const sp = new URLSearchParams();
+    if (groupId) sp.set("group_id", groupId);
+    if (filterMode === "payroll") {
+      sp.set("mode", "payroll");
+      if (payrollPeriodId) sp.set("payroll_period_id", payrollPeriodId);
+    } else {
+      sp.set("mode", "month");
+      sp.set("month", month);
+      sp.set("year", year);
+    }
+    const qs = sp.toString();
+    return `/reports/commissions${qs ? `?${qs}` : ""}`;
+  }, [filterMode, groupId, month, payrollPeriodId, year]);
 
   // Sales view data (từ /commissions/orders)
   const [orderCommissions, setOrderCommissions] = React.useState<any[]>([]);
@@ -86,6 +183,7 @@ export function CommissionReport() {
     total_orders: 0,
     total_khach_ship: 0,
     total_nv_chiu: 0,
+    total_return_commission_abs: 0,
     total_luong: 0,
   });
   const [returnsSummary, setReturnsSummary] = React.useState<any>({
@@ -140,14 +238,15 @@ export function CommissionReport() {
       const ids = new Set(list.map((p: any) => String(p.id)));
       const openExists = openId && ids.has(openId);
       setPayrollPeriodId((prev) => {
+        const touched = periodTouchedRef.current;
         const prevOk = prev && ids.has(prev);
         if (!prevOk) return openExists ? openId : prev;
-        if (!periodTouched) return openExists ? openId : prev;
+        if (!touched) return openExists ? openId : prev;
         return prev;
       });
       setPayrollReady(true);
     } catch {}
-  }, [periodTouched]);
+  }, []);
 
   // Fetch payroll periods (for Admin + Sales) — refresh when user/shop changes too
   React.useEffect(() => {
@@ -164,6 +263,7 @@ export function CommissionReport() {
       total_orders: 0,
       total_khach_ship: 0,
       total_nv_chiu: 0,
+      total_return_commission_abs: 0,
       total_luong: 0,
     });
     setOrderCommissions([]);
@@ -268,8 +368,10 @@ export function CommissionReport() {
           const kpiLuong = Number(j.data?.summary?.kpi_total_luong);
           const kpiShip = Number(j.data?.summary?.kpi_total_khach_ship);
           const kpiNv = Number(j.data?.summary?.kpi_total_nv_chiu);
+          const kpiRet = Number(j.data?.summary?.kpi_return_commission);
           const fallbackD = sd.reduce((s: number, i: any) => s + (Number(i.direct_commission) || 0), 0);
           const fallbackO = sd.reduce((s: number, i: any) => s + (Number(i.override_commission) || 0), 0);
+          const fallbackRet = sd.reduce((s: number, i: any) => s + (Number(i.total_return_commission_abs) || 0), 0);
 
           setSummary((prev: any) => ({
             ...prev,
@@ -279,6 +381,7 @@ export function CommissionReport() {
             total_orders: ordersAll || sumOrders,
             total_khach_ship: Number.isFinite(kpiShip) ? kpiShip : sumShip,
             total_nv_chiu: Number.isFinite(kpiNv) ? kpiNv : sumNv,
+            total_return_commission_abs: Number.isFinite(kpiRet) ? kpiRet : fallbackRet,
             total_luong: Number.isFinite(kpiLuong) ? kpiLuong : sumLuong,
           }));
         }
@@ -402,7 +505,7 @@ export function CommissionReport() {
         <div className="flex items-start gap-3 min-w-0 sm:min-w-[12rem] sm:flex-1">
           {employeeDrilldown && (
             <Link
-              to="/reports/commissions"
+              to={buildListUrl()}
               className="mt-1 p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors shrink-0"
               title="Về báo cáo toàn bộ"
             >
@@ -619,7 +722,9 @@ export function CommissionReport() {
           </div>
           <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lương</p>
           <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums break-words">{formatCurrency(summary.total_luong || 0)}</p>
-          <p className="text-xs text-slate-500 mt-0.5 break-words leading-snug">Tổng HH + Ship KH Trả − tiền NV chịu</p>
+          <p className="text-xs text-slate-500 mt-0.5 break-words leading-snug">
+            Tổng HH + Ship KH Trả − tiền NV chịu − HH hoàn (direct)
+          </p>
         </div>
       </div>
 
@@ -667,7 +772,10 @@ export function CommissionReport() {
                     <tr className="bg-slate-50 border-b border-slate-100">
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right text-slate-700">Doanh số</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Hoa hồng</th>
+                      <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">
+                        Hoa hồng
+                        <span className="block font-normal normal-case text-slate-400 tracking-normal mt-0.5">(kèm HH hoàn)</span>
+                      </th>
                       <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Ship / NV chịu</th>
                       <th className="px-5 py-3 text-xs font-semibold text-violet-600 uppercase tracking-wide text-right whitespace-nowrap">Tổng lương</th>
                       <th className="px-5 py-3 w-8"></th>
@@ -697,11 +805,19 @@ export function CommissionReport() {
                             <span className="font-semibold text-blue-600">{formatCurrency(item.override_commission || 0)}</span>
                           </p>
                           <p className="text-xs text-slate-400 mt-0.5">
-                            <span className="text-slate-400">Tổng:</span>{" "}
+                            <span className="text-slate-400">Tổng (gross):</span>{" "}
                             <span className="font-bold text-slate-900">
                               {formatCurrency((item.direct_commission || 0) + (item.override_commission || 0))}
                             </span>
                           </p>
+                          {(Number(item.total_return_commission_abs) || 0) > 0 && (
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              <span className="text-slate-400">HH hoàn (trừ):</span>{" "}
+                              <span className="font-semibold text-red-600 tabular-nums">
+                                −{formatCurrency(Number(item.total_return_commission_abs) || 0)}
+                              </span>
+                            </p>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-right tabular-nums">
                           <p className="text-xs text-slate-400 mt-0.5">
@@ -717,7 +833,7 @@ export function CommissionReport() {
                           {formatCurrency(Number(item.total_luong) || 0)}
                         </td>
                         <td className="px-5 py-3 text-right">
-                          <Link to={`/reports/commissions/${item.id}`}
+                          <Link to={buildEmployeeDetailUrl(item.id)}
                             className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-0.5 justify-end">
                             Chi tiết <ChevronRight className="w-3 h-3" />
                           </Link>
@@ -732,11 +848,17 @@ export function CommissionReport() {
                         {formatCurrency(salesData.reduce((s: number, i: any) => s + (i.total_sales || 0), 0))}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <div className="text-[11px] font-normal text-slate-300 mb-1">Bán hàng / Từ CTV / Tổng</div>
+                        <div className="text-[11px] font-normal text-slate-300 mb-1">Bán hàng / Từ CTV / Tổng gross / HH hoàn</div>
                         <div className="flex flex-col gap-0.5 items-end">
                           <div className="text-emerald-400 tabular-nums">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.direct_commission || 0), 0))}</div>
                           <div className="text-blue-300 tabular-nums">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.override_commission || 0), 0))}</div>
                           <div className="text-white tabular-nums">{formatCurrency(salesData.reduce((s: number, i: any) => s + (i.direct_commission || 0) + (i.override_commission || 0), 0))}</div>
+                          {(() => {
+                            const retSum = salesData.reduce((s: number, i: any) => s + (Number(i.total_return_commission_abs) || 0), 0);
+                            return retSum > 0 ? (
+                              <div className="text-red-300 tabular-nums">−{formatCurrency(retSum)}</div>
+                            ) : null;
+                          })()}
                         </div>
                       </td>
                       <td className="px-5 py-3 text-right">

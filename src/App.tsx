@@ -216,7 +216,8 @@ export default function App() {
                   <Route path="/reports/commissions" element={<CommissionReport />} />
                   <Route path="/reports/payroll-periods" element={<AdminRoute><PayrollPeriods /></AdminRoute>} />
                   <Route path="/reports/commissions/ctv" element={<ReportsViewRoute><CtvCommissionRoute /></ReportsViewRoute>} />
-                  <Route path="/reports/commissions/:userId" element={<AdminRoute><CommissionReport /></AdminRoute>} />
+                  {/* Admin: xem chi tiết NV bất kỳ; Sales: chỉ xem chính mình (CommissionReport sẽ tự co scope). */}
+                  <Route path="/reports/commissions/:userId" element={<CommissionReport />} />
                   <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
                   <Route path="/cash-transactions" element={<ReportsViewRoute><CashTransactions /></ReportsViewRoute>} />

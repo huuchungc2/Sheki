@@ -64,9 +64,10 @@
   - `shipping_fee`, `ship_payer`
   - `deposit`, `customer_collect`, `shop_collect`, `orders.total_amount`
   - `orders.salesperson_absorbed_amount` (Tiền NV chịu)
-- **Cách hạch toán hoa hồng khi hoàn:** khi Admin duyệt hoàn, hệ thống tạo **bút toán điều chỉnh hoa hồng** (`commission_adjustments`) giá trị **âm**, tính theo **tỷ lệ giá trị item bị hoàn** (hoàn từng phần theo sản phẩm), để trừ lại phần hoa hồng của đơn gốc.
+- **Cách hạch toán hoa hồng khi hoàn:** khi Admin duyệt hoàn, hệ thống tạo **bút toán điều chỉnh hoa hồng** (`commission_adjustments`) giá trị **âm**, tính theo **tỷ lệ giá trị item bị hoàn** (hoàn từng phần theo sản phẩm), để trừ lại phần hoa hồng của đơn gốc. **Tỷ lệ % dùng để tính số tiền HH hoàn (direct + mốc tier cho override quản lý)** lấy tại **thời điểm duyệt hoàn**: `users.commission_rate` của người nhận HH direct trên đơn (trùng CTV khi đơn collaborator) và bảng `commission_tiers` hiện tại — **không** dùng lại `order_items.commission_rate` đã lưu lúc tạo đơn.
 - **Thời điểm ghi nhận:** điều chỉnh hoa hồng được ghi theo **ngày duyệt hoàn** (created_at của adjustment) để báo cáo hoa hồng kỳ hiện tại phản ánh đúng, **không “đập” lại kỳ cũ** của đơn gốc.
 - **Báo cáo Ship/NV chịu:** các KPI/cột **Ship KH Trả** và **Tiền NV chịu** vẫn bám theo **đơn bán** (`orders`) và chỉ tính theo `orders.salesperson_id` như quy tắc hiện tại; **không cộng/trừ lại** theo hoàn hàng.
+- **Xóa đơn hoàn (Admin):** nếu `returns.created_at` nằm trong khoảng thời gian một **kỳ lương đã chốt** (`payroll_periods.status = 'closed'`, `from_at` … `to_at`), `DELETE /returns/:id` bị từ chối — **cùng nguyên tắc** với đơn bán đã gắn kỳ đã chốt (không xóa để tránh lật snapshot lương/HH).
 
 ### Số lượng
 - DECIMAL(10,3) — hỗ trợ 0.5kg, 1.25m
@@ -154,12 +155,14 @@ Tổng lương (cùng công thức tổng kỳ) = Tổng hoa hồng + Tổng Shi
 Các màn liên quan: Dashboard, Hoa hồng của tôi, Báo cáo hoa hồng Admin, Báo cáo HH từ CTV.
 
 - **Số đơn hàng**: **chỉ tính đơn bán** (đơn phát sinh commission), **KHÔNG cộng đơn hoàn**. Đơn `cancelled` không tính.
-- **Tổng đơn hoàn**: KPI riêng (đếm bảng `returns` theo kỳ lọc).
+- **Tổng đơn hoàn**: KPI riêng — đếm/ghi nhận theo **`returns.created_at`** (ngày tạo đơn hoàn), không theo ngày đơn gốc. Khi lọc theo **kỳ lương** (`payroll_period_id`), vẫn bám **`returns.created_at`** (hoặc `commission_adjustments.created_at` cho HH hoàn) có nằm trong khoảng thời gian kỳ đó — **không** dùng `orders.payroll_period_id` để gán hoàn vào kỳ của đơn bán.
 - **HH bán hàng (direct)**: **gross** = tổng `commissions.type='direct'` theo kỳ phát sinh (`commissions.created_at`). **KHÔNG trừ** `commission_adjustments.type='direct'` trong KPI này.
 - **Tổng HH hoàn**: KPI riêng = tổng `commission_adjustments.type='direct'` (âm) theo kỳ phát sinh (`commission_adjustments.created_at`), và chỉ tính cho **salesperson** của đơn gốc.
-- **HH từ CTV (override)**: **net** = `commissions.type='override'` + `commission_adjustments.type='override'` (âm) theo kỳ phát sinh.
+- **HH từ CTV (override)**: **net** = `commissions.type='override'` (theo kỳ phát sinh của dòng HH) + `commission_adjustments.type='override'` (âm, theo **`commission_adjustments.created_at`**).
 - **Tổng HH**: = **HH bán hàng (gross)** + **HH từ CTV (net)**. (HH hoàn hiển thị KPI riêng; khi tính lương thì mới trừ HH hoàn theo công thức.)
+- **Preview / snapshot chốt kỳ (`payroll_settlements.return_commission_abs`)**: Cột «HH hoàn» trên UI = **tổng abs** để quản lý/NV thấy rõ: **hoàn direct** (NV bán, `ca.user_id = salesperson`) + **hoàn override** (bút toán âm `commission_adjustments.type='override'` theo `ca.user_id` quản lý). Công thức **`total_luong`** snapshot/preview vẫn là `(direct + override_net) - (chỉ hoàn direct) + ship - nv`: phần trừ HH khi hoàn **override** đã gộp trong **override net**, không trừ lần hai.
 - **Ship KH Trả / Tiền NV chịu**: bám theo `orders` (theo `salesperson_id`), không cộng/trừ theo hoàn.
+- **Báo cáo doanh thu (`/reports/revenue`)** — Lọc **kỳ lương**: đơn bán / ship / HH bám `orders.payroll_period_id`; cột doanh thu hoàn (`total_returns`) và tổng hoàn trong summary bám **`returns.created_at`** trong `[from_at, to_at]` kỳ (cùng quy ước returns-summary).
 
 ### Filter thời gian (áp dụng cho TẤT CẢ màn hình có tìm kiếm)
 - Mặc định: ngày hiện tại

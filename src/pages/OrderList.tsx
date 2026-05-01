@@ -127,7 +127,6 @@ export function OrderList() {
   const [loading, setLoading]       = React.useState(true);
   const [error, setError]           = React.useState<string | null>(null);
   const [groups, setGroups]         = React.useState<any[]>([]);
-  const [employees, setEmployees]   = React.useState<any[]>([]);
   const [showDateMenu, setShowDateMenu] = React.useState(false);
   const [total, setTotal]           = React.useState(0);
   const [searchInput, setSearchInput] = React.useState("");
@@ -215,17 +214,60 @@ export function OrderList() {
       .then(r => r.json()).then(j => setGroups(j.data || [])).catch(() => {});
   }, [isAdmin, currentUser?.id]);
 
-  // Fetch danh sách nhân viên (admin only)
+  // Nhân viên filter (admin): dùng search (debounce) để tránh load/render toàn bộ gây giật.
+  const [showEmployeeMenu, setShowEmployeeMenu] = React.useState(false);
+  const [employeeQuery, setEmployeeQuery] = React.useState("");
+  const [employeeOptions, setEmployeeOptions] = React.useState<any[]>([]);
+  const [employeeLoading, setEmployeeLoading] = React.useState(false);
+  const [employeeSelectedName, setEmployeeSelectedName] = React.useState<string>("");
+
   React.useEffect(() => {
     if (!isAdmin) return;
+    if (!employeeId) {
+      setEmployeeSelectedName("");
+      return;
+    }
     const token = localStorage.getItem("token");
-    fetch(`${API_URL}/users?scoped=1&limit=100&active_only=1`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
-      .then(r => r.json())
-      .then(j => setEmployees(j.data || []))
-      .catch(() => {});
-  }, [isAdmin]);
+    let aborted = false;
+    fetch(`${API_URL}/users/${employeeId}`, { headers: { "Authorization": `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => {
+        if (aborted) return;
+        setEmployeeSelectedName(String(j?.data?.full_name || ""));
+      })
+      .catch(() => {
+        if (aborted) return;
+        setEmployeeSelectedName("");
+      });
+    return () => { aborted = true; };
+  }, [isAdmin, employeeId]);
+
+  React.useEffect(() => {
+    if (!isAdmin) return;
+    if (!showEmployeeMenu) return;
+    const token = localStorage.getItem("token");
+    const q = employeeQuery.trim();
+    const t = window.setTimeout(async () => {
+      try {
+        setEmployeeLoading(true);
+        const params = new URLSearchParams({
+          scoped: "1",
+          limit: "20",
+          active_only: "1",
+          ...(q ? { search: q } : {}),
+        });
+        const res = await fetch(`${API_URL}/users?${params}`, { headers: { "Authorization": `Bearer ${token}` } });
+        if (!res.ok) return;
+        const j = await res.json();
+        setEmployeeOptions(j?.data || []);
+      } catch {
+        setEmployeeOptions([]);
+      } finally {
+        setEmployeeLoading(false);
+      }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [isAdmin, showEmployeeMenu, employeeQuery]);
 
   const fetchOrders = React.useCallback(async () => {
     const { page: p, search: q, product: prod, status: st, groupId: gid, employeeId: eid, dateFrom: df, dateTo: dt } =
@@ -336,7 +378,7 @@ export function OrderList() {
 
       const groupName = groupId ? (groups.find((g: any) => String(g.id) === String(groupId))?.name || "") : "";
       const employeeName =
-        employeeId ? (employees.find((e: any) => String(e.id) === String(employeeId))?.full_name || "") : "";
+        employeeId ? (employeeSelectedName || "") : "";
 
       exportOrdersList({
         rows,
@@ -353,7 +395,7 @@ export function OrderList() {
     } finally {
       setExporting(false);
     }
-  }, [search, product, status, dateFrom, dateTo, employeeId, groupId, groups, employees]);
+  }, [search, product, status, dateFrom, dateTo, employeeId, groupId, groups, employeeSelectedName]);
 
   // Apply preset
   const applyPreset = (preset: DatePreset) => {
@@ -522,16 +564,96 @@ export function OrderList() {
 
           {/* Nhân viên — chỉ admin */}
           {isAdmin && (
-            <select
-              value={employeeId}
-              onChange={(e) => { patchListParams({ employee: e.target.value || null }, { resetPage: true }); }}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[160px]"
-            >
-              <option value="">Tất cả nhân viên</option>
-              {employees.map((emp: any) => (
-                <option key={emp.id} value={emp.id}>{emp.full_name}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmployeeMenu((v) => !v);
+                  setEmployeeQuery("");
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 hover:border-red-300 rounded-xl text-sm font-medium text-slate-700 transition-all min-w-[180px] justify-between"
+                title="Lọc theo nhân viên"
+              >
+                <span className="truncate">
+                  {employeeId ? (employeeSelectedName || `NV #${employeeId}`) : "Tất cả nhân viên"}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              {showEmployeeMenu && (
+                <div className="absolute top-full left-0 mt-1 w-[18rem] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="p-2 border-b border-slate-100">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={employeeQuery}
+                        onChange={(e) => setEmployeeQuery(e.target.value)}
+                        placeholder="Gõ tên/username/phone..."
+                        className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-lg text-sm outline-none transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmployeeMenu(false)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                        title="Đóng"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        patchListParams({ employee: null }, { resetPage: true });
+                        setShowEmployeeMenu(false);
+                      }}
+                      className={cn(
+                        "mt-2 w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
+                        !employeeId ? "bg-red-50 text-red-600 font-semibold" : "hover:bg-slate-50 text-slate-700"
+                      )}
+                    >
+                      Tất cả nhân viên
+                    </button>
+                  </div>
+
+                  <div className="max-h-72 overflow-auto">
+                    {employeeLoading ? (
+                      <div className="px-3 py-3 text-sm text-slate-500 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Đang tải...
+                      </div>
+                    ) : (employeeOptions.length === 0 ? (
+                      <div className="px-3 py-3 text-sm text-slate-500">
+                        Không tìm thấy nhân viên
+                      </div>
+                    ) : (
+                      employeeOptions.map((emp: any) => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => {
+                            patchListParams({ employee: String(emp.id) }, { resetPage: true });
+                            setEmployeeSelectedName(String(emp.full_name || ""));
+                            setShowEmployeeMenu(false);
+                          }}
+                          className={cn(
+                            "w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 transition-colors",
+                            String(employeeId) === String(emp.id) ? "bg-red-50 text-red-600 font-semibold" : "text-slate-700"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate">{emp.full_name}</span>
+                            <span className="shrink-0 text-xs text-slate-400">#{emp.id}</span>
+                          </div>
+                          {emp.username ? (
+                            <div className="text-xs text-slate-400 truncate mt-0.5">{emp.username}</div>
+                          ) : null}
+                        </button>
+                      ))
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Date preset dropdown */}

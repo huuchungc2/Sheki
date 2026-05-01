@@ -45,6 +45,17 @@ function errorHandler(err, req, res, next) {
     return res.status(500).json({ error: 'Lỗi kết nối database - Access denied' });
   }
 
+  // Multer (upload ảnh)
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: 'File quá lớn (vượt giới hạn upload)' });
+  }
+  if (err.name === 'MulterError') {
+    return res.status(400).json({ error: err.message || 'Lỗi upload file' });
+  }
+  if (err.message && String(err.message).includes('Chỉ hỗ trợ file ảnh')) {
+    return res.status(400).json({ error: err.message });
+  }
+
   if (err.code === 'ECONNREFUSED') {
     return res.status(500).json({ error: 'Lỗi kết nối database - Connection refused' });
   }

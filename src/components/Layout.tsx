@@ -117,7 +117,7 @@ const navigationAdmin = [
     name: "Sản phẩm",
     icon: Package,
     children: [
-      { name: "Danh mục sản phẩm", href: "/categories" },
+      { name: "Danh mục", href: "/categories" },
       { name: "Sản phẩm", href: "/products" },
     ],
   },

@@ -563,7 +563,8 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
           const ship = Number(s.total_khach_ship) || 0;
           const nv = Number(s.total_nv_chiu) || 0;
           const orders = Number(s.total_orders) || 0;
-          return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0;
+          const retAbs = Number(s.total_return_commission_abs) || 0;
+          return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0 || retAbs > 0;
         });
 
         const summary = {
@@ -626,7 +627,13 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
             FROM order_items
             GROUP BY order_id, product_id
           ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
-          WHERE o.shop_id = ? AND o.payroll_period_id = ?
+          WHERE o.shop_id = ?
+            AND EXISTS (
+              SELECT 1 FROM payroll_periods pp
+              WHERE pp.id = ? AND pp.shop_id = o.shop_id
+                AND r.created_at >= pp.from_at
+                AND (pp.to_at IS NULL OR r.created_at <= pp.to_at)
+            )
             ${groupId ? ' AND o.group_id = ?' : ''}
           GROUP BY o.salesperson_id
         ) r_stats ON u.id = r_stats.salesperson_id
@@ -644,7 +651,13 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
           SELECT ca.user_id, COALESCE(SUM(ca.amount),0) AS direct_adjustment
           FROM commission_adjustments ca
           JOIN orders o ON ca.order_id = o.id
-          WHERE o.shop_id = ? AND o.payroll_period_id = ?
+          WHERE o.shop_id = ?
+            AND EXISTS (
+              SELECT 1 FROM payroll_periods pp
+              WHERE pp.id = ? AND pp.shop_id = o.shop_id
+                AND ca.created_at >= pp.from_at
+                AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+            )
             AND o.status <> 'cancelled'
             AND ca.type = 'direct'
             AND ca.user_id = o.salesperson_id
@@ -665,7 +678,13 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
           SELECT ca.user_id, COALESCE(SUM(ca.amount),0) AS override_adjustment
           FROM commission_adjustments ca
           JOIN orders o ON ca.order_id = o.id
-          WHERE o.shop_id = ? AND o.payroll_period_id = ?
+          WHERE o.shop_id = ?
+            AND EXISTS (
+              SELECT 1 FROM payroll_periods pp
+              WHERE pp.id = ? AND pp.shop_id = o.shop_id
+                AND ca.created_at >= pp.from_at
+                AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+            )
             AND o.status <> 'cancelled'
             AND ca.type = 'override'
             ${orderGroupCond}
@@ -748,7 +767,8 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
         const nv = Number(s.total_nv_chiu) || 0;
         const orders = Number(s.total_orders) || 0;
         const adj = Number(s.payroll_adjustments) || 0;
-        return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0 || adj !== 0;
+        const retAbs = Number(s.total_return_commission_abs) || 0;
+        return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0 || adj !== 0 || retAbs > 0;
       });
 
       formattedSalesData.sort((a, b) => (Number(b.total_luong) || 0) - (Number(a.total_luong) || 0));
@@ -956,14 +976,15 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
       };
     });
 
-    // Bảng “Hoa hồng nhân viên” phải bao gồm cả NV không có đơn bán nhưng có phát sinh HH (override/adjustment),
-    // để tổng trong bảng không bị lệch KPI tổng.
+    // Bảng “Hoa hồng nhân viên” phải bao gồm cả NV không có đơn bán nhưng có phát sinh HH (override/adjustment)
+    // hoặc chỉ có HH hoàn direct (total_return_commission_abs), để tổng trong bảng không bị lệch KPI tổng.
     const formattedSalesData = formattedSalesDataAll.filter(s => {
       const totalAll = Number(s.total_all_commission) || 0;
       const ship = Number(s.total_khach_ship) || 0;
       const nv = Number(s.total_nv_chiu) || 0;
       const orders = Number(s.total_orders) || 0;
-      return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0;
+      const retAbs = Number(s.total_return_commission_abs) || 0;
+      return orders > 0 || totalAll !== 0 || ship !== 0 || nv !== 0 || retAbs > 0;
     });
 
     // Sort theo tổng lương: cao → thấp (UI báo cáo hoa hồng nhân viên)
@@ -1045,15 +1066,24 @@ router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async
 });
 
 // Revenue report (gross) — giống Dashboard: doanh số bán gross, hoàn tách riêng.
-// GET /api/reports/revenue?month=MM&year=YYYY&group_id=
+// GET /api/reports/revenue?month=MM&year=YYYY&group_id=&payroll_period_id=
+// — payroll: đơn/ship/HH theo orders.payroll_period_id; doanh thu hoàn theo returns.created_at trong [from_at,to_at] kỳ (khớp returns-summary).
 router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), requireFeature('reports.revenue'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const shopId = req.shopId;
-    const { month, year, group_id } = req.query;
+    const { month, year, group_id, payroll_period_id } = req.query;
 
     const currentMonth = month || new Date().getMonth() + 1;
     const currentYear = year || new Date().getFullYear();
+    const cm = parseInt(String(currentMonth), 10);
+    const cy = parseInt(String(currentYear), 10);
+
+    const payrollPidRaw =
+      payroll_period_id != null && String(payroll_period_id).trim() !== ''
+        ? parseInt(String(payroll_period_id), 10)
+        : null;
+    const usePayroll = Number.isFinite(payrollPidRaw) && payrollPidRaw > 0;
 
     const scope = await getScope(req, 'reports');
     const isScoped = scope !== 'shop';
@@ -1061,22 +1091,71 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
 
     let groupId = group_id ? parseInt(group_id) : null;
 
-    // Group-scope: force group_id within user's groups (reuse existing group filter logic)
     if (scope === 'group') {
       const gids = await loadUserGroupIds(pool, shopId, req.user.id);
       if (!gids.length) {
-        return res.json({ data: { salesData: [], summary: { totalSales: 0, totalCommission: 0, totalReturns: 0, totalEmployees: 0 } } });
+        return res.json({
+          data: {
+            salesData: [],
+            summary: {
+              totalSales: 0,
+              totalCommission: 0,
+              totalReturns: 0,
+              totalEmployees: 0,
+              payroll_period_id: usePayroll ? payrollPidRaw : null,
+              filter: usePayroll ? 'payroll' : 'month',
+            },
+          },
+        });
       }
       if (groupId != null && !gids.includes(Number(groupId))) {
         return res.status(403).json({ error: 'Không có quyền xem nhóm này' });
       }
       if (groupId == null) groupId = Math.min(...gids);
     }
+
+    if (usePayroll) {
+      const [[pr]] = await pool.query(
+        `SELECT id FROM payroll_periods WHERE shop_id = ? AND id = ? LIMIT 1`,
+        [shopId, payrollPidRaw]
+      );
+      if (!pr) return res.status(404).json({ error: 'Không tìm thấy kỳ lương' });
+    }
+
     const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
-    const ordersExistsCond =
-      groupId != null
-        ? ' AND EXISTS (SELECT 1 FROM orders o2 WHERE o2.salesperson_id = u.id AND MONTH(o2.created_at) = ? AND YEAR(o2.created_at) = ? AND o2.group_id = ?)'
-        : '';
+    const oStatsWhere = usePayroll
+      ? 'shop_id = ? AND payroll_period_id = ? AND status != \'cancelled\''
+      : 'shop_id = ? AND MONTH(created_at) = ? AND YEAR(created_at) = ? AND status != \'cancelled\'';
+    const oStatsParams = usePayroll
+      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : [])]
+      : [shopId, cm, cy, ...(groupId ? [groupId] : [])];
+
+    const rStatsWhere = usePayroll
+      ? `o.shop_id = ? AND EXISTS (
+           SELECT 1 FROM payroll_periods pp
+           WHERE pp.id = ? AND pp.shop_id = o.shop_id
+             AND r.created_at >= pp.from_at
+             AND (pp.to_at IS NULL OR r.created_at <= pp.to_at)
+         )${groupId ? ' AND o.group_id = ?' : ''}`
+      : `o.shop_id = ? AND MONTH(r.created_at) = ? AND YEAR(r.created_at) = ?${groupId ? ' AND o.group_id = ?' : ''}`;
+    const rStatsParams = usePayroll
+      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : [])]
+      : [shopId, cm, cy, ...(groupId ? [groupId] : [])];
+
+    const joinOrdersTime = usePayroll
+      ? 'o.shop_id = ? AND o.payroll_period_id = ? AND c.type = '
+      : 'o.shop_id = ? AND MONTH(o.created_at) = ? AND YEAR(o.created_at) = ? AND c.type = ';
+
+    const joinOrdersParams = usePayroll
+      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : [])]
+      : [shopId, cm, cy, ...(groupId ? [groupId] : [])];
+
+    const shipWhere = usePayroll
+      ? 'shop_id = ? AND payroll_period_id = ? AND status != \'cancelled\''
+      : 'shop_id = ? AND MONTH(created_at) = ? AND YEAR(created_at) = ? AND status != \'cancelled\'';
+    const shipParams = usePayroll
+      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : [])]
+      : [shopId, cm, cy, ...(groupId ? [groupId] : [])];
 
     const [salesData] = await pool.query(
       `SELECT
@@ -1099,10 +1178,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
                 COUNT(*) as total_orders,
                 SUM(subtotal) as total_sales
          FROM orders
-         WHERE shop_id = ? AND MONTH(created_at) = ?
-           AND YEAR(created_at) = ?
-           AND status != 'cancelled'
-           ${groupId ? ' AND group_id = ?' : ''}
+         WHERE ${oStatsWhere}
          GROUP BY salesperson_id
        ) o_stats ON u.id = o_stats.salesperson_id
        LEFT JOIN (
@@ -1120,29 +1196,21 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
            FROM order_items
            GROUP BY order_id, product_id
          ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
-        WHERE o.shop_id = ? AND MONTH(r.created_at) = ?
-           AND YEAR(r.created_at) = ?
-           ${groupId ? ' AND o.group_id = ?' : ''}
+        WHERE ${rStatsWhere}
          GROUP BY o.salesperson_id
        ) r_stats ON u.id = r_stats.salesperson_id
        LEFT JOIN (
          SELECT c.user_id, SUM(c.commission_amount) as direct_commission
          FROM commissions c
          JOIN orders o ON c.order_id = o.id
-        WHERE o.shop_id = ? AND MONTH(o.created_at) = ?
-           AND YEAR(o.created_at) = ?
-           AND c.type = 'direct'
-           ${orderGroupCond}
+        WHERE ${joinOrdersTime}'direct'${orderGroupCond}
          GROUP BY c.user_id
        ) c_direct ON u.id = c_direct.user_id
        LEFT JOIN (
          SELECT c.user_id, SUM(c.commission_amount) as override_commission
          FROM commissions c
          JOIN orders o ON c.order_id = o.id
-        WHERE o.shop_id = ? AND MONTH(o.created_at) = ?
-           AND YEAR(o.created_at) = ?
-           AND c.type = 'override'
-           ${orderGroupCond}
+        WHERE ${joinOrdersTime}'override'${orderGroupCond}
          GROUP BY c.user_id
        ) c_override ON u.id = c_override.user_id
        LEFT JOIN (
@@ -1150,10 +1218,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
                 COALESCE(SUM(CASE WHEN ship_payer = 'shop' THEN 0 ELSE shipping_fee END), 0) AS total_khach_ship,
                 COALESCE(SUM(salesperson_absorbed_amount), 0) AS total_nv_chiu
          FROM orders
-        WHERE shop_id = ? AND MONTH(created_at) = ?
-           AND YEAR(created_at) = ?
-           AND status != 'cancelled'
-           ${groupId ? ' AND group_id = ?' : ''}
+        WHERE ${shipWhere}
          GROUP BY salesperson_id
        ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE us.shop_id = ?
@@ -1161,23 +1226,17 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
          ${isScoped ? ' AND u.id = ?' : ''}
        ORDER BY total_sales DESC`,
       [
-        // o_stats
-        shopId, currentMonth, currentYear, ...(groupId ? [groupId] : []),
-        // r_stats
-        shopId, currentMonth, currentYear, ...(groupId ? [groupId] : []),
-        // c_direct
-        shopId, currentMonth, currentYear, ...(groupId ? [groupId] : []),
-        // c_override
-        shopId, currentMonth, currentYear, ...(groupId ? [groupId] : []),
-        // ship_nv
-        shopId, currentMonth, currentYear, ...(groupId ? [groupId] : []),
-        // us.shop_id
+        ...oStatsParams,
+        ...rStatsParams,
+        ...joinOrdersParams,
+        ...joinOrdersParams,
+        ...shipParams,
         shopId,
         ...(isScoped ? [scopedUserId] : []),
       ]
     );
 
-    const formatted = salesData.map(s => {
+    const formatted = salesData.map((s) => {
       const totalAll = parseFloat(s.total_all_commission) || 0;
       const khach = parseFloat(s.total_khach_ship) || 0;
       const nv = parseFloat(s.total_nv_chiu) || 0;
@@ -1197,9 +1256,10 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
       };
     });
 
-    // Summary totals should match Dashboard (gross, not subtract returns)
-    const summaryConds = ['o.shop_id = ?', 'MONTH(o.created_at) = ?', 'YEAR(o.created_at) = ?', "o.status != 'cancelled'"];
-    const summaryParams = [shopId, parseInt(currentMonth), parseInt(currentYear)];
+    const summaryConds = usePayroll
+      ? ['o.shop_id = ?', 'o.payroll_period_id = ?', "o.status != 'cancelled'"]
+      : ['o.shop_id = ?', 'MONTH(o.created_at) = ?', 'YEAR(o.created_at) = ?', "o.status != 'cancelled'"];
+    const summaryParams = usePayroll ? [shopId, payrollPidRaw] : [shopId, cm, cy];
     if (groupId != null) {
       summaryConds.push('o.group_id = ?');
       summaryParams.push(groupId);
@@ -1222,6 +1282,28 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
        WHERE ${summaryConds.join(' AND ')}`,
       summaryParams
     );
+
+    const retWhere = usePayroll
+      ? [
+          'o.shop_id = ?',
+          `EXISTS (
+            SELECT 1 FROM payroll_periods pp
+            WHERE pp.id = ? AND pp.shop_id = o.shop_id
+              AND r.created_at >= pp.from_at
+              AND (pp.to_at IS NULL OR r.created_at <= pp.to_at)
+          )`,
+        ]
+      : ['o.shop_id = ?', 'MONTH(r.created_at) = ?', 'YEAR(r.created_at) = ?'];
+    const retParams = usePayroll ? [shopId, payrollPidRaw] : [shopId, cm, cy];
+    if (groupId != null) {
+      retWhere.push('o.group_id = ?');
+      retParams.push(groupId);
+    }
+    if (isScoped) {
+      retWhere.push('o.salesperson_id = ?');
+      retParams.push(scopedUserId);
+    }
+
     const [[retSum]] = await pool.query(
       `SELECT COALESCE(SUM(ri.qty * ((oi.gross_total - oi.discount_total) / NULLIF(oi.qty_total, 0))), 0) AS total_returns
        FROM returns r
@@ -1235,18 +1317,8 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
          FROM order_items
          GROUP BY order_id, product_id
        ) oi ON oi.order_id = o.id AND oi.product_id = ri.product_id
-       WHERE o.shop_id = ?
-         AND MONTH(r.created_at) = ?
-         AND YEAR(r.created_at) = ?
-         ${groupId != null ? ' AND o.group_id = ?' : ''}
-         ${isScoped ? ' AND o.salesperson_id = ?' : ''}`,
-      [
-        shopId,
-        parseInt(currentMonth),
-        parseInt(currentYear),
-        ...(groupId != null ? [groupId] : []),
-        ...(isScoped ? [scopedUserId] : []),
-      ]
+       WHERE ${retWhere.join(' AND ')}`,
+      retParams
     );
 
     const totalSales = parseFloat(salesSum?.total_sales) || 0;
@@ -1261,6 +1333,8 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
           totalCommission,
           totalReturns,
           totalEmployees: formatted.length,
+          payroll_period_id: usePayroll ? payrollPidRaw : null,
+          filter: usePayroll ? 'payroll' : 'month',
         },
       },
     });
@@ -1306,7 +1380,14 @@ router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
     let returnCommission;
 
     if (periodId != null && Number.isFinite(periodId)) {
-      const conds = ['o.shop_id = ?', 'o.payroll_period_id = ?'];
+      // Hoàn / HH hoàn gắn kỳ lương theo ngày phát sinh (r.created_at / ca.created_at) nằm trong [from_at, to_at] của kỳ — không theo payroll_period_id của đơn gốc.
+      const periodMatchR = `EXISTS (
+        SELECT 1 FROM payroll_periods pp
+        WHERE pp.id = ? AND pp.shop_id = o.shop_id
+          AND r.created_at >= pp.from_at
+          AND (pp.to_at IS NULL OR r.created_at <= pp.to_at)
+      )`;
+      const conds = ['o.shop_id = ?', periodMatchR];
       const params = [shopId, periodId];
       if (targetUserId) {
         conds.push('o.salesperson_id = ?');
@@ -1338,11 +1419,17 @@ router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
         params
       );
 
+      const periodMatchCa = `EXISTS (
+        SELECT 1 FROM payroll_periods pp
+        WHERE pp.id = ? AND pp.shop_id = o.shop_id
+          AND ca.created_at >= pp.from_at
+          AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
+      )`;
       const commConds = [
         "ca.type='direct'",
         'ca.user_id = o.salesperson_id',
         'o.shop_id = ?',
-        'o.payroll_period_id = ?',
+        periodMatchCa,
       ];
       const commParams = [shopId, periodId];
       if (targetUserId) {

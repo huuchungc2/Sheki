@@ -1,7 +1,7 @@
 /**
  * KPI hoa hồng thống nhất:
- * - Dashboard/Báo cáo hoa hồng theo THÁNG: bám theo kỳ tạo đơn (orders.created_at)
- *   để không bị "chuyển kỳ" khi sửa đơn/recalc.
+ * - Đơn bán (`commissions`): theo tháng tạo đơn (orders.created_at).
+ * - Điều chỉnh hoàn (`commission_adjustments`): theo tháng phát sinh bút toán (ca.created_at), không theo đơn gốc.
  */
 
 /**
@@ -59,7 +59,7 @@ async function getCommissionMonthKpi(pool, { month, year, groupId = null, userId
     `SELECT COALESCE(SUM(ca.amount), 0) AS v
      FROM commission_adjustments ca
      JOIN orders o ON ca.order_id = o.id
-     WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
+     WHERE MONTH(ca.created_at) = ? AND YEAR(ca.created_at) = ?
        AND ca.type = 'override' AND o.status != 'cancelled'${shopCond}${groupCond}${userCondAdj}`,
     adjParams
   );

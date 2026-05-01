@@ -37,8 +37,8 @@ function buildOrderScopedFilters({ orderAlias = 'o', salespersonId = null, group
 }
 
 async function getReturnRevenueAndOrdersByMonthYear(pool, { month, year, salespersonId = null, groupId = null, shopId = null }) {
-  // KPI theo kỳ tạo đơn (orders.created_at)
-  const { conds, params } = buildMonthYearConds('o', month, year);
+  // KPI đơn hoàn: theo ngày tạo đơn hoàn (returns.created_at), không theo ngày đơn gốc
+  const { conds, params } = buildMonthYearConds('r', month, year);
   const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
     orderAlias: 'o',
     salespersonId,
@@ -77,8 +77,7 @@ async function getReturnRevenueAndOrdersByMonthYear(pool, { month, year, salespe
 }
 
 async function getReturnRevenueByRange(pool, { from, to, salespersonId = null, shopId = null }) {
-  // KPI theo kỳ tạo đơn (orders.created_at)
-  const { conds, params } = buildRangeConds('o', from, to);
+  const { conds, params } = buildRangeConds('r', from, to);
   const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
     orderAlias: 'o',
     salespersonId,
@@ -112,8 +111,7 @@ async function getReturnRevenueByRange(pool, { from, to, salespersonId = null, s
 }
 
 async function getReturnOrdersCountByRange(pool, { from, to, salespersonId = null, shopId = null }) {
-  // KPI theo kỳ tạo đơn (orders.created_at)
-  const { conds, params } = buildRangeConds('o', from, to);
+  const { conds, params } = buildRangeConds('r', from, to);
   const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
     orderAlias: 'o',
     salespersonId,
@@ -144,8 +142,8 @@ async function getReturnOrdersCountByRange(pool, { from, to, salespersonId = nul
  * - optional filters: userId (salesperson), groupId
  */
 async function getReturnCommissionByMonthYear(pool, { month, year, userId = null, groupId = null, shopId = null }) {
-  // KPI theo kỳ tạo đơn (orders.created_at)
-  const { conds, params } = buildMonthYearConds('o', month, year);
+  // HH hoàn: theo ngày ghi bút toán (commission_adjustments.created_at) — LOGIC_BUSINESS
+  const { conds, params } = buildMonthYearConds('ca', month, year);
   conds.push("ca.type = 'direct'");
   conds.push('ca.user_id = o.salesperson_id');
   if (shopId != null) { conds.push('o.shop_id = ?'); params.push(shopId); }
@@ -166,8 +164,7 @@ async function getReturnCommissionByMonthYear(pool, { month, year, userId = null
 }
 
 async function getReturnCommissionByRange(pool, { from, to, userId = null, shopId = null }) {
-  // KPI theo kỳ tạo đơn (orders.created_at)
-  const { conds, params } = buildRangeConds('o', from, to);
+  const { conds, params } = buildRangeConds('ca', from, to);
   conds.push("ca.type = 'direct'");
   conds.push('ca.user_id = o.salesperson_id');
   if (shopId != null) { conds.push('o.shop_id = ?'); params.push(shopId); }
