@@ -155,6 +155,51 @@ router.get('/dashboard', auth, requireShop, requireFeature('reports.dashboard'),
       userId: isScoped ? uid : null,
       shopId,
     });
+    // HH hoàn (override/quản lý): dùng để HIỂN THỊ đồng nhất; công thức lương vẫn chỉ trừ direct.
+    // Scope:
+    // - own: chỉ adjustment của chính user (ca.user_id = uid)
+    // - group: theo group_id của order (o.group_id IN gids)
+    // - shop: tất cả
+    const overrideAdjCondsMonth = ['ca.type = \'override\'', 'o.shop_id = ?', 'ca.created_at >= ?', 'ca.created_at < ?'];
+    const overrideAdjParamsMonth = [shopId, firstDayThisMonth, new Date(y, m + 1, 1)];
+    const overrideAdjCondsToday = ['ca.type = \'override\'', 'o.shop_id = ?', 'ca.created_at >= ?'];
+    const overrideAdjParamsToday = [shopId, todayStart];
+    if (scope === 'own') {
+      overrideAdjCondsMonth.push('ca.user_id = ?');
+      overrideAdjParamsMonth.push(uid);
+      overrideAdjCondsToday.push('ca.user_id = ?');
+      overrideAdjParamsToday.push(uid);
+    } else if (scope === 'group') {
+      // reuse gids computed above (scope === 'group')
+      // if gids empty => spFilter already AND 1=0; keep consistent here too
+      const gids = spParam || [];
+      if (!gids.length) {
+        overrideAdjCondsMonth.push('1=0');
+        overrideAdjCondsToday.push('1=0');
+      } else {
+        const ph = gids.map(() => '?').join(',');
+        overrideAdjCondsMonth.push(`o.group_id IN (${ph})`);
+        overrideAdjParamsMonth.push(...gids);
+        overrideAdjCondsToday.push(`o.group_id IN (${ph})`);
+        overrideAdjParamsToday.push(...gids);
+      }
+    }
+    const [[overrideAdjMonthRow]] = await pool.query(
+      `SELECT COALESCE(SUM(ca.amount), 0) AS override_return_commission
+       FROM commission_adjustments ca
+       JOIN orders o ON ca.order_id = o.id
+       WHERE ${overrideAdjCondsMonth.join(' AND ')}`,
+      overrideAdjParamsMonth
+    );
+    const [[overrideAdjTodayRow]] = await pool.query(
+      `SELECT COALESCE(SUM(ca.amount), 0) AS override_return_commission
+       FROM commission_adjustments ca
+       JOIN orders o ON ca.order_id = o.id
+       WHERE ${overrideAdjCondsToday.join(' AND ')}`,
+      overrideAdjParamsToday
+    );
+    const returnCommissionOverrideThisMonth = parseFloat(overrideAdjMonthRow?.override_return_commission) || 0; // negative
+    const returnCommissionOverrideToday = parseFloat(overrideAdjTodayRow?.override_return_commission) || 0; // negative
 
     // ── Ship KH trả + NV chịu + Tổng lương (tháng) ──
     let totalKhachShip = 0;
@@ -343,7 +388,12 @@ router.get('/dashboard', auth, requireShop, requireFeature('reports.dashboard'),
           total_orders:      parseInt(thisMonth[0].total_orders) || 0,
           revenue_change:    revChange,
           return_revenue:    revReturns,
-          return_commission: returnCommissionThisMonth || 0,
+          // direct: chỉ HH hoàn của salesperson (dùng để trừ lương)
+          return_commission_direct: returnCommissionThisMonth || 0,
+          // override: HH hoàn của quản lý (đã nằm trong override net)
+          return_commission_override: returnCommissionOverrideThisMonth || 0,
+          // total: để hiển thị “tổng HH hoàn” nếu cần
+          return_commission_total: (returnCommissionThisMonth || 0) + (returnCommissionOverrideThisMonth || 0),
           return_orders:     returnOrdersThisMonth,
         },
         lastMonth: { revenue: revLast },
@@ -351,7 +401,9 @@ router.get('/dashboard', auth, requireShop, requireFeature('reports.dashboard'),
           revenue:      (parseFloat(today[0].revenue) || 0),
           total_orders: parseInt(today[0].total_orders) || 0,
           return_revenue:    revTodayReturns,
-          return_commission: returnCommissionToday || 0,
+          return_commission_direct: returnCommissionToday || 0,
+          return_commission_override: returnCommissionOverrideToday || 0,
+          return_commission_total: (returnCommissionToday || 0) + (returnCommissionOverrideToday || 0),
           return_orders:     returnOrdersToday,
         },
         byStatus,
@@ -1377,7 +1429,8 @@ router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
         : null;
 
     let ret;
-    let returnCommission;
+    let returnCommissionDirectAbs;
+    let returnCommissionOverrideAbs;
 
     if (periodId != null && Number.isFinite(periodId)) {
       // Hoàn / HH hoàn gắn kỳ lương theo ngày phát sinh (r.created_at / ca.created_at) nằm trong [from_at, to_at] của kỳ — không theo payroll_period_id của đơn gốc.
@@ -1425,33 +1478,58 @@ router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
           AND ca.created_at >= pp.from_at
           AND (pp.to_at IS NULL OR ca.created_at <= pp.to_at)
       )`;
-      const commConds = [
+      const commCondsDirect = [
         "ca.type='direct'",
         'ca.user_id = o.salesperson_id',
         'o.shop_id = ?',
         periodMatchCa,
       ];
-      const commParams = [shopId, periodId];
+      const commParamsDirect = [shopId, periodId];
       if (targetUserId) {
-        commConds.push('o.salesperson_id = ?');
-        commParams.push(targetUserId);
+        commCondsDirect.push('o.salesperson_id = ?');
+        commParamsDirect.push(targetUserId);
       }
       if (groupId) {
-        commConds.push('o.group_id = ?');
-        commParams.push(groupId);
+        commCondsDirect.push('o.group_id = ?');
+        commParamsDirect.push(groupId);
       }
-      const [[cRow]] = await pool.query(
+      const [[cRowDirect]] = await pool.query(
         `
         SELECT COALESCE(SUM(ABS(ca.amount)), 0) AS v
         FROM commission_adjustments ca
         JOIN orders o ON o.id = ca.order_id
-        WHERE ${commConds.join(' AND ')}
+        WHERE ${commCondsDirect.join(' AND ')}
         `,
-        commParams
+        commParamsDirect
+      );
+
+      const commCondsOverride = [
+        "ca.type='override'",
+        'o.shop_id = ?',
+        periodMatchCa,
+      ];
+      const commParamsOverride = [shopId, periodId];
+      if (targetUserId) {
+        commCondsOverride.push('ca.user_id = ?');
+        commParamsOverride.push(targetUserId);
+      }
+      if (groupId) {
+        commCondsOverride.push('o.group_id = ?');
+        commParamsOverride.push(groupId);
+      }
+      const [[cRowOverride]] = await pool.query(
+        `
+        SELECT COALESCE(SUM(ABS(ca.amount)), 0) AS v
+        FROM commission_adjustments ca
+        JOIN orders o ON o.id = ca.order_id
+        WHERE ${commCondsOverride.join(' AND ')}
+        `,
+        commParamsOverride
       );
 
       ret = { return_orders: Number(row?.return_orders) || 0, return_revenue: Number(row?.return_revenue) || 0 };
-      returnCommission = Number(cRow?.v) || 0;
+      returnCommissionDirectAbs = Number(cRowDirect?.v) || 0;
+      returnCommissionOverrideAbs = Number(cRowOverride?.v) || 0;
     } else {
       if (!m || !y) return res.status(400).json({ error: 'Thiếu month/year' });
       ret = await getReturnRevenueAndOrdersByMonthYear(pool, {
@@ -1461,20 +1539,50 @@ router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
         groupId,
         shopId,
       });
-      returnCommission = await getReturnCommissionByMonthYear(pool, {
+      returnCommissionDirectAbs = await getReturnCommissionByMonthYear(pool, {
         month: m,
         year: y,
         userId: targetUserId,
         groupId,
         shopId,
       });
+
+      const overrideConds = [
+        "ca.type='override'",
+        'o.shop_id = ?',
+        'MONTH(ca.created_at) = ?',
+        'YEAR(ca.created_at) = ?',
+      ];
+      const overrideParams = [shopId, m, y];
+      if (targetUserId) {
+        overrideConds.push('ca.user_id = ?');
+        overrideParams.push(targetUserId);
+      }
+      if (groupId) {
+        overrideConds.push('o.group_id = ?');
+        overrideParams.push(groupId);
+      }
+      const [[ovRow]] = await pool.query(
+        `
+        SELECT COALESCE(SUM(ABS(ca.amount)), 0) AS v
+        FROM commission_adjustments ca
+        JOIN orders o ON o.id = ca.order_id
+        WHERE ${overrideConds.join(' AND ')}
+        `,
+        overrideParams
+      );
+      returnCommissionOverrideAbs = Number(ovRow?.v) || 0;
     }
 
     res.json({
       data: {
         return_orders: ret.return_orders,
         return_revenue: ret.return_revenue,
-        return_commission: returnCommission,
+        // Backward compatible: return_commission = HH hoàn direct (abs)
+        return_commission: Number(returnCommissionDirectAbs) || 0,
+        return_commission_direct_abs: Number(returnCommissionDirectAbs) || 0,
+        return_commission_override_abs: Number(returnCommissionOverrideAbs) || 0,
+        return_commission_total_abs: (Number(returnCommissionDirectAbs) || 0) + (Number(returnCommissionOverrideAbs) || 0),
       }
     });
   } catch (err) {

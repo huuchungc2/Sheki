@@ -16,6 +16,14 @@
 ### Changed
 - **UI menu + tiêu đề trang** — “Danh mục sản phẩm” → “Danh mục” trong nhóm menu Sản phẩm và tiêu đề màn danh mục. — Files: `src/components/Layout.tsx`, `src/pages/Categories.tsx`
 
+## [01/05/2026] - Dashboard: HH hoàn hiển thị đồng nhất (Sale vs Quản lý)
+### Changed
+- **Dashboard KPI** — Tách “HH hoàn” thành 2 ô: **HH hoàn (Sale/direct)** và **HH hoàn (Quản lý/override)**. Nguyên tắc tính lương giữ nguyên: chỉ trừ HH hoàn direct; override hoàn đã nằm trong override net. — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`
+
+## [01/05/2026] - Báo cáo hoa hồng: tách HH hoàn Sale/Quản lý
+### Changed
+- **CommissionReport** — Tách KPI HH hoàn thành **HH hoàn (Sale/direct)** và **HH hoàn (Quản lý/override)**, giữ nguyên công thức lương (chỉ trừ direct; override đã nằm trong HH từ CTV net). — Files: `backend/routes/reports.js` (`/reports/returns-summary`), `src/pages/CommissionReport.tsx`
+
 ## [01/05/2026] - Báo cáo doanh thu: lọc theo kỳ lương
 ### Added
 - **`GET /reports/revenue?payroll_period_id=`** — Đơn/ship/HH theo `orders.payroll_period_id`; cột hoàn (`total_returns` + summary) theo `returns.created_at` trong khoảng kỳ (khớp returns-summary). — File: `backend/routes/reports.js`

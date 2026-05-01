@@ -15,6 +15,8 @@
 - [x] **OrderList: filter nhân viên có ô tìm kiếm** — Dropdown nhân viên (Admin) có input search + load theo keyword thay vì load hết option gây giật. — File: `src/pages/OrderList.tsx`
 - [x] **ProductForm: upload ảnh trên điện thoại** — Multer nhận MIME kiểu mobile + giới hạn file; hiển thị `/uploads` đúng origin khi dev qua IP; UX xóa ảnh cảm ứng. — Files: `backend/routes/uploads.js`, `backend/middleware/errorHandler.js`, `src/pages/ProductForm.tsx`
 - [x] **Menu Sản phẩm: đổi “Danh mục sản phẩm” → “Danh mục”** — Rút gọn nhãn menu và tiêu đề trang danh mục. — Files: `src/components/Layout.tsx`, `src/pages/Categories.tsx`
+- [x] **Dashboard: HH hoàn hiển thị đồng nhất** — Tách HH hoàn (Sale/direct) và HH hoàn (Quản lý/override) để không gây hiểu nhầm; không đổi công thức lương. — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`
+- [x] **Báo cáo hoa hồng: tách HH hoàn Sale/Quản lý** — KPI HH hoàn hiển thị 2 phần; API `/reports/returns-summary` trả thêm `return_commission_override_abs`. — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`
 - [x] **Báo cáo doanh thu: filter kỳ lương** — API + UI RevenueReport + export Excel. — Files: `backend/routes/reports.js`, `src/pages/RevenueReport.tsx`, `src/lib/exportExcel.ts`
 - [x] **Đơn hoàn: chặn xóa khi kỳ lương đã chốt** — `DELETE /returns/:id` kiểm `returns.created_at` trong kỳ `closed`. — Files: `backend/services/payrollPeriod.js`, `backend/routes/returns.js`, `LOGIC_BUSINESS.md`
 - [x] **Payroll preview: HH hoàn quản lý (override)** — Tính + hiển thị trừ HH override khi hoàn; rebuild snapshot đủ user. — Files: `backend/routes/payroll.js`, `backend/services/payrollPeriod.js`, `src/pages/PayrollPeriods.tsx`

@@ -189,7 +189,10 @@ export function CommissionReport() {
   const [returnsSummary, setReturnsSummary] = React.useState<any>({
     return_orders: 0,
     return_revenue: 0,
-    return_commission: 0,
+    return_commission: 0, // backward: direct abs
+    return_commission_direct_abs: 0,
+    return_commission_override_abs: 0,
+    return_commission_total_abs: 0,
   });
 
   // Admin view data
@@ -267,7 +270,14 @@ export function CommissionReport() {
       total_luong: 0,
     });
     setOrderCommissions([]);
-    setReturnsSummary({ return_orders: 0, return_revenue: 0, return_commission: 0 });
+    setReturnsSummary({
+      return_orders: 0,
+      return_revenue: 0,
+      return_commission: 0,
+      return_commission_direct_abs: 0,
+      return_commission_override_abs: 0,
+      return_commission_total_abs: 0,
+    });
     try {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({ page: String(commPage), limit: String(commLimit) });
@@ -324,6 +334,10 @@ export function CommissionReport() {
           return_orders: Number(rj?.data?.return_orders) || 0,
           return_revenue: Number(rj?.data?.return_revenue) || 0,
           return_commission: Number(rj?.data?.return_commission) || 0,
+          return_commission_direct_abs:
+            Number(rj?.data?.return_commission_direct_abs) || Number(rj?.data?.return_commission) || 0,
+          return_commission_override_abs: Number(rj?.data?.return_commission_override_abs) || 0,
+          return_commission_total_abs: Number(rj?.data?.return_commission_total_abs) || 0,
         });
       }
 
@@ -679,9 +693,19 @@ export function CommissionReport() {
           <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
             <TrendingUp className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng HH hoàn</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH hoàn (Sale)</p>
           <p className="text-xl font-bold text-red-600 mt-1 break-words tabular-nums">
-            {formatCurrency(returnsSummary.return_commission || 0)}
+            −{formatCurrency(returnsSummary.return_commission_direct_abs || 0)}
+          </p>
+          <p className="text-xs text-slate-400 mt-1 break-words">Tháng {month}/{year}</p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+            <TrendingUp className="w-4 h-4" />
+          </div>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH hoàn (Quản lý)</p>
+          <p className="text-xl font-bold text-red-600 mt-1 break-words tabular-nums">
+            −{formatCurrency(returnsSummary.return_commission_override_abs || 0)}
           </p>
           <p className="text-xs text-slate-400 mt-1 break-words">Tháng {month}/{year}</p>
         </div>

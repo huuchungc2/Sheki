@@ -206,9 +206,17 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
                 <TrendingDown className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng HH hoàn</p>
-              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-Math.abs(thisMonth.return_commission || 0))}</p>
-              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission || 0))}</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH hoàn (Sale)</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-Math.abs(thisMonth.return_commission_direct || 0))}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_direct || 0))}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH hoàn (Quản lý)</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-Math.abs(thisMonth.return_commission_override || 0))}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_override || 0))}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
               <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
@@ -493,9 +501,17 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
                 <TrendingDown className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Tổng HH hoàn</p>
-              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-Math.abs(thisMonth.return_commission || 0))}</p>
-              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission || 0))}</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH hoàn (Sale)</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-Math.abs(thisMonth.return_commission_direct || 0))}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_direct || 0))}</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">HH hoàn (Quản lý)</p>
+              <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(-Math.abs(thisMonth.return_commission_override || 0))}</p>
+              <p className="text-xs text-slate-400 mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_override || 0))}</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
               <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center text-red-600 mb-3">
