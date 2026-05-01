@@ -24,6 +24,10 @@
 ### Changed
 - **CommissionReport** — Tách KPI HH hoàn thành **HH hoàn (Sale/direct)** và **HH hoàn (Quản lý/override)**, giữ nguyên công thức lương (chỉ trừ direct; override đã nằm trong HH từ CTV net). — Files: `backend/routes/reports.js` (`/reports/returns-summary`), `src/pages/CommissionReport.tsx`
 
+## [01/05/2026] - ProductForm: bấm “Tải ảnh” trên điện thoại
+### Fixed
+- **Thêm/sửa sản phẩm** — Bỏ `input[type=file]` `display:none` + `label htmlFor`; dùng input phủ vùng (`opacity-0`, `inset-0`) và `accept="image/*"` để Safari/Android mở được picker. — File: `src/pages/ProductForm.tsx`
+
 ## [01/05/2026] - Báo cáo doanh thu: lọc theo kỳ lương
 ### Added
 - **`GET /reports/revenue?payroll_period_id=`** — Đơn/ship/HH theo `orders.payroll_period_id`; cột hoàn (`total_returns` + summary) theo `returns.created_at` trong khoảng kỳ (khớp returns-summary). — File: `backend/routes/reports.js`

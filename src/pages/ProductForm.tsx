@@ -383,16 +383,6 @@ export function ProductForm() {
                 Hình ảnh sản phẩm
               </h3>
               
-              {/* Hidden file input */}
-              <input
-                type="file"
-                id="product-images"
-                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif"
-                multiple
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-              
               {/* Image previews */}
               {images.length > 0 && (
                 <div className="grid grid-cols-2 gap-3 mb-4">
@@ -407,16 +397,23 @@ export function ProductForm() {
                 </div>
               )}
               
-              {/* Upload button */}
-              <label
-                htmlFor="product-images"
-                className="flex flex-col items-center justify-center aspect-square rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 hover:bg-slate-100 hover:border-blue-400 cursor-pointer transition-all group mb-3"
-              >
-                <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mb-3 group-hover:scale-110 transition-all">
-                  <Plus className="w-6 h-6 text-slate-400 group-hover:text-blue-600" />
-                </div>
-                <p className="text-sm font-medium text-slate-600">Tải ảnh lên</p>
-                <p className="text-xs text-slate-400 mt-1 text-center px-2">Chọn thư viện hoặc chụp ảnh (điện thoại)</p>
+              {/* Upload: input phủ vùng (opacity 0) — iOS/Android hay không mở picker khi input display:none + label htmlFor */}
+              <label className="relative flex flex-col items-center justify-center aspect-square rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 hover:bg-slate-100 hover:border-blue-400 cursor-pointer transition-all group mb-3 overflow-hidden">
+                <span className="pointer-events-none flex flex-col items-center">
+                  <span className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mb-3 group-hover:scale-110 transition-all">
+                    <Plus className="w-6 h-6 text-slate-400 group-hover:text-blue-600" />
+                  </span>
+                  <span className="text-sm font-medium text-slate-600">Tải ảnh lên</span>
+                  <span className="text-xs text-slate-400 mt-1 text-center px-2">Chọn thư viện hoặc chụp ảnh (điện thoại)</span>
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                  aria-label="Chọn hoặc chụp ảnh sản phẩm"
+                />
               </label>
               
               {/* Or paste URL */}
