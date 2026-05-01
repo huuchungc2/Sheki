@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { cn, formatCurrency, isAdminUser } from "../lib/utils";
-import { api } from "../lib/api";
+import { API_URL, api } from "../lib/api";
 import type { OrderItem } from "../types";
 import { computeOrderCollects, type ShipPayer } from "../lib/orderCollect";
 
@@ -164,6 +164,7 @@ export function OrderForm() {
         productId: product.id,
         productName: product.name,
         sku: product.sku,
+        image: product.image ?? null,
         price: product.price,
         availableStock: product.available_stock ?? 0,
         quantity: 1,
@@ -208,6 +209,37 @@ export function OrderForm() {
   /** Khi sửa đơn collaborator: đảm bảo quản lý hiện tại có trong list (kể cả ngoài nhóm — backend include_user_ids) */
   const [editIncludeManagerId, setEditIncludeManagerId] = React.useState<number | null>(null);
   const isAdmin = isAdminUser(currentUser);
+
+  const apiOrigin = React.useMemo(() => {
+    if (typeof API_URL !== "string") return "";
+    // When API_URL is absolute (e.g. http://host:3000/api) -> need origin for /uploads/*
+    if (/^https?:\/\//i.test(API_URL)) return API_URL.replace(/\/api\/?$/i, "");
+    // When API_URL is relative (/api) -> uploads are same-origin
+    return "";
+  }, []);
+
+  const getMainProductImage = React.useCallback((p: any): string | null => {
+    const raw = p?.images;
+    if (!raw) return null;
+    try {
+      const arr = Array.isArray(raw) ? raw : JSON.parse(raw);
+      const first = Array.isArray(arr) ? arr[0] : null;
+      return typeof first === "string" && first.trim() ? first.trim() : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const resolveImageSrc = React.useCallback(
+    (img: string | null | undefined) => {
+      if (!img) return null;
+      const v = String(img).trim();
+      if (!v) return null;
+      if (v.startsWith("/")) return `${apiOrigin}${v}`;
+      return v;
+    },
+    [apiOrigin]
+  );
 
   const applyLinesCommission = React.useCallback(
     (list: { id: number; commission_rate?: number }[], managerId: number | null) => {
@@ -405,7 +437,16 @@ export function OrderForm() {
       const wh = selectedWarehouseId ? `&warehouse_id=${selectedWarehouseId}` : '';
       const res: any = await api.get(`/products?search=${encodeURIComponent(q)}&limit=50${wh}&active_only=1`);
       const data = res?.data ?? [];
-      setProductSuggestions(data.map((p: any) => ({ id: p.id, name: p.name, sku: p.sku, price: Number(p.price) || 0, available_stock: Number(p.available_stock) || 0 })));
+      setProductSuggestions(
+        data.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          price: Number(p.price) || 0,
+          available_stock: Number(p.available_stock) || 0,
+          image: getMainProductImage(p),
+        }))
+      );
     } catch {
       setProductSuggestions([]);
     }
@@ -440,6 +481,7 @@ export function OrderForm() {
           productId: it.product_id ?? it.productId ?? '',
           productName: it.product_name ?? it.productName ?? '',
           sku: it.sku ?? '',
+          image: getMainProductImage({ images: it.product_images ?? it.images }),
           price: Number(it.unit_price ?? it.price ?? 0),
           // available_stock sẽ được sync lại theo kho qua /inventory/stock-by-warehouse
           availableStock: Number(it.available_stock ?? 0),
@@ -936,9 +978,26 @@ export function OrderForm() {
                             onClick={() => addProduct(product)}
                             className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
                           >
-                            <div>
-                              <p className="text-sm font-medium text-slate-800">{product.name}</p>
-                              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono">{product.sku}</p>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                {resolveImageSrc(product.image) ? (
+                                  <img
+                                    src={resolveImageSrc(product.image) as string}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = "none";
+                                    }}
+                                  />
+                                ) : (
+                                  <Package className="w-4 h-4 text-slate-300" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-slate-800 truncate">{product.name}</p>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono truncate">{product.sku}</p>
+                              </div>
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-medium text-slate-800">{formatCurrency(product.price)}</p>
@@ -1010,9 +1069,26 @@ export function OrderForm() {
                               onClick={() => addProduct(product)}
                               className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
                             >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-slate-800 truncate">{product.name}</p>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono">{product.sku}</p>
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                  {resolveImageSrc(product.image) ? (
+                                    <img
+                                      src={resolveImageSrc(product.image) as string}
+                                      alt=""
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = "none";
+                                      }}
+                                    />
+                                  ) : (
+                                    <Package className="w-4 h-4 text-slate-300" />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-slate-800 truncate">{product.name}</p>
+                                  <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono truncate">{product.sku}</p>
+                                </div>
                               </div>
                               <div className="text-right flex-shrink-0 pl-3">
                                 <p className="text-sm font-semibold text-slate-800">{formatCurrency(product.price)}</p>
@@ -1108,8 +1184,27 @@ export function OrderForm() {
                             )}
                           >
                             <div className="w-[260px] min-w-0">
-                              <p className="text-[13px] font-semibold text-slate-800 truncate">{item.productName}</p>
-                              <p className="mt-0.5 text-[10px] text-slate-400 font-mono uppercase tracking-wide truncate">{item.sku}</p>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                  {resolveImageSrc((item as any).image) ? (
+                                    <img
+                                      src={resolveImageSrc((item as any).image) as string}
+                                      alt=""
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = "none";
+                                      }}
+                                    />
+                                  ) : (
+                                    <Package className="w-4 h-4 text-slate-300" />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-semibold text-slate-800 truncate">{item.productName}</p>
+                                  <p className="mt-0.5 text-[10px] text-slate-400 font-mono uppercase tracking-wide truncate">{item.sku}</p>
+                                </div>
+                              </div>
                               <p className={cn("mt-0.5 text-[10px]", overStock ? "text-red-600 font-medium" : "text-slate-500")}>
                                 Có thể bán: {maxAllowed.toFixed(3).replace(/\.?0+$/, "")}
                                 {overStock && <span className="ml-1">— Vượt tồn</span>}
@@ -1282,8 +1377,20 @@ export function OrderForm() {
                         >
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-slate-300 flex-shrink-0">
-                                <Package className="w-3 h-3" />
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                {resolveImageSrc((item as any).image) ? (
+                                  <img
+                                    src={resolveImageSrc((item as any).image) as string}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = "none";
+                                    }}
+                                  />
+                                ) : (
+                                  <Package className="w-4 h-4 text-slate-300" />
+                                )}
                               </div>
                               <div className="min-w-0">
                                 <p className="font-medium text-slate-800 truncate text-xs leading-tight">{item.productName}</p>

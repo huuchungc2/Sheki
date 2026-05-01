@@ -11,6 +11,8 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **OrderForm: chọn SP hiển thị ảnh (dropdown + danh sách)** — Dropdown gợi ý sản phẩm và danh sách SP đã chọn hiển thị thumbnail từ `products.images` (desktop/mobile) để UI sinh động hơn. — File: `src/pages/OrderForm.tsx`
+- [x] **OrderForm edit: dòng SP có ảnh** — API chi tiết đơn trả thêm `product_images` để render thumbnail cho item khi sửa đơn. — Files: `src/pages/OrderForm.tsx`, `backend/routes/orders.js`
 - [x] **Báo cáo hoa hồng: vào chi tiết không nhảy tháng/kỳ** — Query giữ tháng-năm hoặc `payroll_period_id`; bootstrap từ URL + ref `periodTouched` tránh lệch kỳ sau load danh sách kỳ; Sales không bị đá về Dashboard. — Files: `src/pages/CommissionReport.tsx`, `src/App.tsx`
 - [x] **OrderList: filter nhân viên có ô tìm kiếm** — Dropdown nhân viên (Admin) có input search + load theo keyword thay vì load hết option gây giật. — File: `src/pages/OrderList.tsx`
 - [x] **ProductForm: upload ảnh trên điện thoại** — Multer nhận MIME kiểu mobile + giới hạn file; hiển thị `/uploads` đúng origin khi dev qua IP; UX xóa ảnh cảm ứng. — Files: `backend/routes/uploads.js`, `backend/middleware/errorHandler.js`, `src/pages/ProductForm.tsx`

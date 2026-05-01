@@ -1,3 +1,7 @@
+## [01/05/2026] - OrderForm: sản phẩm có ảnh (gợi ý + đã chọn)
+### Changed
+- **OrderForm** — Dropdown tìm sản phẩm (desktop/mobile) và danh sách sản phẩm đã chọn hiển thị thumbnail ảnh sản phẩm (lấy `products.images[0]`, resolve `/uploads` theo API origin), fallback icon khi không có ảnh; **edit mode** cũng có ảnh nhờ API đơn trả thêm `product_images`. — Files: `src/pages/OrderForm.tsx`, `backend/routes/orders.js`
+
 ## [01/05/2026] - Báo cáo HH: chi tiết khớp kỳ/tháng (fetch đầu + URL kỳ lương)
 ### Fixed
 - **CommissionReport** — Khởi tạo bộ lọc từ query (lazy) trước fetch đầu tiên (không còn một nhịp sai tháng/năm mặc định); `fetchPayrollPeriods` đọc `periodTouched` qua ref để không ghi đè `payroll_period_id` trên URL bằng kỳ đang mở khi response tới trễ. — File: `src/pages/CommissionReport.tsx`

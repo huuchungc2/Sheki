@@ -585,7 +585,7 @@ router.get('/:id', auth, requireShop, requireFeature('orders.view'), async (req,
     }
 
     const [items] = await pool.query(
-      `SELECT oi.*, p.name as product_name, p.sku, p.unit
+      `SELECT oi.*, p.name as product_name, p.sku, p.unit, p.images as product_images
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
        WHERE oi.order_id = ?`,
