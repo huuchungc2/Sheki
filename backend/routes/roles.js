@@ -5,6 +5,8 @@ const requireShop = require('../middleware/requireShop');
 const requirePermission = require('../middleware/requirePermission');
 const { getPool } = require('../config/db');
 const { FEATURE_KEYS } = require('../rbac/features');
+const { defaultFeaturePermissions } = require('../rbac/defaults');
+const { syncModulePermissionsFromFeatures } = require('../services/rolePermissionSync');
 
 const CODE_RE = /^[a-z][a-z0-9_]{2,31}$/;
 
@@ -82,41 +84,11 @@ async function tableExists(pool, tableName) {
   }
 }
 
-function defaultFeaturePermissions(roleCodeRaw) {
-  const roleCode = String(roleCodeRaw || '').trim().toLowerCase();
-  const out = {};
-  for (const k of FEATURE_KEYS) out[k] = false;
-  if (roleCode === 'admin') {
-    for (const k of FEATURE_KEYS) out[k] = true;
-    return out;
-  }
-  const allow = new Set([
-    'dashboard.view',
-    'orders.list',
-    'orders.view',
-    'orders.create',
-    'orders.edit',
-    'orders.export_items',
-    'customers.list',
-    'customers.view',
-    'customers.create',
-    'customers.edit',
-    'reports.revenue',
-    'reports.commissions',
-    'reports.commissions_ctv',
-    'reports.dashboard',
-    'reports.salary',
-    'products.list',
-  ]);
-  for (const k of allow) out[k] = true;
-  return out;
-}
-
-async function seedRoleFeaturePermissionsForNewRole(pool, shopId, newRoleId, roleCode) {
+async function seedRoleFeaturePermissionsForNewRole(pool, shopId, newRoleId, roleLike) {
   if (!shopId || !newRoleId) return;
   const has = await tableExists(pool, 'role_feature_permissions');
   if (!has) return;
-  const defaults = defaultFeaturePermissions(roleCode);
+  const defaults = defaultFeaturePermissions(roleLike);
   const rowsToInsert = FEATURE_KEYS.map((k) => [shopId, newRoleId, k, defaults[k] ? 1 : 0]);
   await pool.query('DELETE FROM role_feature_permissions WHERE shop_id = ? AND role_id = ?', [shopId, newRoleId]);
   if (rowsToInsert.length) {
@@ -125,6 +97,7 @@ async function seedRoleFeaturePermissionsForNewRole(pool, shopId, newRoleId, rol
       [rowsToInsert]
     );
   }
+  await syncModulePermissionsFromFeatures(pool, shopId, newRoleId, defaults);
 }
 
 router.get('/', auth, requireShop, requirePermission('settings', 'view'), async (req, res, next) => {
@@ -195,7 +168,10 @@ router.post('/', auth, requireShop, requirePermission('settings', 'edit'), async
     }
 
     await seedRolePermissionsForNewRole(pool, req.shopId, r.insertId, isAdmin);
-    await seedRoleFeaturePermissionsForNewRole(pool, req.shopId, r.insertId, code);
+    await seedRoleFeaturePermissionsForNewRole(pool, req.shopId, r.insertId, {
+      code,
+      can_access_admin: isAdmin ? 1 : 0,
+    });
 
     const [[row]] = await pool.query('SELECT * FROM roles WHERE id = ?', [r.insertId]);
     res.status(201).json({ data: row });

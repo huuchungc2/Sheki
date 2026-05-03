@@ -1,5 +1,6 @@
 const { getPool } = require('../config/db');
 const { FEATURE_KEYS } = require('../rbac/features');
+const { defaultFeaturePermissions } = require('../rbac/defaults');
 
 function emptyCaps2() {
   const out = {};
@@ -7,44 +8,15 @@ function emptyCaps2() {
   return out;
 }
 
-function salesLikeDefaultCaps2() {
-  const out = emptyCaps2();
-  const allow = new Set([
-    'dashboard.view',
-
-    'orders.list',
-    'orders.view',
-    'orders.create',
-    'orders.edit',
-    'orders.export_items',
-
-    'customers.list',
-    'customers.view',
-    'customers.create',
-    'customers.edit',
-
-    'reports.revenue',
-    'reports.commissions',
-    'reports.commissions_ctv',
-    'reports.dashboard',
-    'reports.salary',
-
-    'products.list',
-  ]);
-  for (const k of allow) {
-    if (Object.prototype.hasOwnProperty.call(out, k)) out[k] = true;
-  }
-  return out;
-}
-
-function defaultCaps2ForRole(roleCodeRaw) {
-  const roleCode = String(roleCodeRaw || '').trim().toLowerCase();
-  if (roleCode === 'admin') {
-    const out = {};
-    for (const k of FEATURE_KEYS) out[k] = true;
-    return out;
-  }
-  return salesLikeDefaultCaps2();
+/**
+ * @param {string} roleCodeRaw
+ * @param {{ can_access_admin?: any } | null | undefined} userLike
+ */
+function caps2FromRole(roleCodeRaw, userLike) {
+  return defaultFeaturePermissions({
+    code: roleCodeRaw,
+    can_access_admin: userLike?.can_access_admin,
+  });
 }
 
 /**
@@ -68,7 +40,7 @@ function requireFeature(featureKey) {
       if (!roleId) return res.status(403).json({ error: 'Thiếu vai trò' });
 
       const pool = await getPool();
-      const defaultCaps = defaultCaps2ForRole(req.user.role);
+      const defaultCaps = caps2FromRole(req.user.role, req.user);
 
       // Ensure table exists
       try {
@@ -132,14 +104,7 @@ async function computeFeatureCaps(pool, reqUser) {
   if (!shopId || !roleId) return emptyCaps2();
 
   // Start from defaults so missing keys don't become false by accident.
-  const base =
-    reqUser.can_access_admin
-      ? (() => {
-          const out = {};
-          for (const k of FEATURE_KEYS) out[k] = true;
-          return out;
-        })()
-      : defaultCaps2ForRole(reqUser.role);
+  const base = caps2FromRole(reqUser.role, reqUser);
 
   // Table missing => admin-class all true; others false
   try {
@@ -152,7 +117,7 @@ async function computeFeatureCaps(pool, reqUser) {
         return out;
       }
       // No table yet: return defaults so UI/menu still usable
-      return defaultCaps2ForRole(reqUser.role);
+      return caps2FromRole(reqUser.role, reqUser);
     }
     throw e;
   }
@@ -169,7 +134,7 @@ async function computeFeatureCaps(pool, reqUser) {
       return out;
     }
     // No rows seeded yet: default template (sales-like) to avoid blank UI.
-    return defaultCaps2ForRole(reqUser.role);
+    return caps2FromRole(reqUser.role, reqUser);
   }
 
   const [rows] = await pool.query(
@@ -186,4 +151,3 @@ async function computeFeatureCaps(pool, reqUser) {
 }
 
 module.exports = { requireFeature, computeFeatureCaps };
-

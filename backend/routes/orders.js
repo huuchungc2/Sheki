@@ -4,6 +4,7 @@ const router = express.Router();
 
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
+const requirePermission = require('../middleware/requirePermission');
 const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
 const {
@@ -40,7 +41,7 @@ async function loadUserGroupIds(pool, shopId, userId) {
   return rows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
 }
 
-router.get('/', auth, requireShop, requireFeature('orders.list'), async (req, res, next) => {
+router.get('/', auth, requireShop, requirePermission('orders', 'view'), requireFeature('orders.list'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, status, employee, warehouse, date_from, date_to, group_id, product, page = 1, limit = 20 } = req.query;
@@ -268,7 +269,7 @@ router.get('/', auth, requireShop, requireFeature('orders.list'), async (req, re
 
 // Export: chi tiết sản phẩm theo bộ lọc (phục vụ Excel)
 // GET /api/orders/export-items?search=&status=&employee=&warehouse=&date_from=&date_to=&group_id=
-router.get('/export-items', auth, requireShop, requireFeature('orders.export_items'), async (req, res, next) => {
+router.get('/export-items', auth, requireShop, requirePermission('orders', 'view'), requireFeature('orders.export_items'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, status, employee, warehouse, date_from, date_to, group_id, product } = req.query;
@@ -376,7 +377,7 @@ router.get('/export-items', auth, requireShop, requireFeature('orders.export_ite
 
 // Page items: trả danh sách sản phẩm theo list order_ids (phục vụ cột "Sản phẩm" trong OrderList)
 // GET /api/orders/page-items?order_ids=1,2,3
-router.get('/page-items', auth, requireShop, requireFeature('orders.list'), async (req, res, next) => {
+router.get('/page-items', auth, requireShop, requirePermission('orders', 'view'), requireFeature('orders.list'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const raw = String(req.query.order_ids || '');
@@ -439,7 +440,7 @@ router.get('/page-items', auth, requireShop, requireFeature('orders.list'), asyn
 // - groups của salesperson_id của đơn
 // - managers (collaborators) của salesperson_id của đơn, có thể filter theo group_id
 // GET /api/orders/:id/edit-context?group_id=&include_user_ids=
-router.get('/:id/edit-context', auth, requireShop, requireFeature('orders.view'), async (req, res, next) => {
+router.get('/:id/edit-context', auth, requireShop, requirePermission('orders', 'view'), requireFeature('orders.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -540,7 +541,7 @@ router.get('/:id/edit-context', auth, requireShop, requireFeature('orders.view')
   }
 });
 
-router.get('/:id', auth, requireShop, requireFeature('orders.view'), async (req, res, next) => {
+router.get('/:id', auth, requireShop, requirePermission('orders', 'view'), requireFeature('orders.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -674,7 +675,7 @@ router.get('/:id', auth, requireShop, requireFeature('orders.view'), async (req,
   }
 });
 
-router.post('/', auth, requireShop, requireFeature('orders.create'), async (req, res, next) => {
+router.post('/', auth, requireShop, requirePermission('orders', 'create'), requireFeature('orders.create'), async (req, res, next) => {
   try {
     const {
       customer_id,
@@ -869,7 +870,7 @@ router.post('/', auth, requireShop, requireFeature('orders.create'), async (req,
   }
 });
 
-router.put('/:id', auth, requireShop, requireFeature('orders.edit'), async (req, res, next) => {
+router.put('/:id', auth, requireShop, requirePermission('orders', 'edit'), requireFeature('orders.edit'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -1163,7 +1164,7 @@ router.put('/:id', auth, requireShop, requireFeature('orders.edit'), async (req,
 
 // POST /api/orders/:id/cancel-with-payroll-adjustment
 // Admin/kế toán: hủy đơn thuộc kỳ đã chốt bằng cách tạo payroll_adjustments (âm) sang kỳ đang mở.
-router.post('/:id/cancel-with-payroll-adjustment', auth, requireShop, requireFeature('orders.edit'), async (req, res, next) => {
+router.post('/:id/cancel-with-payroll-adjustment', auth, requireShop, requirePermission('orders', 'edit'), requireFeature('orders.edit'), async (req, res, next) => {
   try {
     return res.status(400).json({
       error: 'Đơn thuộc kỳ lương đã chốt không được hủy. Vui lòng tạo đơn hoàn (returns).',
@@ -1171,7 +1172,7 @@ router.post('/:id/cancel-with-payroll-adjustment', auth, requireShop, requireFea
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', auth, requireShop, requireFeature('orders.delete'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, requirePermission('orders', 'delete'), requireFeature('orders.delete'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -1180,11 +1181,7 @@ router.delete('/:id', auth, requireShop, requireFeature('orders.delete'), async 
       return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
     }
 
-    const isAdminOrderDel = req.user.can_access_admin === true || req.user.role === 'admin';
-    if (!isAdminOrderDel) {
-      return res.status(403).json({ error: 'Không có quyền xóa đơn hàng' });
-    }
-
+    // Quyền xóa: requirePermission('orders','delete') + requireFeature('orders.delete') + scope/payroll/status (không chặn cứng chỉ admin — NV có quyền trong Settings vẫn xóa được đơn trong phạm vi)
     const order = existing[0];
     const p = await getOrderPayrollPeriod(pool, { shopId: req.shopId, orderId: parseInt(req.params.id, 10) });
     if (p?.status === 'closed') {

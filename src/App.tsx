@@ -68,6 +68,24 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Khớp `requirePermission(module, action)` trên API — Super Admin / Admin shop bypass giống backend */
+function PermissionRoute({
+  module,
+  action,
+  children,
+}: {
+  module: string;
+  action: string;
+  children: React.ReactNode;
+}) {
+  const u = getStoredUser();
+  if (!u) return <Navigate to="/login" replace />;
+  if ((u as { is_super_admin?: boolean }).is_super_admin) return <>{children}</>;
+  if (isAdminUser(u)) return <>{children}</>;
+  if (capTrue(u, module, action)) return <>{children}</>;
+  return <Navigate to="/" replace />;
+}
+
 function InventoryViewRoute({ children }: { children: React.ReactNode }) {
   const u = getStoredUser();
   if (isAdminUser(u)) return <>{children}</>;
@@ -191,18 +209,18 @@ export default function App() {
                   <Route path="/employees/:id/collaborators" element={<AdminRoute><CollaboratorsPage /></AdminRoute>} />
                   <Route path="/employees/:id/collaborators/commissions" element={<AdminRoute><CollaboratorsCommissionReport /></AdminRoute>} />
                   <Route path="/employees/import" element={<AdminRoute><BulkImport /></AdminRoute>} />
-                  <Route path="/products" element={<AdminRoute><ProductList /></AdminRoute>} />
-                  <Route path="/products/new" element={<AdminRoute><ProductForm /></AdminRoute>} />
-                  <Route path="/products/edit/:id" element={<AdminRoute><ProductForm /></AdminRoute>} />
-                  <Route path="/products/import" element={<AdminRoute><BulkImport /></AdminRoute>} />
+                  <Route path="/products" element={<PermissionRoute module="products" action="view"><ProductList /></PermissionRoute>} />
+                  <Route path="/products/new" element={<PermissionRoute module="products" action="create"><ProductForm /></PermissionRoute>} />
+                  <Route path="/products/edit/:id" element={<PermissionRoute module="products" action="edit"><ProductForm /></PermissionRoute>} />
+                  <Route path="/products/import" element={<PermissionRoute module="products" action="view"><BulkImport /></PermissionRoute>} />
                   <Route path="/categories" element={<AdminRoute><Categories /></AdminRoute>} />
-                  <Route path="/customers" element={<CustomerList />} />
-                  <Route path="/customers/new" element={<CustomerForm />} />
-                  <Route path="/customers/edit/:id" element={<CustomerForm />} />
-                  <Route path="/customers/import" element={<BulkImport />} />
-                  <Route path="/orders" element={<OrderList />} />
-                  <Route path="/orders/new" element={<OrderForm />} />
-                  <Route path="/orders/edit/:id" element={<OrderForm />} />
+                  <Route path="/customers" element={<PermissionRoute module="customers" action="view"><CustomerList /></PermissionRoute>} />
+                  <Route path="/customers/new" element={<PermissionRoute module="customers" action="create"><CustomerForm /></PermissionRoute>} />
+                  <Route path="/customers/edit/:id" element={<PermissionRoute module="customers" action="edit"><CustomerForm /></PermissionRoute>} />
+                  <Route path="/customers/import" element={<PermissionRoute module="customers" action="view"><BulkImport /></PermissionRoute>} />
+                  <Route path="/orders" element={<PermissionRoute module="orders" action="view"><OrderList /></PermissionRoute>} />
+                  <Route path="/orders/new" element={<PermissionRoute module="orders" action="create"><OrderForm /></PermissionRoute>} />
+                  <Route path="/orders/edit/:id" element={<PermissionRoute module="orders" action="edit"><OrderForm /></PermissionRoute>} />
                   <Route path="/orders/search/*" element={<Navigate to="/orders" replace />} />
                   <Route path="/inventory" element={<InventoryViewRoute><InventoryHistory /></InventoryViewRoute>} />
                   <Route path="/inventory/import" element={<InventoryEditRoute><InventoryImport /></InventoryEditRoute>} />
@@ -214,11 +232,11 @@ export default function App() {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/reports/revenue" element={<ReportsViewRoute><RevenueReport /></ReportsViewRoute>} />
                   <Route path="/reports/commissions" element={<CommissionReport />} />
-                  <Route path="/reports/payroll-periods" element={<AdminRoute><PayrollPeriods /></AdminRoute>} />
+                  <Route path="/reports/payroll-periods" element={<PermissionRoute module="reports" action="edit"><PayrollPeriods /></PermissionRoute>} />
                   <Route path="/reports/commissions/ctv" element={<ReportsViewRoute><CtvCommissionRoute /></ReportsViewRoute>} />
                   {/* Admin: xem chi tiết NV bất kỳ; Sales: chỉ xem chính mình (CommissionReport sẽ tự co scope). */}
                   <Route path="/reports/commissions/:userId" element={<CommissionReport />} />
-                  <Route path="/reports/commissions/:userId/order/:orderId" element={<AdminRoute><OrderCommissionDetail /></AdminRoute>} />
+                  <Route path="/reports/commissions/:userId/order/:orderId" element={<PermissionRoute module="reports" action="view"><OrderCommissionDetail /></PermissionRoute>} />
                   <Route path="/commission-rules" element={<AdminRoute><CommissionRules /></AdminRoute>} />
                   <Route path="/cash-transactions" element={<ReportsViewRoute><CashTransactions /></ReportsViewRoute>} />
                   <Route path="/roles" element={<AdminRoute><RolesPage /></AdminRoute>} />

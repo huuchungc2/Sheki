@@ -5,8 +5,10 @@ const requireShop = require('../middleware/requireShop');
 const requirePermission = require('../middleware/requirePermission');
 const { getPool } = require('../config/db');
 const { FEATURE_KEYS, FEATURE_TREE, SCOPE_TARGETS, SCOPE_LEVELS } = require('../rbac/features');
+const { defaultFeaturePermissions, getDefaultModulePermissionRows } = require('../rbac/defaults');
+const { syncModulePermissionsFromFeatures } = require('../services/rolePermissionSync');
 
-// Nhóm nhân viên theo mã vai trò (roles.code) — nhân viên thuộc shop hiện tại (user_shops)
+// Nhóm nhân viên theo vai trò (role_id) — nhân viên thuộc shop hiện tại (user_shops)
 router.get('/', auth, requireShop, requirePermission('settings', 'view'), async (req, res, next) => {
   try {
     const pool = await getPool();
@@ -22,7 +24,7 @@ router.get('/', auth, requireShop, requirePermission('settings', 'view'), async 
 
     const roleMap = {};
     rows.forEach((u) => {
-      const key = u.role;
+      const key = String(u.role_id);
       if (!roleMap[key]) {
         roleMap[key] = { role: u.role, role_name: u.role_name, role_id: u.role_id, users: [] };
       }
@@ -56,87 +58,18 @@ async function resolveRole(req, pool) {
 
   const asNum = Number(raw);
   if (Number.isFinite(asNum) && String(parseInt(raw, 10)) === raw) {
-    const [[r]] = await pool.query('SELECT id, code FROM roles WHERE id = ? LIMIT 1', [parseInt(raw, 10)]);
+    const [[r]] = await pool.query(
+      'SELECT id, code, can_access_admin FROM roles WHERE id = ? LIMIT 1',
+      [parseInt(raw, 10)]
+    );
     return r || null;
   }
 
-  const [[r]] = await pool.query('SELECT id, code FROM roles WHERE code = ? LIMIT 1', [raw.toLowerCase()]);
+  const [[r]] = await pool.query(
+    'SELECT id, code, can_access_admin FROM roles WHERE code = ? LIMIT 1',
+    [raw.toLowerCase()]
+  );
   return r || null;
-}
-
-function salesLikePermissions() {
-  // IMPORTANT: Always return a full 8x4 matrix (32 rows) so UI can render/toggle consistently.
-  // Keep this in sync with backend RBAC config (`backend/rbac/modules.js`).
-  const { RBAC_MODULES, RBAC_ACTIONS } = require('../rbac/modules');
-  const modules = RBAC_MODULES.map((m) => m.id);
-  const actions = RBAC_ACTIONS.map((a) => a.id);
-  const permissions = [];
-  for (const m of modules) {
-    for (const a of actions) {
-      let allowed = false;
-      if (m === 'dashboard' && a === 'view') allowed = true;
-      if (m === 'orders' && ['view', 'create', 'edit'].includes(a)) allowed = true;
-      if (m === 'customers' && ['view', 'create', 'edit'].includes(a)) allowed = true;
-      if (m === 'reports' && a === 'view') allowed = true;
-      if (m === 'products' && a === 'view') allowed = true;
-      permissions.push({ module: m, action: a, allowed });
-    }
-  }
-  return permissions;
-}
-
-function getDefaultPermissions(roleCode) {
-  const { RBAC_MODULES } = require('../rbac/modules');
-  const modules = RBAC_MODULES.map((m) => m.id);
-  const permissions = [];
-
-  if (roleCode === 'admin') {
-    modules.forEach((m) => {
-      ['view', 'create', 'edit', 'delete'].forEach((a) => {
-        permissions.push({ module: m, action: a, allowed: true });
-      });
-    });
-    return permissions;
-  }
-
-  // Mọi vai trò khác (sales, tùy chỉnh): mặc định giống sales
-  return salesLikePermissions();
-}
-
-function defaultFeaturePermissions(roleCodeRaw) {
-  const roleCode = String(roleCodeRaw || '').trim().toLowerCase();
-  const out = {};
-  for (const k of FEATURE_KEYS) out[k] = false;
-  if (roleCode === 'admin') {
-    for (const k of FEATURE_KEYS) out[k] = true;
-    return out;
-  }
-
-  // Default non-admin: like sales
-  const allow = new Set([
-    'dashboard.view',
-
-    'orders.list',
-    'orders.view',
-    'orders.create',
-    'orders.edit',
-    'orders.export_items',
-
-    'customers.list',
-    'customers.view',
-    'customers.create',
-    'customers.edit',
-
-    'reports.revenue',
-    'reports.commissions',
-    'reports.commissions_ctv',
-    'reports.dashboard',
-    'reports.salary',
-
-    'products.list',
-  ]);
-  for (const k of allow) out[k] = true;
-  return out;
 }
 
 async function tableExists(pool, tableName) {
@@ -164,13 +97,13 @@ router.get('/feature-matrix', auth, requireShop, requirePermission('settings', '
     const matrix = {};
 
     if (!hasTable) {
-      for (const r of roles) matrix[r.id] = defaultFeaturePermissions(r.code);
+      for (const r of roles) matrix[r.id] = defaultFeaturePermissions(r);
       return res.json({
         data: { roles, feature_tree: FEATURE_TREE, feature_keys: FEATURE_KEYS, matrix, migrated: false },
       });
     }
 
-    for (const r of roles) matrix[r.id] = defaultFeaturePermissions(r.code);
+    for (const r of roles) matrix[r.id] = defaultFeaturePermissions(r);
 
     const [rows] = await pool.query(
       'SELECT role_id, feature_key, allowed FROM role_feature_permissions WHERE shop_id = ?',
@@ -225,6 +158,12 @@ router.put('/feature-matrix', auth, requireShop, requirePermission('settings', '
           [rowsToInsert]
         );
       }
+
+      const fullMap = {};
+      for (const k of FEATURE_KEYS) {
+        fullMap[k] = Object.prototype.hasOwnProperty.call(perms, k) ? !!perms[k] : false;
+      }
+      await syncModulePermissionsFromFeatures(pool, sid, roleId, fullMap);
     }
 
     res.json({ message: 'Đã cập nhật phân quyền chi tiết' });
@@ -248,10 +187,13 @@ router.post('/feature-seed-default/:roleId', auth, requireShop, requirePermissio
       });
     }
 
-    const [[role]] = await pool.query('SELECT id, code FROM roles WHERE id = ? LIMIT 1', [roleId]);
+    const [[role]] = await pool.query(
+      'SELECT id, code, can_access_admin FROM roles WHERE id = ? LIMIT 1',
+      [roleId]
+    );
     if (!role) return res.status(404).json({ error: 'Không tìm thấy vai trò' });
 
-    const defaults = defaultFeaturePermissions(role.code);
+    const defaults = defaultFeaturePermissions(role);
     await pool.query('DELETE FROM role_feature_permissions WHERE shop_id = ? AND role_id = ?', [sid, roleId]);
 
     const rowsToInsert = FEATURE_KEYS.map((k) => [sid, roleId, k, defaults[k] ? 1 : 0]);
@@ -261,6 +203,7 @@ router.post('/feature-seed-default/:roleId', auth, requireShop, requirePermissio
         [rowsToInsert]
       );
     }
+    await syncModulePermissionsFromFeatures(pool, sid, roleId, defaults);
 
     res.json({ message: 'Đã khởi tạo phân quyền mặc định', data: defaults });
   } catch (err) {
@@ -382,7 +325,7 @@ router.get('/:roleId/permissions', auth, requireShop, requirePermission('setting
       rows = out;
     }
 
-    const defaultPermissions = getDefaultPermissions(String(r.code || '').toLowerCase());
+    const defaultPermissions = getDefaultModulePermissionRows(r);
     const scopes = await getModuleScopes(pool, req.shopId, r.id);
     return res.json({ data: rows.length ? rows : defaultPermissions, role_id: r.id, role: r.code, module_scopes: scopes });
   } catch (err) { next(err); }

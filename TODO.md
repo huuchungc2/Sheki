@@ -7,10 +7,13 @@
 
 ## 🔴 ĐANG LÀM
 
-- [ ] **RBAC (phase 2): áp `requirePermission` dần cho orders/customers/products/reports** — Giữ `scope_own_data` để lọc dữ liệu; thay `authorize('admin')` dần bằng module/action tương ứng; đồng bộ `AdminRoute` vs quyền thật. — Files: `backend/routes/*`, `src/App.tsx`
+- [ ] **Mobile: chuẩn bị phase WebView/RN** — Rà soát tài liệu + checklist release + cấu hình env API_URL, back button, offline, file upload WebView. — Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Settings: phân quyền theo vai (`can_access_admin`, đồng bộ ma trận → `role_permissions`)** — `backend/rbac/defaults.js` một nguồn mặc định; `PUT /settings/feature-matrix` + seed role gọi `syncModulePermissionsFromFeatures`; `requireFeature` / `/roles` seed dùng `can_access_admin`; nhóm user Settings theo `role_id`; `EmployeeForm` chọn vai trò mặc định không chỉ `sales`. — Files: `backend/rbac/defaults.js`, `backend/routes/settings.js`, `backend/routes/roles.js`, `backend/middleware/requireFeature.js`, `backend/services/rolePermissionSync.js`, `src/pages/EmployeeForm.tsx`
+- [x] **tsconfig: exclude `mobile/` cho `npm run lint`** — `tsc` root không type-check app RN thiếu deps. — File: `tsconfig.json`
+- [x] **RBAC (phase 2): `requirePermission` orders/customers/products/reports + `PermissionRoute`** — API: `customers.js`, `orders.js`, `products.js`, `reports.js`; FE: `PermissionRoute` khớp `_caps`; payroll-periods / commission order detail dùng `reports.edit` / `reports.view`. — Files: `backend/routes/customers.js`, `backend/routes/orders.js`, `backend/routes/products.js`, `backend/routes/reports.js`, `src/App.tsx`
 - [x] **Layout: PWA iPhone — safe-area header/menu** — `env(safe-area-inset-top/bottom)` cho header, sidebar brand, vùng nội dung. — File: `src/components/Layout.tsx`
 - [x] **Dev: iPhone Safari vào IP LAN** — Vite `allowedHosts: true`; CORS backend thêm `100.x` (Tailscale). — Files: `vite.config.ts`, `backend/server.js`, `.env.example`
 - [x] **Layout: iPhone — nút menu (z-index main vs sidebar + pointer-events khi drawer mở)** — Drawer đóng `aside z-30` / `main z-40`; mở drawer `main pointer-events-none` + `header z-[60]`; nút menu ~44px, `touch-manipulation`; vùng trang `isolate` cho Recharts. — File: `src/components/Layout.tsx`
@@ -66,7 +69,7 @@
 ## 🟡 TIẾP THEO (theo thứ tự ưu tiên)
 
 - [x] **Super Admin: tạo shop auto-seed quyền + kho mặc định** — Khi tạo shop mới, auto copy `role_permissions` từ shop mẫu (id=1) và tạo 1 `warehouse` mặc định để tránh lỗi 403/thiếu kho. — Files: `backend/routes/shops.js`
-- [ ] **Settings: phân quyền theo vai (role) đúng nghĩa** — Bỏ hardcode role ở UI, load roles từ DB; đổi `role_permissions` theo `role_id`; thêm middleware `requirePermission(module, action)` và áp dần vào routes (giữ `scope_own_data` để lọc dữ liệu). — Files: `backend/routes/settings.js`, `backend/middleware/requirePermission.js`, `backend/routes/roles.js`, `src/pages/Settings.tsx`, `migrations/021_role_permissions_role_id.sql`, `schema.sql`
+- [x] **Settings: phân quyền theo vai (role) đúng nghĩa** — Đồng bộ ma trận chức năng với `role_permissions`; mặc định theo `can_access_admin`; RBAC phase 2 đã áp `requirePermission` trên routes chính. — Files: `backend/rbac/defaults.js`, `backend/routes/settings.js`, `backend/routes/roles.js`, `backend/middleware/requireFeature.js`, `src/pages/EmployeeForm.tsx`
 - [ ] **Mobile: chuẩn bị phase WebView/RN** — Rà soát tài liệu + checklist release + cấu hình env API_URL, back button, offline, file upload WebView. — Files: `README.md`, `FEATURE_MOBILE.md`, `FEATURE_MOBILE_RN.md`, `PROMPT_MOBILE.md`
 
 - [x] **Sales: Cài đặt mở hồ sơ + đổi mật khẩu** — Sidebar “Cài đặt” không redirect về Dashboard nữa; Sales vào `/profile` để sửa thông tin cá nhân + link đổi mật khẩu. — Files: `src/components/Layout.tsx`, `src/pages/Profile.tsx`, `src/App.tsx`, `backend/routes/users.js`, `CHANGELOG.md`

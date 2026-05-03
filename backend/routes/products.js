@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
-const authorize = require('../middleware/authorize');
+const requirePermission = require('../middleware/requirePermission');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
 
@@ -27,7 +27,7 @@ async function generateProductSku(pool, shopId) {
   return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
-router.get('/', auth, requireShop, async (req, res, next) => {
+router.get('/', auth, requireShop, requirePermission('products', 'view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, category, warehouse_id, available_only, active_only, status, page = 1, limit = 20 } = req.query;
@@ -134,7 +134,7 @@ router.get('/', auth, requireShop, async (req, res, next) => {
 
 // Get next auto SKU (SKU-YYYYMMDD-XXXX), reset per day
 // NOTE: must be declared before '/:id' route
-router.get('/next-sku', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.get('/next-sku', auth, requireShop, requirePermission('products', 'create'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const sku = await generateProductSku(pool, req.shopId);
@@ -144,7 +144,7 @@ router.get('/next-sku', auth, requireShop, authorize('admin'), async (req, res, 
   }
 });
 
-router.get('/:id', auth, requireShop, async (req, res, next) => {
+router.get('/:id', auth, requireShop, requirePermission('products', 'view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
@@ -180,7 +180,7 @@ router.get('/:id', auth, requireShop, async (req, res, next) => {
 
 // Bulk: gán danh mục cho nhiều sản phẩm trong shop hiện tại
 // POST /api/products/bulk/category { product_ids: number[], category_id: number|null }
-router.post('/bulk/category', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post('/bulk/category', auth, requireShop, requirePermission('products', 'edit'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const sid = req.shopId;
@@ -223,7 +223,7 @@ router.post('/bulk/category', auth, requireShop, authorize('admin'), async (req,
   }
 });
 
-router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post('/', auth, requireShop, requirePermission('products', 'create'), async (req, res, next) => {
   try {
     const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images, warehouse_id } = req.body;
 
@@ -295,7 +295,7 @@ router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) =
   }
 });
 
-router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.put('/:id', auth, requireShop, requirePermission('products', 'edit'), async (req, res, next) => {
   try {
     const { name, sku, category_id, unit, price, cost_price, stock_qty, low_stock_threshold, weight, length, width, height, description, images, is_active, warehouse_id } = req.body;
 
@@ -396,7 +396,7 @@ router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next)
   }
 });
 
-router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, requirePermission('products', 'delete'), async (req, res, next) => {
   try {
     const pool = await getPool();
     await pool.query('UPDATE products SET is_active = 0 WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);

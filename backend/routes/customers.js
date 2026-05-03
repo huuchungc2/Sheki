@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
-const authorize = require('../middleware/authorize');
+const requirePermission = require('../middleware/requirePermission');
 const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
 const { normalizeCustomerBirthday } = require('../utils/customerBirthday');
@@ -81,7 +81,7 @@ async function resolveAssignedEmployeeId(pool, raw) {
   return rows.length ? id : null;
 }
 
-router.get('/', auth, requireShop, requireFeature('customers.list'), async (req, res, next) => {
+router.get('/', auth, requireShop, requirePermission('customers', 'view'), requireFeature('customers.list'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { search, tier, page = 1, limit = 20 } = req.query;
@@ -137,7 +137,7 @@ router.get('/', auth, requireShop, requireFeature('customers.list'), async (req,
   }
 });
 
-router.get('/suggest', auth, requireShop, requireFeature('customers.list'), async (req, res, next) => {
+router.get('/suggest', auth, requireShop, requirePermission('customers', 'view'), requireFeature('customers.list'), async (req, res, next) => {
   try {
     const { q, order_id } = req.query;
     const pool = await getPool();
@@ -187,7 +187,7 @@ router.get('/suggest', auth, requireShop, requireFeature('customers.list'), asyn
   }
 });
 
-router.get('/:id', auth, requireShop, requireFeature('customers.view'), async (req, res, next) => {
+router.get('/:id', auth, requireShop, requirePermission('customers', 'view'), requireFeature('customers.view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { order_id } = req.query;
@@ -230,7 +230,7 @@ router.get('/:id', auth, requireShop, requireFeature('customers.view'), async (r
   }
 });
 
-router.post('/', auth, requireShop, requireFeature('customers.create'), async (req, res, next) => {
+router.post('/', auth, requireShop, requirePermission('customers', 'create'), requireFeature('customers.create'), async (req, res, next) => {
   try {
     const { name, phone, email, address, city, district, ward, birthday, tier, source, assigned_employee_id, note } = req.body;
 
@@ -271,7 +271,7 @@ router.post('/', auth, requireShop, requireFeature('customers.create'), async (r
   }
 });
 
-router.put('/:id', auth, requireShop, requireFeature('customers.edit'), async (req, res, next) => {
+router.put('/:id', auth, requireShop, requirePermission('customers', 'edit'), requireFeature('customers.edit'), async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -321,7 +321,7 @@ router.put('/:id', auth, requireShop, requireFeature('customers.edit'), async (r
   }
 });
 
-router.delete('/:id', auth, requireShop, requireFeature('customers.delete'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, requirePermission('customers', 'delete'), requireFeature('customers.delete'), async (req, res, next) => {
   try {
     const pool = await getPool();
     await pool.query('DELETE FROM customers WHERE id = ? AND shop_id = ?', [req.params.id, req.shopId]);

@@ -16,7 +16,9 @@ export function EmployeeForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
 
-  const [roles, setRoles] = React.useState<{ id: number; code: string; name: string }[]>([]);
+  const [roles, setRoles] = React.useState<
+    { id: number; code: string; name: string; can_access_admin?: number | boolean }
+  >([]);
   const [rolesLoading, setRolesLoading] = React.useState(true);
 
   const [formData, setFormData] = React.useState({
@@ -92,8 +94,20 @@ export function EmployeeForm() {
     // Ensure role_id always has a valid default once roles are available
     if (!roles.length) return;
     if (formData.role_id) return;
-    const s = roles.find((r) => r.code === "sales") || roles[0];
-    if (s) setFormData((prev) => ({ ...prev, role_id: s.id }));
+    const pick =
+      roles.find((r) => {
+        const ca = r.can_access_admin;
+        const adminish =
+          ca === true ||
+          ca === 1 ||
+          ca === "1" ||
+          String(ca).toLowerCase() === "true" ||
+          String(r.code).toLowerCase() === "admin";
+        return !adminish;
+      }) ||
+      roles.find((r) => String(r.code).toLowerCase() === "sales") ||
+      roles[0];
+    if (pick) setFormData((prev) => ({ ...prev, role_id: pick.id }));
   }, [roles, formData.role_id]);
 
   React.useEffect(() => {

@@ -27,7 +27,7 @@ async function loadUserGroupIds(pool, shopId, userId) {
   return rows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
 }
 
-router.get('/dashboard', auth, requireShop, requireFeature('reports.dashboard'), async (req, res, next) => {
+router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view'), requireFeature('reports.dashboard'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const shopId = req.shopId;
@@ -445,7 +445,7 @@ router.get('/dashboard', auth, requireShop, requireFeature('reports.dashboard'),
   }
 });
 
-router.get('/salary', auth, requireShop, requireFeature('reports.salary'), async (req, res, next) => {
+router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), requireFeature('reports.salary'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const shopId = req.shopId;
@@ -1397,7 +1397,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
 
 // Returns summary for commission period filters
 // GET /api/reports/returns-summary?month=MM&year=YYYY&group_id=&user_id=&payroll_period_id=
-router.get('/returns-summary', auth, requireShop, async (req, res, next) => {
+router.get('/returns-summary', auth, requireShop, requirePermission('reports', 'view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const shopId = req.shopId;

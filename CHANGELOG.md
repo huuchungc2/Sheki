@@ -1,3 +1,36 @@
+## [03/05/2026] - OrderList: chỉ hiện biểu tượng xóa khi có quyền xóa đơn
+### Changed
+- **Danh sách đơn** — Nút xóa chỉ hiển thị khi `_caps.orders.delete` và `_caps2['orders.delete']` (khớp API); đọc `user` từ `localStorage` mỗi render để nhận caps sau `GET /auth/me`. Vẫn ẩn khi dòng không được phép sửa/xóa theo trạng thái (NV phạm vi cá nhân + đơn đang giao/đã giao). — File: `src/pages/OrderList.tsx`
+
+## [03/05/2026] - Đơn hàng: xóa đơn theo RBAC (không chỉ admin)
+### Fixed
+- **`DELETE /orders/:id`** — Gỡ chặn cứng «chỉ admin / can_access_admin mới xóa» (trùng với `requirePermission` + `requireFeature` đã bật trong Settings). Giữ kiểm kỳ lương đã chốt, phạm vi own/group, và cấm NV phạm vi cá nhân xóa đơn `shipping`/`completed`. — File: `backend/routes/orders.js`
+
+## [03/05/2026] - Settings: phân quyền theo vai (`can_access_admin` + đồng bộ `role_permissions`)
+### Added
+- **`backend/rbac/defaults.js`** — `defaultFeaturePermissions`, `getDefaultModulePermissionRows`, `salesLikeFeatureDefaults`: một nguồn cho mặc định feature/module matrix (ưu tiên `can_access_admin`, fallback `code === admin`).
+### Changed
+- **`PUT /settings/feature-matrix`** — Sau khi ghi `role_feature_permissions`, gọi `syncModulePermissionsFromFeatures` để `requirePermission` khớp ma trận Settings.
+- **`POST /settings/feature-seed-default/:roleId`** — Seed xong đồng bộ module permissions; đọc `can_access_admin` từ `roles`.
+- **`GET /settings` (nhóm user)** — Gom nhóm theo `role_id` thay vì mã `role` (tránh trùng khi đổi tên mã).
+- **`GET /settings/:roleId/permissions`** — Khi chưa có bản ghi, trả mặc định từ `getDefaultModulePermissionRows` (có `can_access_admin`).
+- **`resolveRole`** — Trả thêm `can_access_admin` cho các route settings theo `roleId`.
+- **`/roles` tạo role mới** — `seedRoleFeaturePermissionsForNewRole` dùng `defaultFeaturePermissions` từ rbac/defaults + `syncModulePermissionsFromFeatures`.
+- **`requireFeature` / `computeFeatureCaps`** — Caps mặc định dùng `can_access_admin`, không chỉ `role === admin`.
+- **`EmployeeForm`** — Vai trò mặc định: ưu tiên vai không admin-class, rồi `sales`, rồi phần tử đầu.
+### Files
+- `backend/rbac/defaults.js`, `backend/routes/settings.js`, `backend/routes/roles.js`, `backend/middleware/requireFeature.js`, `src/pages/EmployeeForm.tsx`
+
+## [03/05/2026] - Tooling: `npm run lint` (tsc) không quét thư mục `mobile/`
+### Fixed
+- **tsconfig** — `include` chỉ `src` + `vite.config.ts`, `exclude` gồm `mobile` (RN/Expo cài riêng) — `tsc --noEmit` ở root hết lỗi thiếu module. — File: `tsconfig.json`
+
+## [03/05/2026] - RBAC phase 2: `requirePermission` (orders/customers/products/reports)
+### Added
+- **FE `PermissionRoute`** — Bảo vệ route khớp `requirePermission(module, action)` + Super Admin / `can_access_admin`; thay `AdminRoute` cho trang sản phẩm/khách/đơn và một phần báo cáo. — File: `src/App.tsx`
+### Changed
+- **API** — `customers` / `orders` / `products` / `reports`: gắn `requirePermission` theo thao tác (`view`/`create`/`edit`/`delete`); `products` bỏ `authorize('admin')`; `reports` thêm `reports.view` cho dashboard/salary/returns-summary. Giữ `getScope` + `requireFeature` như cũ. — Files: `backend/routes/customers.js`, `backend/routes/orders.js`, `backend/routes/products.js`, `backend/routes/reports.js`
+
 ## [03/05/2026] - Layout: PWA iPhone (Thêm vào Màn hình chính) — safe area header
 ### Fixed
 - **Thanh top + nội dung** — `pt-[env(safe-area-inset-top)]` trên `<header>`, hàng công cụ gói trong `h-16` bên dưới; phần logo sidebar `pt` cộng safe-area; `pb` nội dung cộng `safe-area-inset-bottom` — tránh menu 3 gạch / tap target dính dưới giờ & notch khi `display-mode: standalone` + `viewport-fit=cover`. — File: `src/components/Layout.tsx`

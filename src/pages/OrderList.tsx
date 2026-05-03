@@ -27,6 +27,16 @@ const paymentConfig: Record<string, { label: string; icon: any }> = {
   card:     { label: "Thẻ ATM",      icon: CreditCard },
 };
 
+/** Khớp `DELETE /orders/:id`: `requirePermission('orders','delete')` + `requireFeature('orders.delete')` */
+function userMayDeleteOrders(user: any): boolean {
+  if (!user) return false;
+  if (user.is_super_admin) return true;
+  const perm = !!user._caps?.orders?.delete;
+  const c2 = user._caps2;
+  const feat = c2 && typeof c2 === "object" ? !!c2["orders.delete"] : false;
+  return perm && feat;
+}
+
 /** Cùng công thức danh sách đơn / LOGIC_BUSINESS — một bảng mọi kích thước */
 function computeOrderMoney(order: any) {
   const khachTraShip = order.ship_payer === "shop" ? 0 : Number(order.shipping_fee) || 0;
@@ -90,13 +100,18 @@ export function OrderList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const ordersListReturn = `${location.pathname}${location.search}`;
 
-  // Lấy role từ localStorage
-  const currentUser = React.useMemo(() => {
-    const u = localStorage.getItem("user");
-    return u ? JSON.parse(u) : null;
-  }, []);
+  // Đọc mỗi lần render để sau `GET /auth/me` (Layout) cập nhật `_caps` / `_caps2` thì nút quyền đúng
+  const currentUser = (() => {
+    try {
+      const u = localStorage.getItem("user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  })();
   const isAdmin =
     currentUser?.can_access_admin === true || currentUser?.role === "admin";
+  const showDeleteColumn = userMayDeleteOrders(currentUser);
 
   /** NV phạm vi cá nhân (scope_own_data): không sửa/xóa/bulk chọn đơn đang giao hoặc đã giao — Admin & role xem toàn hệ thống giữ quyền */
   const canSalesMutateOrderRow = React.useCallback(
@@ -965,21 +980,22 @@ export function OrderList() {
                         {/* Luôn hiện: mobile/touch không có hover → trước đây opacity-0 khiến mất icon */}
                         <div className="flex items-center justify-end gap-1 min-h-[28px]">
                           {rowCanMutate ? (
-                            <>
-                              <Link to={`/orders/edit/${order.id}`} state={{ ordersListReturn }}
-                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-all"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(order.id)}
-                                disabled={deleting === order.id}
-                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white flex items-center justify-center text-slate-500 transition-all disabled:opacity-50"
-                              >
-                                {deleting === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                              </button>
-                            </>
+                            <Link to={`/orders/edit/${order.id}`} state={{ ordersListReturn }}
+                              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-all"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Link>
+                          ) : null}
+                          {rowCanMutate && showDeleteColumn ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(order.id)}
+                              disabled={deleting === order.id}
+                              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white flex items-center justify-center text-slate-500 transition-all disabled:opacity-50"
+                              aria-label="Xóa đơn"
+                            >
+                              {deleting === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                            </button>
                           ) : null}
                         </div>
                       </td>
