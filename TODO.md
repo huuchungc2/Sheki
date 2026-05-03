@@ -11,6 +11,9 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Layout: PWA iPhone — safe-area header/menu** — `env(safe-area-inset-top/bottom)` cho header, sidebar brand, vùng nội dung. — File: `src/components/Layout.tsx`
+- [x] **Dev: iPhone Safari vào IP LAN** — Vite `allowedHosts: true`; CORS backend thêm `100.x` (Tailscale). — Files: `vite.config.ts`, `backend/server.js`, `.env.example`
+- [x] **Layout: iPhone — nút menu (z-index main vs sidebar + pointer-events khi drawer mở)** — Drawer đóng `aside z-30` / `main z-40`; mở drawer `main pointer-events-none` + `header z-[60]`; nút menu ~44px, `touch-manipulation`; vùng trang `isolate` cho Recharts. — File: `src/components/Layout.tsx`
 - [x] **Layout: chọn shop Super Admin (mobile + all_shops)** — Bỏ ẩn `sm` cho dropdown shop; SA chỉ dùng `all_shops`, không fallback membership rỗng. — File: `src/components/Layout.tsx`
 - [x] **PayrollPeriods: gộp cột HH / Ship-NV + xuất Excel** — UI gộp «Hoa hồng», «Ship/NV chịu»; giải thích cột Điều chỉnh; nút xuất Excel (chi tiết đủ cột). — Files: `src/pages/PayrollPeriods.tsx`, `src/lib/exportExcel.ts`
 - [x] **OrderList: cột Nhân viên sau cột Sản phẩm** — Đổi thứ tự header + cell: Khách hàng → Sản phẩm → Nhân viên. — File: `src/pages/OrderList.tsx`

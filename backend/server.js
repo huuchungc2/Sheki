@@ -77,7 +77,10 @@ const CORS_ORIGINS = [
 
 const isAllowedLanOrigin = (origin) => {
   if (!origin) return true;
-  return /^http:\/\/(192\.168|10|172\.(1[6-9]|2\d|3[0-1]))\.\d+\.\d+:(5173|4173)$/.test(origin);
+  // Wi‑Fi LAN + Tailscale (100.x) + Docker/host gateway — cổng dev Vite / preview
+  return /^http:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|100\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+):(5173|4173)$/.test(
+    origin
+  );
 };
 app.use(
   cors({

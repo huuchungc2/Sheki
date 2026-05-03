@@ -52,6 +52,8 @@ export default defineConfig(({mode}) => {
       host: '0.0.0.0',
       port: 5173,
       strictPort: true,
+      /* Vite 6+: chặn Host lạ (DNS rebinding). Cho phép mọi host trong dev để mở bằng IP LAN / hostname máy trên iPhone Safari. */
+      allowedHosts: true,
       hmr:
         process.env.DISABLE_HMR === 'true'
           ? false

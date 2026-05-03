@@ -1,3 +1,22 @@
+## [03/05/2026] - Layout: PWA iPhone (Thêm vào Màn hình chính) — safe area header
+### Fixed
+- **Thanh top + nội dung** — `pt-[env(safe-area-inset-top)]` trên `<header>`, hàng công cụ gói trong `h-16` bên dưới; phần logo sidebar `pt` cộng safe-area; `pb` nội dung cộng `safe-area-inset-bottom` — tránh menu 3 gạch / tap target dính dưới giờ & notch khi `display-mode: standalone` + `viewport-fit=cover`. — File: `src/components/Layout.tsx`
+
+## [03/05/2026] - Dev: iPhone Safari vào IP LAN + CORS Tailscale
+### Fixed
+- **Vite 6** — `server.allowedHosts: true` trong dev để tránh chặn Host khi mở `http://192.168.x.x:5173` / hostname trên Safari (lỗi kiểu “Blocked request… host is not allowed”). — File: `vite.config.ts`
+- **Backend CORS** — Cho phép origin dev qua IP **Tailscale** `100.x.x.x` (cổng 5173/4173), bổ sung regex LAN rõ ràng hơn. — File: `backend/server.js`
+
+## [03/05/2026] - Layout: iPhone — nút mở menu (Safari / layer sidebar)
+### Fixed
+- **Sidebar đóng** — Không dùng `pointer-events-none` trên `aside` (WebKit có thể không xử lý đủ); đặt drawer đóng `z-30`, `<main>` mobile `relative z-40` để toàn bộ header nằm trên layer sidebar. **Drawer mở** — `main` `pointer-events-none` để tap tới backdrop đóng menu; `header` `pointer-events-auto z-[60]` để vẫn bấm hamburger/avatar. — File: `src/components/Layout.tsx`
+### Changed
+- **Nút menu** — `type="button"`, `aria-label`, vùng chạm tối thiểu ~44×44px trên mobile; header `touch-manipulation` + `isolate`; nền header đậm hơn một chút khi không có `backdrop-filter`. — File: `src/components/Layout.tsx`
+
+## [03/05/2026] - Layout: mobile/chiếu màn hình — menu & đăng xuất hoạt động (Dashboard)
+### Changed
+- **Vùng trang** — `relative isolate z-0` để biểu đồ (Recharts) không “tràn” tầng z lên sticky header. — File: `src/components/Layout.tsx`
+
 ## [03/05/2026] - Layout: hiện lại chọn shop cho Super Admin
 ### Fixed
 - **Thanh header** — Dropdown chọn shop không còn `hidden` trên mobile; Super Admin luôn dùng danh sách `all_shops` (không fallback `shops`/membership rỗng); khi chỉ còn 1 shop hiển thị nhãn «Shop: …». — File: `src/components/Layout.tsx`

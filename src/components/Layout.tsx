@@ -423,13 +423,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
       <aside 
         className={cn(
-          "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed h-full z-50",
+          "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed h-full",
+          /* Mobile: drawer đóng — hạ z dưới <main> (z-40) để iOS/Safari không còn layer sidebar đè full viewport che nút menu.
+             Mở drawer — z-50 trên backdrop + nội dung. Desktop: luôn z-50. */
           isMobile
-            ? cn("w-72 max-w-[85vw]", isSidebarOpen ? "translate-x-0" : "-translate-x-full")
-            : (isSidebarOpen ? "w-64" : "w-20")
+            ? cn(
+                "w-72 max-w-[85vw]",
+                isSidebarOpen ? "translate-x-0 z-50" : "-translate-x-full z-30"
+              )
+            : cn("z-50", isSidebarOpen ? "w-64" : "w-20")
         )}
       >
-        <div className="p-6 flex items-center gap-3">
+        {/* safe-area-top: PWA “Thêm vào Màn hình chính” (standalone) — tránh logo/shop dính dưới status bar */}
+        <div className="px-6 pb-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
             S
           </div>
@@ -578,14 +584,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main className={cn(
         "flex-1 min-w-0 transition-all duration-300 min-h-screen flex flex-col",
-        isMobile ? "ml-0" : (isSidebarOpen ? "ml-64" : "ml-20")
+        /* Mobile đóng drawer: main z-40 > aside z-30 → không bị layer sidebar che header (iPhone).
+           Mobile mở drawer: pointer-events-none để tap xuyên tới backdrop z-40 đóng menu; header bật lại pointer-events + z cao. */
+        isMobile
+          ? cn("ml-0 relative z-40", isSidebarOpen && "pointer-events-none")
+          : (isSidebarOpen ? "ml-64" : "ml-20")
       )}>
-        {/* TopBar */}
-        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 px-4 sm:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        {/* TopBar — safe-area-inset-top: PWA standalone (iPhone) tránh menu 3 gạch dính sát / dưới giờ pin */}
+        <header
+          className={cn(
+            "bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 isolate touch-manipulation supports-[backdrop-filter]:bg-white/80",
+            "pt-[env(safe-area-inset-top,0px)]",
+            isMobile && isSidebarOpen && "pointer-events-auto relative z-[60]"
+          )}
+        >
+          <div className="h-16 px-4 sm:px-8 flex items-center justify-between">
+          <div className="flex items-center gap-4 min-w-0">
             <button 
+              type="button"
+              aria-label={isSidebarOpen ? "Đóng menu" : "Mở menu"}
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-all"
+              className={cn(
+                "shrink-0 flex items-center justify-center rounded-lg text-slate-500 transition-all hover:bg-slate-100 active:bg-slate-200",
+                "min-h-[44px] min-w-[44px] p-2 -ml-1 sm:min-h-0 sm:min-w-0 sm:p-2 sm:ml-0"
+              )}
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -768,10 +790,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </div>
+          </div>
         </header>
 
-        {/* Page Content */}
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
+        {/* Page Content — isolate: chart/Recharts không “tràn” z-index lên sticky header (Dex/cast); pb safe-area cho home indicator */}
+        <div className="px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8 max-w-7xl mx-auto w-full min-w-0 relative isolate z-0 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] lg:pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
           <div key={location.pathname} className="min-w-0">
             {children}
           </div>
