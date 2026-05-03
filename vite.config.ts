@@ -5,8 +5,29 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const siteUrl = (env.VITE_SITE_URL || env.APP_URL || '')
+    .trim()
+    .replace(/\/$/, '');
+
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'inject-og-meta',
+        transformIndexHtml(html) {
+          const ogImage = siteUrl
+            ? `${siteUrl}/og-image.png`
+            : '/og-image.png';
+          const ogUrlMeta = siteUrl
+            ? `<meta property="og:url" content="${siteUrl}/" />`
+            : '';
+          return html
+            .replaceAll('__OG_IMAGE_SRC__', ogImage)
+            .replace('__OG_URL_META_BLOCK__', ogUrlMeta);
+        },
+      },
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
