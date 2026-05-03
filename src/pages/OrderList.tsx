@@ -821,9 +821,9 @@ export function OrderList() {
                     />
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Khách hàng</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sản phẩm</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Ship / NV / HH</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
                   <th className="px-4 py-3 w-24"></th>
@@ -874,18 +874,6 @@ export function OrderList() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm text-slate-700 font-medium">{order.salesperson_name || "—"}</p>
-                          {order.group_name ? (
-                            <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">
-                              {order.group_name}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 text-xs">—</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
                             {initials}
@@ -924,6 +912,18 @@ export function OrderList() {
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="text-sm text-slate-700 font-medium">{order.salesperson_name || "—"}</p>
+                          {order.group_name ? (
+                            <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">
+                              {order.group_name}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="space-y-0.5">

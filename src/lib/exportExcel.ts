@@ -394,6 +394,91 @@ export function exportRevenueReport(opts: {
   XLSX.writeFile(wb, fileName);
 }
 
+/** Preview lương theo kỳ (màn Chốt kỳ lương) */
+export function exportPayrollPeriodPreview(opts: {
+  rows: any[];
+  periodId: number;
+  periodFrom?: string | null;
+  periodTo?: string | null;
+  periodStatus?: string;
+}) {
+  const { rows, periodId, periodFrom, periodTo, periodStatus } = opts;
+  const wb = XLSX.utils.book_new();
+  const range =
+    periodFrom && periodTo
+      ? `${fmtDate(periodFrom)} → ${fmtDate(periodTo)}`
+      : periodFrom
+        ? fmtDate(periodFrom)
+        : "";
+  const statusLabel =
+    periodStatus === "open" ? "Đang mở" : periodStatus === "closed" ? "Đã chốt" : "";
+  const sorted = [...rows].sort(
+    (a, b) => (Number(b.total_luong) || 0) - (Number(a.total_luong) || 0)
+  );
+
+  const aoa: any[][] = [
+    ["PREVIEW LƯƠNG THEO KỲ LƯƠNG"],
+    [
+      `Kỳ #${periodId}${statusLabel ? ` — ${statusLabel}` : ""}${
+        range ? ` — ${range}` : ""
+      }`,
+    ],
+    [
+      "Ghi chú: Cột «Điều chỉnh» = tổng cộng/trừ thủ công (payroll_adjustments) gán vào kỳ; cộng vào Tổng lương.",
+    ],
+    [],
+    [
+      "Nhân viên",
+      "HH direct",
+      "HH override",
+      "HH hoàn (trừ)",
+      "Ship KH trả",
+      "NV chịu",
+      "Điều chỉnh",
+      "Tổng lương",
+    ],
+  ];
+
+  sorted.forEach((r) => {
+    aoa.push([
+      r.full_name,
+      Number(r.direct_commission) || 0,
+      Number(r.override_commission) || 0,
+      Number(r.return_commission_abs) || 0,
+      Number(r.ship_khach_tra) || 0,
+      Number(r.nv_chiu) || 0,
+      Number(r.adjustments) || 0,
+      Number(r.total_luong) || 0,
+    ]);
+  });
+
+  aoa.push([]);
+  aoa.push([
+    "TỔNG CỘNG",
+    sorted.reduce((s, r) => s + (Number(r.direct_commission) || 0), 0),
+    sorted.reduce((s, r) => s + (Number(r.override_commission) || 0), 0),
+    sorted.reduce((s, r) => s + (Number(r.return_commission_abs) || 0), 0),
+    sorted.reduce((s, r) => s + (Number(r.ship_khach_tra) || 0), 0),
+    sorted.reduce((s, r) => s + (Number(r.nv_chiu) || 0), 0),
+    sorted.reduce((s, r) => s + (Number(r.adjustments) || 0), 0),
+    sorted.reduce((s, r) => s + (Number(r.total_luong) || 0), 0),
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [
+    { wch: 28 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 16 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, "Preview lương");
+  XLSX.writeFile(wb, `PreviewLuong_Ky_${periodId}.xlsx`);
+}
+
 /** Báo cáo Thu chi (Admin) */
 export function exportCashTransactions(opts: {
   rows: any[];

@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Loader2, Calendar, Lock, Unlock, RefreshCcw } from "lucide-react";
+import { Loader2, Calendar, Lock, Unlock, RefreshCcw, Download } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
+import { exportPayrollPeriodPreview } from "../lib/exportExcel";
 
 const API_URL = (import.meta as any)?.env?.VITE_API_URL || "/api";
 
@@ -20,6 +21,7 @@ export function PayrollPeriods() {
   const [closing, setClosing] = React.useState(false);
   const [previewRows, setPreviewRows] = React.useState<any[]>([]);
   const [previewLoading, setPreviewLoading] = React.useState(false);
+  const [exporting, setExporting] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<number | null>(null);
 
   const fetchPeriods = React.useCallback(async () => {
@@ -114,6 +116,23 @@ export function PayrollPeriods() {
       alert(e?.message || "Reindex thất bại");
     }
   };
+
+  const exportPreviewExcel = React.useCallback(() => {
+    if (selectedId == null || previewRows.length === 0) return;
+    const p = periods.find((x) => Number(x.id) === Number(selectedId));
+    try {
+      setExporting(true);
+      exportPayrollPeriodPreview({
+        rows: previewRows,
+        periodId: selectedId,
+        periodFrom: p?.from_at,
+        periodTo: p?.to_at,
+        periodStatus: p?.status,
+      });
+    } finally {
+      setExporting(false);
+    }
+  }, [selectedId, previewRows, periods]);
 
   const rebuildSettlements = async () => {
     if (!selected?.id) return;
@@ -254,29 +273,57 @@ export function PayrollPeriods() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm font-bold text-slate-700">Preview lương theo kỳ</p>
-          {previewLoading && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+          <div className="flex items-center gap-2">
+            {previewLoading && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+            <button
+              type="button"
+              onClick={exportPreviewExcel}
+              disabled={exporting || previewRows.length === 0 || selectedId == null}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
+                exporting || previewRows.length === 0 || selectedId == null
+                  ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
+                  : "bg-white text-slate-700 border-slate-200 hover:border-emerald-200 hover:text-emerald-700"
+              )}
+            >
+              {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 shrink-0" />}
+              Xuất Excel
+            </button>
+          </div>
         </div>
         {previewRows.length === 0 ? (
           <div className="py-12 text-center text-slate-400 text-sm">Chưa có dữ liệu trong kỳ này</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[980px] w-full text-sm">
+            <p className="text-xs text-slate-500 px-5 pt-4 pb-1 leading-relaxed">
+              <span className="font-semibold text-slate-600">Điều chỉnh:</span> tổng số cộng hoặc trừ thủ công gán vào kỳ này (bảng{" "}
+              <code className="text-[11px] bg-slate-100 px-1 rounded">payroll_adjustments</code>
+              ), được cộng vào <span className="font-semibold">Tổng lương</span> sau HH, ship và NV chịu (công thức preview backend).
+            </p>
+            <table className="min-w-[820px] w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Nhân viên</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">HH direct</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">HH override</th>
                   <th
-                    className="px-5 py-3 text-right text-xs font-semibold text-red-600"
-                    title="Tổng HH bị trừ do hoàn: NV (direct) + quản lý (override). Số âm đỏ; chi tiết từng dòng bên dưới nếu có."
+                    className="px-5 py-3 text-right text-xs font-semibold text-slate-500 max-w-[220px]"
+                    title="HH bán (direct) + HH CTV (override), trừ HH hoàn (direct + phần override hiển thị); override đã là net (gồm hoàn CTV trong kỳ)."
                   >
-                    HH hoàn (trừ)
+                    Hoa hồng
                   </th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">Ship KH trả</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">NV chịu</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">Điều chỉnh</th>
+                  <th
+                    className="px-5 py-3 text-right text-xs font-semibold text-slate-500"
+                    title="Ship do khách trả (theo đơn) và tiền NV chịu trên đơn."
+                  >
+                    Ship / NV chịu
+                  </th>
+                  <th
+                    className="px-5 py-3 text-right text-xs font-semibold text-slate-500"
+                    title="Cộng/trừ thủ công (payroll_adjustments) gán vào kỳ."
+                  >
+                    Điều chỉnh
+                  </th>
                   <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500">Tổng lương</th>
                 </tr>
               </thead>
@@ -284,40 +331,83 @@ export function PayrollPeriods() {
                 {previewRows.map((r: any) => (
                   <tr key={r.user_id} className="hover:bg-slate-50/50">
                     <td className="px-5 py-3 font-semibold text-slate-800">{r.full_name}</td>
-                    <td className="px-5 py-3 text-right tabular-nums">{(Number(r.direct_commission) || 0).toLocaleString("vi-VN")}</td>
-                    <td className="px-5 py-3 text-right tabular-nums">{(Number(r.override_commission) || 0).toLocaleString("vi-VN")}</td>
-                    <td className="px-5 py-3 text-right tabular-nums align-top">
-                      {(() => {
-                        const total = Number(r.return_commission_abs) || 0;
-                        const hasSplit =
-                          r.return_commission_direct_abs != null &&
-                          r.return_commission_override_abs != null;
-                        const directAbs = hasSplit ? Number(r.return_commission_direct_abs) || 0 : 0;
-                        const overrideAbs = hasSplit ? Number(r.return_commission_override_abs) || 0 : 0;
-                        if (total <= 0) {
-                          return <span className="text-slate-400 tabular-nums">0</span>;
-                        }
-                        return (
-                          <div className="flex flex-col items-end gap-0.5">
-                            <span className="font-semibold text-red-600">{formatCurrency(-total)}</span>
-                            {hasSplit && directAbs > 0 ? (
-                              <span className="text-[11px] text-slate-500 font-normal">
-                                NV bán (direct): <span className="text-red-600 font-medium">−{formatCurrency(directAbs)}</span>
-                              </span>
-                            ) : null}
-                            {hasSplit && overrideAbs > 0 ? (
-                              <span className="text-[11px] text-slate-500 font-normal">
-                                Quản lý (override): <span className="text-red-600 font-medium">−{formatCurrency(overrideAbs)}</span>
-                              </span>
-                            ) : null}
-                          </div>
-                        );
-                      })()}
+                    <td className="px-5 py-3 text-right align-top">
+                      <div className="space-y-1 text-[13px]">
+                        <p className="tabular-nums">
+                          <span className="text-slate-400 text-[11px]">Direct </span>
+                          <span className="font-medium text-slate-800">
+                            {formatCurrency(Number(r.direct_commission) || 0)}
+                          </span>
+                        </p>
+                        <p className="tabular-nums">
+                          <span className="text-slate-400 text-[11px]">Override </span>
+                          <span className="font-medium text-slate-800">
+                            {formatCurrency(Number(r.override_commission) || 0)}
+                          </span>
+                        </p>
+                        {(() => {
+                          const total = Number(r.return_commission_abs) || 0;
+                          const hasSplit =
+                            r.return_commission_direct_abs != null &&
+                            r.return_commission_override_abs != null;
+                          const directAbs = hasSplit ? Number(r.return_commission_direct_abs) || 0 : 0;
+                          const overrideAbs = hasSplit ? Number(r.return_commission_override_abs) || 0 : 0;
+                          if (total <= 0) {
+                            return (
+                              <p className="tabular-nums text-slate-400 text-[11px]">
+                                Hoàn (trừ): 0
+                              </p>
+                            );
+                          }
+                          return (
+                            <div className="space-y-0.5 pt-0.5 border-t border-slate-100">
+                              <p className="tabular-nums text-red-600 font-semibold text-[12px]">
+                                Hoàn (trừ): {formatCurrency(-total)}
+                              </p>
+                              {hasSplit && directAbs > 0 ? (
+                                <p className="text-[11px] text-slate-500">
+                                  NV (direct): −{formatCurrency(directAbs)}
+                                </p>
+                              ) : null}
+                              {hasSplit && overrideAbs > 0 ? (
+                                <p className="text-[11px] text-slate-500">
+                                  Quản lý (override): −{formatCurrency(overrideAbs)}
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </td>
-                    <td className="px-5 py-3 text-right tabular-nums">{(Number(r.ship_khach_tra) || 0).toLocaleString("vi-VN")}</td>
-                    <td className="px-5 py-3 text-right tabular-nums">{(Number(r.nv_chiu) || 0).toLocaleString("vi-VN")}</td>
-                    <td className="px-5 py-3 text-right tabular-nums">{(Number(r.adjustments) || 0).toLocaleString("vi-VN")}</td>
-                    <td className="px-5 py-3 text-right font-bold tabular-nums">{(Number(r.total_luong) || 0).toLocaleString("vi-VN")}</td>
+                    <td className="px-5 py-3 text-right align-top">
+                      <div className="space-y-1 text-[13px]">
+                        <p className="tabular-nums">
+                          <span className="text-slate-400 text-[11px]">Ship KH </span>
+                          <span className="font-medium text-slate-800">
+                            {formatCurrency(Number(r.ship_khach_tra) || 0)}
+                          </span>
+                        </p>
+                        <p className="tabular-nums">
+                          <span className="text-slate-400 text-[11px]">NV chịu </span>
+                          <span
+                            className={cn(
+                              "font-medium",
+                              (Number(r.nv_chiu) || 0) > 0 ? "text-rose-700" : "text-slate-400"
+                            )}
+                          >
+                            {(Number(r.nv_chiu) || 0) > 0
+                              ? formatCurrency(Number(r.nv_chiu) || 0)
+                              : "—"}
+                          </span>
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums text-slate-800">
+                      {formatCurrency(Number(r.adjustments) || 0)}
+                    </td>
+                    <td className="px-5 py-3 text-right font-bold tabular-nums text-violet-900">
+                      {formatCurrency(Number(r.total_luong) || 0)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

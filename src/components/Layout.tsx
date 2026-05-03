@@ -251,9 +251,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
   });
 
+  /** Super Admin: luôn dùng danh sách shop đầy đủ từ API (`all_shops`), không fallback `shops` (membership — thường rỗng với SA). */
   const shopSwitcherOptions = React.useMemo(() => {
-    if (currentUser?.is_super_admin && Array.isArray(allShops) && allShops.length > 0) {
-      return allShops;
+    if (currentUser?.is_super_admin) {
+      return Array.isArray(allShops) ? allShops : [];
     }
     return shops;
   }, [currentUser?.is_super_admin, allShops, shops]);
@@ -660,15 +661,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </>
               )}
             </div>
-            <div className="h-8 w-px bg-slate-200 mx-2"></div>
+            <div className="h-8 w-px bg-slate-200 mx-1 sm:mx-2 shrink-0" aria-hidden />
             {shopSwitcherOptions.length > 1 && (
-              <div className="hidden sm:block">
+              <div className="flex items-center min-w-0 max-w-[min(100vw-12rem,220px)] sm:max-w-[220px]">
                 <label className="sr-only" htmlFor="layout-shop-select">
                   Shop
                 </label>
                 <select
                   id="layout-shop-select"
-                  className="text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-2 py-1.5 max-w-[200px]"
+                  className="text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-2 py-1.5 w-full min-w-0 truncate"
+                  title="Chọn shop làm ngữ cảnh (đơn, báo cáo…)"
                   value={String(currentUser?.shop_id ?? "")}
                   onChange={async (e) => {
                     const shopId = parseInt(e.target.value, 10);
@@ -711,6 +713,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   ))}
                 </select>
               </div>
+            )}
+            {currentUser?.is_super_admin && shopSwitcherOptions.length === 1 && (
+              <span className="text-[11px] font-semibold text-slate-500 truncate max-w-[140px] sm:max-w-[200px]" title={shopSwitcherOptions[0]?.name}>
+                Shop: {shopSwitcherOptions[0]?.name ?? "—"}
+              </span>
             )}
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">

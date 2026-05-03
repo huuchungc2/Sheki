@@ -1,3 +1,15 @@
+## [03/05/2026] - Layout: hiện lại chọn shop cho Super Admin
+### Fixed
+- **Thanh header** — Dropdown chọn shop không còn `hidden` trên mobile; Super Admin luôn dùng danh sách `all_shops` (không fallback `shops`/membership rỗng); khi chỉ còn 1 shop hiển thị nhãn «Shop: …». — File: `src/components/Layout.tsx`
+
+## [03/05/2026] - PayrollPeriods: gộp cột preview + xuất Excel
+### Changed
+- **Chốt kỳ lương** — Bảng preview gộp «Hoa hồng» (direct + override + hoàn trừ), «Ship / NV chịu» (hai dòng); mô tả cột «Điều chỉnh» (payroll_adjustments); nút **Xuất Excel** (`PreviewLuong_Ky_{id}.xlsx`, đủ cột + tổng). — Files: `src/pages/PayrollPeriods.tsx`, `src/lib/exportExcel.ts`
+
+## [03/05/2026] - OrderList: cột Nhân viên sau Sản phẩm
+### Changed
+- **Danh sách đơn** — Thứ tự cột bảng: Mã đơn → Khách hàng → Sản phẩm → Nhân viên → Ship/NV/HH → Lương → thao tác. — File: `src/pages/OrderList.tsx`
+
 ## [01/05/2026] - OrderForm: sản phẩm có ảnh (gợi ý + đã chọn)
 ### Changed
 - **OrderForm** — Dropdown tìm sản phẩm (desktop/mobile) và danh sách sản phẩm đã chọn hiển thị thumbnail ảnh sản phẩm (lấy `products.images[0]`, resolve `/uploads` theo API origin), fallback icon khi không có ảnh; **edit mode** cũng có ảnh nhờ API đơn trả thêm `product_images`. — Files: `src/pages/OrderForm.tsx`, `backend/routes/orders.js`

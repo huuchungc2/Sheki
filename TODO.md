@@ -11,6 +11,9 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Layout: chọn shop Super Admin (mobile + all_shops)** — Bỏ ẩn `sm` cho dropdown shop; SA chỉ dùng `all_shops`, không fallback membership rỗng. — File: `src/components/Layout.tsx`
+- [x] **PayrollPeriods: gộp cột HH / Ship-NV + xuất Excel** — UI gộp «Hoa hồng», «Ship/NV chịu»; giải thích cột Điều chỉnh; nút xuất Excel (chi tiết đủ cột). — Files: `src/pages/PayrollPeriods.tsx`, `src/lib/exportExcel.ts`
+- [x] **OrderList: cột Nhân viên sau cột Sản phẩm** — Đổi thứ tự header + cell: Khách hàng → Sản phẩm → Nhân viên. — File: `src/pages/OrderList.tsx`
 - [x] **OrderForm: chọn SP hiển thị ảnh (dropdown + danh sách)** — Dropdown gợi ý sản phẩm và danh sách SP đã chọn hiển thị thumbnail từ `products.images` (desktop/mobile) để UI sinh động hơn. — File: `src/pages/OrderForm.tsx`
 - [x] **OrderForm edit: dòng SP có ảnh** — API chi tiết đơn trả thêm `product_images` để render thumbnail cho item khi sửa đơn. — Files: `src/pages/OrderForm.tsx`, `backend/routes/orders.js`
 - [x] **Báo cáo hoa hồng: vào chi tiết không nhảy tháng/kỳ** — Query giữ tháng-năm hoặc `payroll_period_id`; bootstrap từ URL + ref `periodTouched` tránh lệch kỳ sau load danh sách kỳ; Sales không bị đá về Dashboard. — Files: `src/pages/CommissionReport.tsx`, `src/App.tsx`
