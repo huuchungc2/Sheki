@@ -9,16 +9,25 @@ export default defineConfig(({mode}) => {
     .trim()
     .replace(/\/$/, '');
 
+  let viteBase = '/';
+
   return {
     plugins: [
       react(),
       tailwindcss(),
       {
         name: 'inject-og-meta',
+        configResolved(config) {
+          viteBase = config.base;
+        },
         transformIndexHtml(html) {
+          const base =
+            viteBase.endsWith('/') ? viteBase : `${viteBase}/`;
+          const assetUrl = (file: string) =>
+            `${base}${file.replace(/^\//, '')}`.replace(/\/{2,}/g, '/');
           const ogImage = siteUrl
             ? `${siteUrl}/og-image.png`
-            : '/og-image.png';
+            : assetUrl('og-image.png');
           const ogUrlMeta = siteUrl
             ? `<meta property="og:url" content="${siteUrl}/" />`
             : '';
