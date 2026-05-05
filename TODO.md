@@ -11,6 +11,10 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **OrderForm: PTTT Chuyển khoản → Thu Cod → Tiền mặt** — Bỏ Thẻ ATM; thêm `cod`; danh sách đơn + Excel nhãn đồng bộ. — Files: `src/pages/OrderForm.tsx`, `src/pages/OrderList.tsx`, `src/lib/exportExcel.ts`, `src/types.ts`
+- [x] **PayrollPeriods: cột Hoàn tách khỏi Hoa hồng** — Preview kỳ lương: «Hoàn (trừ)» + NV (direct) / QL (override) ra cột **Hoàn** riêng; Excel thêm cột Hoàn NV / Hoàn QL. — Files: `src/pages/PayrollPeriods.tsx`, `src/lib/exportExcel.ts`
+- [x] **Activity log: IP thật (Vite proxy + `getClientIp` / TRUST_PROXY)** — Không còn toàn `127.0.0.1` khi dev qua proxy; production sau Nginx bật `TRUST_PROXY` khi cần. — Files: `vite.config.ts`, `backend/utils/clientIp.js`, `backend/middleware/logger.js`, `backend/middleware/errorHandler.js`, `backend/server.js`, `backend/.env.example`
+- [x] **Nhật ký hoạt động: cột IP + tìm theo IP** — UI danh sách + modal; API `GET /logs` search theo `ip_address`. — Files: `src/pages/ActivityLog.tsx`, `backend/routes/logs.js`
 - [x] **Settings: phân quyền theo vai (`can_access_admin`, đồng bộ ma trận → `role_permissions`)** — `backend/rbac/defaults.js` một nguồn mặc định; `PUT /settings/feature-matrix` + seed role gọi `syncModulePermissionsFromFeatures`; `requireFeature` / `/roles` seed dùng `can_access_admin`; nhóm user Settings theo `role_id`; `EmployeeForm` chọn vai trò mặc định không chỉ `sales`. — Files: `backend/rbac/defaults.js`, `backend/routes/settings.js`, `backend/routes/roles.js`, `backend/middleware/requireFeature.js`, `backend/services/rolePermissionSync.js`, `src/pages/EmployeeForm.tsx`
 - [x] **tsconfig: exclude `mobile/` cho `npm run lint`** — `tsc` root không type-check app RN thiếu deps. — File: `tsconfig.json`
 - [x] **RBAC (phase 2): `requirePermission` orders/customers/products/reports + `PermissionRoute`** — API: `customers.js`, `orders.js`, `products.js`, `reports.js`; FE: `PermissionRoute` khớp `_caps`; payroll-periods / commission order detail dùng `reports.edit` / `reports.view`. — Files: `backend/routes/customers.js`, `backend/routes/orders.js`, `backend/routes/products.js`, `backend/routes/reports.js`, `src/App.tsx`

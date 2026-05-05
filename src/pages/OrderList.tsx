@@ -24,6 +24,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
 const paymentConfig: Record<string, { label: string; icon: any }> = {
   cash:     { label: "Tiền mặt",     icon: Wallet },
   transfer: { label: "Chuyển khoản", icon: ArrowRight },
+  cod:      { label: "Thu Cod",     icon: Truck },
   card:     { label: "Thẻ ATM",      icon: CreditCard },
 };
 

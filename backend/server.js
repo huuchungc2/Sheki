@@ -35,6 +35,11 @@ const errorHandler = require('./middleware/errorHandler');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Tin X-Forwarded-For cho req.ip (morgan, v.v.) khi bật TRUST_PROXY — phải đặt trước route
+if (process.env.TRUST_PROXY === '1' || String(process.env.TRUST_PROXY || '').toLowerCase() === 'true') {
+  app.set('trust proxy', true);
+}
+
 // Create logs directory
 const logsDir = path.join(__dirname, 'logs');
 if (!fs.existsSync(logsDir)) {

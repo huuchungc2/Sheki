@@ -11,6 +11,14 @@ export default defineConfig(({mode}) => {
 
   let viteBase = '/';
 
+  /** IP máy đang mở trình duyệt (theo TCP tới Vite); gửi xuống API vì proxy tới :3000 khiến Node chỉ thấy 127.0.0.1. */
+  const forwardClientIpToBackend = (proxy: {on: (ev: string, fn: (...a: unknown[]) => void) => void}) => {
+    proxy.on('proxyReq', (proxyReq: {setHeader: (k: string, v: string) => void}, req: {socket?: {remoteAddress?: string}}) => {
+      const ip = req.socket?.remoteAddress;
+      if (ip) proxyReq.setHeader('X-Forwarded-For', ip);
+    });
+  };
+
   return {
     plugins: [
       react(),
@@ -68,10 +76,12 @@ export default defineConfig(({mode}) => {
         "/api": {
           target: "http://127.0.0.1:3000",
           changeOrigin: true,
+          configure: forwardClientIpToBackend,
         },
         "/uploads": {
           target: "http://127.0.0.1:3000",
           changeOrigin: true,
+          configure: forwardClientIpToBackend,
         },
       },
     },

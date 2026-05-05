@@ -57,7 +57,7 @@ export type Order = {
   date: string;
   total: number;
   status: "pending" | "completed" | "cancelled" | "shipping";
-  paymentMethod: "cash" | "transfer" | "card";
+  paymentMethod: "cash" | "transfer" | "cod" | "card";
   items: OrderItem[];
   shippingAddress: string;
   carrierService: "standard" | "express";

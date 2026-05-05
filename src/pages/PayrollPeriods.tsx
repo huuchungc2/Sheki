@@ -302,15 +302,21 @@ export function PayrollPeriods() {
               <code className="text-[11px] bg-slate-100 px-1 rounded">payroll_adjustments</code>
               ), được cộng vào <span className="font-semibold">Tổng lương</span> sau HH, ship và NV chịu (công thức preview backend).
             </p>
-            <table className="min-w-[820px] w-full text-sm">
+            <table className="min-w-[960px] w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Nhân viên</th>
                   <th
-                    className="px-5 py-3 text-right text-xs font-semibold text-slate-500 max-w-[220px]"
-                    title="HH bán (direct) + HH CTV (override), trừ HH hoàn (direct + phần override hiển thị); override đã là net (gồm hoàn CTV trong kỳ)."
+                    className="px-5 py-3 text-right text-xs font-semibold text-slate-500 max-w-[200px]"
+                    title="HH bán (direct) và HH CTV (override); override là net trong kỳ (gồm hoàn CTV nếu có)."
                   >
                     Hoa hồng
+                  </th>
+                  <th
+                    className="px-5 py-3 text-right text-xs font-semibold text-red-700 bg-red-50 max-w-[200px]"
+                    title="HH hoàn direct (NV) và hoàn override (QL) phát sinh trong kỳ; trừ vào tổng lương theo công thức preview."
+                  >
+                    Hoàn
                   </th>
                   <th
                     className="px-5 py-3 text-right text-xs font-semibold text-slate-500"
@@ -345,39 +351,41 @@ export function PayrollPeriods() {
                             {formatCurrency(Number(r.override_commission) || 0)}
                           </span>
                         </p>
-                        {(() => {
-                          const total = Number(r.return_commission_abs) || 0;
-                          const hasSplit =
-                            r.return_commission_direct_abs != null &&
-                            r.return_commission_override_abs != null;
-                          const directAbs = hasSplit ? Number(r.return_commission_direct_abs) || 0 : 0;
-                          const overrideAbs = hasSplit ? Number(r.return_commission_override_abs) || 0 : 0;
-                          if (total <= 0) {
-                            return (
-                              <p className="tabular-nums text-slate-400 text-[11px]">
-                                Hoàn (trừ): 0
-                              </p>
-                            );
-                          }
-                          return (
-                            <div className="space-y-0.5 pt-0.5 border-t border-slate-100">
-                              <p className="tabular-nums text-red-600 font-semibold text-[12px]">
-                                Hoàn (trừ): {formatCurrency(-total)}
-                              </p>
-                              {hasSplit && directAbs > 0 ? (
-                                <p className="text-[11px] text-slate-500">
-                                  NV (direct): −{formatCurrency(directAbs)}
-                                </p>
-                              ) : null}
-                              {hasSplit && overrideAbs > 0 ? (
-                                <p className="text-[11px] text-slate-500">
-                                  Quản lý (override): −{formatCurrency(overrideAbs)}
-                                </p>
-                              ) : null}
-                            </div>
-                          );
-                        })()}
                       </div>
+                    </td>
+                    <td className="px-5 py-3 text-right align-top bg-red-50/40">
+                      {(() => {
+                        const total = Number(r.return_commission_abs) || 0;
+                        const hasSplit =
+                          r.return_commission_direct_abs != null &&
+                          r.return_commission_override_abs != null;
+                        const directAbs = hasSplit ? Number(r.return_commission_direct_abs) || 0 : 0;
+                        const overrideAbs = hasSplit ? Number(r.return_commission_override_abs) || 0 : 0;
+                        if (total <= 0) {
+                          return (
+                            <p className="tabular-nums text-red-400 text-[11px] pt-0.5 font-medium">
+                              Hoàn (trừ): 0
+                            </p>
+                          );
+                        }
+                        return (
+                          <div className="space-y-0.5 text-[13px] text-red-700">
+                            <p className="tabular-nums font-semibold text-[12px]">
+                              Hoàn (trừ): {formatCurrency(-total)}
+                            </p>
+                            {hasSplit && directAbs > 0 ? (
+                              <p className="text-[11px] text-red-600/90 tabular-nums">
+                                NV (direct): −{formatCurrency(directAbs)}
+                              </p>
+                            ) : null}
+                            {hasSplit && overrideAbs > 0 ? (
+                              <p className="text-[11px] text-red-600/90 tabular-nums">
+                                Quản lý (override): −{formatCurrency(overrideAbs)}
+                              </p>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-5 py-3 text-right align-top">
                       <div className="space-y-1 text-[13px]">

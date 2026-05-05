@@ -16,10 +16,10 @@ router.get('/', auth, requireShop, authorize('admin'), async (req, res, next) =>
     const params = [req.shopId];
 
     if (search) {
-      query += ' AND (user_name LIKE ? OR target_name LIKE ? OR module LIKE ?)';
-      countQuery += ' AND (user_name LIKE ? OR target_name LIKE ? OR module LIKE ?)';
+      query += ' AND (user_name LIKE ? OR target_name LIKE ? OR module LIKE ? OR IFNULL(ip_address, "") LIKE ?)';
+      countQuery += ' AND (user_name LIKE ? OR target_name LIKE ? OR module LIKE ? OR IFNULL(ip_address, "") LIKE ?)';
       const like = `%${search}%`;
-      params.push(like, like, like);
+      params.push(like, like, like, like);
     }
 
     if (module) {

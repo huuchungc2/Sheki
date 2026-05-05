@@ -1,4 +1,5 @@
 const { getPool } = require('../config/db');
+const { getClientIp } = require('../utils/clientIp');
 
 async function logActivity({ shopId = null, userId, userName, module, action, targetId, targetName, details, ipAddress, userAgent, status = 'success', errorMessage = null }) {
   try {
@@ -52,7 +53,7 @@ function logMiddleware(req, res, next) {
             action: actionMap[req.method] || req.method.toLowerCase(),
             targetId: req.params.id || null,
             details: req.body,
-            ipAddress: req.ip || req.connection.remoteAddress,
+            ipAddress: getClientIp(req),
             userAgent: req.get('User-Agent'),
             status,
             errorMessage: status === 'error' ? (body?.error || body?.message) : null,

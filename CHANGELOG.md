@@ -1,3 +1,22 @@
+## [05/05/2026] - OrderForm: phương thức thanh toán (Chuyển khoản, Thu Cod, Tiền mặt)
+### Changed
+- **Đơn hàng** — Thay «Thẻ ATM» bằng **Thu Cod** (`payment_method=cod`); thứ tự nút: **Chuyển khoản → Thu Cod → Tiền mặt**; đơn cũ `card` khi sửa chuẩn hóa sang `transfer`. — Files: `src/pages/OrderForm.tsx`, `src/pages/OrderList.tsx`, `src/lib/exportExcel.ts`, `src/types.ts`
+
+## [05/05/2026] - PayrollPeriods: cột Hoàn (HH hoàn) tách khỏi Hoa hồng
+### Changed
+- **Preview chốt kỳ lương** — Cột «Hoa hồng» chỉ còn Direct / Override; «Hoàn (trừ)», NV (direct), Quản lý (override) hiển thị ở cột **Hoàn**. — File: `src/pages/PayrollPeriods.tsx`
+- **Xuất Excel preview lương** — Thêm cột «Hoàn NV (direct)», «Hoàn QL (override)» (giữ tổng hoàn). — File: `src/lib/exportExcel.ts`
+- **Cột Hoàn (UI)** — Header + nền cột tông đỏ (`bg-red-50`); toàn bộ số liệu hoàn dùng `text-red-*` (kể cả 0). — File: `src/pages/PayrollPeriods.tsx`
+
+## [04/05/2026] - Activity log: IP thật sau Vite proxy / reverse proxy
+### Fixed
+- **Nguyên nhân `::ffff:127.0.0.1`** — Trình duyệt gọi Vite `:5173` → proxy `/api` tới Express `:3000`; TCP tới Node là localhost nên `remoteAddress` luôn loopback. **Vite** gắn `X-Forwarded-For` = IP máy nối tới Vite; **backend** `getClientIp()` chỉ tin header khi socket là loopback hoặc `TRUST_PROXY=1`. — Files: `vite.config.ts`, `backend/utils/clientIp.js`, `backend/middleware/logger.js`, `backend/middleware/errorHandler.js`, `backend/server.js`, `backend/.env.example`
+
+## [04/05/2026] - Nhật ký hoạt động: hiện IP + tìm theo IP
+### Changed
+- **ActivityLog** — Thêm cột IP (font mono); placeholder tìm kiếm gồm IP; modal chi tiết luôn có dòng «Địa chỉ IP» (kể cả khi trống). — File: `src/pages/ActivityLog.tsx`
+- **`GET /logs`** — Bộ lọc `search` gồm khớp `ip_address`. — File: `backend/routes/logs.js`
+
 ## [03/05/2026] - OrderList: chỉ hiện biểu tượng xóa khi có quyền xóa đơn
 ### Changed
 - **Danh sách đơn** — Nút xóa chỉ hiển thị khi `_caps.orders.delete` và `_caps2['orders.delete']` (khớp API); đọc `user` từ `localStorage` mỗi render để nhận caps sau `GET /auth/me`. Vẫn ẩn khi dòng không được phép sửa/xóa theo trạng thái (NV phạm vi cá nhân + đơn đang giao/đã giao). — File: `src/pages/OrderList.tsx`

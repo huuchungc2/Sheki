@@ -34,6 +34,7 @@ function orderStatusLabel(st: string) {
 function paymentLabel(p: string) {
   if (p === "cash") return "Tiền mặt";
   if (p === "transfer") return "Chuyển khoản";
+  if (p === "cod") return "Thu Cod";
   if (p === "card") return "Thẻ ATM";
   return p || "—";
 }
@@ -431,7 +432,9 @@ export function exportPayrollPeriodPreview(opts: {
       "Nhân viên",
       "HH direct",
       "HH override",
-      "HH hoàn (trừ)",
+      "Hoàn (tổng, trừ)",
+      "Hoàn NV (direct)",
+      "Hoàn QL (override)",
       "Ship KH trả",
       "NV chịu",
       "Điều chỉnh",
@@ -445,6 +448,8 @@ export function exportPayrollPeriodPreview(opts: {
       Number(r.direct_commission) || 0,
       Number(r.override_commission) || 0,
       Number(r.return_commission_abs) || 0,
+      Number(r.return_commission_direct_abs) || 0,
+      Number(r.return_commission_override_abs) || 0,
       Number(r.ship_khach_tra) || 0,
       Number(r.nv_chiu) || 0,
       Number(r.adjustments) || 0,
@@ -458,6 +463,8 @@ export function exportPayrollPeriodPreview(opts: {
     sorted.reduce((s, r) => s + (Number(r.direct_commission) || 0), 0),
     sorted.reduce((s, r) => s + (Number(r.override_commission) || 0), 0),
     sorted.reduce((s, r) => s + (Number(r.return_commission_abs) || 0), 0),
+    sorted.reduce((s, r) => s + (Number(r.return_commission_direct_abs) || 0), 0),
+    sorted.reduce((s, r) => s + (Number(r.return_commission_override_abs) || 0), 0),
     sorted.reduce((s, r) => s + (Number(r.ship_khach_tra) || 0), 0),
     sorted.reduce((s, r) => s + (Number(r.nv_chiu) || 0), 0),
     sorted.reduce((s, r) => s + (Number(r.adjustments) || 0), 0),
@@ -469,7 +476,9 @@ export function exportPayrollPeriodPreview(opts: {
     { wch: 28 },
     { wch: 14 },
     { wch: 14 },
-    { wch: 14 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 16 },
     { wch: 14 },
     { wch: 12 },
     { wch: 12 },

@@ -5,8 +5,8 @@ import {
   Plus, 
   Save, 
   User, 
-  CreditCard, 
   Package,
+  Truck,
   MapPin,
   Minus,
   Calculator,
@@ -499,7 +499,11 @@ export function OrderForm() {
         setShipPayer(order?.ship_payer === "shop" ? "shop" : "customer");
         setDeposit(Number(order?.deposit ?? 0));
         setSalespersonAbsorbedAmount(Number(order?.salesperson_absorbed_amount ?? 0));
-        setPaymentMethod(order?.payment_method ?? 'cash');
+        {
+          const pm = String(order?.payment_method ?? "cash");
+          const ok = ["cash", "transfer", "cod"].includes(pm);
+          setPaymentMethod(ok ? pm : pm === "card" ? "transfer" : "cash");
+        }
         setOrderStatus(order?.status ?? 'pending');
         setPayrollPeriodStatus(order?.payroll_period_status ?? null);
         setSelectedGroupId(order?.group_id ?? null);
@@ -1637,9 +1641,9 @@ export function OrderForm() {
               <label className="text-[11px] text-slate-400 mb-1.5 block">Phương thức thanh toán</label>
               <div className="flex gap-2">
                 {[
-                  { id: 'cash', label: 'Tiền mặt', icon: Wallet },
-                  { id: 'card', label: 'Thẻ ATM', icon: CreditCard },
-                  { id: 'transfer', label: 'Chuyển khoản', icon: ArrowRight },
+                  { id: "transfer", label: "Chuyển khoản", icon: ArrowRight },
+                  { id: "cod", label: "Thu Cod", icon: Truck },
+                  { id: "cash", label: "Tiền mặt", icon: Wallet },
                 ].map((m) => (
                   <button
                     key={m.id}

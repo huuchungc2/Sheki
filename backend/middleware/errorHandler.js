@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getClientIp } = require('../utils/clientIp');
 
 function appendErrorLog(payload) {
   try {
@@ -25,7 +26,7 @@ function errorHandler(err, req, res, next) {
     url: req?.originalUrl,
     user_id: req?.user?.id || null,
     statusCode: res?.statusCode || 500,
-    ip: req?.ip || req?.connection?.remoteAddress || null,
+    ip: getClientIp(req) || null,
     userAgent: req?.get?.('User-Agent') || null,
   });
 

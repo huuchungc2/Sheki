@@ -118,7 +118,7 @@ export function ActivityLog() {
               setIsComposing(false);
               setSearchInput((e.target as HTMLInputElement).value);
             }}
-            placeholder="Tìm theo người dùng, mô tả..." 
+            placeholder="Tìm theo người dùng, IP, mô tả..." 
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
           />
         </div>
@@ -156,6 +156,7 @@ export function ActivityLog() {
                   <tr className="bg-slate-50/50 border-b border-slate-200">
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Người dùng</th>
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">IP</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Module</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hành động</th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mô tả</th>
@@ -165,7 +166,7 @@ export function ActivityLog() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {logs.length === 0 ? (
-                    <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400">Không có nhật ký nào</td></tr>
+                    <tr><td colSpan={8} className="px-6 py-12 text-center text-slate-400">Không có nhật ký nào</td></tr>
                   ) : logs.map((log: any) => {
                     const Icon = MODULE_ICONS[log.module] || FileText;
                     return (
@@ -181,6 +182,11 @@ export function ActivityLog() {
                             </div>
                             <span className="text-sm font-medium text-slate-900">{log.user_name || "—"}</span>
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-mono text-slate-600 tabular-nums" title={log.ip_address || undefined}>
+                            {log.ip_address || "—"}
+                          </span>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -292,12 +298,10 @@ export function ActivityLog() {
                   <p className="mt-2 p-3 bg-red-50 rounded-xl text-sm text-red-600">{selectedLog.error_message}</p>
                 </div>
               )}
-              {selectedLog.ip_address && (
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">IP Address</p>
-                  <p className="text-sm font-mono text-slate-900 mt-1">{selectedLog.ip_address}</p>
-                </div>
-              )}
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Địa chỉ IP</p>
+                <p className="text-sm font-mono text-slate-900 mt-1">{selectedLog.ip_address || "—"}</p>
+              </div>
             </div>
           </div>
         </div>
