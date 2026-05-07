@@ -239,20 +239,20 @@ export function InventoryHistory() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Lịch sử Nhập Xuất Kho</h1>
-          <p className="text-slate-500 text-sm mt-1">Theo dõi biến động hàng hóa trong kho của bạn.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Lịch sử Nhập Xuất Kho</h1>
+          <p className="text-muted-foreground text-sm mt-1">Theo dõi biến động hàng hóa trong kho của bạn.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+          <button className="flex items-center gap-2 h-10 px-4 bg-background border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors">
             <Download className="w-4 h-4" />
             Xuất báo cáo
           </button>
-          <div className="flex bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-            <Link to="/inventory/import" className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-sm flex items-center gap-2">
+          <div className="flex bg-card border border-border rounded-md p-1 shadow-sm">
+            <Link to="/inventory/import" className="px-4 py-1.5 bg-primary text-primary-foreground rounded-md text-sm font-semibold shadow-sm flex items-center gap-2">
               <ArrowDownRight className="w-4 h-4" />
               Nhập kho
             </Link>
-            <Link to="/inventory/export" className="px-4 py-1.5 text-slate-600 hover:bg-slate-50 rounded-lg text-sm font-bold flex items-center gap-2 transition-all">
+            <Link to="/inventory/export" className="px-4 py-1.5 text-foreground hover:bg-accent rounded-md text-sm font-semibold flex items-center gap-2 transition-colors">
               <ArrowUpRight className="w-4 h-4" />
               Xuất kho
             </Link>
@@ -262,38 +262,38 @@ export function InventoryHistory() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng nhập tháng này</p>
+        <div className="bg-card p-4 rounded-xl border border-border">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tổng nhập tháng này</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xl font-bold text-slate-900">
+            <p className="text-xl font-semibold text-foreground">
               {formatCurrency(summary?.importTotalValue ?? 0)}
             </p>
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">+12%</span>
+            <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full border border-border">+12%</span>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng xuất tháng này</p>
+        <div className="bg-card p-4 rounded-xl border border-border">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tổng xuất tháng này</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xl font-bold text-slate-900">
+            <p className="text-xl font-semibold text-foreground">
               {formatCurrency(summary?.exportTotalValue ?? 0)}
             </p>
-            <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">-5%</span>
+            <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full border border-border">-5%</span>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Số phiếu nhập</p>
-          <p className="text-xl font-bold text-slate-900 mt-2">{(summary?.importCount ?? 0)} phiếu</p>
+        <div className="bg-card p-4 rounded-xl border border-border">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Số phiếu nhập</p>
+          <p className="text-xl font-semibold text-foreground mt-2">{(summary?.importCount ?? 0)} phiếu</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Số phiếu xuất</p>
-          <p className="text-xl font-bold text-slate-900 mt-2">{(summary?.exportCount ?? 0)} phiếu</p>
+        <div className="bg-card p-4 rounded-xl border border-border">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Số phiếu xuất</p>
+          <p className="text-xl font-semibold text-foreground mt-2">{(summary?.exportCount ?? 0)} phiếu</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="bg-card p-4 rounded-xl border border-border flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input 
             type="text" 
             value={searchInput}
@@ -304,7 +304,7 @@ export function InventoryHistory() {
               setSearchInput((e.target as HTMLInputElement).value);
             }}
             placeholder="Tìm theo mã phiếu, người lập..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+            className="w-full h-10 pl-10 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
         </div>
         <div className="flex flex-wrap items-stretch gap-2 w-full md:w-auto min-w-0">
@@ -313,7 +313,7 @@ export function InventoryHistory() {
               ref={dateTriggerRef}
               type="button"
               onClick={() => setIsDateOpen((v) => !v)}
-              className="w-full min-w-0 flex items-center justify-center gap-2 px-3 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-all"
+              className="w-full min-w-0 flex items-center justify-center gap-2 h-10 px-3 bg-background text-foreground border border-input rounded-md text-sm font-semibold hover:bg-accent transition-colors"
             >
               <Calendar className="w-4 h-4 shrink-0" />
               <span className="truncate min-w-0">
@@ -325,11 +325,11 @@ export function InventoryHistory() {
                 <div
                   ref={datePanelRef}
                   style={datePopoverStyle}
-                  className="rounded-xl border border-slate-200 bg-white p-3 shadow-xl max-h-[min(60vh,420px)] flex flex-col"
+                  className="rounded-xl border border-border bg-popover text-popover-foreground p-3 shadow-xl max-h-[min(60vh,420px)] flex flex-col"
                 >
                   <div className="grid min-h-0 flex-1 grid-cols-1 gap-2.5 overflow-y-auto">
                     <div className="min-w-0">
-                      <label className="text-[10px] font-medium uppercase tracking-wide text-slate-400 mb-0.5 block">
+                      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5 block">
                         Từ ngày
                       </label>
                       <GregorianDateSelect
@@ -342,11 +342,11 @@ export function InventoryHistory() {
                           setDateFrom(v);
                           setPage(1);
                         }}
-                        selectClassName="px-2 py-1.5 bg-slate-50 border border-slate-200 focus:ring-1 focus:ring-blue-500/25 rounded-lg text-xs"
+                        selectClassName="px-2 py-1.5 bg-background border border-input focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md text-xs"
                       />
                     </div>
                     <div className="min-w-0">
-                      <label className="text-[10px] font-medium uppercase tracking-wide text-slate-400 mb-0.5 block">
+                      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5 block">
                         Đến ngày
                       </label>
                       <GregorianDateSelect
@@ -359,11 +359,11 @@ export function InventoryHistory() {
                           setDateTo(v);
                           setPage(1);
                         }}
-                        selectClassName="px-2 py-1.5 bg-slate-50 border border-slate-200 focus:ring-1 focus:ring-blue-500/25 rounded-lg text-xs"
+                        selectClassName="px-2 py-1.5 bg-background border border-input focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md text-xs"
                       />
                     </div>
                   </div>
-                  <div className="mt-2.5 flex shrink-0 items-center justify-end gap-1.5 border-t border-slate-100 pt-2.5">
+                  <div className="mt-2.5 flex shrink-0 items-center justify-end gap-1.5 border-t border-border pt-2.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -372,14 +372,14 @@ export function InventoryHistory() {
                         setPage(1);
                         setIsDateOpen(false);
                       }}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200"
+                      className="h-8 px-2.5 rounded-md text-xs font-semibold text-foreground hover:bg-accent border border-border transition-colors"
                     >
                       Xoá lọc
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsDateOpen(false)}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-blue-600 hover:bg-blue-700"
+                      className="h-8 px-2.5 rounded-md text-xs font-semibold text-primary-foreground bg-primary hover:opacity-95 transition-opacity"
                     >
                       Áp dụng
                     </button>
@@ -391,7 +391,7 @@ export function InventoryHistory() {
           <select 
             value={type}
             onChange={(e) => { setType(e.target.value); setPage(1); }}
-            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1 md:flex-none h-10 px-4 bg-background text-foreground border border-input rounded-md text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả loại phiếu</option>
             <option value="import">Nhập kho</option>
@@ -400,7 +400,7 @@ export function InventoryHistory() {
           <select
             value={warehouseId}
             onChange={(e) => { setWarehouseId(e.target.value); setPage(1); }}
-            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1 md:flex-none h-10 px-4 bg-background text-foreground border border-input rounded-md text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả kho</option>
             {warehouses.filter((w: any) => w.is_active).map((w: any) => (
@@ -410,7 +410,7 @@ export function InventoryHistory() {
           <select 
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1 md:flex-none h-10 px-4 bg-background text-foreground border border-input rounded-md text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả trạng thái</option>
             <option value="completed">Hoàn tất</option>
@@ -420,52 +420,52 @@ export function InventoryHistory() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-20 text-red-500">
+          <div className="flex flex-col items-center justify-center py-20 text-destructive">
             <AlertCircle className="w-10 h-10 mb-3" />
-            <p className="text-sm font-medium">{error}</p>
-            <button onClick={fetchTransactions} className="mt-3 text-sm text-blue-600 hover:underline">Thử lại</button>
+            <p className="text-sm font-semibold">{error}</p>
+            <button onClick={fetchTransactions} className="mt-3 text-sm font-semibold text-primary hover:underline">Thử lại</button>
           </div>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-200">
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mã phiếu</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Loại</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Thời gian</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kho / Người lập</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sản phẩm</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Số lượng</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Giá trị</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right"></th>
+                  <tr className="bg-muted/30 border-b border-border">
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Mã phiếu</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Loại</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Thời gian</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kho / Người lập</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sản phẩm</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Số lượng</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Giá trị</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Trạng thái</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {transactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-slate-50/50 transition-all group">
+                    <tr key={tx.id} className="hover:bg-muted/20 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={cn(
                             "w-8 h-8 rounded-lg flex items-center justify-center",
-                            tx.type === "import" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
+                            tx.type === "import" ? "bg-accent text-accent-foreground border border-border" : "bg-muted text-foreground border border-border"
                           )}>
                             <FileText className="w-4 h-4" />
                           </div>
-                          <span className="text-sm font-bold text-slate-900 font-mono">{tx.id}</span>
+                          <span className="text-sm font-semibold text-foreground font-mono">{tx.id}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={cn(
-                          "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full",
-                          tx.type === "import" ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
+                          "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border border-border",
+                          tx.type === "import" ? "bg-accent text-accent-foreground" : "bg-muted text-foreground"
                         )}>
                           {tx.type === "import" ? "Nhập kho" : "Xuất kho"}
                         </span>
@@ -476,55 +476,55 @@ export function InventoryHistory() {
                             const dt = parseApiDate(tx.date);
                             return (
                               <>
-                                <p className="text-sm text-slate-900">{formatDate(dt)}</p>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-sm text-foreground">{formatDate(dt)}</p>
+                                <p className="text-xs text-muted-foreground">
                                   {dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               </>
                             );
                           })()
                         ) : (
-                          <p className="text-sm text-slate-400">—</p>
+                          <p className="text-sm text-muted-foreground">—</p>
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-sm text-slate-900">
-                          <Warehouse className="w-3 h-3 text-slate-400" />
+                        <div className="flex items-center gap-2 text-sm text-foreground">
+                          <Warehouse className="w-3 h-3 text-muted-foreground" />
                           {tx.warehouseName}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                          <User className="w-3 h-3 text-slate-400" />
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <User className="w-3 h-3 text-muted-foreground" />
                           {tx.staffName}
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-start gap-2">
-                          <Tag className="w-3 h-3 text-slate-400 mt-0.5" />
+                          <Tag className="w-3 h-3 text-muted-foreground mt-0.5" />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{tx.productName}</p>
-                            <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wide">{tx.sku}</p>
+                            <p className="text-sm font-semibold text-foreground truncate">{tx.productName}</p>
+                            <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wide">{tx.sku}</p>
                             {tx.reason !== "—" && (
-                              <p className="text-[11px] text-slate-500 truncate">{tx.reason}</p>
+                              <p className="text-[11px] text-muted-foreground truncate">{tx.reason}</p>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                      <td className="px-6 py-4 text-sm font-semibold text-foreground">
                         {tx.qty}
                       </td>
-                      <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                      <td className="px-6 py-4 text-sm font-semibold text-foreground">
                         {formatCurrency(tx.totalValue)}
                       </td>
                       <td className="px-6 py-4">
                         <span className={cn(
-                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                          tx.status === "completed" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border",
+                          tx.status === "completed" ? "bg-accent text-accent-foreground border-border" : "bg-muted text-muted-foreground border-border"
                         )}>
                           {tx.status === "completed" ? "Hoàn tất" : "Lưu nháp"}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-all">
+                        <button className="p-2 hover:bg-accent rounded-lg text-muted-foreground transition-colors">
                           <Eye className="w-4 h-4" />
                         </button>
                       </td>
@@ -536,13 +536,13 @@ export function InventoryHistory() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
-                <p className="text-sm text-slate-500">Hiển thị {(page - 1) * limit + 1}–{Math.min(page * limit, total)} của {total} kết quả</p>
+              <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+                <p className="text-sm text-muted-foreground">Hiển thị {(page - 1) * limit + 1}–{Math.min(page * limit, total)} của {total} kết quả</p>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="p-2 rounded-md border border-border text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -551,10 +551,10 @@ export function InventoryHistory() {
                       key={p}
                       onClick={() => setPage(p)}
                       className={cn(
-                        "w-8 h-8 rounded-lg text-sm font-medium transition-all",
+                        "w-8 h-8 rounded-md text-sm font-semibold transition-colors",
                         p === page
-                          ? "bg-blue-600 text-white"
-                          : "text-slate-600 hover:bg-slate-50"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground hover:bg-accent"
                       )}
                     >
                       {p}
@@ -563,7 +563,7 @@ export function InventoryHistory() {
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="p-2 rounded-md border border-border text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>

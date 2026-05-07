@@ -30,6 +30,29 @@ import vnLoc from "../lib/vietnam-locations-simple.json";
 
 const COUNTER_ADDRESS = "Mua tại cửa hàng";
 
+/** UI tokens for this screen (semantic colors only) */
+const ds = {
+  canvas: "bg-background text-foreground",
+  surface1: "bg-card text-card-foreground",
+  surface2: "bg-popover text-popover-foreground",
+  surface3: "bg-accent text-accent-foreground",
+  hairline: "border-border",
+  hairlineStrong: "border-input",
+  ink: "text-foreground",
+  inkMuted: "text-muted-foreground",
+  inkSubtle: "text-muted-foreground",
+  inkTertiary: "text-muted-foreground",
+  primary: "bg-primary text-primary-foreground",
+  primaryHover: "hover:bg-primary/90",
+  primaryPress: "active:bg-primary/85",
+  primaryMuted: "bg-primary/15",
+  primaryText: "text-primary",
+  primaryBorder: "border-primary/35",
+  success: "text-foreground",
+  successBg: "bg-muted",
+  focusRing: "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+} as const;
+
 function getMainProductImage(p: any): string | null {
   const raw = p?.images;
   if (!raw) return null;
@@ -260,7 +283,10 @@ function MoneyAmountField({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         className={cn(
-          "min-w-[7rem] max-w-[12rem] px-2 py-0.5 border border-blue-300 rounded text-right font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 tabular-nums",
+          "min-w-[7rem] max-w-[12rem] rounded-md border px-2 py-0.5 text-right text-sm font-medium tabular-nums",
+          ds.surface1,
+          ds.hairlineStrong,
+          ds.focusRing,
           inputClassName
         )}
       />
@@ -272,7 +298,8 @@ function MoneyAmountField({
       type="button"
       onClick={openEdit}
       className={cn(
-        "max-w-[12rem] text-right font-medium text-slate-700 tabular-nums hover:text-slate-900 rounded px-1 py-0.5 -mr-1 hover:bg-slate-50",
+        "max-w-[12rem] -mr-1 rounded-md px-1 py-0.5 text-right text-sm font-medium tabular-nums transition-colors hover:bg-accent hover:text-accent-foreground",
+        ds.inkMuted,
         className
       )}
     >
@@ -1049,25 +1076,38 @@ export function CounterSale() {
   const [mobileSummaryExpanded, setMobileSummaryExpanded] = React.useState(false);
 
   return (
-    <div className={cn("max-w-6xl mx-auto", mobileSummaryExpanded ? "pb-32" : "pb-24", "sm:pb-8 lg:pb-20")}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div
+      className={cn(
+        ds.canvas,
+        "-mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-4 sm:-mt-6 lg:-mt-8 pt-4 sm:pt-6 lg:pt-8",
+        "max-w-[min(100vw,1280px)] mx-auto tracking-[-0.02em]",
+        mobileSummaryExpanded ? "pb-32" : "pb-24",
+        "sm:pb-8 lg:pb-20"
+      )}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate("/orders/counter-list")}
-            className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
+            className={cn(
+              "rounded-md border p-2 transition-colors hover:bg-accent hover:text-accent-foreground",
+              ds.hairline,
+              ds.inkMuted,
+              ds.focusRing
+            )}
             aria-label="Quay lại"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Store className="w-6 h-6 text-emerald-600" />
+            <h1 className={cn("flex items-center gap-2 text-lg font-semibold sm:text-xl", ds.ink)}>
+              <Store className={cn("h-6 w-6", ds.primaryText)} />
               {editingOrderId
                 ? `Sửa đơn tại quầy${loadedOrderCode ? ` · ${loadedOrderCode}` : ""}`
                 : "Bán tại quầy"}
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className={cn("mt-0.5 text-sm", ds.inkSubtle)}>
               Đơn hoàn tất ngay — ship 0 — địa chỉ «{COUNTER_ADDRESS}»
             </p>
           </div>
@@ -1076,38 +1116,66 @@ export function CounterSale() {
           <button
             type="button"
             onClick={printAgain}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors",
+              ds.hairline,
+              ds.surface1,
+              ds.ink,
+              "hover:bg-accent",
+              ds.focusRing
+            )}
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="h-4 w-4" />
             In lại {lastBill.code}
           </button>
         ) : null}
       </div>
 
       {formError ? (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
+        <div
+          className={cn(
+            "mt-4 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm",
+            "bg-destructive/10 text-destructive-foreground",
+            ds.hairline
+          )}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
           {formError}
         </div>
       ) : null}
 
       {loadingEditOrder ? (
-        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600">
-          <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+        <div
+          className={cn(
+            "mt-4 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm",
+            ds.surface1,
+            ds.hairline,
+            ds.inkMuted
+          )}
+        >
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           Đang tải đơn…
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         {/* LEFT */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className={cn("space-y-4 rounded-xl border p-4 sm:p-5", ds.surface1, ds.hairline)}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Kho xuất</label>
+            <label className={cn("mb-1 block text-xs font-medium uppercase tracking-wide", ds.inkSubtle)}>
+              Kho xuất
+            </label>
             <select
               value={selectedWarehouseId ?? ""}
               onChange={(e) => setSelectedWarehouseId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+              className={cn(
+                "w-full rounded-md border px-3 py-2 text-sm",
+                ds.surface2,
+                ds.hairline,
+                ds.ink,
+                ds.focusRing
+              )}
             >
               <option value="">— Chọn —</option>
               {warehouses
@@ -1120,11 +1188,19 @@ export function CounterSale() {
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Nhóm bán hàng</label>
+            <label className={cn("mb-1 block text-xs font-medium uppercase tracking-wide", ds.inkSubtle)}>
+              Nhóm bán hàng
+            </label>
             <select
               value={selectedGroupId ?? ""}
               onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+              className={cn(
+                "w-full rounded-md border px-3 py-2 text-sm",
+                ds.surface2,
+                ds.hairline,
+                ds.ink,
+                ds.focusRing
+              )}
             >
               <option value="">— Chọn —</option>
               {groups.map((g: any) => (
@@ -1137,8 +1213,10 @@ export function CounterSale() {
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400 mb-2 block">Khách hàng</label>
-          <div className="grid grid-cols-3 rounded-xl border border-slate-200 overflow-hidden text-xs font-semibold">
+          <label className={cn("mb-2 block text-xs font-medium uppercase tracking-wide", ds.inkSubtle)}>
+            Khách hàng
+          </label>
+          <div className={cn("grid grid-cols-3 overflow-hidden rounded-md border text-xs font-medium", ds.hairline)}>
             <button
               type="button"
               onClick={() => {
@@ -1150,8 +1228,10 @@ export function CounterSale() {
                 setShowCustomerSuggestions(false);
               }}
               className={cn(
-                "py-2 px-2 transition-colors",
-                customerMode === "none" ? "bg-emerald-600 text-white" : "bg-slate-50 text-slate-600"
+                "px-2 py-2.5 transition-colors",
+                customerMode === "none"
+                  ? cn(ds.primary, ds.primaryHover)
+                  : cn(ds.surface2, ds.inkMuted, "hover:bg-accent hover:text-accent-foreground")
               )}
             >
               Bỏ qua
@@ -1160,8 +1240,11 @@ export function CounterSale() {
               type="button"
               onClick={() => setCustomerMode("search")}
               className={cn(
-                "py-2 px-2 transition-colors border-l border-slate-200",
-                customerMode === "search" ? "bg-emerald-600 text-white" : "bg-slate-50 text-slate-600"
+                "border-l px-2 py-2.5 transition-colors",
+                ds.hairline,
+                customerMode === "search"
+                  ? cn(ds.primary, ds.primaryHover)
+                  : cn(ds.surface2, ds.inkMuted, "hover:bg-accent hover:text-accent-foreground")
               )}
             >
               Tìm khách
@@ -1170,8 +1253,11 @@ export function CounterSale() {
               type="button"
               onClick={() => setCustomerMode("quick")}
               className={cn(
-                "py-2 px-2 transition-colors border-l border-slate-200",
-                customerMode === "quick" ? "bg-emerald-600 text-white" : "bg-slate-50 text-slate-600"
+                "border-l px-2 py-2.5 transition-colors",
+                ds.hairline,
+                customerMode === "quick"
+                  ? cn(ds.primary, ds.primaryHover)
+                  : cn(ds.surface2, ds.inkMuted, "hover:bg-accent hover:text-accent-foreground")
               )}
             >
               Khách lẻ (tạo nhanh)
@@ -1179,12 +1265,12 @@ export function CounterSale() {
           </div>
 
           {customerMode === "none" ? (
-            <p className="mt-2 text-[11px] text-slate-400">
+            <p className={cn("mt-2 text-xs", ds.inkTertiary)}>
               Mặc định dùng khách «Khách lẻ» để tạo đơn và in bill (không cần nhập thông tin).
             </p>
           ) : customerMode === "search" ? (
             <div className="relative mt-2">
-              <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
+              <Search className={cn("absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2", ds.inkTertiary)} />
               <input
                 type="text"
                 placeholder="Tên hoặc SĐT..."
@@ -1195,41 +1281,63 @@ export function CounterSale() {
                   fetchCustomerSuggestions(e.target.value);
                   setSelectedCustomer(null);
                 }}
-                className="w-full pr-10 pl-3 py-2.5 border border-slate-200 rounded-xl text-sm"
+                className={cn(
+                  "w-full rounded-md border py-2.5 pl-3 pr-10 text-sm",
+                  ds.surface2,
+                  ds.hairline,
+                  ds.ink,
+                  ds.focusRing
+                )}
               />
               {showCustomerSuggestions && customerQuery.trim() ? (
-                <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-100 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                <div
+                  className={cn(
+                    "absolute left-0 right-0 z-20 mt-1 max-h-48 overflow-y-auto rounded-md border shadow-xl",
+                    ds.surface1,
+                    ds.hairline
+                  )}
+                >
                   {customerSuggestions.length ? (
                     customerSuggestions.map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => pickCustomer(c)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 border-b border-slate-50 last:border-0"
+                        className={cn(
+                          "w-full border-b px-3 py-2 text-left text-sm last:border-0",
+                          ds.hairline,
+                          "hover:bg-accent"
+                        )}
                       >
-                        <span className="font-medium text-slate-800">{c.name}</span>
-                        <span className="text-slate-400 text-xs ml-2">{c.phone}</span>
+                        <span className={cn("font-medium", ds.ink)}>{c.name}</span>
+                        <span className={cn("ml-2 text-xs", ds.inkSubtle)}>{c.phone}</span>
                       </button>
                     ))
                   ) : (
-                    <div className="px-3 py-2 text-xs text-slate-400">Không có kết quả</div>
+                    <div className={cn("px-3 py-2 text-xs", ds.inkSubtle)}>Không có kết quả</div>
                   )}
                 </div>
               ) : null}
               {selectedCustomer ? (
-                <p className="text-xs text-emerald-700 font-semibold mt-1 flex items-center gap-1">
-                  <User className="w-3.5 h-3.5" /> Đã chọn: {selectedCustomer.name}
+                <p className={cn("mt-1 flex items-center gap-1 text-xs font-medium", ds.success)}>
+                  <User className="h-3.5 w-3.5" /> Đã chọn: {selectedCustomer.name}
                 </p>
               ) : null}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <input
                 type="text"
                 placeholder="Tên khách *"
                 value={walkName}
                 onChange={(e) => setWalkName(e.target.value)}
-                className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
+                className={cn(
+                  "rounded-md border px-3 py-2.5 text-sm",
+                  ds.surface2,
+                  ds.hairline,
+                  ds.ink,
+                  ds.focusRing
+                )}
               />
               <input
                 type="tel"
@@ -1237,9 +1345,15 @@ export function CounterSale() {
                 placeholder="SĐT 10 số *"
                 value={walkPhone}
                 onChange={(e) => setWalkPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
+                className={cn(
+                  "rounded-md border px-3 py-2.5 text-sm",
+                  ds.surface2,
+                  ds.hairline,
+                  ds.ink,
+                  ds.focusRing
+                )}
               />
-              <p className="sm:col-span-2 text-[11px] text-slate-400">
+              <p className={cn("text-xs sm:col-span-2", ds.inkTertiary)}>
                 Địa chỉ lưu hệ thống dùng phường mặc định (theo bản đồ VN) — có sửa sau trong Khách hàng.
               </p>
             </div>
@@ -1248,10 +1362,10 @@ export function CounterSale() {
 
         <div ref={productPickerWrapRef}>
           {/* Desktop/tablet: ô tìm SP gọn như OrderForm (không bung full-width) */}
-          <div className="hidden sm:flex items-center justify-between gap-3">
-            <div className="text-[11px] text-slate-400">Thêm sản phẩm</div>
+          <div className="hidden items-center justify-between gap-3 sm:flex">
+            <div className={cn("text-xs font-medium uppercase tracking-wide", ds.inkSubtle)}>Thêm sản phẩm</div>
             <div className="relative w-56">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+              <Search className={cn("absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2", ds.inkTertiary)} />
               <input
                 type="text"
                 placeholder="Tìm sản phẩm, SKU..."
@@ -1262,10 +1376,22 @@ export function CounterSale() {
                   fetchProductSuggestions(e.target.value);
                 }}
                 onFocus={() => productQuery.length > 0 && setShowProductSuggestions(true)}
-                className="w-full pr-3 pl-9 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50"
+                className={cn(
+                  "w-full rounded-md border py-1.5 pl-9 pr-3 text-sm",
+                  ds.surface2,
+                  ds.hairline,
+                  ds.ink,
+                  ds.focusRing
+                )}
               />
               {showProductSuggestions ? (
-                <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-100 rounded-lg shadow-lg overflow-hidden">
+                <div
+                  className={cn(
+                    "absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-md border shadow-xl",
+                    ds.surface1,
+                    ds.hairline
+                  )}
+                >
                   <div className="max-h-52 overflow-y-auto overscroll-contain">
                     {productSuggestions.length > 0 ? (
                       productSuggestions.map((p) => (
@@ -1273,39 +1399,49 @@ export function CounterSale() {
                           key={p.id}
                           type="button"
                           onClick={() => addProduct(p)}
-                          className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                          className={cn(
+                            "flex w-full items-center justify-between border-b px-4 py-3 text-left transition-colors last:border-0",
+                            ds.hairline,
+                            "hover:bg-accent"
+                          )}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div
+                              className={cn(
+                                "flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border",
+                                ds.surface2,
+                                ds.hairline
+                              )}
+                            >
                               {resolveImageSrc(p.image) ? (
                                 <img
                                   src={resolveImageSrc(p.image) as string}
                                   alt=""
-                                  className="w-full h-full object-cover"
+                                  className="h-full w-full object-cover"
                                   loading="lazy"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = "none";
                                   }}
                                 />
                               ) : (
-                                <Package className="w-4 h-4 text-slate-300" />
+                                <Package className={cn("h-4 w-4", ds.inkTertiary)} />
                               )}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
-                              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono truncate">
+                              <p className={cn("truncate text-sm font-medium", ds.ink)}>{p.name}</p>
+                              <p className={cn("truncate font-mono text-[10px] uppercase tracking-wide", ds.inkSubtle)}>
                                 {p.sku}
                               </p>
                             </div>
                           </div>
-                          <div className="text-right shrink-0 pl-3">
-                            <p className="text-sm font-medium text-slate-800">{formatCurrency(p.price)}</p>
-                            <p className="text-[10px] text-slate-400">Thêm</p>
+                          <div className="shrink-0 pl-3 text-right">
+                            <p className={cn("text-sm font-medium tabular-nums", ds.ink)}>{formatCurrency(p.price)}</p>
+                            <p className={cn("text-[10px]", ds.inkSubtle)}>Thêm</p>
                           </div>
                         </button>
                       ))
                     ) : (
-                      <div className="px-4 py-6 text-center text-slate-400 text-sm">Không tìm thấy sản phẩm</div>
+                      <div className={cn("px-4 py-6 text-center text-sm", ds.inkSubtle)}>Không tìm thấy sản phẩm</div>
                     )}
                   </div>
                 </div>
@@ -1316,7 +1452,7 @@ export function CounterSale() {
           <div className="sm:hidden">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                <Search className={cn("absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2", ds.inkTertiary)} />
                 <input
                   ref={productInputRef}
                   type="text"
@@ -1330,10 +1466,22 @@ export function CounterSale() {
                   onFocus={() => {
                     if (productQuery.length > 0) setShowProductSuggestions(true);
                   }}
-                  className="w-full h-10 pl-10 pr-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50 bg-white"
+                  className={cn(
+                    "h-10 w-full rounded-md border pl-10 pr-3 text-sm",
+                    ds.surface2,
+                    ds.hairline,
+                    ds.ink,
+                    ds.focusRing
+                  )}
                 />
                 {showProductSuggestions ? (
-                  <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-100 rounded-xl shadow-lg overflow-hidden">
+                  <div
+                    className={cn(
+                      "absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-md border shadow-xl",
+                      ds.surface1,
+                      ds.hairline
+                    )}
+                  >
                     <div className="max-h-[min(60vh,20rem)] overflow-y-auto overscroll-contain">
                       {productSuggestions.length > 0 ? (
                         productSuggestions.map((p) => (
@@ -1341,42 +1489,53 @@ export function CounterSale() {
                             key={p.id}
                             type="button"
                             onClick={() => addProduct(p)}
-                            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                            className={cn(
+                              "flex w-full items-center justify-between border-b px-4 py-2.5 text-left transition-colors last:border-0",
+                              ds.hairline,
+                              "hover:bg-accent"
+                            )}
                           >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div
+                                className={cn(
+                                  "flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border",
+                                  ds.surface2,
+                                  ds.hairline
+                                )}
+                              >
                                 {resolveImageSrc(p.image) ? (
                                   <img
                                     src={resolveImageSrc(p.image) as string}
                                     alt=""
-                                    className="w-full h-full object-cover"
+                                    className="h-full w-full object-cover"
                                     loading="lazy"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).style.display = "none";
                                     }}
                                   />
                                 ) : (
-                                  <Package className="w-4 h-4 text-slate-300" />
+                                  <Package className={cn("h-4 w-4", ds.inkTertiary)} />
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[13px] font-semibold text-slate-800 truncate leading-tight">
-                                  {p.name}
-                                </p>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono truncate leading-tight">
+                                <p className={cn("truncate text-[13px] font-semibold leading-tight", ds.ink)}>{p.name}</p>
+                                <p
+                                  className={cn(
+                                    "truncate font-mono text-[10px] uppercase leading-tight tracking-wide",
+                                    ds.inkSubtle
+                                  )}
+                                >
                                   {p.sku}
                                 </p>
                               </div>
                             </div>
-                            <div className="text-right flex-shrink-0 pl-3">
-                              <p className="text-[13px] font-semibold text-slate-800 tabular-nums">
-                                {formatCurrency(p.price)}
-                              </p>
+                            <div className="flex-shrink-0 pl-3 text-right">
+                              <p className={cn("text-[13px] font-semibold tabular-nums", ds.ink)}>{formatCurrency(p.price)}</p>
                             </div>
                           </button>
                         ))
                       ) : (
-                        <div className="px-4 py-6 text-center text-slate-400 text-sm">Không tìm thấy sản phẩm</div>
+                        <div className={cn("px-4 py-6 text-center text-sm", ds.inkSubtle)}>Không tìm thấy sản phẩm</div>
                       )}
                     </div>
                   </div>
@@ -1389,18 +1548,25 @@ export function CounterSale() {
                   setShowProductSuggestions(true);
                   if (productQuery.length > 0) fetchProductSuggestions(productQuery);
                 }}
-                className="h-10 w-10 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition-colors shrink-0"
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-md border transition-colors",
+                  ds.hairline,
+                  ds.surface2,
+                  ds.primaryText,
+                  "hover:bg-primary/20",
+                  ds.focusRing
+                )}
                 aria-label="Mở tìm sản phẩm"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="h-5 w-5" />
               </button>
             </div>
           </div>
         </div>
 
         {items.length === 0 ? (
-          <div className="py-12 text-center text-slate-400">
-            <Package className="w-7 h-7 mx-auto mb-2 text-slate-200" />
+          <div className={cn("py-12 text-center", ds.inkSubtle)}>
+            <Package className={cn("mx-auto mb-2 h-7 w-7", ds.inkTertiary)} />
             <p className="text-sm">Chưa có sản phẩm. Tìm và thêm bên trên.</p>
           </div>
         ) : (
@@ -1409,8 +1575,14 @@ export function CounterSale() {
             <div className="block sm:hidden">
               <div className="overflow-x-auto">
                 <div className="min-w-0" style={{ minWidth: lineGridMinPxMobile }}>
-                  <div className="sticky top-0 z-10 px-4 pt-3 pb-2 border-b border-slate-100 bg-slate-50">
-                    <div className="flex gap-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <div
+                    className={cn(
+                      "sticky top-0 z-10 border-b px-4 pb-2 pt-3",
+                      ds.hairline,
+                      ds.surface2
+                    )}
+                  >
+                    <div className={cn("flex gap-3 text-[11px] font-semibold uppercase tracking-wide", ds.inkSubtle)}>
                       <div className="w-[260px]">Sản phẩm</div>
                       <div className="w-[190px] text-center">Số lượng</div>
                       <div className="w-[140px] text-right">Đơn giá</div>
@@ -1421,40 +1593,59 @@ export function CounterSale() {
                     </div>
                   </div>
 
-                  <div className="px-4 py-2 divide-y divide-slate-100">
+                  <div className={cn("divide-y px-4 py-2", ds.hairline)}>
                     {items.map((it) => {
                       const lineTotal = it.price * it.quantity - it.discountAmount;
                       const { maxAllowed, overStock } = computeStockMeta(it as any);
                       return (
                         <div
                           key={it.productId}
-                          className={cn("flex items-center gap-3 py-2.5", overStock ? "bg-red-50/40" : "")}
+                          className={cn(
+                            "flex items-center gap-3 py-2.5",
+                            overStock ? "bg-destructive/10" : ""
+                          )}
                         >
                           <div className="w-[260px] min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <div
+                                className={cn(
+                                  "flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border",
+                                  ds.surface2,
+                                  ds.hairline
+                                )}
+                              >
                                 {resolveImageSrc((it as any).image) ? (
                                   <img
                                     src={resolveImageSrc((it as any).image) as string}
                                     alt=""
-                                    className="w-full h-full object-cover"
+                                    className="h-full w-full object-cover"
                                     loading="lazy"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).style.display = "none";
                                     }}
                                   />
                                 ) : (
-                                  <Package className="w-4 h-4 text-slate-300" />
+                                  <Package className={cn("h-4 w-4", ds.inkTertiary)} />
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[13px] font-semibold text-slate-800 truncate">{it.productName}</p>
-                                <p className="mt-0.5 text-[10px] text-slate-400 font-mono uppercase tracking-wide truncate">
+                                <p className={cn("truncate text-[13px] font-semibold", ds.ink)}>{it.productName}</p>
+                                <p
+                                  className={cn(
+                                    "mt-0.5 truncate font-mono text-[10px] uppercase tracking-wide",
+                                    ds.inkSubtle
+                                  )}
+                                >
                                   {it.sku}
                                 </p>
                               </div>
                             </div>
-                            <p className={cn("mt-0.5 text-[10px]", overStock ? "text-red-600 font-medium" : "text-slate-500")}>
+                            <p
+                              className={cn(
+                                "mt-0.5 text-[10px]",
+                                overStock ? "font-medium text-destructive-foreground" : ds.inkSubtle
+                              )}
+                            >
                               Có thể bán: {maxAllowed.toFixed(3).replace(/\.?0+$/, "")}
                               {overStock ? <span className="ml-1">— Vượt tồn</span> : null}
                             </p>
@@ -1476,9 +1667,14 @@ export function CounterSale() {
                                   }
                                   updateItem(it.productId, { quantity: v });
                                 }}
-                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600"
+                                className={cn(
+                                  "flex h-8 w-8 items-center justify-center rounded-md border",
+                                  ds.surface2,
+                                  ds.hairline,
+                                  ds.inkMuted
+                                )}
                               >
-                                <Minus className="w-4 h-4" />
+                                <Minus className="h-4 w-4" />
                               </button>
                               <input
                                 type="number"
@@ -1491,10 +1687,10 @@ export function CounterSale() {
                                   updateItem(it.productId, { quantity: roundQty(v) });
                                 }}
                                 className={cn(
-                                  "w-24 h-8 rounded-lg border px-2 text-center text-[13px] font-semibold outline-none",
+                                  "h-8 w-24 rounded-md border px-2 text-center text-[13px] font-semibold outline-none",
                                   overStock
-                                    ? "border-red-300 bg-red-50 text-red-700"
-                                    : "border-slate-200 bg-white text-slate-800"
+                                    ? cn(ds.hairlineStrong, "bg-destructive/10 text-destructive-foreground")
+                                    : cn(ds.surface2, ds.hairline, ds.ink)
                                 )}
                               />
                               <button
@@ -1504,9 +1700,14 @@ export function CounterSale() {
                                   if (next > maxAllowed + 1e-9) return;
                                   updateItem(it.productId, { quantity: next });
                                 }}
-                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600"
+                                className={cn(
+                                  "flex h-8 w-8 items-center justify-center rounded-md border",
+                                  ds.surface2,
+                                  ds.hairline,
+                                  ds.inkMuted
+                                )}
                               >
-                                <Plus className="w-4 h-4" />
+                                <Plus className="h-4 w-4" />
                               </button>
                             </div>
                           </div>
@@ -1519,11 +1720,16 @@ export function CounterSale() {
                               onChange={(e) =>
                                 updateItem(it.productId, { price: Math.max(0, Number(e.target.value) || 0) })
                               }
-                              className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-right text-[13px] font-semibold text-slate-800 outline-none"
+                              className={cn(
+                                "h-8 w-full rounded-md border px-2 text-right text-[13px] font-semibold outline-none",
+                                ds.surface2,
+                                ds.hairline,
+                                ds.ink
+                              )}
                             />
                           </div>
                           {showDiscCols ? (
-                            <div className="w-[90px] flex justify-center">
+                            <div className="flex w-[90px] justify-center">
                               <input
                                 type="number"
                                 min={0}
@@ -1534,12 +1740,18 @@ export function CounterSale() {
                                     discountRate: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
                                   })
                                 }
-                                className="w-16 h-8 rounded-lg border border-rose-200 bg-rose-50 px-2 text-center text-[13px] font-semibold text-rose-800 outline-none"
+                                className={cn(
+                                  "h-8 w-16 rounded-md border px-2 text-center text-[13px] font-semibold outline-none",
+                                  ds.surface2,
+                                  ds.hairlineStrong,
+                                  ds.ink,
+                                  ds.focusRing
+                                )}
                               />
                             </div>
                           ) : null}
                           {showCommCols ? (
-                            <div className="w-[90px] flex justify-center">
+                            <div className="flex w-[90px] justify-center">
                               <input
                                 type="number"
                                 min={0}
@@ -1550,36 +1762,53 @@ export function CounterSale() {
                                     commissionRate: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
                                   })
                                 }
-                                className="w-16 h-8 rounded-lg border border-green-200 bg-green-50 px-2 text-center text-[13px] font-semibold text-green-800 outline-none"
+                                className={cn(
+                                  "h-8 w-16 rounded-md border px-2 text-center text-[13px] font-semibold outline-none",
+                                  ds.surface2,
+                                  ds.hairlineStrong,
+                                  ds.ink,
+                                  ds.focusRing
+                                )}
                               />
                             </div>
                           ) : null}
                           <div className="w-[120px] text-right">
-                            <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(lineTotal)}</p>
+                            <p className={cn("text-[13px] font-semibold", ds.ink)}>{formatCurrency(lineTotal)}</p>
                             {showCommCols ? (
-                              <p className="mt-0.5 text-[10px] font-semibold text-green-700">
+                              <p className={cn("mt-0.5 text-[10px] font-semibold", ds.success)}>
                                 HH: {formatCurrency(it.commissionAmount)}
                               </p>
                             ) : null}
                           </div>
-                          <div className="w-[30px] flex justify-end">
+                          <div className="flex w-[30px] justify-end">
                             <button
                               type="button"
                               onClick={() => setItems((prev) => prev.filter((x) => x.productId !== it.productId))}
-                              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+                              className={cn(
+                                "flex h-8 w-8 items-center justify-center rounded-md border transition-colors",
+                                ds.hairline,
+                                ds.inkTertiary,
+                                "hover:bg-destructive/10 hover:text-destructive-foreground"
+                              )}
                               aria-label="Xóa sản phẩm"
                             >
-                              <X className="w-4 h-4" />
+                              <X className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
                       );
                     })}
-                    <div className="flex gap-3 items-center py-2.5 border-t border-slate-200 bg-slate-50 text-[11px]">
-                      <div className="w-[260px] shrink-0 font-semibold text-slate-600">
+                    <div
+                      className={cn(
+                        "flex items-center gap-3 border-t py-2.5 text-[11px]",
+                        ds.hairline,
+                        ds.surface2
+                      )}
+                    >
+                      <div className={cn("w-[260px] shrink-0 font-semibold", ds.inkMuted)}>
                         Giá trị đơn ({items.length} SP)
                       </div>
-                      <div className="w-[190px] shrink-0 text-center font-medium text-slate-700">
+                      <div className={cn("w-[190px] shrink-0 text-center font-medium", ds.ink)}>
                         {items
                           .reduce((s, i) => s + i.quantity, 0)
                           .toFixed(qtyPrecision)
@@ -1587,15 +1816,15 @@ export function CounterSale() {
                       </div>
                       <div className="w-[140px] shrink-0" />
                       {showDiscCols ? (
-                        <div className="w-[90px] shrink-0 text-center text-red-600 font-medium tabular-nums">
+                        <div className="w-[90px] shrink-0 text-center font-medium tabular-nums text-destructive-foreground">
                           {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
                         </div>
                       ) : null}
                       {showCommCols ? <div className="w-[90px] shrink-0" /> : null}
                       <div className="w-[120px] shrink-0 text-right">
-                        <p className="text-[13px] font-semibold text-slate-800">{formatCurrency(subtotal)}</p>
+                        <p className={cn("text-[13px] font-semibold", ds.ink)}>{formatCurrency(subtotal)}</p>
                         {showCommCols ? (
-                          <p className="mt-0.5 text-[10px] font-semibold text-green-700">
+                          <p className={cn("mt-0.5 text-[10px] font-semibold", ds.success)}>
                             HH: {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
                           </p>
                         ) : null}
@@ -1608,7 +1837,7 @@ export function CounterSale() {
             </div>
 
             {/* Desktop/tablet */}
-            <div className="hidden sm:block overflow-x-auto">
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full border-collapse text-xs" style={{ tableLayout: "fixed" }}>
                 <colgroup>
                   {counterDesktopColPercents.map((pct, i) => (
@@ -1616,13 +1845,13 @@ export function CounterSale() {
                   ))}
                 </colgroup>
                 <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 text-[11px] uppercase tracking-wide">
-                    <th className="px-4 py-2 text-left font-medium">Sản phẩm</th>
-                    <th className="px-3 py-2 text-center font-medium">Số lượng</th>
-                    <th className="px-3 py-2 text-right font-medium">Đơn giá</th>
-                    {showDiscCols ? <th className="px-2 py-2 text-center font-medium">CK%</th> : null}
-                    {showCommCols ? <th className="px-2 py-2 text-center font-medium">HH%</th> : null}
-                    <th className="px-3 py-2 text-right font-medium">Thành tiền</th>
+                  <tr className={cn("border-b text-[11px] font-medium uppercase tracking-wide", ds.hairline, ds.inkSubtle)}>
+                    <th className="px-4 py-2 text-left">Sản phẩm</th>
+                    <th className="px-3 py-2 text-center">Số lượng</th>
+                    <th className="px-3 py-2 text-right">Đơn giá</th>
+                    {showDiscCols ? <th className="px-2 py-2 text-center">CK%</th> : null}
+                    {showCommCols ? <th className="px-2 py-2 text-center">HH%</th> : null}
+                    <th className="px-3 py-2 text-right">Thành tiền</th>
                     <th className="px-2 py-2" />
                   </tr>
                 </thead>
@@ -1634,34 +1863,41 @@ export function CounterSale() {
                       <tr
                         key={it.productId}
                         className={cn(
-                          "group border-b border-slate-50 last:border-0 transition-colors",
-                          overStock ? "bg-red-50/70" : "hover:bg-slate-50/60"
+                          "group border-b transition-colors last:border-0",
+                          ds.hairline,
+                          overStock ? "bg-destructive/10" : "hover:bg-accent/80"
                         )}
                       >
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                            <div
+                              className={cn(
+                                "flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border",
+                                ds.surface2,
+                                ds.hairline
+                              )}
+                            >
                               {resolveImageSrc((it as any).image) ? (
                                 <img
                                   src={resolveImageSrc((it as any).image) as string}
                                   alt=""
-                                  className="w-full h-full object-cover"
+                                  className="h-full w-full object-cover"
                                   loading="lazy"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = "none";
                                   }}
                                 />
                               ) : (
-                                <Package className="w-4 h-4 text-slate-300" />
+                                <Package className={cn("h-4 w-4", ds.inkTertiary)} />
                               )}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-medium text-slate-800 truncate text-xs leading-tight">{it.productName}</p>
-                              <p className="text-slate-400 font-mono text-[10px] leading-tight truncate">{it.sku}</p>
+                              <p className={cn("truncate text-xs font-medium leading-tight", ds.ink)}>{it.productName}</p>
+                              <p className={cn("truncate font-mono text-[10px] leading-tight", ds.inkSubtle)}>{it.sku}</p>
                               <p
                                 className={cn(
                                   "text-[10px] leading-tight",
-                                  overStock ? "text-red-500 font-medium" : "text-slate-400"
+                                  overStock ? "font-medium text-destructive-foreground" : ds.inkSubtle
                                 )}
                               >
                                 Có thể bán: {maxAllowed.toFixed(3).replace(/\.?0+$/, "")}
@@ -1687,9 +1923,14 @@ export function CounterSale() {
                                 }
                                 updateItem(it.productId, { quantity: v });
                               }}
-                              className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors shrink-0"
+                              className={cn(
+                                "flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors",
+                                ds.surface2,
+                                ds.inkSubtle,
+                                "hover:bg-accent hover:text-accent-foreground"
+                              )}
                             >
-                              <Minus className="w-2.5 h-2.5" />
+                              <Minus className="h-2.5 w-2.5" />
                             </button>
                             <input
                               type="number"
@@ -1702,10 +1943,15 @@ export function CounterSale() {
                                 updateItem(it.productId, { quantity: roundQty(v) });
                               }}
                               className={cn(
-                                "w-20 h-6 px-1 border rounded text-center text-xs font-medium outline-none focus:ring-1 transition-colors tabular-nums",
+                                "h-6 w-20 rounded border px-1 text-center text-xs font-medium outline-none transition-colors focus:ring-1 tabular-nums",
                                 overStock
-                                  ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100 text-red-700"
-                                  : "border-slate-200 bg-white focus:border-emerald-300 focus:ring-emerald-100"
+                                  ? cn(ds.hairline, "bg-destructive/10 text-destructive-foreground focus:border-ring focus:ring-ring/40")
+                                  : cn(
+                                      ds.surface2,
+                                      ds.hairline,
+                                      ds.ink,
+                                      "focus:border-ring focus:ring-ring/40"
+                                    )
                               )}
                             />
                             <button
@@ -1715,9 +1961,14 @@ export function CounterSale() {
                                 if (next > maxAllowed + 1e-9) return;
                                 updateItem(it.productId, { quantity: next });
                               }}
-                              className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors shrink-0"
+                              className={cn(
+                                "flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors",
+                                ds.surface2,
+                                ds.inkSubtle,
+                                "hover:bg-accent hover:text-accent-foreground"
+                              )}
                             >
-                              <Plus className="w-2.5 h-2.5" />
+                              <Plus className="h-2.5 w-2.5" />
                             </button>
                           </div>
                         </td>
@@ -1730,7 +1981,11 @@ export function CounterSale() {
                             onChange={(e) =>
                               updateItem(it.productId, { price: Math.max(0, Number(e.target.value) || 0) })
                             }
-                            className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-emerald-300 rounded text-right text-xs font-medium text-slate-700 outline-none focus:ring-1 focus:ring-emerald-100 transition-colors tabular-nums"
+                            className={cn(
+                              "h-6 w-full rounded border border-transparent bg-transparent px-2 text-right text-xs font-medium outline-none transition-colors focus:ring-1 tabular-nums",
+                              ds.inkMuted,
+                              "hover:border-input focus:border-ring focus:bg-card focus:ring-ring/40"
+                            )}
                           />
                         </td>
 
@@ -1747,9 +2002,15 @@ export function CounterSale() {
                                     discountRate: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
                                   })
                                 }
-                                className="w-14 h-6 px-1.5 bg-rose-50 border border-transparent hover:border-rose-200 focus:bg-white focus:border-rose-400 rounded text-center text-xs font-semibold text-rose-800 outline-none focus:ring-1 focus:ring-rose-100 transition-colors tabular-nums"
+                                className={cn(
+                                  "h-6 w-14 rounded border px-1.5 text-center text-xs font-semibold outline-none transition-colors focus:ring-1 tabular-nums",
+                                  ds.surface2,
+                                  ds.hairlineStrong,
+                                  ds.ink,
+                                  "focus:border-ring focus:ring-ring/30"
+                                )}
                               />
-                              <span className="text-rose-500 text-[10px] font-semibold">%</span>
+                              <span className={cn("text-[10px] font-semibold", ds.inkSubtle)}>%</span>
                             </div>
                           </td>
                         ) : null}
@@ -1757,7 +2018,7 @@ export function CounterSale() {
                         {showCommCols ? (
                           <td className="px-2 py-2.5">
                             <div className="flex flex-col items-center gap-0.5">
-                              <div className="flex items-center gap-1 justify-center">
+                              <div className="flex items-center justify-center gap-1">
                                 <input
                                   type="number"
                                   min={0}
@@ -1768,11 +2029,17 @@ export function CounterSale() {
                                       commissionRate: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
                                     })
                                   }
-                                  className="w-14 h-6 px-1.5 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded text-center text-xs font-semibold text-green-700 outline-none focus:ring-1 focus:ring-green-100 transition-colors tabular-nums"
+                                  className={cn(
+                                    "h-6 w-14 rounded border px-1.5 text-center text-xs font-semibold outline-none transition-colors focus:ring-1 tabular-nums",
+                                    ds.surface2,
+                                    ds.hairlineStrong,
+                                    ds.ink,
+                                    "focus:border-ring focus:ring-ring/30"
+                                  )}
                                 />
-                                <span className="text-green-600 text-[10px] font-semibold">%</span>
+                                <span className={cn("text-[10px] font-semibold", ds.success)}>%</span>
                               </div>
-                              <span className="text-green-600 text-[10px] font-semibold tabular-nums">
+                              <span className={cn("text-[10px] font-semibold tabular-nums", ds.success)}>
                                 {formatCurrency(it.commissionAmount)}
                               </span>
                             </div>
@@ -1780,19 +2047,21 @@ export function CounterSale() {
                         ) : null}
 
                         <td className="px-3 py-2.5 text-right">
-                          <span className="font-medium text-slate-900 text-xs tabular-nums">
-                            {formatCurrency(lineTotal)}
-                          </span>
+                          <span className={cn("text-xs font-medium tabular-nums", ds.ink)}>{formatCurrency(lineTotal)}</span>
                         </td>
 
                         <td className="px-2 py-2.5 text-center">
                           <button
                             type="button"
                             onClick={() => setItems((prev) => prev.filter((x) => x.productId !== it.productId))}
-                            className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                            className={cn(
+                              "flex h-6 w-6 items-center justify-center rounded opacity-0 transition-colors group-hover:opacity-100",
+                              ds.inkTertiary,
+                              "hover:bg-destructive/10 hover:text-destructive-foreground"
+                            )}
                             aria-label="Xóa sản phẩm"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="h-4 w-4" />
                           </button>
                         </td>
                       </tr>
@@ -1808,36 +2077,46 @@ export function CounterSale() {
         {/* RIGHT */}
         <div className="flex flex-col gap-4">
           {/* Tổng kết */}
-          <div className="bg-white border border-slate-100 rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-md bg-red-50 flex items-center justify-center">
-                <Calculator className="w-3.5 h-3.5 text-red-500" />
+          <div className={cn("rounded-xl border p-5", ds.surface1, ds.hairline)}>
+            <div className="mb-4 flex items-center gap-2">
+              <div className={cn("flex h-6 w-6 items-center justify-center rounded-md", ds.primaryMuted)}>
+                <Calculator className={cn("h-3.5 w-3.5", ds.primaryText)} />
               </div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tổng kết đơn hàng</span>
+              <span className={cn("text-xs font-semibold uppercase tracking-wide", ds.inkSubtle)}>
+                Tổng kết đơn hàng
+              </span>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
+              <div className={cn("flex items-center justify-between border-b py-1.5 text-sm", ds.hairline)}>
                 <div className="min-w-0 pr-2">
-                  <span className="text-slate-400">Mã ĐH</span>
+                  <span className={ds.inkSubtle}>Mã ĐH</span>
                   {!editingOrderId ? (
-                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">Lưu đơn để tạo mã</p>
+                    <p className={cn("mt-0.5 text-[10px] leading-tight", ds.inkTertiary)}>Lưu đơn để tạo mã</p>
                   ) : null}
                 </div>
-                <span className="font-medium text-slate-800">{editingOrderId ? (loadedOrderCode || `#${editingOrderId}`) : "—"}</span>
+                <span className={cn("font-medium", ds.ink)}>
+                  {editingOrderId ? loadedOrderCode || `#${editingOrderId}` : "—"}
+                </span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
-                <span className="text-slate-400 shrink-0">Giảm giá</span>
-                <MoneyAmountField value={Math.max(0, Number(orderDiscountAmount) || 0)} onChange={setOrderDiscountAmount} className="text-sm" />
+              <div className={cn("flex items-center justify-between gap-2 border-b py-1.5 text-sm", ds.hairline)}>
+                <span className={cn("shrink-0", ds.inkSubtle)}>Giảm giá</span>
+                <MoneyAmountField
+                  value={Math.max(0, Number(orderDiscountAmount) || 0)}
+                  onChange={setOrderDiscountAmount}
+                  className="text-sm"
+                />
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <div className={cn("flex items-center justify-between border-b py-2", ds.hairline)}>
                 <div>
-                  <span className="text-sm font-semibold text-slate-700">Giá trị đơn</span>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Tổng sau chiết khấu dòng</p>
+                  <span className={cn("text-sm font-semibold", ds.ink)}>Giá trị đơn</span>
+                  <p className={cn("mt-0.5 text-[10px]", ds.inkTertiary)}>Tổng sau chiết khấu dòng</p>
                 </div>
-                <span className="text-xl font-semibold text-red-600 tabular-nums">{formatCurrency(subtotalAfterDiscount)}</span>
+                <span className={cn("text-xl font-semibold tabular-nums", ds.primaryText)}>
+                  {formatCurrency(subtotalAfterDiscount)}
+                </span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
-                <span className="text-slate-400 shrink-0">VAT</span>
+              <div className={cn("flex items-center justify-between gap-2 border-b py-1.5 text-sm", ds.hairline)}>
+                <span className={cn("shrink-0", ds.inkSubtle)}>VAT</span>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -1850,30 +2129,36 @@ export function CounterSale() {
                       setVatRateTouched(true);
                       setVatRate(Math.max(0, Math.min(100, v)));
                     }}
-                    className="w-20 h-8 rounded-lg border border-slate-200 bg-white px-2 text-right text-[13px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 tabular-nums"
+                    className={cn(
+                      "h-8 w-20 rounded-md border px-2 text-right text-[13px] font-semibold tabular-nums",
+                      ds.surface2,
+                      ds.hairline,
+                      ds.ink,
+                      ds.focusRing
+                    )}
                     aria-label="VAT %"
                   />
-                  <span className="text-[11px] text-slate-400 font-semibold">%</span>
-                  <span className="min-w-[7rem] text-right font-semibold text-slate-800 tabular-nums">
+                  <span className={cn("text-[11px] font-semibold", ds.inkSubtle)}>%</span>
+                  <span className={cn("min-w-[7rem] text-right font-semibold tabular-nums", ds.ink)}>
                     {vatAmount > 0 ? formatCurrency(vatAmount) : "—"}
                   </span>
                 </div>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
-                <span className="text-slate-400 shrink-0">Phí vận chuyển</span>
+              <div className={cn("flex items-center justify-between gap-2 border-b py-1.5 text-sm", ds.hairline)}>
+                <span className={cn("shrink-0", ds.inkSubtle)}>Phí vận chuyển</span>
                 <MoneyAmountField value={shippingFee} onChange={setShippingFee} className="text-sm" />
               </div>
-              <div className="py-1.5 border-b border-slate-50">
-                <span className="text-slate-400 text-sm block mb-1.5">Phí ship do</span>
+              <div className={cn("border-b py-1.5", ds.hairline)}>
+                <span className={cn("mb-1.5 block text-sm", ds.inkSubtle)}>Phí ship do</span>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setShipPayer("shop")}
                     className={cn(
-                      "py-2 rounded-lg text-xs font-medium border transition-colors",
+                      "rounded-md border py-2 text-xs font-medium transition-colors",
                       shipPayer === "shop"
-                        ? "border-amber-400 bg-amber-50 text-amber-900"
-                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+                        ? cn(ds.primaryBorder, ds.primaryMuted, ds.ink)
+                        : cn(ds.hairline, ds.surface2, ds.inkMuted, "hover:border-input")
                     )}
                   >
                     Shop trả
@@ -1882,34 +2167,34 @@ export function CounterSale() {
                     type="button"
                     onClick={() => setShipPayer("customer")}
                     className={cn(
-                      "py-2 rounded-lg text-xs font-medium border transition-colors",
+                      "rounded-md border py-2 text-xs font-medium transition-colors",
                       shipPayer === "customer"
-                        ? "border-amber-400 bg-amber-50 text-amber-900"
-                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+                        ? cn(ds.primaryBorder, ds.primaryMuted, ds.ink)
+                        : cn(ds.hairline, ds.surface2, ds.inkMuted, "hover:border-input")
                     )}
                   >
                     Khách trả
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
-                <span className="text-slate-400 shrink-0">Đặt cọc</span>
+              <div className={cn("flex items-center justify-between gap-2 border-b py-1.5 text-sm", ds.hairline)}>
+                <span className={cn("shrink-0", ds.inkSubtle)}>Đặt cọc</span>
                 <MoneyAmountField value={deposit} onChange={setDeposit} className="text-sm" />
               </div>
               {/* Tiền NV chịu: tạm ẩn trên Bán tại quầy */}
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">Thu khách</span>
-                <span className="font-medium text-slate-800">{formatCurrency(customerCollect)}</span>
+              <div className={cn("flex items-center justify-between border-b py-1.5 text-sm", ds.hairline)}>
+                <span className={ds.inkSubtle}>Thu khách</span>
+                <span className={cn("font-medium", ds.ink)}>{formatCurrency(customerCollect)}</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">Shop thu</span>
-                <span className="font-medium text-indigo-700">{formatCurrency(shopCollect)}</span>
+              <div className={cn("flex items-center justify-between border-b py-1.5 text-sm", ds.hairline)}>
+                <span className={ds.inkSubtle}>Shop thu</span>
+                <span className={cn("font-medium", ds.primaryText)}>{formatCurrency(shopCollect)}</span>
               </div>
             </div>
             {showCommCols ? (
-              <div className="mt-3 flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg">
-                <span className="text-xs text-green-700">Tổng hoa hồng</span>
-                <span className="text-sm font-semibold text-green-800">
+              <div className={cn("mt-3 flex items-center justify-between rounded-md px-3 py-2", ds.successBg)}>
+                <span className={cn("text-xs", ds.success)}>Tổng hoa hồng</span>
+                <span className={cn("text-sm font-semibold tabular-nums", ds.success)}>
                   {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
                 </span>
               </div>
@@ -1917,16 +2202,20 @@ export function CounterSale() {
           </div>
 
           {/* Cài đặt đơn hàng */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+          <div className={cn("space-y-4 rounded-xl border p-5", ds.surface1, ds.hairline)}>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center">
-                <Info className="w-3.5 h-3.5 text-slate-500" />
+              <div className={cn("flex h-6 w-6 items-center justify-center rounded-md", ds.surface2)}>
+                <Info className={cn("h-3.5 w-3.5", ds.inkSubtle)} />
               </div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Cài đặt đơn hàng</span>
+              <span className={cn("text-xs font-semibold uppercase tracking-wide", ds.inkSubtle)}>
+                Cài đặt đơn hàng
+              </span>
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 mb-1.5 block">Phương thức thanh toán</label>
+              <label className={cn("mb-1.5 block text-[11px] font-medium", ds.inkSubtle)}>
+                Phương thức thanh toán
+              </label>
               <div className="flex gap-2">
                 {[
                   { id: "transfer", label: "Chuyển khoản", icon: ArrowRight },
@@ -1938,13 +2227,13 @@ export function CounterSale() {
                     type="button"
                     onClick={() => setPaymentMethod(m.id)}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-1 py-2 border rounded-lg text-[10px] font-medium transition-all",
+                      "flex flex-1 flex-col items-center gap-1 rounded-md border py-2 text-[10px] font-medium transition-all",
                       paymentMethod === m.id
-                        ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                        : "border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200"
+                        ? cn(ds.primaryBorder, ds.primaryMuted, ds.primaryText)
+                        : cn(ds.hairline, ds.surface2, ds.inkTertiary, "hover:border-input hover:text-muted-foreground")
                     )}
                   >
-                    <m.icon className="w-3.5 h-3.5" />
+                    <m.icon className="h-3.5 w-3.5" />
                     {m.label}
                   </button>
                 ))}
@@ -1952,11 +2241,17 @@ export function CounterSale() {
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 mb-1.5 block">Trạng thái đơn hàng</label>
+              <label className={cn("mb-1.5 block text-[11px] font-medium", ds.inkSubtle)}>Trạng thái đơn hàng</label>
               <select
                 value={orderStatus}
                 onChange={(e) => setOrderStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50 transition-all bg-white"
+                className={cn(
+                  "w-full rounded-md border px-3 py-2 text-sm transition-all",
+                  ds.surface2,
+                  ds.hairline,
+                  ds.ink,
+                  ds.focusRing
+                )}
               >
                 <option value="pending">Chờ duyệt</option>
                 <option value="shipping">Đang giao</option>
@@ -1966,26 +2261,38 @@ export function CounterSale() {
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 mb-1.5 block">Nhân viên phụ trách</label>
-              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center text-[10px] font-semibold text-emerald-700 flex-shrink-0">
+              <label className={cn("mb-1.5 block text-[11px] font-medium", ds.inkSubtle)}>Nhân viên phụ trách</label>
+              <div className={cn("flex items-center gap-2 rounded-md border px-3 py-2", ds.surface2, ds.hairline)}>
+                <div
+                  className={cn(
+                    "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+                    ds.primaryMuted,
+                    ds.primaryText
+                  )}
+                >
                   {responsibleSalesInitials}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{responsibleSalesDisplay}</p>
-                  <p className="text-[10px] text-slate-400">Nhân viên bán hàng (sales) — người lên đơn</p>
+                <div className="min-w-0 flex-1">
+                  <p className={cn("truncate text-sm font-medium", ds.ink)}>{responsibleSalesDisplay}</p>
+                  <p className={cn("text-[10px]", ds.inkTertiary)}>Nhân viên bán hàng (sales) — người lên đơn</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 mb-1.5 block">Ghi chú (tuỳ chọn)</label>
+              <label className={cn("mb-1.5 block text-[11px] font-medium", ds.inkSubtle)}>Ghi chú (tuỳ chọn)</label>
               <input
                 type="text"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Ghi chú đơn / in kèm bill"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                className={cn(
+                  "w-full rounded-md border px-3 py-2 text-sm placeholder:text-muted-foreground",
+                  ds.surface2,
+                  ds.hairline,
+                  ds.ink,
+                  ds.focusRing
+                )}
               />
             </div>
           </div>
@@ -1994,29 +2301,42 @@ export function CounterSale() {
             type="button"
             disabled={saving || loadingEditOrder}
             onClick={submit}
-            className="hidden lg:inline-flex w-full items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 disabled:opacity-50"
+            className={cn(
+              "hidden w-full items-center justify-center gap-2 rounded-md py-3 text-sm font-semibold text-primary-foreground transition-colors disabled:opacity-50 lg:inline-flex",
+              ds.primary,
+              ds.primaryHover,
+              ds.primaryPress,
+              ds.focusRing
+            )}
           >
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />}
+            {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />}
             {editingOrderId ? "Cập nhật & in bill" : "Thanh toán & in bill"}
           </button>
         </div>
       </div>
 
       {/* Mobile sticky summary */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden pb-[env(safe-area-inset-bottom,0px)]">
-        <div className="mx-auto max-w-6xl px-3 pb-3">
+      <div className="fixed bottom-0 left-0 right-0 z-40 pb-[env(safe-area-inset-bottom,0px)] sm:hidden">
+        <div className="mx-auto max-w-[1280px] px-3 pb-3">
           {!mobileSummaryExpanded ? (
-            <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur shadow-md flex items-stretch gap-2 px-2 py-2">
+            <div
+              className={cn(
+                "flex items-stretch gap-2 rounded-xl border px-2 py-2 shadow-lg backdrop-blur-md",
+                ds.surface1,
+                ds.hairline,
+                "bg-card/95"
+              )}
+            >
               <button
                 type="button"
                 onClick={() => setMobileSummaryExpanded(true)}
-                className="flex-1 min-w-0 text-left pl-1 py-0.5 rounded-lg hover:bg-slate-50 transition-colors"
+                className="min-w-0 flex-1 rounded-md py-0.5 pl-1 text-left transition-colors hover:bg-accent"
               >
-                <div className="text-[10px] text-slate-500">Thu khách</div>
-                <div className="text-base font-semibold text-slate-900 tabular-nums leading-tight">
+                <div className={cn("text-[10px]", ds.inkSubtle)}>Thu khách</div>
+                <div className={cn("text-base font-semibold tabular-nums leading-tight", ds.ink)}>
                   {formatCurrency(customerCollect)}
                 </div>
-                <div className="text-[9px] text-slate-400 mt-0.5">
+                <div className={cn("mt-0.5 text-[9px]", ds.inkTertiary)}>
                   {showDiscCols || showCommCols ? (
                     <>
                       Chạm để xem{" "}
@@ -2030,56 +2350,78 @@ export function CounterSale() {
               <button
                 type="button"
                 onClick={() => setMobileSummaryExpanded(true)}
-                className="shrink-0 w-10 flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                className={cn(
+                  "flex w-10 shrink-0 items-center justify-center rounded-md border transition-colors",
+                  ds.hairline,
+                  ds.surface2,
+                  ds.inkMuted,
+                  "hover:bg-accent"
+                )}
                 aria-label="Mở tổng kết chi tiết"
               >
-                <ChevronUp className="w-5 h-5" />
+                <ChevronUp className="h-5 w-5" />
               </button>
               <button
                 type="button"
                 disabled={saving || loadingEditOrder}
                 onClick={submit}
-                className="shrink-0 flex flex-col items-center justify-center gap-0.5 px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all min-w-[5.5rem] disabled:opacity-50"
+                className={cn(
+                  "flex min-w-[5.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-4 py-2 text-xs font-semibold text-primary-foreground transition-all disabled:opacity-50",
+                  ds.primary,
+                  ds.primaryHover,
+                  ds.primaryPress
+                )}
               >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                 {editingOrderId ? "Lưu" : "In bill"}
               </button>
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur shadow-lg max-h-[min(70vh,520px)] overflow-y-auto">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50/80">
-                <span className="text-xs font-semibold text-slate-600">Tổng kết</span>
+            <div
+              className={cn(
+                "max-h-[min(70vh,520px)] overflow-y-auto rounded-xl border shadow-xl backdrop-blur-md",
+                ds.surface1,
+                ds.hairline,
+                "bg-card/98"
+              )}
+            >
+              <div className={cn("flex items-center justify-between border-b px-3 py-2", ds.hairline, ds.surface2)}>
+                <span className={cn("text-xs font-semibold", ds.inkMuted)}>Tổng kết</span>
                 <button
                   type="button"
                   onClick={() => setMobileSummaryExpanded(false)}
-                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800 py-1 px-2 rounded-lg hover:bg-slate-100"
+                  className={cn(
+                    "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors",
+                    ds.inkSubtle,
+                    "hover:bg-accent hover:text-accent-foreground"
+                  )}
                 >
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="h-4 w-4" />
                   Thu gọn
                 </button>
               </div>
-              <div className="px-3 py-2 space-y-2">
+              <div className="space-y-2 px-3 py-2">
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500">Mã ĐH</span>
-                  <span className="font-semibold text-slate-800">
-                    {editingOrderId ? (loadedOrderCode || `#${editingOrderId}`) : "—"}
+                  <span className={ds.inkSubtle}>Mã ĐH</span>
+                  <span className={cn("font-semibold", ds.ink)}>
+                    {editingOrderId ? loadedOrderCode || `#${editingOrderId}` : "—"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-[10px] gap-2">
-                  <span className="text-slate-500 shrink-0">Giảm giá</span>
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className={cn("shrink-0", ds.inkSubtle)}>Giảm giá</span>
                   <MoneyAmountField
                     value={Math.max(0, Number(orderDiscountAmount) || 0)}
                     onChange={setOrderDiscountAmount}
                     className="text-[11px]"
-                    inputClassName="text-[11px] py-1"
+                    inputClassName="py-1 text-[11px]"
                   />
                 </div>
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500">Giá trị đơn</span>
-                  <span className="font-semibold text-emerald-700">{formatCurrency(subtotalAfterDiscount)}</span>
+                  <span className={ds.inkSubtle}>Giá trị đơn</span>
+                  <span className={cn("font-semibold", ds.primaryText)}>{formatCurrency(subtotalAfterDiscount)}</span>
                 </div>
-                <div className="flex items-center justify-between text-[10px] gap-2">
-                  <span className="text-slate-500 shrink-0">VAT</span>
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className={cn("shrink-0", ds.inkSubtle)}>VAT</span>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="number"
@@ -2092,22 +2434,28 @@ export function CounterSale() {
                         setVatRateTouched(true);
                         setVatRate(Math.max(0, Math.min(100, v)));
                       }}
-                      className="w-14 h-7 rounded-md border border-slate-200 bg-white px-2 text-right text-[11px] font-semibold text-slate-800 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-50 tabular-nums"
+                      className={cn(
+                        "h-7 w-14 rounded-md border px-2 text-right text-[11px] font-semibold tabular-nums",
+                        ds.surface2,
+                        ds.hairline,
+                        ds.ink,
+                        ds.focusRing
+                      )}
                       aria-label="VAT %"
                     />
-                    <span className="text-[10px] text-slate-400 font-semibold">%</span>
-                    <span className="min-w-[5.5rem] text-right font-semibold text-slate-800 tabular-nums">
+                    <span className={cn("text-[10px] font-semibold", ds.inkSubtle)}>%</span>
+                    <span className={cn("min-w-[5.5rem] text-right font-semibold tabular-nums", ds.ink)}>
                       {vatAmount > 0 ? formatCurrency(vatAmount) : "—"}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] gap-2">
-                  <span className="text-slate-500 shrink-0">Phí vận chuyển</span>
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className={cn("shrink-0", ds.inkSubtle)}>Phí vận chuyển</span>
                   <MoneyAmountField
                     value={shippingFee}
                     onChange={setShippingFee}
                     className="text-[11px]"
-                    inputClassName="text-[11px] py-1"
+                    inputClassName="py-1 text-[11px]"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -2115,10 +2463,10 @@ export function CounterSale() {
                     type="button"
                     onClick={() => setShipPayer("shop")}
                     className={cn(
-                      "py-1.5 rounded-lg text-[10px] font-medium border",
+                      "rounded-md border py-1.5 text-[10px] font-medium",
                       shipPayer === "shop"
-                        ? "border-amber-400 bg-amber-50 text-amber-900"
-                        : "border-slate-200 bg-slate-50 text-slate-600"
+                        ? cn(ds.primaryBorder, ds.primaryMuted, ds.ink)
+                        : cn(ds.hairline, ds.surface2, ds.inkMuted)
                     )}
                   >
                     Shop trả ship
@@ -2127,37 +2475,37 @@ export function CounterSale() {
                     type="button"
                     onClick={() => setShipPayer("customer")}
                     className={cn(
-                      "py-1.5 rounded-lg text-[10px] font-medium border",
+                      "rounded-md border py-1.5 text-[10px] font-medium",
                       shipPayer === "customer"
-                        ? "border-amber-400 bg-amber-50 text-amber-900"
-                        : "border-slate-200 bg-slate-50 text-slate-600"
+                        ? cn(ds.primaryBorder, ds.primaryMuted, ds.ink)
+                        : cn(ds.hairline, ds.surface2, ds.inkMuted)
                     )}
                   >
                     Khách trả ship
                   </button>
                 </div>
-                <div className="flex items-center justify-between text-[10px] gap-2">
-                  <span className="text-slate-500 shrink-0">Đặt cọc</span>
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className={cn("shrink-0", ds.inkSubtle)}>Đặt cọc</span>
                   <MoneyAmountField
                     value={deposit}
                     onChange={setDeposit}
                     className="text-[11px]"
-                    inputClassName="text-[11px] py-1"
+                    inputClassName="py-1 text-[11px]"
                   />
                 </div>
                 {/* Tiền NV chịu: tạm ẩn trên Bán tại quầy */}
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500">Thu khách</span>
-                  <span className="font-semibold text-slate-800">{formatCurrency(customerCollect)}</span>
+                  <span className={ds.inkSubtle}>Thu khách</span>
+                  <span className={cn("font-semibold", ds.ink)}>{formatCurrency(customerCollect)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500">Shop thu</span>
-                  <span className="font-semibold text-indigo-700">{formatCurrency(shopCollect)}</span>
+                  <span className={ds.inkSubtle}>Shop thu</span>
+                  <span className={cn("font-semibold", ds.primaryText)}>{formatCurrency(shopCollect)}</span>
                 </div>
                 {showCommCols ? (
                   <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-slate-500">Hoa hồng</span>
-                    <span className="font-semibold text-green-700">
+                    <span className={ds.inkSubtle}>Hoa hồng</span>
+                    <span className={cn("font-semibold tabular-nums", ds.success)}>
                       {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
                     </span>
                   </div>
@@ -2168,9 +2516,14 @@ export function CounterSale() {
                   type="button"
                   disabled={saving || loadingEditOrder}
                   onClick={submit}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-all disabled:opacity-50"
+                  className={cn(
+                    "flex w-full items-center justify-center gap-2 rounded-md py-3 text-sm font-semibold text-primary-foreground transition-all disabled:opacity-50",
+                    ds.primary,
+                    ds.primaryHover,
+                    ds.primaryPress
+                  )}
                 >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                   {editingOrderId ? "Cập nhật & in bill" : "Thanh toán & in bill"}
                 </button>
               </div>

@@ -277,7 +277,7 @@ export function EmployeeForm() {
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -286,13 +286,24 @@ export function EmployeeForm() {
     return (
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all"><ArrowLeft className="w-5 h-5" /></button>
-          <div><h1 className="text-2xl font-bold text-slate-900">Lỗi tải dữ liệu</h1></div>
+          <button
+            onClick={() => navigate(-1)}
+            className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            aria-label="Quay lại"
+          >
+            <ArrowLeft className="w-4 h-4 mx-auto" />
+          </button>
+          <div><h1 className="text-xl font-semibold tracking-tight">Lỗi tải dữ liệu</h1></div>
         </div>
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
-        <button onClick={() => navigate("/employees")} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold">Quay lại danh sách</button>
+        <button
+          onClick={() => navigate("/employees")}
+          className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 transition-opacity"
+        >
+          Quay lại danh sách
+        </button>
       </div>
     );
   }
@@ -301,21 +312,36 @@ export function EmployeeForm() {
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all">
-            <ArrowLeft className="w-5 h-5" />
+          <button
+            onClick={() => navigate(-1)}
+            className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            aria-label="Quay lại"
+          >
+            <ArrowLeft className="w-4 h-4 mx-auto" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-xl font-semibold tracking-tight">
               {isEdit ? `Chỉnh sửa nhân viên: ${formData.full_name || id}` : "Thêm nhân viên mới"}
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {isEdit ? "Cập nhật thông tin hồ sơ nhân sự." : "Điền đầy đủ thông tin để tạo hồ sơ nhân sự."}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate(-1)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">Hủy bỏ</button>
-          <button type="button" onClick={handleSubmit} disabled={isSaving} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="h-10 px-4 rounded-md bg-background border border-border text-sm font-semibold text-foreground hover:bg-accent transition-colors"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSaving}
+            className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 inline-flex items-center gap-2"
+          >
             {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
             <Save className="w-4 h-4" />
             {isSaving ? "Đang lưu..." : "Lưu hồ sơ"}
@@ -324,12 +350,12 @@ export function EmployeeForm() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 px-4 py-3 text-sm flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" /> Đã lưu thành công!
         </div>
       )}
@@ -337,15 +363,15 @@ export function EmployeeForm() {
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center text-blue-400 mb-4">
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
                 <User className="w-12 h-12" />
               </div>
-              <h3 className="font-bold text-slate-900">Vai trò hệ thống</h3>
+              <h3 className="font-semibold text-foreground">Vai trò hệ thống</h3>
               <div className="mt-4 w-full space-y-4">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
+                <div className="p-4 bg-muted/30 rounded-lg border border-border text-left">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vai trò</span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Vai trò</span>
                   </div>
                   <select
                     value={formData.role_id || ""}
@@ -353,7 +379,7 @@ export function EmployeeForm() {
                     disabled={rolesLoading || roles.length === 0}
                     className={cn(
                       "w-full text-lg font-bold bg-transparent outline-none cursor-pointer",
-                      rolesLoading || roles.length === 0 ? "text-slate-400 cursor-not-allowed" : "text-slate-900"
+                      rolesLoading || roles.length === 0 ? "text-muted-foreground cursor-not-allowed" : "text-foreground"
                     )}
                   >
                     <option value="">
@@ -365,9 +391,9 @@ export function EmployeeForm() {
                       </option>
                     ))}
                   </select>
-                  {errors.role_id && <p className="text-xs text-red-500 font-medium">{errors.role_id}</p>}
+                  {errors.role_id && <p className="text-xs text-destructive font-medium">{errors.role_id}</p>}
                   {!rolesLoading && roles.length === 0 && (
-                    <p className="text-xs text-amber-600 font-medium mt-1">
+                    <p className="text-xs text-muted-foreground font-medium mt-1">
                       Không tải được danh sách vai trò. Vui lòng thử refresh hoặc đăng nhập lại.
                     </p>
                   )}
@@ -375,17 +401,27 @@ export function EmployeeForm() {
 
                 {isEdit && (
                   <div className="space-y-2 text-left">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đặt lại mật khẩu</label>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Đặt lại mật khẩu</label>
                     <div className="relative">
-                      <input type="password" value={formData.password} onChange={(e) => handleChange("password", e.target.value)} placeholder="Để trống nếu không đổi" className={cn("w-full px-4 py-3 bg-slate-50 border focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none", errors.password ? "border-red-300 bg-red-50" : "border-transparent")} />
+                      <input
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => handleChange("password", e.target.value)}
+                        placeholder="Để trống nếu không đổi"
+                        className={cn(
+                          "w-full h-10 px-3 rounded-md bg-background text-foreground text-sm border outline-none",
+                          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                          errors.password ? "border-destructive/50" : "border-input"
+                        )}
+                      />
                     </div>
-                    {errors.password && <p className="text-xs text-red-500 font-medium">{errors.password}</p>}
+                    {errors.password && <p className="text-xs text-destructive font-medium">{errors.password}</p>}
                   </div>
                 )}
 
                 <div className="space-y-2 text-left">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Trạng thái</label>
-                  <select value={formData.is_active} onChange={(e) => handleChange("is_active", Number(e.target.value))} className="w-full text-sm font-bold text-slate-900 bg-transparent outline-none cursor-pointer">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Trạng thái</label>
+                  <select value={formData.is_active} onChange={(e) => handleChange("is_active", Number(e.target.value))} className="w-full text-sm font-semibold text-foreground bg-transparent outline-none cursor-pointer">
                     <option value={1}>Đang làm việc</option>
                     <option value={0}>Đã nghỉ</option>
                   </select>
@@ -394,29 +430,29 @@ export function EmployeeForm() {
             </div>
 
             {/* Groups Selection */}
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-600" />
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm">
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
                 Nhóm nhân viên
               </h3>
               {groups.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-4">Chưa có nhóm nào. Tạo nhóm trong Cài đặt.</p>
+                <p className="text-sm text-muted-foreground text-center py-4">Chưa có nhóm nào. Tạo nhóm trong Cài đặt.</p>
               ) : (
                 <div className="space-y-2">
                   {groups.map(group => (
                     <label key={group.id} className={cn(
                       "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                      groupIds.includes(group.id) ? "bg-blue-50 border-blue-200" : "bg-slate-50 border-slate-200 hover:border-blue-200"
+                      groupIds.includes(group.id) ? "bg-accent border-primary/25" : "bg-muted/30 border-border hover:border-primary/25"
                     )}>
                       <input
                         type="checkbox"
                         checked={groupIds.includes(group.id)}
                         onChange={() => toggleGroup(group.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        className="w-4 h-4 rounded border-input accent-primary"
                       />
                       <div>
-                        <p className="text-sm font-bold text-slate-900">{group.name}</p>
-                        {group.description && <p className="text-xs text-slate-400">{group.description}</p>}
+                        <p className="text-sm font-semibold text-foreground">{group.name}</p>
+                        {group.description && <p className="text-xs text-muted-foreground">{group.description}</p>}
                       </div>
                     </label>
                   ))}
@@ -424,106 +460,205 @@ export function EmployeeForm() {
               )}
             </div>
 
-            <div className="bg-blue-600 p-6 rounded-3xl text-white shadow-xl shadow-blue-600/20">
-              <h3 className="font-bold text-lg">Bảo mật tài khoản</h3>
-              <p className="text-blue-100 text-sm mt-1">{isEdit ? 'Để trống mật khẩu nếu không muốn đổi.' : 'Mật khẩu mặc định sẽ được gửi qua email nhân viên sau khi tạo hồ sơ.'}</p>
+            <div className="bg-card p-6 rounded-xl border border-border">
+              <h3 className="font-semibold text-base">Bảo mật tài khoản</h3>
+              <p className="text-muted-foreground text-sm mt-1">
+                {isEdit ? "Để trống mật khẩu nếu không muốn đổi." : "Mật khẩu sẽ do bạn thiết lập khi tạo hồ sơ."}
+              </p>
             </div>
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"><User className="w-4 h-4" /></div>
-                <h2 className="text-lg font-bold text-slate-900">Thông tin cá nhân</h2>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-primary"><User className="w-4 h-4" /></div>
+                <h2 className="text-lg font-semibold text-foreground">Thông tin cá nhân</h2>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Họ và tên <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.full_name} onChange={(e) => handleChange("full_name", e.target.value)} placeholder="VD: Nguyễn Văn An" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.full_name ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
-                  {errors.full_name && <p className="text-xs text-red-500 font-medium">{errors.full_name}</p>}
+                  <label className="text-xs font-medium text-muted-foreground">Họ và tên <span className="text-destructive ml-0.5">*</span></label>
+                  <input
+                    type="text"
+                    value={formData.full_name}
+                    onChange={(e) => handleChange("full_name", e.target.value)}
+                    placeholder="VD: Nguyễn Văn An"
+                    className={cn(
+                      "w-full h-10 px-3 rounded-md bg-background text-foreground text-sm border outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      errors.full_name ? "border-destructive/50" : "border-input"
+                    )}
+                  />
+                  {errors.full_name && <p className="text-xs text-destructive font-medium">{errors.full_name}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Tên đăng nhập <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-medium text-muted-foreground">Tên đăng nhập <span className="text-destructive ml-0.5">*</span></label>
                   <div className="relative">
-                    <AtSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" autoComplete="username" value={formData.username} onChange={(e) => handleChange("username", e.target.value.toLowerCase())} placeholder="vd: nguyen_van_a" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.username ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                    <AtSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      autoComplete="username"
+                      value={formData.username}
+                      onChange={(e) => handleChange("username", e.target.value.toLowerCase())}
+                      placeholder="vd: nguyen_van_a"
+                      className={cn(
+                        "w-full h-10 pl-9 pr-3 rounded-md bg-background text-foreground text-sm border outline-none",
+                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        errors.username ? "border-destructive/50" : "border-input"
+                      )}
+                    />
                   </div>
-                  {errors.username && <p className="text-xs text-red-500 font-medium">{errors.username}</p>}
+                  {errors.username && <p className="text-xs text-destructive font-medium">{errors.username}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Email công việc <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-medium text-muted-foreground">Email công việc <span className="text-destructive ml-0.5">*</span></label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="email@company.com" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.email ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={formData.email}
+                      onChange={(e) => handleChange("email", e.target.value)}
+                      placeholder="email@company.com"
+                      className={cn(
+                        "w-full h-10 pl-9 pr-3 rounded-md bg-background text-foreground text-sm border outline-none",
+                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        errors.email ? "border-destructive/50" : "border-input"
+                      )}
+                    />
                   </div>
-                  {errors.email && <p className="text-xs text-red-500 font-medium">{errors.email}</p>}
+                  {errors.email && <p className="text-xs text-destructive font-medium">{errors.email}</p>}
                 </div>
                 {!isEdit && (
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Mật khẩu <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-medium text-muted-foreground">Mật khẩu <span className="text-destructive ml-0.5">*</span></label>
                     <div className="relative">
-                      <Shield className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input type="password" value={formData.password} onChange={(e) => handleChange("password", e.target.value)} placeholder="Tối thiểu 6 ký tự" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.password ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                      <Shield className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => handleChange("password", e.target.value)}
+                        placeholder="Tối thiểu 6 ký tự"
+                        className={cn(
+                          "w-full h-10 pl-9 pr-3 rounded-md bg-background text-foreground text-sm border outline-none",
+                          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                          errors.password ? "border-destructive/50" : "border-input"
+                        )}
+                      />
                     </div>
-                    {errors.password && <p className="text-xs text-red-500 font-medium">{errors.password}</p>}
+                    {errors.password && <p className="text-xs text-destructive font-medium">{errors.password}</p>}
                   </div>
                 )}
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Số điện thoại</label>
+                  <label className="text-xs font-medium text-muted-foreground">Số điện thoại</label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="tel" value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} placeholder="090 123 4567" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.phone ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                    <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => handleChange("phone", e.target.value)}
+                      placeholder="090 123 4567"
+                      className={cn(
+                        "w-full h-10 pl-9 pr-3 rounded-md bg-background text-foreground text-sm border outline-none",
+                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        errors.phone ? "border-destructive/50" : "border-input"
+                      )}
+                    />
                   </div>
-                  {errors.phone && <p className="text-xs text-red-500 font-medium">{errors.phone}</p>}
+                  {errors.phone && <p className="text-xs text-destructive font-medium">{errors.phone}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Phòng ban</label>
+                  <label className="text-xs font-medium text-muted-foreground">Phòng ban</label>
                   <div className="relative">
-                    <Briefcase className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" value={formData.department} onChange={(e) => handleChange("department", e.target.value)} placeholder="VD: Kinh doanh" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <Briefcase className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={formData.department}
+                      onChange={(e) => handleChange("department", e.target.value)}
+                      placeholder="VD: Kinh doanh"
+                      className="w-full h-10 pl-9 pr-3 rounded-md bg-background text-foreground text-sm border border-input outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Chức vụ</label>
+                  <label className="text-xs font-medium text-muted-foreground">Chức vụ</label>
                   <div className="relative">
-                    <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" value={formData.position} onChange={(e) => handleChange("position", e.target.value)} placeholder="VD: Nhân viên" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={formData.position}
+                      onChange={(e) => handleChange("position", e.target.value)}
+                      placeholder="VD: Nhân viên"
+                      className="w-full h-10 pl-9 pr-3 rounded-md bg-background text-foreground text-sm border border-input outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Ngày gia nhập</label>
+                  <label className="text-xs font-medium text-muted-foreground">Ngày gia nhập</label>
                   <div className="relative">
-                    <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="date" value={formData.join_date} onChange={(e) => handleChange("join_date", e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="date"
+                      value={formData.join_date}
+                      onChange={(e) => handleChange("join_date", e.target.value)}
+                      className="w-full h-10 pl-9 pr-3 rounded-md bg-background text-foreground text-sm border border-input outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Tỉnh / Thành phố</label>
+                  <label className="text-xs font-medium text-muted-foreground">Tỉnh / Thành phố</label>
                   <div className="relative">
-                    <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" value={formData.city} onChange={(e) => handleChange("city", e.target.value)} placeholder="VD: Hà Nội" className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={(e) => handleChange("city", e.target.value)}
+                      placeholder="VD: Hà Nội"
+                      className="w-full h-10 pl-9 pr-3 rounded-md bg-background text-foreground text-sm border border-input outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"><CreditCard className="w-4 h-4" /></div>
-                <h2 className="text-lg font-bold text-slate-900">Lương & Hoa hồng</h2>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-primary"><CreditCard className="w-4 h-4" /></div>
+                <h2 className="text-lg font-semibold text-foreground">Lương &amp; Hoa hồng</h2>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Lương cơ bản (VNĐ)</label>
-                  <input type="number" min="0" value={formData.salary || ""} onChange={(e) => handleChange("salary", Number(e.target.value))} placeholder="0" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.salary ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
-                  {errors.salary && <p className="text-xs text-red-500 font-medium">{errors.salary}</p>}
+                  <label className="text-xs font-medium text-muted-foreground">Lương cơ bản (VNĐ)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.salary || ""}
+                    onChange={(e) => handleChange("salary", Number(e.target.value))}
+                    placeholder="0"
+                    className={cn(
+                      "w-full h-10 px-3 rounded-md bg-background text-foreground text-sm border outline-none tabular-nums",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      errors.salary ? "border-destructive/50" : "border-input"
+                    )}
+                  />
+                  {errors.salary && <p className="text-xs text-destructive font-medium">{errors.salary}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Tỷ lệ hoa hồng (%)</label>
-                  <input type="number" min="0" max="100" value={formData.commission_rate || ""} onChange={(e) => handleChange("commission_rate", Number(e.target.value))} placeholder="5" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.commission_rate ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
-                  {errors.commission_rate && <p className="text-xs text-red-500 font-medium">{errors.commission_rate}</p>}
+                  <label className="text-xs font-medium text-muted-foreground">Tỷ lệ hoa hồng (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.commission_rate || ""}
+                    onChange={(e) => handleChange("commission_rate", Number(e.target.value))}
+                    placeholder="5"
+                    className={cn(
+                      "w-full h-10 px-3 rounded-md bg-background text-foreground text-sm border outline-none tabular-nums",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      errors.commission_rate ? "border-destructive/50" : "border-input"
+                    )}
+                  />
+                  {errors.commission_rate && <p className="text-xs text-destructive font-medium">{errors.commission_rate}</p>}
                 </div>
               </div>
             </div>

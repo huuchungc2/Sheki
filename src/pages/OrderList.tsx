@@ -19,10 +19,10 @@ const API_URL =
 const ORDER_LIST_API_COUNTER = "0";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-  pending:   { label: "Chờ duyệt", color: "bg-amber-100 text-amber-700",    icon: Clock },
-  shipping:  { label: "Đang giao", color: "bg-blue-100 text-blue-700",      icon: Truck },
-  completed: { label: "Đã giao",   color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
-  cancelled: { label: "Đã hủy",   color: "bg-red-100 text-red-700",        icon: XCircle },
+  pending:   { label: "Chờ duyệt", color: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50", icon: Clock },
+  shipping:  { label: "Đang giao", color: "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900/50", icon: Truck },
+  completed: { label: "Đã giao",   color: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50", icon: CheckCircle2 },
+  cancelled: { label: "Đã hủy",    color: "bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900/50", icon: XCircle },
 };
 
 const paymentConfig: Record<string, { label: string; icon: any }> = {
@@ -505,8 +505,8 @@ export function OrderList() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Quản lý đơn hàng</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Theo dõi và quản lý các giao dịch bán hàng.</p>
+          <h1 className="text-xl font-semibold tracking-tight">Quản lý đơn hàng</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Theo dõi và quản lý các giao dịch bán hàng.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -514,17 +514,21 @@ export function OrderList() {
             onClick={exportExcel}
             disabled={exporting}
             className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
+              "inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-xs font-semibold transition-colors border",
               exporting
-                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                : "bg-white text-slate-700 border-slate-200 hover:border-emerald-200 hover:text-emerald-700"
+                ? "bg-muted text-muted-foreground border-border cursor-not-allowed"
+                : "bg-background text-foreground border-border hover:bg-accent"
             )}
             title="Xuất Excel theo bộ lọc hiện tại"
           >
             {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 shrink-0" />}
             Xuất Excel
           </button>
-          <Link to="/orders/new" state={{ ordersListReturn }} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
+          <Link
+            to="/orders/new"
+            state={{ ordersListReturn }}
+            className="inline-flex items-center gap-1.5 h-9 px-3 bg-primary text-primary-foreground rounded-md text-xs font-semibold hover:opacity-95 transition-opacity"
+          >
             <Plus className="w-3.5 h-3.5 shrink-0" />
             Thêm đơn
           </Link>
@@ -532,11 +536,11 @@ export function OrderList() {
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+      <div className="bg-card border border-border rounded-lg p-4 space-y-3">
         <div className="flex flex-wrap gap-3">
           {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={searchInput}
@@ -547,13 +551,13 @@ export function OrderList() {
                 setSearchInput((e.target as HTMLInputElement).value);
               }}
               placeholder="Mã đơn, tên khách, SĐT..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none transition-all"
+              className="w-full h-10 pl-9 pr-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
           </div>
 
           {/* Filter theo sản phẩm */}
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={productInput}
@@ -564,7 +568,7 @@ export function OrderList() {
                 setProductInput((e.target as HTMLInputElement).value);
               }}
               placeholder="Tên/SKU sản phẩm..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none transition-all"
+              className="w-full h-10 pl-9 pr-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
           </div>
 
@@ -572,7 +576,7 @@ export function OrderList() {
           <select
             value={status}
             onChange={(e) => { patchListParams({ status: e.target.value || null }, { resetPage: true }); }}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[140px]"
+            className="h-10 px-3 bg-background border border-input rounded-md text-sm outline-none appearance-none cursor-pointer transition-colors min-w-[160px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả trạng thái</option>
             <option value="pending">Chờ duyệt</option>
@@ -585,7 +589,7 @@ export function OrderList() {
           <select
             value={groupId}
             onChange={(e) => { patchListParams({ group: e.target.value || null }, { resetPage: true }); }}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[140px]"
+            className="h-10 px-3 bg-background border border-input rounded-md text-sm outline-none appearance-none cursor-pointer transition-colors min-w-[160px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả nhóm</option>
             {groups.map((g: any) => (
@@ -602,30 +606,30 @@ export function OrderList() {
                   setShowEmployeeMenu((v) => !v);
                   setEmployeeQuery("");
                 }}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 hover:border-red-300 rounded-xl text-sm font-medium text-slate-700 transition-all min-w-[180px] justify-between"
+                className="flex items-center gap-2 h-10 px-3 bg-background border border-input hover:bg-accent rounded-md text-sm font-medium text-foreground transition-colors min-w-[200px] justify-between"
                 title="Lọc theo nhân viên"
               >
                 <span className="truncate">
                   {employeeId ? (employeeSelectedName || `NV #${employeeId}`) : "Tất cả nhân viên"}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
               </button>
 
               {showEmployeeMenu && (
-                <div className="absolute top-full left-0 mt-1 w-[18rem] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                  <div className="p-2 border-b border-slate-100">
+                <div className="absolute top-full left-0 mt-1 w-[18rem] bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                  <div className="p-2 border-b border-border">
                     <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <input
                         value={employeeQuery}
                         onChange={(e) => setEmployeeQuery(e.target.value)}
                         placeholder="Gõ tên/username/phone..."
-                        className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-lg text-sm outline-none transition-all"
+                        className="w-full h-10 pl-9 pr-9 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       />
                       <button
                         type="button"
                         onClick={() => setShowEmployeeMenu(false)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
                         title="Đóng"
                       >
                         <X className="w-4 h-4" />
@@ -639,7 +643,7 @@ export function OrderList() {
                       }}
                       className={cn(
                         "mt-2 w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                        !employeeId ? "bg-red-50 text-red-600 font-semibold" : "hover:bg-slate-50 text-slate-700"
+                        !employeeId ? "bg-accent text-accent-foreground font-semibold" : "hover:bg-accent/50 text-foreground"
                       )}
                     >
                       Tất cả nhân viên
@@ -648,12 +652,12 @@ export function OrderList() {
 
                   <div className="max-h-72 overflow-auto">
                     {employeeLoading ? (
-                      <div className="px-3 py-3 text-sm text-slate-500 flex items-center gap-2">
+                      <div className="px-3 py-3 text-sm text-muted-foreground flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         Đang tải...
                       </div>
                     ) : (employeeOptions.length === 0 ? (
-                      <div className="px-3 py-3 text-sm text-slate-500">
+                      <div className="px-3 py-3 text-sm text-muted-foreground">
                         Không tìm thấy nhân viên
                       </div>
                     ) : (
@@ -667,16 +671,16 @@ export function OrderList() {
                             setShowEmployeeMenu(false);
                           }}
                           className={cn(
-                            "w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 transition-colors",
-                            String(employeeId) === String(emp.id) ? "bg-red-50 text-red-600 font-semibold" : "text-slate-700"
+                            "w-full text-left px-3 py-2.5 text-sm hover:bg-accent/50 transition-colors",
+                            String(employeeId) === String(emp.id) ? "bg-accent text-accent-foreground font-semibold" : "text-foreground"
                           )}
                         >
                           <div className="flex items-center justify-between gap-3">
                             <span className="truncate">{emp.full_name}</span>
-                            <span className="shrink-0 text-xs text-slate-400">#{emp.id}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">#{emp.id}</span>
                           </div>
                           {emp.username ? (
-                            <div className="text-xs text-slate-400 truncate mt-0.5">{emp.username}</div>
+                            <div className="text-xs text-muted-foreground truncate mt-0.5">{emp.username}</div>
                           ) : null}
                         </button>
                       ))
@@ -691,18 +695,18 @@ export function OrderList() {
           <div className="relative">
             <button
               onClick={() => setShowDateMenu(!showDateMenu)}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 hover:border-red-300 rounded-xl text-sm font-medium text-slate-700 transition-all min-w-[140px] justify-between"
+              className="flex items-center gap-2 h-10 px-3 bg-background border border-input hover:bg-accent rounded-md text-sm font-medium text-foreground transition-colors min-w-[160px] justify-between"
             >
-              <Calendar className="w-4 h-4 text-slate-400" />
+              <Calendar className="w-4 h-4 text-muted-foreground" />
               <span>{datePreset ? presetLabels[datePreset] : "Chọn thời gian"}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
             {showDateMenu && (
-              <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute top-full left-0 mt-1 w-52 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 overflow-hidden">
                 {(["today","week","month","last_month","last_year","custom"] as DatePreset[]).map(p => (
                   <button key={p} onClick={() => applyPreset(p)}
-                    className={cn("w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors",
-                      datePreset === p ? "bg-red-50 text-red-600 font-semibold" : "text-slate-700"
+                    className={cn("w-full px-4 py-2.5 text-left text-sm hover:bg-accent/50 transition-colors",
+                      datePreset === p ? "bg-accent text-accent-foreground font-semibold" : "text-foreground"
                     )}>
                     {presetLabels[p]}
                   </button>
@@ -716,12 +720,12 @@ export function OrderList() {
             <div className="flex items-center gap-2">
               <input type="date" value={dateFrom}
                 onChange={(e) => { patchListParams({ from: e.target.value, preset: "custom" }, { resetPage: true }); }}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-100"
+                className="h-10 px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background tabular-nums"
               />
-              <span className="text-slate-400 text-xs">–</span>
+              <span className="text-muted-foreground text-xs">–</span>
               <input type="date" value={dateTo}
                 onChange={(e) => { patchListParams({ to: e.target.value, preset: "custom" }, { resetPage: true }); }}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-100"
+                className="h-10 px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background tabular-nums"
               />
             </div>
           )}
@@ -730,7 +734,7 @@ export function OrderList() {
           {hasActiveFilters && (
             <button
               onClick={() => { setSearchParams(new URLSearchParams(), { replace: true }); }}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-xl hover:text-red-600 hover:border-red-200 transition-all"
+              className="flex items-center gap-1.5 h-10 px-3 text-xs font-semibold text-muted-foreground bg-background border border-input rounded-md hover:bg-accent hover:text-foreground transition-colors"
             >
               <X className="w-3.5 h-3.5" />
               Xóa lọc
@@ -740,49 +744,49 @@ export function OrderList() {
 
         {/* Hiển thị range ngày đang áp dụng */}
         {(dateFrom || dateTo) && datePreset !== "custom" && (
-          <p className="text-xs text-slate-400">
-            Đang lọc: <span className="font-semibold text-slate-600">{dateFrom || "..."} → {dateTo || "..."}</span>
+          <p className="text-xs text-muted-foreground">
+            Đang lọc: <span className="font-semibold text-foreground tabular-nums">{dateFrom || "..."} → {dateTo || "..."}</span>
           </p>
         )}
       </div>
 
       {/* KPI totals (theo bộ lọc hiện tại) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Tổng đơn hàng</p>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
-              <ShoppingCart className="w-5 h-5 text-amber-600" />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng đơn hàng</p>
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+              <ShoppingCart className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">
+          <p className="mt-3 text-2xl font-semibold text-foreground tabular-nums tracking-tight">
             {summary.total_orders || 0}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Tổng đơn (không gồm đơn hủy) theo bộ lọc.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Tổng đơn (không gồm đơn hủy) theo bộ lọc.</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Tổng doanh thu</p>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-blue-600" />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng doanh thu</p>
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">
+          <p className="mt-3 text-2xl font-semibold text-foreground tabular-nums tracking-tight">
             {formatCurrency(summary.total_revenue)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Tổng tạm tính (subtotal) theo bộ lọc.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Tổng tạm tính (subtotal) theo bộ lọc.</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Tổng hoa hồng</p>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng hoa hồng</p>
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">
+          <p className="mt-3 text-2xl font-semibold text-foreground tabular-nums tracking-tight">
             {formatCurrency(summary.total_commission)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground">
             HH bán hàng (direct gross). Tháng đủ ngày (1 → cuối tháng), không lọc thêm → cùng số với «HH bán hàng» báo cáo (cùng tháng/nhóm).
           </p>
         </div>
@@ -790,13 +794,13 @@ export function OrderList() {
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
-          <span className="text-sm font-semibold text-blue-700">Đã chọn {selected.size} đơn</span>
+        <div className="flex items-center gap-3 px-4 py-3 bg-card border border-border rounded-lg">
+          <span className="text-sm font-semibold text-foreground">Đã chọn {selected.size} đơn</span>
           <div className="flex items-center gap-2 ml-auto">
             <select
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value)}
-              className="px-3 py-1.5 border border-blue-200 bg-white rounded-lg text-sm outline-none focus:border-blue-400 cursor-pointer"
+              className="h-9 px-3 border border-input bg-background rounded-md text-sm outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <option value="">Đổi trạng thái...</option>
               <option value="pending">Chờ duyệt</option>
@@ -807,39 +811,39 @@ export function OrderList() {
             <button
               onClick={handleBulkStatus}
               disabled={!bulkStatus || bulkLoading}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-all"
+              className="h-9 px-4 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 disabled:opacity-50 transition-opacity inline-flex items-center gap-1.5"
             >
               {bulkLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Áp dụng
             </button>
-            <button onClick={() => setSelected(new Set())} className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700">Bỏ chọn</button>
+            <button onClick={() => setSelected(new Set())} className="h-9 px-3 text-sm text-muted-foreground hover:text-foreground transition-colors">Bỏ chọn</button>
           </div>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm">{error}</div>
       )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
         </div>
       ) : orders.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center text-slate-400">
-          <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-slate-200" />
+        <div className="bg-card rounded-lg border border-border py-16 text-center text-muted-foreground">
+          <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
           Không có đơn hàng nào
         </div>
       ) : (
         <>
           {/* Bảng đầy cột — mọi kích thước; mobile cuộn ngang */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto -mx-1 sm:mx-0">
-            <p className="md:hidden text-[11px] text-slate-400 px-3 pt-3 pb-0">
+          <div className="bg-card rounded-lg border border-border overflow-x-auto -mx-1 sm:mx-0">
+            <p className="md:hidden text-[11px] text-muted-foreground px-3 pt-3 pb-0">
               Vuốt ngang để xem đủ cột.
             </p>
             <table className="w-full min-w-[1120px] text-left border-collapse text-sm">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
+                <tr className="bg-muted border-b border-border">
                   <th className="px-4 py-3 w-10">
                     <input type="checkbox"
                       checked={
@@ -848,21 +852,21 @@ export function OrderList() {
                       }
                       onChange={toggleAll}
                       disabled={selectableOrders.length === 0}
-                      className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-4 h-4 rounded border-input accent-primary cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Mã đơn</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Khách hàng</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sản phẩm</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nhân viên</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Ship / NV / HH</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
+                  <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Mã đơn</th>
+                  <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Khách hàng</th>
+                  <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Sản phẩm</th>
+                  <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Nhân viên</th>
+                  <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Ship / NV / HH</th>
+                  <th className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide text-right whitespace-nowrap">Lương</th>
                   <th className="px-4 py-3 w-24"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {orders.map((order: any) => {
-                  const st = statusConfig[order.status] || { label: order.status, color: "bg-slate-100 text-slate-600", icon: Clock };
+                  const st = statusConfig[order.status] || { label: order.status, color: "bg-muted text-muted-foreground border border-border", icon: Clock };
                   const pay = paymentConfig[order.payment_method] || { label: order.payment_method || "—", icon: Wallet };
                   const isSelected = selected.has(order.id);
                   const rowCanMutate = canSalesMutateOrderRow(order);
@@ -874,8 +878,8 @@ export function OrderList() {
                     <tr key={order.id}
                       className={cn(
                         "group transition-colors",
-                        "cursor-pointer hover:bg-slate-50/60",
-                        isSelected && "bg-blue-50/60"
+                        "cursor-pointer hover:bg-accent/30",
+                        isSelected && "bg-accent/40"
                       )}
                       onClick={
                         () => navigate(`/orders/edit/${order.id}`, { state: { ordersListReturn } })
@@ -886,13 +890,13 @@ export function OrderList() {
                           checked={isSelected}
                           onChange={() => toggleOne(order.id)}
                           disabled={!rowCanMutate}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="w-4 h-4 rounded border-input accent-primary cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         />
                       </td>
                       <td className="px-4 py-3">
                         <div>
-                          <span className="text-sm font-bold text-red-600 font-mono">{order.code || `#${order.id}`}</span>
-                          <p className="text-xs text-slate-400 mt-0.5">
+                          <span className="text-sm font-semibold text-primary font-mono">{order.code || `#${order.id}`}</span>
+                          <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
                             {isToday ? "Hôm nay" : (order.created_at ? formatDate(order.created_at) : "—")}
                             {order.created_at ? ` • ${new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : ""}
                           </p>
@@ -906,20 +910,20 @@ export function OrderList() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground flex-shrink-0">
                             {initials}
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-900 text-sm leading-tight">{order.customer_name || "—"}</p>
-                            <p className="text-xs text-slate-400">{order.customer_phone || ""}</p>
-                            <div className="mt-1 text-xs text-slate-400">
+                            <p className="font-semibold text-foreground text-sm leading-tight">{order.customer_name || "—"}</p>
+                            <p className="text-xs text-muted-foreground tabular-nums">{order.customer_phone || ""}</p>
+                            <div className="mt-1 text-xs text-muted-foreground">
                               Tổng tiền:{" "}
-                              <span className="font-semibold text-slate-900 tabular-nums">
+                              <span className="font-semibold text-foreground tabular-nums">
                                 {formatCurrency(order.total_amount || 0)}
                               </span>
                             </div>
-                            <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                              <pay.icon className="w-3.5 h-3.5 text-slate-300" />
+                            <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <pay.icon className="w-3.5 h-3.5 text-muted-foreground" />
                               {pay.label}
                             </div>
                           </div>
@@ -929,53 +933,53 @@ export function OrderList() {
                         {items.length ? (
                           <div className="space-y-0.5">
                             {items.slice(0, 2).map((it: any, idx: number) => (
-                              <p key={`${it.product_id}-${idx}`} className="text-xs text-slate-700 leading-tight">
+                              <p key={`${it.product_id}-${idx}`} className="text-xs text-foreground/90 leading-tight">
                                 <span className="font-semibold">{it.product_name}</span>{" "}
-                                <span className="text-slate-400">×</span>{" "}
+                                <span className="text-muted-foreground">×</span>{" "}
                                 <span className="tabular-nums font-semibold">{it.qty}</span>
-                                {it.unit ? <span className="text-slate-400"> {it.unit}</span> : null}
+                                {it.unit ? <span className="text-muted-foreground"> {it.unit}</span> : null}
                               </p>
                             ))}
                             {items.length > 2 ? (
-                              <p className="text-[11px] text-slate-400">+{items.length - 2} sản phẩm</p>
+                              <p className="text-[11px] text-muted-foreground">+{items.length - 2} sản phẩm</p>
                             ) : null}
                           </div>
                         ) : (
-                          <span className="text-slate-300 text-xs">—</span>
+                          <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <div>
-                          <p className="text-sm text-slate-700 font-medium">{order.salesperson_name || "—"}</p>
+                          <p className="text-sm text-foreground font-medium">{order.salesperson_name || "—"}</p>
                           {order.group_name ? (
-                            <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">
+                            <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-muted text-foreground border border-border">
                               {order.group_name}
                             </span>
                           ) : (
-                            <span className="text-slate-300 text-xs">—</span>
+                            <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="space-y-0.5">
-                          <p className="text-xs text-slate-700">
-                            <span className="text-slate-400">Ship:</span>{" "}
+                          <p className="text-xs text-foreground/90">
+                            <span className="text-muted-foreground">Ship:</span>{" "}
                             <span className="font-semibold tabular-nums">
                               {order.ship_payer === "shop" ? "Shop trả" : `KH trả ${formatCurrency(Number(order.shipping_fee) || 0)}`}
                             </span>
                           </p>
                           <p className="text-xs">
-                            <span className="text-slate-400">NV chịu:</span>{" "}
+                            <span className="text-muted-foreground">NV chịu:</span>{" "}
                             <span className={cn(
                               "tabular-nums",
-                              nvChiuAmt > 0 ? "font-semibold text-rose-700" : "text-slate-400"
+                              nvChiuAmt > 0 ? "font-semibold text-destructive" : "text-muted-foreground"
                             )}>
                               {nvChiuAmt > 0 ? formatCurrency(nvChiuAmt) : "—"}
                             </span>
                           </p>
                           <p className="text-xs">
-                            <span className="text-slate-400">HH:</span>{" "}
-                            <span className="font-semibold text-emerald-600 tabular-nums">
+                            <span className="text-muted-foreground">HH:</span>{" "}
+                            <span className="font-semibold text-foreground tabular-nums">
                               {formatCurrency(commissionAmt)}
                             </span>
                           </p>
@@ -985,7 +989,7 @@ export function OrderList() {
                         <span
                           className={cn(
                             "text-sm font-semibold tabular-nums",
-                            luongDon < 0 ? "text-red-600" : "text-violet-800"
+                            luongDon < 0 ? "text-destructive" : "text-foreground"
                           )}
                           title="HH + Ship KH Trả − NV chịu"
                         >
@@ -997,7 +1001,7 @@ export function OrderList() {
                         <div className="flex items-center justify-end gap-1 min-h-[28px]">
                           {rowCanMutate ? (
                             <Link to={`/orders/edit/${order.id}`} state={{ ordersListReturn }}
-                              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-all"
+                              className="w-8 h-8 rounded-md border border-border bg-background hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </Link>
@@ -1007,7 +1011,7 @@ export function OrderList() {
                               type="button"
                               onClick={() => handleDelete(order.id)}
                               disabled={deleting === order.id}
-                              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-600 hover:text-white flex items-center justify-center text-slate-500 transition-all disabled:opacity-50"
+                              className="w-8 h-8 rounded-md border border-border bg-background hover:bg-destructive hover:text-destructive-foreground flex items-center justify-center text-muted-foreground hover:border-destructive transition-colors disabled:opacity-50"
                               aria-label="Xóa đơn"
                             >
                               {deleting === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
@@ -1025,24 +1029,24 @@ export function OrderList() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-1">
-              <p className="text-xs text-slate-400">
-                Hiển thị <span className="font-semibold text-slate-700">{(page - 1) * limit + 1}–{Math.min(page * limit, total)}</span> / <span className="font-semibold text-slate-700">{total}</span> đơn
+              <p className="text-xs text-muted-foreground">
+                Hiển thị <span className="font-semibold text-foreground tabular-nums">{(page - 1) * limit + 1}–{Math.min(page * limit, total)}</span> / <span className="font-semibold text-foreground tabular-nums">{total}</span> đơn
               </p>
               <div className="flex items-center gap-1">
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-30 transition-all">
+                  className="w-9 h-9 rounded-md border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 transition-colors">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 {getVisiblePageNumbers(page, totalPages, 5).map((p) => (
                   <button key={p} onClick={() => setPage(p)}
-                    className={cn("w-8 h-8 rounded-lg text-xs font-bold transition-all",
-                      page === p ? "bg-red-600 text-white shadow-lg shadow-red-600/20" : "hover:bg-slate-100 text-slate-600"
+                    className={cn("w-9 h-9 rounded-md text-xs font-semibold tabular-nums border transition-colors",
+                      page === p ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-accent text-foreground"
                     )}>
                     {p}
                   </button>
                 ))}
                 <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-30 transition-all">
+                  className="w-9 h-9 rounded-md border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 transition-colors">
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>

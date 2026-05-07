@@ -331,7 +331,7 @@ export function ProductForm() {
   if (fetchLoading) {
     return (
       <div className="max-w-5xl mx-auto flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -340,21 +340,36 @@ export function ProductForm() {
     <div className="max-w-5xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all">
-            <ArrowLeft className="w-5 h-5" />
+          <button
+            onClick={() => navigate(-1)}
+            className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            aria-label="Quay lại"
+          >
+            <ArrowLeft className="w-4 h-4 mx-auto" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-xl font-semibold tracking-tight">
               {isEdit ? `Chỉnh sửa sản phẩm: ${formData.name || id}` : "Thêm sản phẩm mới"}
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {isEdit ? "Cập nhật thông tin chi tiết của sản phẩm." : "Tạo sản phẩm mới để bắt đầu kinh doanh."}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate(-1)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">Hủy bỏ</button>
-          <button type="button" onClick={handleSubmit} disabled={isLoading} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="h-10 px-4 rounded-md bg-background border border-border text-sm font-semibold text-foreground hover:bg-accent transition-colors"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 inline-flex items-center gap-2"
+          >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             <Save className="w-4 h-4" />
             {isLoading ? "Đang lưu..." : "Lưu sản phẩm"}
@@ -363,12 +378,12 @@ export function ProductForm() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 px-4 py-3 text-sm flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" /> Đã lưu thành công!
         </div>
       )}
@@ -377,9 +392,9 @@ export function ProductForm() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-6">
             {/* Image Section */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-blue-600" />
+            <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-primary" />
                 Hình ảnh sản phẩm
               </h3>
               
@@ -387,9 +402,9 @@ export function ProductForm() {
               {images.length > 0 && (
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   {images.map((img, i) => (
-                    <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-slate-50 border border-slate-200 group">
+                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-muted/30 border border-border group">
                       <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" aria-label="Xóa ảnh">
+                      <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 w-7 h-7 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:opacity-95 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" aria-label="Xóa ảnh">
                         <X className="w-3 h-3" />
                       </button>
                     </div>
@@ -398,13 +413,13 @@ export function ProductForm() {
               )}
               
               {/* Upload: input phủ vùng (opacity 0) — iOS/Android hay không mở picker khi input display:none + label htmlFor */}
-              <label className="relative flex flex-col items-center justify-center aspect-square rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 hover:bg-slate-100 hover:border-blue-400 cursor-pointer transition-all group mb-3 overflow-hidden">
+              <label className="relative flex flex-col items-center justify-center aspect-square rounded-xl bg-muted/30 border-2 border-dashed border-border hover:bg-accent/40 hover:border-primary/30 cursor-pointer transition-all group mb-3 overflow-hidden">
                 <span className="pointer-events-none flex flex-col items-center">
-                  <span className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mb-3 group-hover:scale-110 transition-all">
-                    <Plus className="w-6 h-6 text-slate-400 group-hover:text-blue-600" />
+                  <span className="w-12 h-12 rounded-lg bg-background border border-border shadow-sm flex items-center justify-center mb-3 group-hover:scale-110 transition-all">
+                    <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary" />
                   </span>
-                  <span className="text-sm font-medium text-slate-600">Tải ảnh lên</span>
-                  <span className="text-xs text-slate-400 mt-1 text-center px-2">Chọn thư viện hoặc chụp ảnh (điện thoại)</span>
+                  <span className="text-sm font-medium text-foreground">Tải ảnh lên</span>
+                  <span className="text-xs text-muted-foreground mt-1 text-center px-2">Chọn thư viện hoặc chụp ảnh (điện thoại)</span>
                 </span>
                 <input
                   type="file"
@@ -423,24 +438,24 @@ export function ProductForm() {
                   value={newImageUrl}
                   onChange={(e) => setNewImageUrl(e.target.value)}
                   placeholder="Hoặc dán URL hình ảnh..."
-                  className="flex-1 px-3 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none"
+                  className="flex-1 h-10 px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addImage())}
                 />
-                <button type="button" onClick={addImage} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
+                <button type="button" onClick={addImage} className="h-10 px-3 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95">
                   Thêm
                 </button>
               </div>
             </div>
 
             {/* Shipping */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Truck className="w-4 h-4 text-blue-600" />
+            <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-primary" />
                 Vận chuyển & Kho
               </h3>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Kho <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-medium text-muted-foreground">Kho <span className="text-destructive ml-0.5">*</span></label>
                   <select
                     value={warehouseId}
                     onChange={(e) => {
@@ -448,8 +463,9 @@ export function ProductForm() {
                       if (errors.warehouse_id) setErrors((prev) => ({ ...prev, warehouse_id: undefined }));
                     }}
                     className={cn(
-                      "w-full px-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none",
-                      errors.warehouse_id ? "ring-2 ring-red-300 bg-red-50" : ""
+                      "h-10 w-full px-3 bg-background border rounded-md text-sm outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      errors.warehouse_id ? "border-destructive/50" : "border-input"
                     )}
                   >
                     <option value="">Chọn kho</option>
@@ -459,14 +475,14 @@ export function ProductForm() {
                       </option>
                     ))}
                   </select>
-                  {errors.warehouse_id && <p className="text-xs text-red-500 font-medium">{errors.warehouse_id}</p>}
+                  {errors.warehouse_id && <p className="text-xs text-destructive font-medium">{errors.warehouse_id}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Cảnh báo hết hàng</label>
-                  <input type="number" placeholder="10" className="w-full px-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none" />
+                  <label className="text-xs font-medium text-muted-foreground">Cảnh báo hết hàng</label>
+                  <input type="number" placeholder="10" className="h-10 w-full px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Khối lượng (kg)</label>
+                  <label className="text-xs font-medium text-muted-foreground">Khối lượng (kg)</label>
                   <input
                     type="number"
                     step="0.001"
@@ -474,21 +490,21 @@ export function ProductForm() {
                     value={formData.weight ?? ""}
                     onChange={(e) => handleChange("weight", Number(e.target.value))}
                     placeholder="0"
-                    className="w-full px-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none"
+                    className="h-10 w-full px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background tabular-nums"
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dài (cm)</label>
-                    <input type="number" placeholder="0" className="w-full px-2 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-lg text-sm outline-none" />
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Dài (cm)</label>
+                    <input type="number" placeholder="0" className="h-10 w-full px-2 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background tabular-nums" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rộng (cm)</label>
-                    <input type="number" placeholder="0" className="w-full px-2 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-lg text-sm outline-none" />
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Rộng (cm)</label>
+                    <input type="number" placeholder="0" className="h-10 w-full px-2 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background tabular-nums" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cao (cm)</label>
-                    <input type="number" placeholder="0" className="w-full px-2 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-lg text-sm outline-none" />
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Cao (cm)</label>
+                    <input type="number" placeholder="0" className="h-10 w-full px-2 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background tabular-nums" />
                   </div>
                 </div>
               </div>
@@ -496,27 +512,27 @@ export function ProductForm() {
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"><Package className="w-4 h-4" /></div>
-                <h2 className="text-lg font-bold text-slate-900">Thông tin chung</h2>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-primary"><Package className="w-4 h-4" /></div>
+                <h2 className="text-lg font-semibold text-foreground">Thông tin chung</h2>
               </div>
               
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Tên sản phẩm <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="VD: Áo thun Cotton Basic" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.name ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
-                  {errors.name && <p className="text-xs text-red-500 font-medium">{errors.name}</p>}
+                  <label className="text-xs font-medium text-muted-foreground">Tên sản phẩm <span className="text-destructive ml-0.5">*</span></label>
+                  <input type="text" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="VD: Áo thun Cotton Basic" className={cn("w-full h-10 px-3 bg-background border rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", errors.name ? "border-destructive/50" : "border-input")} />
+                  {errors.name && <p className="text-xs text-destructive font-medium">{errors.name}</p>}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Mã SKU <span className="text-red-500">*</span></label>
-                    <input type="text" value={formData.sku} onChange={(e) => handleChange("sku", e.target.value)} placeholder="VD: TS-001" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm font-mono transition-all outline-none", errors.sku ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
-                    {errors.sku && <p className="text-xs text-red-500 font-medium">{errors.sku}</p>}
+                    <label className="text-xs font-medium text-muted-foreground">Mã SKU <span className="text-destructive ml-0.5">*</span></label>
+                    <input type="text" value={formData.sku} onChange={(e) => handleChange("sku", e.target.value)} placeholder="VD: TS-001" className={cn("w-full h-10 px-3 bg-background border rounded-md text-sm font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", errors.sku ? "border-destructive/50" : "border-input")} />
+                    {errors.sku && <p className="text-xs text-destructive font-medium">{errors.sku}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Danh mục</label>
-                    <select value={formData.category_id} onChange={(e) => handleChange("category_id", e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none">
+                    <label className="text-xs font-medium text-muted-foreground">Danh mục</label>
+                    <select value={formData.category_id} onChange={(e) => handleChange("category_id", e.target.value)} className="h-10 w-full px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                       <option value="">Chọn danh mục</option>
                       {categories.map((cat: any) => (
                         <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -525,41 +541,41 @@ export function ProductForm() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Mô tả sản phẩm</label>
-                  <textarea rows={4} value={formData.description} onChange={(e) => handleChange("description", e.target.value)} placeholder="Nhập mô tả chi tiết về sản phẩm..." className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none resize-none"></textarea>
+                  <label className="text-xs font-medium text-muted-foreground">Mô tả sản phẩm</label>
+                  <textarea rows={4} value={formData.description} onChange={(e) => handleChange("description", e.target.value)} placeholder="Nhập mô tả chi tiết về sản phẩm..." className="w-full px-3 py-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-none"></textarea>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"><DollarSign className="w-4 h-4" /></div>
-                <h2 className="text-lg font-bold text-slate-900">Giá bán & Tồn kho</h2>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-primary"><DollarSign className="w-4 h-4" /></div>
+                <h2 className="text-lg font-semibold text-foreground">Giá bán &amp; Tồn kho</h2>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Giá bán lẻ <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-medium text-muted-foreground">Giá bán lẻ <span className="text-destructive ml-0.5">*</span></label>
                   <div className="relative">
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">VNĐ</span>
-                    <input type="number" value={formData.price || ""} onChange={(e) => handleChange("price", Number(e.target.value))} placeholder="0" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.price ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-semibold">VNĐ</span>
+                    <input type="number" value={formData.price || ""} onChange={(e) => handleChange("price", Number(e.target.value))} placeholder="0" className={cn("w-full h-10 px-3 pr-12 bg-background border rounded-md text-sm outline-none tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", errors.price ? "border-destructive/50" : "border-input")} />
                   </div>
-                  {errors.price && <p className="text-xs text-red-500 font-medium">{errors.price}</p>}
+                  {errors.price && <p className="text-xs text-destructive font-medium">{errors.price}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Giá vốn</label>
+                  <label className="text-xs font-medium text-muted-foreground">Giá vốn</label>
                   <div className="relative">
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">VNĐ</span>
-                    <input type="number" value={formData.cost_price || ""} onChange={(e) => handleChange("cost_price", Number(e.target.value))} placeholder="0" className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-semibold">VNĐ</span>
+                    <input type="number" value={formData.cost_price || ""} onChange={(e) => handleChange("cost_price", Number(e.target.value))} placeholder="0" className="w-full h-10 px-3 pr-12 bg-background border border-input rounded-md text-sm outline-none tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Tồn kho theo kho đã chọn</label>
-                  <input type="number" step="0.001" min="0" value={formData.stock_qty || ""} onChange={(e) => handleChange("stock_qty", Number(e.target.value))} placeholder="0" className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                  <label className="text-xs font-medium text-muted-foreground">Tồn kho theo kho đã chọn</label>
+                  <input type="number" step="0.001" min="0" value={formData.stock_qty || ""} onChange={(e) => handleChange("stock_qty", Number(e.target.value))} placeholder="0" className="w-full h-10 px-3 bg-background border border-input rounded-md text-sm outline-none tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Đơn vị tính</label>
-                  <input type="text" value={formData.unit} onChange={(e) => handleChange("unit", e.target.value)} placeholder="VD: Cái, Hộp, Kg" className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none" />
+                  <label className="text-xs font-medium text-muted-foreground">Đơn vị tính</label>
+                  <input type="text" value={formData.unit} onChange={(e) => handleChange("unit", e.target.value)} placeholder="VD: Cái, Hộp, Kg" className="w-full h-10 px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
                 </div>
               </div>
             </div>

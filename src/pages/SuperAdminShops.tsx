@@ -413,40 +413,40 @@ export function SuperAdminShops() {
   ) => (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-          <Shield className="w-3.5 h-3.5 text-blue-600" aria-hidden />
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-primary" aria-hidden />
           Quản trị viên (role Admin)
         </p>
         <button
           type="button"
           onClick={() => setRows((prev) => [...prev, emptyAdminRow()])}
-          className="text-xs font-bold text-blue-600 hover:underline shrink-0"
+          className="text-xs font-semibold text-primary hover:underline shrink-0"
         >
           + Thêm dòng
         </button>
       </div>
-      <p className="text-xs text-slate-600 leading-relaxed">
+      <p className="text-xs text-muted-foreground leading-relaxed">
         Các tài khoản tạo ở đây được ghi vào DB với vai trò{" "}
-        <strong className="text-slate-800">Admin</strong> (cả <code className="text-[11px] bg-slate-100 px-1 rounded">users.role_id</code> và{" "}
-        <code className="text-[11px] bg-slate-100 px-1 rounded">user_shops.role_id</code>). Nhân viên{" "}
+        <strong className="text-foreground">Admin</strong> (cả <code className="text-[11px] bg-muted px-1 rounded">users.role_id</code> và{" "}
+        <code className="text-[11px] bg-muted px-1 rounded">user_shops.role_id</code>). Nhân viên{" "}
         <strong>Sales</strong> chỉ do quản trị shop thêm ở màn Nhân viên — không phải luồng này. Để trống cả dòng = bỏ qua dòng đó.
       </p>
       {rows.map((row, idx) => (
-        <div key={row.key} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/80 space-y-3 relative">
+        <div key={row.key} className="p-4 rounded-xl border border-border bg-muted/20 space-y-3 relative">
           {rows.length > 1 && (
             <button
               type="button"
-              className="absolute top-2 right-2 p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+              className="absolute top-2 right-2 p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               onClick={() => setRows((prev) => prev.filter((r) => r.key !== row.key))}
               aria-label="Xoá dòng"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           )}
-          <p className="text-[10px] font-bold text-slate-500">Quản trị #{idx + 1}</p>
+          <p className="text-[10px] font-semibold text-muted-foreground">Quản trị #{idx + 1}</p>
           <input
             id={`${idPrefix}-name-${row.key}`}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             placeholder="Họ và tên"
             value={row.full_name}
             onChange={(e) =>
@@ -454,7 +454,7 @@ export function SuperAdminShops() {
             }
           />
           <input
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             placeholder="Tên đăng nhập"
             autoComplete="off"
             value={row.username}
@@ -463,7 +463,7 @@ export function SuperAdminShops() {
             }
           />
           <input
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             placeholder="Email"
             type="email"
             autoComplete="off"
@@ -473,7 +473,7 @@ export function SuperAdminShops() {
             }
           />
           <input
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+            className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             placeholder="Mật khẩu (≥6 ký tự)"
             type="password"
             autoComplete="new-password"
@@ -488,15 +488,15 @@ export function SuperAdminShops() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/20">
+          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground shadow-lg">
             <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quản lý shop</h1>
-            <p className="text-sm text-slate-500 font-medium mt-0.5">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Quản lý shop</h1>
+            <p className="text-sm text-muted-foreground font-medium mt-0.5">
               Tạo shop và tạo một hoặc nhiều tài khoản admin cho shop đó. Admin shop đăng nhập và quản lý nhân viên như shop Sheki.
             </p>
           </div>
@@ -504,7 +504,7 @@ export function SuperAdminShops() {
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all"
+          className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 transition-opacity shadow-sm"
         >
           <Plus className="w-4 h-4" />
           Thêm shop
@@ -512,75 +512,79 @@ export function SuperAdminShops() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-100 text-red-700 text-sm font-bold">{error}</div>
+        <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-sm font-semibold">{error}</div>
       )}
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
+          <div className="flex items-center justify-center py-20 text-muted-foreground gap-2">
             <Loader2 className="w-6 h-6 animate-spin" />
             <span className="font-bold text-sm">Đang tải…</span>
           </div>
         ) : rows.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 font-medium text-sm">Chưa có shop nào.</div>
+          <div className="py-16 text-center text-muted-foreground font-medium text-sm">Chưa có shop nào.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[900px]">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/80">
-                  <th className="text-left py-4 px-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">ID</th>
-                  <th className="text-left py-4 px-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">Tên / Mã</th>
-                  <th className="text-left py-4 px-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">Shop</th>
-                  <th className="text-left py-4 px-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">Hạn dùng</th>
-                  <th className="text-left py-4 px-3 font-black text-slate-400 text-[10px] uppercase tracking-widest">Admin</th>
-                  <th className="text-right py-4 px-4 font-black text-slate-400 text-[10px] uppercase tracking-widest">Thao tác</th>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="text-left py-4 px-4 font-semibold text-muted-foreground text-[10px] uppercase tracking-widest">ID</th>
+                  <th className="text-left py-4 px-3 font-semibold text-muted-foreground text-[10px] uppercase tracking-widest">Tên / Mã</th>
+                  <th className="text-left py-4 px-3 font-semibold text-muted-foreground text-[10px] uppercase tracking-widest">Shop</th>
+                  <th className="text-left py-4 px-3 font-semibold text-muted-foreground text-[10px] uppercase tracking-widest">Hạn dùng</th>
+                  <th className="text-left py-4 px-3 font-semibold text-muted-foreground text-[10px] uppercase tracking-widest">Admin</th>
+                  <th className="text-right py-4 px-4 font-semibold text-muted-foreground text-[10px] uppercase tracking-widest">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((s) => (
-                  <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors align-top">
-                    <td className="py-4 px-4 font-mono text-slate-500">{s.id}</td>
+                  <tr key={s.id} className="border-b border-border hover:bg-muted/20 transition-colors align-top">
+                    <td className="py-4 px-4 font-mono text-muted-foreground">{s.id}</td>
                     <td className="py-4 px-3">
-                      <p className="font-bold text-slate-900">{s.name}</p>
-                      <p className="text-xs text-slate-500 font-mono">{s.code}</p>
+                      <p className="font-semibold text-foreground">{s.name}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{s.code}</p>
                     </td>
                     <td className="py-4 px-3">
                       <span
                         className={cn(
-                          "inline-flex px-2.5 py-1 rounded-lg text-xs font-bold",
-                          userActiveFromApi(s.is_active) ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                          "inline-flex px-2.5 py-1 rounded-md text-xs font-semibold border",
+                          userActiveFromApi(s.is_active)
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50"
+                            : "bg-muted text-muted-foreground border-border"
                         )}
                       >
                         {userActiveFromApi(s.is_active) ? "Hoạt động" : "Tắt"}
                       </span>
                       {s.shop_expired && (
-                        <span className="ml-1 inline-flex px-2 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-900">
+                        <span className="ml-1 inline-flex px-2 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900/50">
                           Hết hạn
                         </span>
                       )}
                     </td>
-                    <td className="py-4 px-3 text-slate-700 text-xs">
+                    <td className="py-4 px-3 text-foreground text-xs">
                       {s.valid_until
                         ? new Date(`${String(s.valid_until).slice(0, 10)}T12:00:00`).toLocaleDateString("vi-VN")
                         : "Không giới hạn"}
                     </td>
                     <td className="py-4 px-3 max-w-[280px]">
                       {(s.admins || []).length === 0 ? (
-                        <span className="text-slate-400 text-xs">Chưa có admin</span>
+                        <span className="text-muted-foreground text-xs">Chưa có admin</span>
                       ) : (
                         <ul className="space-y-2">
                           {(s.admins || []).map((a) => (
                             <li key={a.user_id} className="flex flex-wrap items-center gap-2 text-xs">
-                              <span className="font-semibold text-slate-800 truncate max-w-[120px]" title={a.full_name}>
+                              <span className="font-semibold text-foreground truncate max-w-[120px]" title={a.full_name}>
                                 {a.full_name}
                               </span>
-                              <span className="text-slate-500 truncate max-w-[100px]" title={a.username}>
+                              <span className="text-muted-foreground truncate max-w-[100px]" title={a.username}>
                                 @{a.username}
                               </span>
                               <span
                                 className={cn(
-                                  "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold",
-                                  userActiveFromApi(a.is_active) ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
+                                  "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold border",
+                                  userActiveFromApi(a.is_active)
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-900/50"
+                                    : "bg-muted text-muted-foreground border-border"
                                 )}
                               >
                                 {userActiveFromApi(a.is_active) ? "Active" : "Khoá"}
@@ -589,7 +593,7 @@ export function SuperAdminShops() {
                                 type="button"
                                 disabled={togglingAdmin === `${s.id}-${a.user_id}`}
                                 onClick={() => toggleAdminActive(s.id, a)}
-                                className="shrink-0 text-[10px] font-bold text-blue-600 hover:underline disabled:opacity-50"
+                                className="shrink-0 text-[10px] font-semibold text-primary hover:underline disabled:opacity-50"
                               >
                                 {togglingAdmin === `${s.id}-${a.user_id}` ? "…" : userActiveFromApi(a.is_active) ? "Khoá" : "Mở"}
                               </button>
@@ -601,7 +605,7 @@ export function SuperAdminShops() {
                                   setResetPwConfirm("");
                                   setError(null);
                                 }}
-                                className="shrink-0 text-[10px] font-bold text-amber-800 hover:underline"
+                                className="shrink-0 text-[10px] font-semibold text-amber-800 hover:underline"
                                 title="Đặt lại mật khẩu (không cần mật khẩu cũ)"
                               >
                                 Đặt lại MK
@@ -615,7 +619,7 @@ export function SuperAdminShops() {
                       <button
                         type="button"
                         onClick={() => openAddAdmins(s)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-800 text-xs font-bold hover:bg-slate-200 transition-all"
+                        className="inline-flex items-center gap-1.5 h-10 px-3 rounded-md bg-muted text-foreground text-xs font-semibold hover:bg-accent transition-colors"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
                         Thêm admin
@@ -623,7 +627,7 @@ export function SuperAdminShops() {
                       <button
                         type="button"
                         onClick={() => openEdit(s)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-all"
+                        className="inline-flex items-center gap-1.5 h-10 px-3 rounded-md bg-accent text-accent-foreground text-xs font-semibold hover:opacity-95 transition-opacity"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                         Sửa
@@ -638,17 +642,17 @@ export function SuperAdminShops() {
       </div>
 
       {showCreate && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto" role="dialog">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full border border-slate-200 relative my-6 max-h-[calc(100vh-3rem)] flex flex-col">
-            <div className="shrink-0 flex items-start justify-between gap-4 p-6 pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-foreground/50 backdrop-blur-sm overflow-y-auto" role="dialog">
+          <div className="bg-card rounded-2xl shadow-2xl max-w-2xl w-full border border-border relative my-6 max-h-[calc(100vh-3rem)] flex flex-col">
+            <div className="shrink-0 flex items-start justify-between gap-4 p-6 pb-4 border-b border-border">
               <div>
-                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Super Admin</p>
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">Tạo shop mới</h2>
-                <p className="text-sm text-slate-500 mt-1">Hai bước: thông tin shop → tài khoản quản trị (Admin).</p>
+                <p className="text-[10px] font-semibold text-primary uppercase tracking-widest mb-1">Super Admin</p>
+                <h2 className="text-xl font-semibold tracking-tight text-foreground">Tạo shop mới</h2>
+                <p className="text-sm text-muted-foreground mt-1">Hai bước: thông tin shop → tài khoản quản trị (Admin).</p>
               </div>
               <button
                 type="button"
-                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 shrink-0"
+                className="p-2 rounded-lg hover:bg-accent text-muted-foreground shrink-0 transition-colors"
                 onClick={() => setShowCreate(false)}
                 aria-label="Đóng"
               >
@@ -657,57 +661,57 @@ export function SuperAdminShops() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
-              <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
+              <section className="rounded-xl border border-border bg-muted/20 p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white text-xs font-black">1</span>
-                  <h3 className="text-sm font-black text-slate-900">Thông tin shop</h3>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground text-xs font-bold">1</span>
+                  <h3 className="text-sm font-semibold text-foreground">Thông tin shop</h3>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tên shop</label>
+                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Tên shop</label>
                     <input
-                      className="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-medium focus:ring-4 focus:ring-blue-500/15 focus:border-blue-400 outline-none"
+                      className="mt-1 w-full h-11 px-4 rounded-xl border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       value={createName}
                       onChange={(e) => setCreateName(e.target.value)}
                       placeholder="VD: Sheki Hà Nội"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mã shop</label>
+                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Mã shop</label>
                     <input
-                      className="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-mono focus:ring-4 focus:ring-blue-500/15 focus:border-blue-400 outline-none"
+                      className="mt-1 w-full h-11 px-4 rounded-xl border border-input bg-background text-sm font-mono text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       value={createCode}
                       onChange={(e) => setCreateCode(e.target.value)}
                       placeholder="sheki-hn (không dấu, chữ thường)"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hạn dùng (tuỳ chọn)</label>
+                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Hạn dùng (tuỳ chọn)</label>
                     <input
                       type="date"
-                      className="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm outline-none"
+                      className="mt-1 w-full h-11 px-4 rounded-xl border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       value={createValidUntil}
                       onChange={(e) => setCreateValidUntil(e.target.value)}
                     />
-                    <p className="text-[11px] text-slate-500 mt-1.5">Để trống = không giới hạn.</p>
+                    <p className="text-[11px] text-muted-foreground mt-1.5">Để trống = không giới hạn.</p>
                   </div>
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-blue-100 bg-blue-50/40 p-5">
+              <section className="rounded-xl border border-border bg-muted/10 p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white text-xs font-black">2</span>
-                  <h3 className="text-sm font-black text-slate-900">Quản trị viên (Admin)</h3>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground text-xs font-bold">2</span>
+                  <h3 className="text-sm font-semibold text-foreground">Quản trị viên (Admin)</h3>
                 </div>
-                <div className="flex gap-3 rounded-xl bg-white/80 border border-blue-100 p-3 mb-4 text-xs text-slate-700">
-                  <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" aria-hidden />
+                <div className="flex gap-3 rounded-xl bg-card border border-border p-3 mb-4 text-xs text-foreground">
+                  <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
                   <p>
                     Luồng này <strong>luôn gán role Admin</strong> trong database. Nếu sau này thấy user là Sales, đó là do{" "}
                     <strong>đã thêm ở màn Nhân viên</strong> hoặc đổi role — không phải do bước tạo shop này.
                   </p>
                 </div>
 
-                <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-white p-3 mb-4">
+                <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-border bg-card p-3 mb-4">
                   <input
                     type="checkbox"
                     checked={createSkipAdmins}
@@ -715,11 +719,11 @@ export function SuperAdminShops() {
                       setCreateSkipAdmins(e.target.checked);
                       setError(null);
                     }}
-                    className="mt-0.5 rounded border-slate-300 w-4 h-4 text-blue-600"
+                    className="mt-0.5 rounded border-input w-4 h-4 text-primary"
                   />
-                  <span className="text-sm text-slate-700">
-                    <span className="font-bold text-slate-900">Chỉ tạo shop, không tạo tài khoản quản trị</span>
-                    <span className="block text-xs text-slate-500 mt-0.5">
+                  <span className="text-sm text-foreground">
+                    <span className="font-semibold text-foreground">Chỉ tạo shop, không tạo tài khoản quản trị</span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
                       Dùng khi tạo shell shop; sau đó dùng «Thêm admin» trên bảng hoặc gán user thủ công.
                     </span>
                   </span>
@@ -728,15 +732,15 @@ export function SuperAdminShops() {
                 {!createSkipAdmins ? (
                   renderAdminForm(createAdminRows, setCreateAdminRows, "create")
                 ) : (
-                  <p className="text-sm text-slate-500 italic">Bỏ qua bước nhập tài khoản — request gửi danh sách admin rỗng.</p>
+                  <p className="text-sm text-muted-foreground italic">Bỏ qua bước nhập tài khoản — request gửi danh sách admin rỗng.</p>
                 )}
               </section>
             </div>
 
-            <div className="shrink-0 flex flex-wrap justify-end gap-3 p-6 pt-4 border-t border-slate-100 bg-slate-50/80 rounded-b-3xl">
+            <div className="shrink-0 flex flex-wrap justify-end gap-3 p-6 pt-4 border-t border-border bg-muted/20 rounded-b-2xl">
               <button
                 type="button"
-                className="px-5 py-3 rounded-2xl text-sm font-bold text-slate-600 hover:bg-white border border-transparent hover:border-slate-200"
+                className="h-10 px-5 rounded-md text-sm font-semibold text-foreground hover:bg-accent border border-transparent hover:border-border transition-colors"
                 onClick={() => setShowCreate(false)}
               >
                 Huỷ
@@ -745,7 +749,7 @@ export function SuperAdminShops() {
                 type="button"
                 disabled={creating}
                 onClick={submitCreate}
-                className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2 shadow-lg shadow-blue-600/20"
+                className="h-10 px-6 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 disabled:opacity-50 inline-flex items-center gap-2 shadow-sm transition-opacity"
               >
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Tạo shop
@@ -756,44 +760,44 @@ export function SuperAdminShops() {
       )}
 
       {createSuccess && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50" role="dialog">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border border-slate-100 relative">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-foreground/50" role="dialog">
+          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-8 border border-border relative">
             <button
               type="button"
-              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-100 text-slate-400"
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
               onClick={() => setCreateSuccess(null)}
             >
               <X className="w-5 h-5" />
             </button>
-            <h2 className="text-lg font-black text-slate-900 mb-2">Đã tạo shop</h2>
-            <p className="text-sm text-slate-600 mb-4">
+            <h2 className="text-lg font-semibold text-foreground mb-2">Đã tạo shop</h2>
+            <p className="text-sm text-muted-foreground mb-4">
               {createSuccess.shop.name} ({createSuccess.shop.code}) — ID {createSuccess.shop.id}
             </p>
             {createSuccess.admins.length > 0 ? (
               <>
-                <p className="text-sm font-bold text-slate-800 mb-2">Tài khoản quản trị đã tạo ({createSuccess.admins.length}):</p>
-                <ul className="text-sm text-slate-700 space-y-2 mb-4">
+                <p className="text-sm font-semibold text-foreground mb-2">Tài khoản quản trị đã tạo ({createSuccess.admins.length}):</p>
+                <ul className="text-sm text-foreground space-y-2 mb-4">
                   {createSuccess.admins.map((a) => (
                     <li key={a.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="font-medium">{a.full_name}</span>
-                      <span className="text-slate-500">—</span>
+                      <span className="text-muted-foreground">—</span>
                       <span className="font-mono text-xs">{a.username}</span>
-                      <span className="inline-flex items-center rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-black uppercase text-blue-800">
+                      <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary border border-border">
                         {a.role_code || "admin"}
                       </span>
                     </li>
                   ))}
                 </ul>
-                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 dark:bg-amber-950/30 dark:border-amber-900/50 dark:text-amber-200">
                   Lưu mật khẩu đã nhập ở bước trước — hệ thống không hiển thị lại mật khẩu.
                 </p>
               </>
             ) : (
-              <p className="text-sm text-slate-500">Chưa tạo tài khoản admin (chỉ tạo shop). Có thể dùng &quot;Thêm admin&quot; trên bảng.</p>
+              <p className="text-sm text-muted-foreground">Chưa tạo tài khoản admin (chỉ tạo shop). Có thể dùng &quot;Thêm admin&quot; trên bảng.</p>
             )}
             <button
               type="button"
-              className="mt-6 w-full py-3 rounded-2xl bg-blue-600 text-white text-sm font-black"
+              className="mt-6 w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold"
               onClick={() => setCreateSuccess(null)}
             >
               Đóng
@@ -803,29 +807,29 @@ export function SuperAdminShops() {
       )}
 
       {editRow && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50" role="dialog">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border border-slate-100 relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-foreground/50" role="dialog">
+          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-8 border border-border relative">
             <button
               type="button"
-              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-100 text-slate-400"
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
               onClick={() => setEditRow(null)}
             >
               <X className="w-5 h-5" />
             </button>
-            <h2 className="text-lg font-black text-slate-900 mb-6">Sửa shop #{editRow.id}</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-6">Sửa shop #{editRow.id}</h2>
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên shop</label>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Tên shop</label>
                 <input
-                  className="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium outline-none"
+                  className="mt-1 w-full h-11 px-4 rounded-xl border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mã shop</label>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Mã shop</label>
                 <input
-                  className="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium outline-none"
+                  className="mt-1 w-full h-11 px-4 rounded-xl border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   value={editCode}
                   onChange={(e) => setEditCode(e.target.value)}
                 />
@@ -835,30 +839,30 @@ export function SuperAdminShops() {
                   type="checkbox"
                   checked={editActive}
                   onChange={(e) => setEditActive(e.target.checked)}
-                  className="rounded border-slate-300 w-4 h-4 text-blue-600"
+                  className="rounded border-input w-4 h-4 text-primary"
                 />
-                <span className="text-sm font-bold text-slate-700">Shop đang hoạt động</span>
+                <span className="text-sm font-semibold text-foreground">Shop đang hoạt động</span>
               </label>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hạn sử dụng</label>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Hạn sử dụng</label>
                 <input
                   type="date"
-                  className="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium outline-none"
+                  className="mt-1 w-full h-11 px-4 rounded-xl border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   value={editValidUntil}
                   onChange={(e) => setEditValidUntil(e.target.value)}
                 />
-                <p className="text-[11px] text-slate-400 mt-1">Xoá ngày trong ô (để trống) rồi Lưu = không giới hạn.</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Xoá ngày trong ô (để trống) rồi Lưu = không giới hạn.</p>
               </div>
             </div>
             <div className="mt-8 flex justify-end gap-3">
-              <button type="button" className="px-5 py-3 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-100" onClick={() => setEditRow(null)}>
+              <button type="button" className="h-10 px-5 rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors" onClick={() => setEditRow(null)}>
                 Huỷ
               </button>
               <button
                 type="button"
                 disabled={savingEdit}
                 onClick={submitEdit}
-                className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2"
+                className="h-10 px-6 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 disabled:opacity-50 inline-flex items-center gap-2 transition-opacity"
               >
                 {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Lưu
@@ -869,11 +873,11 @@ export function SuperAdminShops() {
       )}
 
       {addAdminShop && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 overflow-y-auto" role="dialog">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 border border-slate-100 relative my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-foreground/50 overflow-y-auto" role="dialog">
+          <div className="bg-card rounded-2xl shadow-2xl max-w-lg w-full p-8 border border-border relative my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <button
               type="button"
-              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-100 text-slate-400"
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
               onClick={() => {
                 setAddAdminShop(null);
                 setAddSuccess(null);
@@ -881,28 +885,28 @@ export function SuperAdminShops() {
             >
               <X className="w-5 h-5" />
             </button>
-            <h2 className="text-lg font-black text-slate-900 mb-1">Thêm tài khoản admin</h2>
-            <p className="text-sm text-slate-600 mb-3">
+            <h2 className="text-lg font-semibold text-foreground mb-1">Thêm tài khoản admin</h2>
+            <p className="text-sm text-muted-foreground mb-3">
               Shop: {addAdminShop.name} ({addAdminShop.code})
             </p>
-            <div className="flex gap-3 rounded-xl bg-blue-50/80 border border-blue-100 p-3 mb-4 text-xs text-slate-700">
-              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" aria-hidden />
+            <div className="flex gap-3 rounded-xl bg-muted/20 border border-border p-3 mb-4 text-xs text-foreground">
+              <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
               <p>
                 Tài khoản tạo ở đây được gán <strong>Admin</strong> trong DB. Nhân viên Sales thêm tại màn Nhân viên của shop.
               </p>
             </div>
 
-            <div className="mb-6 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Admin shop hiện có</p>
+            <div className="mb-6 p-4 rounded-xl bg-muted/20 border border-border">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Admin shop hiện có</p>
               {shopAdminsLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
               ) : shopAdmins.length === 0 ? (
-                <p className="text-sm text-slate-500">Chưa có admin nào.</p>
+                <p className="text-sm text-muted-foreground">Chưa có admin nào.</p>
               ) : (
                 <ul className="text-sm space-y-1">
                   {shopAdmins.map((m) => (
                     <li key={m.user_id}>
-                      {m.full_name} <span className="text-slate-500">(@{m.username})</span>
+                      {m.full_name} <span className="text-muted-foreground">(@{m.username})</span>
                     </li>
                   ))}
                 </ul>
@@ -920,7 +924,7 @@ export function SuperAdminShops() {
             <div className="mt-8 flex justify-end gap-3">
               <button
                 type="button"
-                className="px-5 py-3 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-100"
+                className="h-10 px-5 rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors"
                 onClick={() => {
                   setAddAdminShop(null);
                   setAddSuccess(null);
@@ -932,7 +936,7 @@ export function SuperAdminShops() {
                 type="button"
                 disabled={addAdminLoading}
                 onClick={submitAddAdmins}
-                className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2"
+                className="h-10 px-6 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 disabled:opacity-50 inline-flex items-center gap-2 transition-opacity"
               >
                 {addAdminLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Tạo tài khoản
@@ -943,11 +947,11 @@ export function SuperAdminShops() {
       )}
 
       {resetPw && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50" role="dialog">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border border-slate-100 relative">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-foreground/50" role="dialog">
+          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-8 border border-border relative">
             <button
               type="button"
-              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-slate-100 text-slate-400"
+              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
               onClick={() => setResetPw(null)}
               aria-label="Đóng"
             >
@@ -955,29 +959,29 @@ export function SuperAdminShops() {
             </button>
             <div className="flex items-center gap-2 mb-2">
               <KeyRound className="w-5 h-5 text-amber-700" />
-              <h2 className="text-lg font-black text-slate-900">Đặt lại mật khẩu admin shop</h2>
+              <h2 className="text-lg font-semibold text-foreground">Đặt lại mật khẩu admin shop</h2>
             </div>
-            <p className="text-sm text-slate-600 mb-4">
-              {resetPw.admin.full_name} <span className="text-slate-500">(@{resetPw.admin.username})</span>
+            <p className="text-sm text-muted-foreground mb-4">
+              {resetPw.admin.full_name} <span className="text-muted-foreground">(@{resetPw.admin.username})</span>
             </p>
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mật khẩu mới</label>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Mật khẩu mới</label>
                 <input
                   type="password"
                   autoComplete="new-password"
-                  className="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm"
+                  className="mt-1 w-full h-11 px-4 rounded-xl border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   value={resetPwNew}
                   onChange={(e) => setResetPwNew(e.target.value)}
                   placeholder="Tối thiểu 6 ký tự"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nhập lại</label>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Nhập lại</label>
                 <input
                   type="password"
                   autoComplete="new-password"
-                  className="mt-1 w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm"
+                  className="mt-1 w-full h-11 px-4 rounded-xl border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   value={resetPwConfirm}
                   onChange={(e) => setResetPwConfirm(e.target.value)}
                 />
@@ -986,7 +990,7 @@ export function SuperAdminShops() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                className="px-5 py-3 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-100"
+                className="h-10 px-5 rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors"
                 onClick={() => setResetPw(null)}
               >
                 Huỷ
@@ -995,7 +999,7 @@ export function SuperAdminShops() {
                 type="button"
                 disabled={resetPwLoading}
                 onClick={() => void submitResetPassword()}
-                className="px-6 py-3 rounded-2xl bg-amber-600 text-white text-sm font-black hover:bg-amber-700 disabled:opacity-50 inline-flex items-center gap-2"
+                className="h-10 px-6 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 disabled:opacity-50 inline-flex items-center gap-2 transition-opacity"
               >
                 {resetPwLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Lưu mật khẩu

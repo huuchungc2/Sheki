@@ -407,7 +407,7 @@ export function SalesReturnsList() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -416,11 +416,11 @@ export function SalesReturnsList() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 mx-auto text-red-400 mb-4" />
-          <p className="text-red-500 font-medium">{error}</p>
+          <AlertCircle className="w-12 h-12 mx-auto text-destructive/70 mb-4" />
+          <p className="text-destructive font-medium">{error}</p>
           <button
             onClick={fetchData}
-            className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold"
+            className="mt-4 inline-flex items-center h-10 px-4 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity"
           >
             Thử lại
           </button>
@@ -430,11 +430,11 @@ export function SalesReturnsList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Đơn hoàn</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Đơn hoàn</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Danh sách đơn hoàn liên quan đơn hàng của bạn (chỉ xem).
           </p>
         </div>
@@ -445,10 +445,10 @@ export function SalesReturnsList() {
               onClick={exportExcel}
               disabled={exporting}
               className={cn(
-                "inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-all",
+                "inline-flex items-center gap-2 h-10 px-3 rounded-md border text-sm font-semibold transition-colors",
                 exporting
-                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                  : "bg-white text-slate-700 border-slate-200 hover:border-emerald-200 hover:text-emerald-700"
+                  ? "bg-muted text-muted-foreground border-border cursor-not-allowed"
+                  : "bg-background text-foreground border-border hover:bg-accent"
               )}
               title="Xuất Excel theo bộ lọc hiện tại"
             >
@@ -456,7 +456,7 @@ export function SalesReturnsList() {
               Xuất Excel
             </button>
           )}
-          <button onClick={fetchData} className="text-sm font-semibold text-slate-500 hover:text-slate-700">
+          <button onClick={fetchData} className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
             Làm mới
           </button>
         </div>
@@ -468,10 +468,10 @@ export function SalesReturnsList() {
             type="button"
             onClick={() => setTab("returns")}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-sm font-semibold border",
+              "h-9 px-3 rounded-md text-sm font-semibold border transition-colors",
               tab === "returns"
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background text-foreground border-border hover:bg-accent"
             )}
           >
             Đơn hoàn
@@ -480,10 +480,10 @@ export function SalesReturnsList() {
             type="button"
             onClick={() => setTab("requests")}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-sm font-semibold border inline-flex items-center gap-2",
+              "h-9 px-3 rounded-md text-sm font-semibold border inline-flex items-center gap-2 transition-colors",
               tab === "requests"
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background text-foreground border-border hover:bg-accent"
             )}
           >
             <ShieldCheck className="w-4 h-4" />
@@ -494,27 +494,27 @@ export function SalesReturnsList() {
 
       {isAdmin && tab === "requests" && (
         <div className="space-y-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-slate-800">Tạo yêu cầu hoàn</p>
-              <span className="text-xs text-slate-400">Order ID (VD: 123)</span>
+              <p className="text-sm font-semibold text-foreground">Tạo yêu cầu hoàn</p>
+              <span className="text-xs text-muted-foreground">Order ID (VD: 123)</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-[160px_1fr_180px] gap-3 items-end">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Order ID</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Order ID</label>
                 <input
                   value={orderId}
                   onChange={(e) => setOrderId(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                  className="w-full h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   placeholder="123"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Lý do (tuỳ chọn)</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Lý do (tuỳ chọn)</label>
                 <input
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                  className="w-full h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   placeholder="Khách đổi size / lỗi sản phẩm..."
                 />
               </div>
@@ -522,10 +522,10 @@ export function SalesReturnsList() {
                 disabled={!orderId || creating}
                 onClick={loadOrderForRequest}
                 className={cn(
-                  "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all",
+                  "inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md text-sm font-semibold transition-colors",
                   !orderId || creating
-                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                    : "bg-primary text-primary-foreground hover:opacity-95 transition-opacity"
                 )}
               >
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -536,39 +536,39 @@ export function SalesReturnsList() {
 
           {showItemsModal && (
             <>
-              <div className="fixed inset-0 bg-black/30 z-40" onClick={() => !creating && setShowItemsModal(false)} />
+              <div className="fixed inset-0 bg-foreground/40 z-40" onClick={() => !creating && setShowItemsModal(false)} />
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div className="w-full max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
-                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="w-full max-w-2xl bg-card rounded-2xl border border-border shadow-2xl overflow-hidden">
+                  <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-bold text-slate-900">Chọn số lượng hoàn</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Đơn #{orderId}</p>
+                      <p className="text-sm font-semibold text-foreground">Chọn số lượng hoàn</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Đơn #{orderId}</p>
                     </div>
                     <button
                       onClick={() => !creating && setShowItemsModal(false)}
-                      className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                      className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
                     >
                       Đóng
                     </button>
                   </div>
                   <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
                     {orderItems.length === 0 ? (
-                      <div className="text-sm text-slate-400 text-center py-8">Không có sản phẩm</div>
+                      <div className="text-sm text-muted-foreground text-center py-8">Không có sản phẩm</div>
                     ) : (
                       orderItems.map((it: any) => (
                         <div
                           key={it.product_id}
-                          className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100"
+                          className="flex items-center justify-between gap-3 p-3 bg-muted/20 rounded-xl border border-border"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 truncate">{it.product_name}</p>
-                            <p className="text-[11px] text-slate-400 font-mono">{it.sku || `PID:${it.product_id}`}</p>
-                            <p className="text-xs text-slate-500 mt-0.5">
+                            <p className="text-sm font-semibold text-foreground truncate">{it.product_name}</p>
+                            <p className="text-[11px] text-muted-foreground font-mono">{it.sku || `PID:${it.product_id}`}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               Đã mua: <span className="font-semibold">{it.qty}</span>
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500">Hoàn</span>
+                            <span className="text-xs text-muted-foreground">Hoàn</span>
                             <input
                               type="number"
                               min={0}
@@ -579,25 +579,25 @@ export function SalesReturnsList() {
                                 const v = Math.max(0, Number(e.target.value || 0));
                                 setReturnQtyByProduct((prev) => ({ ...prev, [it.product_id]: v }));
                               }}
-                              className="w-28 px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 text-right"
+                              className="w-28 h-10 px-3 border border-input bg-background rounded-md text-sm font-semibold text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background text-right"
                             />
                           </div>
                         </div>
                       ))
                     )}
                   </div>
-                  <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                  <div className="px-5 py-4 border-t border-border flex items-center justify-end gap-2">
                     <button
                       onClick={() => setShowItemsModal(false)}
                       disabled={creating}
-                      className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      className="h-10 px-4 bg-background border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors disabled:opacity-50"
                     >
                       Hủy
                     </button>
                     <button
                       onClick={submitRequest}
                       disabled={creating}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2"
+                      className="h-10 px-4 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 inline-flex items-center gap-2"
                     >
                       {creating && <Loader2 className="w-4 h-4 animate-spin" />}
                       Tạo yêu cầu hoàn
@@ -608,43 +608,43 @@ export function SalesReturnsList() {
             </>
           )}
 
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <p className="text-sm font-bold text-slate-700">Yêu cầu hoàn</p>
-              <button onClick={fetchRequests} className="text-xs font-semibold text-slate-500 hover:text-slate-700">
+          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <p className="text-sm font-semibold text-foreground">Yêu cầu hoàn</p>
+              <button onClick={fetchRequests} className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
                 Làm mới
               </button>
             </div>
             {reqLoading ? (
               <div className="py-12 flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
             ) : reqError ? (
-              <div className="py-10 text-center text-sm text-rose-700">{reqError}</div>
+              <div className="py-10 text-center text-sm text-destructive">{reqError}</div>
             ) : requests.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 text-sm">Chưa có yêu cầu hoàn</div>
+              <div className="py-12 text-center text-muted-foreground text-sm">Chưa có yêu cầu hoàn</div>
             ) : (
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-border">
                 {requests.map((r) => (
-                  <div key={r.id} className="p-5 hover:bg-slate-50/50">
+                  <div key={r.id} className="p-5 hover:bg-muted/20 transition-colors">
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-900">
+                        <p className="text-sm font-semibold text-foreground">
                           Yêu cầu #{r.id} • {r.order_code}{" "}
-                          <span className="text-xs font-medium text-slate-400">({formatDate(r.created_at)})</span>
+                          <span className="text-xs font-medium text-muted-foreground">({formatDate(r.created_at)})</span>
                         </p>
-                        {r.reason && <p className="text-xs text-slate-500 mt-1">Lý do: {r.reason}</p>}
-                        {r.admin_note && <p className="text-xs text-emerald-700 mt-1">Admin: {r.admin_note}</p>}
+                        {r.reason && <p className="text-xs text-muted-foreground mt-1">Lý do: {r.reason}</p>}
+                        {r.admin_note && <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">Admin: {r.admin_note}</p>}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <span
                           className={cn(
-                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold",
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border",
                             r.status === "approved"
-                              ? "bg-emerald-50 text-emerald-700"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50"
                               : r.status === "rejected"
-                                ? "bg-rose-50 text-rose-700"
-                                : "bg-amber-50 text-amber-700"
+                                ? "bg-destructive/10 text-destructive border-destructive/30"
+                                : "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50"
                           )}
                         >
                           {r.status === "approved" ? (
@@ -667,7 +667,7 @@ export function SalesReturnsList() {
                               type="button"
                               disabled={reqActionId === r.id}
                               onClick={() => approve(r.id)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                              className="h-9 px-3 rounded-md text-xs font-semibold bg-primary text-primary-foreground hover:opacity-95 transition-opacity disabled:opacity-50"
                             >
                               {reqActionId === r.id ? "..." : "Duyệt"}
                             </button>
@@ -675,7 +675,7 @@ export function SalesReturnsList() {
                               type="button"
                               disabled={reqActionId === r.id}
                               onClick={() => reject(r.id)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-100 text-rose-700 hover:bg-rose-200 disabled:opacity-50"
+                              className="h-9 px-3 rounded-md text-xs font-semibold bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive/50 transition-colors disabled:opacity-50"
                             >
                               Từ chối
                             </button>
@@ -687,13 +687,13 @@ export function SalesReturnsList() {
                       {(r.items || []).map((it, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 text-xs"
+                          className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-xl border border-border text-xs"
                         >
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-700 truncate">{it.product_name}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">{it.sku}</p>
+                            <p className="font-semibold text-foreground truncate">{it.product_name}</p>
+                            <p className="text-[10px] text-muted-foreground font-mono">{it.sku}</p>
                           </div>
-                          <span className="font-bold text-slate-800">{it.qty}</span>
+                          <span className="font-bold text-foreground">{it.qty}</span>
                         </div>
                       ))}
                     </div>
@@ -708,11 +708,11 @@ export function SalesReturnsList() {
       {tab === "requests" ? null : (
         <>
           {/* Filter bar — y chang OrderList (bỏ status/nhóm/nhân viên) */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap gap-3">
           {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={searchInput}
@@ -723,7 +723,7 @@ export function SalesReturnsList() {
                 setSearchInput((e.target as HTMLInputElement).value);
               }}
               placeholder="Mã đơn, ghi chú..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 focus:bg-white focus:ring-2 focus:ring-red-100 rounded-xl text-sm outline-none transition-all"
+              className="w-full h-10 pl-9 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
           </div>
 
@@ -732,22 +732,22 @@ export function SalesReturnsList() {
             <button
               type="button"
               onClick={() => setShowDateMenu(!showDateMenu)}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 hover:border-red-300 rounded-xl text-sm font-medium text-slate-700 transition-all min-w-[140px] justify-between"
+              className="flex items-center gap-2 h-10 px-3 bg-background border border-input rounded-md text-sm font-semibold text-foreground transition-colors min-w-[140px] justify-between focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <Calendar className="w-4 h-4 text-slate-400" />
+              <Calendar className="w-4 h-4 text-muted-foreground" />
               <span>{datePreset ? presetLabels[datePreset] : "Chọn thời gian"}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
             {showDateMenu && (
-              <div className="absolute top-full left-0 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute top-full left-0 mt-1 w-52 bg-popover text-popover-foreground border border-border rounded-xl shadow-xl z-50 overflow-hidden">
                 {(["today", "week", "month", "last_month", "last_year", "custom"] as DatePreset[]).map((p) => (
                   <button
                     key={p}
                     type="button"
                     onClick={() => applyPreset(p)}
                     className={cn(
-                      "w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors",
-                      datePreset === p ? "bg-red-50 text-red-600 font-semibold" : "text-slate-700"
+                      "w-full px-4 py-2.5 text-left text-sm hover:bg-accent transition-colors",
+                      datePreset === p ? "bg-accent text-accent-foreground font-semibold" : "text-foreground"
                     )}
                   >
                     {presetLabels[p]}
@@ -761,7 +761,7 @@ export function SalesReturnsList() {
           <select
             value={groupId}
             onChange={(e) => patchListParams({ group_id: e.target.value || null }, { resetPage: true })}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 hover:border-red-300 rounded-xl text-sm font-medium text-slate-700 transition-all min-w-[140px]"
+            className="h-10 px-3 bg-background border border-input rounded-md text-sm font-semibold text-foreground transition-colors min-w-[140px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả nhóm</option>
             {groups.map((g) => (
@@ -780,16 +780,16 @@ export function SalesReturnsList() {
                 onChange={(e) => {
                   patchListParams({ from: e.target.value, preset: "custom" }, { resetPage: true });
                 }}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-100"
+                className="h-10 px-3 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               />
-              <span className="text-slate-400 text-xs">–</span>
+              <span className="text-muted-foreground text-xs">–</span>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => {
                   patchListParams({ to: e.target.value, preset: "custom" }, { resetPage: true });
                 }}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-red-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-red-100"
+                className="h-10 px-3 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               />
             </div>
           )}
@@ -801,7 +801,7 @@ export function SalesReturnsList() {
               onClick={() => {
                 setSearchParams(new URLSearchParams(), { replace: true });
               }}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-xl hover:text-red-600 hover:border-red-200 transition-all"
+              className="flex items-center gap-1.5 h-10 px-3 text-xs font-semibold text-muted-foreground bg-background border border-border rounded-md hover:bg-accent transition-colors"
             >
               <X className="w-3.5 h-3.5" />
               Xóa lọc
@@ -811,70 +811,70 @@ export function SalesReturnsList() {
 
         {/* Hiển thị range ngày đang áp dụng */}
         {(dateFrom || dateTo) && datePreset !== "custom" && (
-          <p className="text-xs text-slate-400">
-            Đang lọc: <span className="font-semibold text-slate-600">{dateFrom || "..."} → {dateTo || "..."}</span>
+          <p className="text-xs text-muted-foreground">
+            Đang lọc: <span className="font-semibold text-foreground">{dateFrom || "..."} → {dateTo || "..."}</span>
           </p>
         )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Tổng số đơn hoàn</p>
-            <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center">
-              <Package className="w-5 h-5 text-rose-600" />
+            <p className="text-xs font-semibold text-muted-foreground">Tổng số đơn hoàn</p>
+            <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <Package className="w-5 h-5 text-destructive" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">{total || 0}</p>
-          <p className="mt-1 text-xs text-slate-500">Tổng số đơn hoàn theo bộ lọc hiện tại.</p>
+          <p className="mt-3 text-2xl font-semibold text-foreground tabular-nums">{total || 0}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Tổng số đơn hoàn theo bộ lọc hiện tại.</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Tổng doanh số hoàn</p>
-            <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-rose-600" />
+            <p className="text-xs font-semibold text-muted-foreground">Tổng doanh số hoàn</p>
+            <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-destructive" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-extrabold text-rose-700 tabular-nums">
+          <p className="mt-3 text-2xl font-semibold text-destructive tabular-nums">
             {formatCurrency(-Math.abs(totals.totalReturnAmount))}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Tổng giá trị hàng hoàn (sau CK dòng), không gồm ship.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Tổng giá trị hàng hoàn (sau CK dòng), không gồm ship.</p>
         </div>
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500">Tổng hoa hồng hoàn</p>
-            <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center">
-              <TrendingDown className="w-5 h-5 text-rose-600" />
+            <p className="text-xs font-semibold text-muted-foreground">Tổng hoa hồng hoàn</p>
+            <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <TrendingDown className="w-5 h-5 text-destructive" />
             </div>
           </div>
-          <p className="mt-3 text-2xl font-extrabold text-rose-700 tabular-nums">
+          <p className="mt-3 text-2xl font-semibold text-destructive tabular-nums">
             {formatCurrency(-Math.abs(totals.totalCommissionReturnAbs))}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Tổng hoa hồng bị trừ do hoàn hàng.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Tổng hoa hồng bị trừ do hoàn hàng.</p>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
         {rows.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 text-sm">
-            <Package className="w-10 h-10 mx-auto mb-2 text-slate-200" />
+          <div className="py-16 text-center text-muted-foreground text-sm">
+            <Package className="w-10 h-10 mx-auto mb-2 text-muted-foreground/50" />
             Chưa có đơn hoàn nào
           </div>
         ) : (
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-border">
             {rows.map((r) => (
-              <div key={r.id} className="p-5 hover:bg-slate-50/50">
+              <div key={r.id} className="p-5 hover:bg-muted/20 transition-colors">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">
+                    <p className="text-sm font-semibold text-foreground">
                       Đơn hoàn #{r.id}{" "}
-                      <span className="text-xs font-medium text-slate-400">
+                      <span className="text-xs font-medium text-muted-foreground">
                         ({formatDate(r.created_at)})
                       </span>
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Đơn gốc:{" "}
-                      <span className="font-mono font-semibold text-slate-700">{r.order_code}</span>
+                      <span className="font-mono font-semibold text-foreground">{r.order_code}</span>
                       {r.warehouse_name ? (
                         <> • Kho nhập: <span className="font-semibold">{r.warehouse_name}</span></>
                       ) : null}
@@ -882,19 +882,19 @@ export function SalesReturnsList() {
                         <> • Xử lý: <span className="font-semibold">{r.created_by_name}</span></>
                       ) : null}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Doanh số hoàn:{" "}
-                      <span className="font-extrabold text-rose-700 tabular-nums">
+                      <span className="font-semibold text-destructive tabular-nums">
                         {formatCurrency(-Math.abs(Number(r.return_amount) || 0))}
                       </span>
                       {" "}•{" "}
                       HH hoàn:{" "}
-                      <span className="font-extrabold text-rose-700 tabular-nums">
+                      <span className="font-semibold text-destructive tabular-nums">
                         {formatCurrency(-Math.abs(Number(r.commission_return_amount) || 0))}
                       </span>
                     </p>
                     {r.note && (
-                      <p className="text-xs text-slate-500 mt-1">Ghi chú: {r.note}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Ghi chú: {r.note}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 justify-end">
@@ -906,8 +906,8 @@ export function SalesReturnsList() {
                         className={cn(
                           "text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all",
                           deleteId === r.id
-                            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                            : "bg-white text-rose-700 border-rose-200 hover:bg-rose-50"
+                            ? "bg-muted text-muted-foreground border-border cursor-not-allowed"
+                            : "bg-background text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive/50 transition-colors"
                         )}
                         title="Xóa đơn hoàn (rollback kho + hoa hồng)"
                       >
@@ -916,7 +916,7 @@ export function SalesReturnsList() {
                     )}
                     <Link
                       to={`/orders/edit/${r.order_id}`}
-                      className="text-xs font-semibold text-blue-600 hover:underline inline-flex items-center gap-1 shrink-0"
+                      className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 shrink-0"
                     >
                       Xem đơn gốc <ArrowRight className="w-3 h-3" />
                     </Link>
@@ -927,14 +927,14 @@ export function SalesReturnsList() {
                     <div
                       key={idx}
                       className={cn(
-                        "flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 text-xs"
+                        "flex items-center justify-between px-3 py-2 bg-muted/20 rounded-xl border border-border text-xs"
                       )}
                     >
                       <div className="min-w-0">
-                        <p className="font-semibold text-slate-700 truncate">{it.product_name}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">{it.sku}</p>
+                        <p className="font-semibold text-foreground truncate">{it.product_name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{it.sku}</p>
                       </div>
-                      <span className="font-bold text-slate-800">{it.qty}</span>
+                      <span className="font-bold text-foreground">{it.qty}</span>
                     </div>
                   ))}
                 </div>
@@ -946,9 +946,9 @@ export function SalesReturnsList() {
 
       {total > limit && (
         <div className="flex items-center justify-between">
-          <p className="text-xs text-slate-500">
-            Tổng: <span className="font-bold text-slate-700">{total}</span> • Trang{" "}
-            <span className="font-bold text-slate-700">{page}</span>
+          <p className="text-xs text-muted-foreground">
+            Tổng: <span className="font-semibold text-foreground">{total}</span> • Trang{" "}
+            <span className="font-semibold text-foreground">{page}</span>
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -956,8 +956,8 @@ export function SalesReturnsList() {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
               className={cn(
-                "px-3 py-2 rounded-xl border text-sm font-semibold inline-flex items-center gap-1",
-                page <= 1 ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                "h-10 px-3 rounded-md border text-sm font-semibold inline-flex items-center gap-1 transition-colors",
+                page <= 1 ? "bg-muted text-muted-foreground border-border cursor-not-allowed" : "bg-background text-foreground border-border hover:bg-accent"
               )}
             >
               <ChevronLeft className="w-4 h-4" />
@@ -971,8 +971,8 @@ export function SalesReturnsList() {
                   type="button"
                   onClick={() => setPage(p)}
                   className={cn(
-                    "w-9 h-9 rounded-xl text-sm font-semibold border",
-                    p === page ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    "w-9 h-9 rounded-md text-sm font-semibold border transition-colors",
+                    p === page ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border-border hover:bg-accent"
                   )}
                 >
                   {p}
@@ -985,10 +985,10 @@ export function SalesReturnsList() {
               onClick={() => setPage((p) => p + 1)}
               disabled={page >= Math.ceil(total / limit)}
               className={cn(
-                "px-3 py-2 rounded-xl border text-sm font-semibold inline-flex items-center gap-1",
+                "h-10 px-3 rounded-md border text-sm font-semibold inline-flex items-center gap-1 transition-colors",
                 page >= Math.ceil(total / limit)
-                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                  ? "bg-muted text-muted-foreground border-border cursor-not-allowed"
+                  : "bg-background text-foreground border-border hover:bg-accent"
               )}
             >
               Sau

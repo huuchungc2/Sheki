@@ -8,7 +8,6 @@ export function SuperAdminRecovery() {
   const [username, setUsername] = React.useState("superadmin");
   const [newPassword, setNewPassword] = React.useState("");
   const [confirm, setConfirm] = React.useState("");
-  const [resetKey, setResetKey] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [ok, setOk] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -25,28 +24,9 @@ export function SuperAdminRecovery() {
       setError("Mật khẩu tối thiểu 6 ký tự");
       return;
     }
-    if (!resetKey.trim()) {
-      setError("Nhập mã khôi phục (SUPERADMIN_RESET_KEY trong backend/.env)");
-      return;
-    }
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/auth/super-admin-recovery`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: username.trim(),
-          newPassword,
-          resetKey: resetKey.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Thất bại");
-        return;
-      }
-      setOk(data.message || "Đã đặt lại mật khẩu.");
-      setTimeout(() => navigate("/login"), 2000);
+      setOk("Trang này không còn dùng reset key. Vui lòng reset bằng script trên máy có MySQL.");
     } catch {
       setError("Lỗi kết nối server");
     } finally {
@@ -55,99 +35,96 @@ export function SuperAdminRecovery() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-8 space-y-6">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate("/login")}
-            className="p-2 rounded-xl hover:bg-slate-100 text-slate-500"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-xl font-black text-slate-900">Khôi phục Super Admin</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Cần mã <code className="text-xs bg-slate-100 px-1 rounded">SUPERADMIN_RESET_KEY</code> trong{" "}
-              <code className="text-xs bg-slate-100 px-1 rounded">backend/.env</code>
-            </p>
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-card rounded-xl border border-border shadow-sm">
+        <div className="p-6 border-b border-border">
+          <div className="flex items-start gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/login")}
+              className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Về đăng nhập"
+            >
+              <ArrowLeft className="w-4 h-4 mx-auto" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight">Khôi phục Super Admin</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Đặt lại mật khẩu bằng script chạy trên máy có MySQL.
+              </p>
+            </div>
           </div>
         </div>
 
-        {error && (
-          <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-2 text-red-600 text-sm font-medium">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            {error}
-          </div>
-        )}
-        {ok && (
-          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-700 text-sm font-medium">
-            {ok} Đang chuyển về đăng nhập…
-          </div>
-        )}
+        <div className="p-6 space-y-5">
+          {error && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span className="min-w-0">{error}</span>
+            </div>
+          )}
+          {ok && (
+            <div className="rounded-lg border border-border bg-accent text-accent-foreground px-4 py-3 text-sm">
+              {ok} Đang chuyển về đăng nhập…
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Username super admin</label>
-            <input
-              type="text"
-              className="mt-1 w-full px-4 py-3 bg-slate-50 border border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 outline-none"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Mã khôi phục (reset key)</label>
-            <input
-              type="password"
-              className="mt-1 w-full px-4 py-3 bg-slate-50 border border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 outline-none"
-              value={resetKey}
-              onChange={(e) => setResetKey(e.target.value)}
-              placeholder="Giá trị SUPERADMIN_RESET_KEY"
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Mật khẩu mới</label>
-            <input
-              type="password"
-              className="mt-1 w-full px-4 py-3 bg-slate-50 border border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 outline-none"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              minLength={6}
-              autoComplete="new-password"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nhập lại mật khẩu</label>
-            <input
-              type="password"
-              className="mt-1 w-full px-4 py-3 bg-slate-50 border border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 outline-none"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              autoComplete="new-password"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
-            Đặt lại mật khẩu
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Username Super Admin</label>
+              <input
+                type="text"
+                className="h-10 w-full px-3 rounded-md bg-background text-foreground text-sm border border-input outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Mật khẩu mới</label>
+              <input
+                type="password"
+                className="h-10 w-full px-3 rounded-md bg-background text-foreground text-sm border border-input outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={6}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Nhập lại mật khẩu</label>
+              <input
+                type="password"
+                className="h-10 w-full px-3 rounded-md bg-background text-foreground text-sm border border-input outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
 
-        <p className="text-xs text-slate-400 text-center">
-          Không có server key? Chạy trên máy có MySQL:{" "}
-          <code className="bg-slate-100 px-1 rounded">node backend/scripts/resetSuperAdminPassword.js &lt;mật_mới&gt;</code>
-        </p>
-        <p className="text-center text-sm">
-          <Link to="/login" className="text-blue-600 font-bold hover:underline">
-            Về đăng nhập
-          </Link>
-        </p>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+              Đặt lại mật khẩu
+            </button>
+          </form>
+
+          <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground">Reset trên máy có MySQL</p>
+            <p>
+              Chạy:
+              <code className="bg-muted px-1 rounded ml-1">node backend/scripts/resetSuperAdminPassword.js &lt;mật_mới&gt; [username]</code>
+            </p>
+          </div>
+          <p className="text-center text-sm">
+            <Link to="/login" className="text-primary font-semibold hover:underline">
+              Về đăng nhập
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

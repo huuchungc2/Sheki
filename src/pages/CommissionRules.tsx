@@ -170,14 +170,14 @@ export default function CommissionRules() {
   // formatCtvRate moved to src/lib/commissionUtils
 
   if (loading) {
-    return <div className="text-center py-12 text-slate-400">Đang tải...</div>;
+    return <div className="text-center py-12 text-muted-foreground">Đang tải...</div>;
   }
 
   return (
-    <div>
+    <div className="space-y-6 min-w-0">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Quy tắc hoa hồng</h1>
-        <p className="text-sm text-slate-500 mt-1">Quản lý mức hoa hồng Sale quản lý hưởng từ CTV</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Quy tắc hoa hồng</h1>
+        <p className="text-sm text-muted-foreground mt-1">Quản lý mức hoa hồng Sale quản lý hưởng từ CTV</p>
       </div>
 
       {/* Tabs */}
@@ -185,8 +185,10 @@ export default function CommissionRules() {
         <button
           onClick={() => setActiveTab("tiers")}
           className={cn(
-            "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-            activeTab === "tiers" ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+            "h-10 px-4 rounded-md text-sm font-semibold transition-colors border",
+            activeTab === "tiers"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-foreground border-border hover:bg-accent"
           )}
         >
           <Percent className="w-4 h-4 inline mr-2" />
@@ -195,8 +197,10 @@ export default function CommissionRules() {
         <button
           onClick={() => setActiveTab("collaborators")}
           className={cn(
-            "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-            activeTab === "collaborators" ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+            "h-10 px-4 rounded-md text-sm font-semibold transition-colors border",
+            activeTab === "collaborators"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-foreground border-border hover:bg-accent"
           )}
         >
           <Users className="w-4 h-4 inline mr-2" />
@@ -207,10 +211,10 @@ export default function CommissionRules() {
       {activeTab === "tiers" && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Bảng mức hoa hồng</h2>
+            <h2 className="text-lg font-semibold text-foreground">Bảng mức hoa hồng</h2>
             <button
               onClick={() => openTierForm()}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-all"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity"
             >
               <Plus className="w-4 h-4" />
               Thêm mức
@@ -219,60 +223,60 @@ export default function CommissionRules() {
 
           {/* Tier form */}
           {showTierForm && (
-            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
-              <h3 className="text-sm font-semibold text-slate-900 mb-3">
+            <div className="bg-card rounded-xl border border-border p-4 mb-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">
                 {editingTier ? "Sửa mức hoa hồng" : "Thêm mức hoa hồng mới"}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Hoa hồng CTV từ (%)</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Hoa hồng CTV từ (%)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={tierForm.ctv_rate_min}
                     onChange={(e) => setTierForm({ ...tierForm, ctv_rate_min: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    className="w-full h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     placeholder="VD: 10"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Đến (%) — để trống nếu không giới hạn</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Đến (%) — để trống nếu không giới hạn</label>
                   <input
                     type="number"
                     step="0.01"
                     value={tierForm.ctv_rate_max}
                     onChange={(e) => setTierForm({ ...tierForm, ctv_rate_max: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    className="w-full h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     placeholder="VD: 15"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Sale hưởng (%)</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Sale hưởng (%)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={tierForm.sales_override_rate}
                     onChange={(e) => setTierForm({ ...tierForm, sales_override_rate: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    className="w-full h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     placeholder="VD: 3"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Ghi chú</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Ghi chú</label>
                   <input
                     type="text"
                     value={tierForm.note}
                     onChange={(e) => setTierForm({ ...tierForm, note: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    className="w-full h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     placeholder="VD: CTV cao cấp"
                   />
                 </div>
               </div>
               <div className="flex gap-2 mt-3 justify-end">
-                <button onClick={() => { setShowTierForm(false); resetTierForm(); }} className="flex items-center gap-1 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
+                <button onClick={() => { setShowTierForm(false); resetTierForm(); }} className="inline-flex items-center gap-1 h-10 px-4 text-sm font-semibold text-foreground hover:bg-accent border border-border rounded-md transition-colors">
                   <X className="w-4 h-4" /> Hủy
                 </button>
-                <button onClick={saveTier} className="flex items-center gap-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all">
+                <button onClick={saveTier} className="inline-flex items-center gap-1 h-10 px-4 text-sm font-semibold bg-primary text-primary-foreground rounded-md hover:opacity-95 transition-opacity">
                   <Save className="w-4 h-4" /> Lưu
                 </button>
               </div>
@@ -281,40 +285,40 @@ export default function CommissionRules() {
 
           {/* Tiers table */}
           {tiers.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+            <div className="bg-card rounded-xl border border-border p-8 text-center text-muted-foreground">
               Chưa có quy tắc nào. Nhấn "Thêm mức" để bắt đầu.
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Mức hoa hồng CTV</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Sale quản lý hưởng</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Ghi chú</th>
-                    <th className="text-right px-4 py-3 font-semibold text-slate-600">Thao tác</th>
+                  <tr className="bg-muted/30 border-b border-border">
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Mức hoa hồng CTV</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Sale quản lý hưởng</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Ghi chú</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tiers.map((tier) => (
-                    <tr key={tier.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={tier.id} className="border-b border-border hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium text-xs">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground font-medium text-xs border border-border">
                         {formatCtvRate(tier.ctv_rate_min, tier.ctv_rate_max)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-green-50 text-green-700 font-medium text-xs">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-accent text-accent-foreground font-medium text-xs border border-border">
                           {tier.sales_override_rate}%
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-500">{tier.note || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{tier.note || "—"}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex gap-1 justify-end">
-                          <button onClick={() => openTierForm(tier)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all">
+                          <button onClick={() => openTierForm(tier)} className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => deleteTier(tier.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all">
+                          <button onClick={() => deleteTier(tier.id)} className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -327,10 +331,10 @@ export default function CommissionRules() {
           )}
 
           {/* Example */}
-          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="mt-4 bg-muted/20 border border-border rounded-xl p-4">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-              <div className="text-sm text-amber-800">
+              <AlertCircle className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="text-sm text-foreground">
                 <p className="font-semibold mb-1">Ví dụ cách tính:</p>
                 <p>CTV Lan có hoa hồng 10% trên đơn hàng 1.000.000đ → Lan hưởng 100.000đ.</p>
                 <p>Nếu Sale A quản lý Lan và tier ≥10% → Sale hưởng 3% trên 100.000đ = <strong>3.000đ</strong>.</p>
@@ -343,18 +347,18 @@ export default function CommissionRules() {
       {activeTab === "collaborators" && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Gán CTV cho Sale quản lý</h2>
+            <h2 className="text-lg font-semibold text-foreground">Gán CTV cho Sale quản lý</h2>
           </div>
 
           {/* Add collaborator form */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+          <div className="bg-card rounded-xl border border-border p-4 mb-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Sale quản lý</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Sale quản lý</label>
                 <select
                   value={selectedSalesId}
                   onChange={(e) => handleSalesChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  className="w-full h-10 px-3 border border-input bg-background rounded-md text-sm font-semibold text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <option value="">-- Chọn Sale --</option>
                   {salesUsers.map((u) => (
@@ -363,12 +367,12 @@ export default function CommissionRules() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Cộng tác viên</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Cộng tác viên</label>
                 <select
                   value={selectedCtvId}
                   onChange={(e) => setSelectedCtvId(e.target.value)}
                   disabled={!selectedSalesId}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                  className="w-full h-10 px-3 border border-input bg-background rounded-md text-sm font-semibold text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:bg-muted disabled:text-muted-foreground"
                 >
                   <option value="">-- Chọn CTV --</option>
                   {availableCtvs.map((u) => (
@@ -380,7 +384,7 @@ export default function CommissionRules() {
                 <button
                   onClick={addCollaborator}
                   disabled={!selectedSalesId || !selectedCtvId}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-2 h-10 px-3 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
                   Gán CTV
@@ -388,7 +392,7 @@ export default function CommissionRules() {
               </div>
             </div>
             {collabError && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+              <p className="mt-2 text-sm text-destructive flex items-center gap-1">
                 <AlertCircle className="w-4 h-4" /> {collabError}
               </p>
             )}
@@ -396,40 +400,40 @@ export default function CommissionRules() {
 
           {/* Collaborators table */}
           {collaborators.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+            <div className="bg-card rounded-xl border border-border p-8 text-center text-muted-foreground">
               Chưa có CTV nào được gán.
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Sale quản lý</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Cộng tác viên</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">SĐT CTV</th>
-                    <th className="text-right px-4 py-3 font-semibold text-slate-600">Thao tác</th>
+                  <tr className="bg-muted/30 border-b border-border">
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Sale quản lý</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Cộng tác viên</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">SĐT CTV</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {collaborators.map((c) => (
-                    <tr key={`${c.sales_id}-${c.ctv_id}`} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={`${c.sales_id}-${c.ctv_id}`} className="border-b border-border hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
                         <div>
-                          <p className="font-medium text-slate-900">{c.sales_name}</p>
-                          <p className="text-xs text-slate-400">{c.sales_email}</p>
+                          <p className="font-medium text-foreground">{c.sales_name}</p>
+                          <p className="text-xs text-muted-foreground">{c.sales_email}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <div>
-                          <p className="font-medium text-slate-900">{c.ctv_name}</p>
-                          <p className="text-xs text-slate-400">{c.ctv_email}</p>
+                          <p className="font-medium text-foreground">{c.ctv_name}</p>
+                          <p className="text-xs text-muted-foreground">{c.ctv_email}</p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-slate-500">{c.ctv_phone || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{c.ctv_phone || "—"}</td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => removeCollaborator(c.sales_id, c.ctv_id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                          className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

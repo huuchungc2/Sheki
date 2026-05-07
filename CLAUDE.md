@@ -129,3 +129,35 @@ Thêm dòng theo format:
 ```
 
 **KHÔNG được kết thúc mà thiếu 3 bước trên.**
+
+---
+
+## 🎨 QUY TẮC MÀU SẮC — BẮT BUỘC
+
+### ⚠️ DESIGN.md — CHỈ tham khảo spacing / radius / typography
+`DESIGN.md` là spec của Linear marketing site (dark-only, không có light mode).
+**TUYỆT ĐỐI KHÔNG dùng colors từ DESIGN.md, không tạo object `ds` theo DESIGN.md.**
+Design system màu sắc chính thức của ERP Sheki là `src/index.css`.
+
+### KHÔNG ĐƯỢC làm
+- Tạo object `ds = { canvas: "bg-[#010102]", ... }` với hex cố định
+- Dùng hardcode hex bất kỳ: `bg-[#0f1011]`, `text-[#f7f8f8]`, `border-[#23252a]`...
+- Dùng `bg-white`, `bg-black`, `bg-slate-*`, `bg-zinc-*`, `bg-gray-*`, `text-slate-*`
+
+### PHẢI làm — Tailwind semantic tokens từ index.css
+
+| Mục đích | Token |
+|---|---|
+| Surface chính | `bg-background` |
+| Card / panel | `bg-card` / `text-card-foreground` |
+| Popover / dropdown | `bg-popover` / `text-popover-foreground` |
+| Subtle / muted | `bg-muted` / `text-muted-foreground` |
+| Text chính | `text-foreground` |
+| Border | `border-border` / `border-input` |
+| Brand primary | `bg-primary` / `text-primary` / `text-primary-foreground` |
+| Accent | `bg-accent` / `text-accent-foreground` |
+| Destructive | `bg-destructive` / `text-destructive-foreground` |
+
+### Ngoại lệ duy nhất
+POS / quầy thu ngân (`CounterSale.tsx`) → thêm class `dark` vào div wrapper ngoài
+cùng để giữ dark cố định. Bên trong vẫn dùng semantic tokens như bảng trên.

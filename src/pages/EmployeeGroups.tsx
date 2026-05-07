@@ -37,48 +37,48 @@ export function EmployeeGroups() {
   }, [fetchGroups]);
 
   return (
-    <div className="min-h-screen bg-slate-50 -m-8 p-8">
+    <div className="min-h-screen bg-background -m-8 p-8">
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Nhóm nhân viên</h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">Quản lý nhóm để phân quyền theo phạm vi “Nhóm”.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Nhóm nhân viên</h1>
+          <p className="text-sm text-muted-foreground font-medium mt-1">Quản lý nhóm để phân quyền theo phạm vi “Nhóm”.</p>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold">
+        <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-xl flex items-center gap-3 text-destructive text-sm font-semibold">
           <AlertCircle className="w-5 h-5 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
+        <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-700 text-sm font-semibold dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300">
           <CheckCircle2 className="w-5 h-5 shrink-0" /> Thao tác thành công!
         </div>
       )}
 
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-slate-500 font-medium">Đang tải...</div>
+        <div className="bg-card rounded-xl border border-border p-10 text-muted-foreground font-medium">Đang tải...</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-6">
-            <h2 className="text-lg font-black text-slate-900 mb-4">{editingGroup ? "Sửa nhóm" : "Thêm nhóm mới"}</h2>
+          <div className="lg:col-span-5 bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">{editingGroup ? "Sửa nhóm" : "Thêm nhóm mới"}</h2>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-slate-600">Tên nhóm *</label>
+                <label className="text-xs font-semibold text-muted-foreground">Tên nhóm *</label>
                 <input
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                  className="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   placeholder="VD: CSKH, KHO, SALES..."
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-600">Mô tả</label>
+                <label className="text-xs font-semibold text-muted-foreground">Mô tả</label>
                 <textarea
                   value={groupDesc}
                   onChange={(e) => setGroupDesc(e.target.value)}
                   rows={3}
-                  className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none resize-none"
+                  className="mt-1 w-full px-3 py-2 rounded-md border border-input bg-background text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-none"
                   placeholder="Mô tả nhóm..."
                 />
               </div>
@@ -111,7 +111,7 @@ export function EmployeeGroups() {
                       setSaving(false);
                     }
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 hover:opacity-95 transition-opacity"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   {editingGroup ? "Cập nhật" : "Tạo nhóm"}
@@ -123,7 +123,7 @@ export function EmployeeGroups() {
                       setGroupName("");
                       setGroupDesc("");
                     }}
-                    className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold"
+                    className="h-10 px-4 rounded-md border border-border bg-background text-sm font-semibold text-foreground hover:bg-accent transition-colors"
                   >
                     Hủy
                   </button>
@@ -132,17 +132,17 @@ export function EmployeeGroups() {
             </div>
           </div>
 
-          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6">
-            <h2 className="text-lg font-black text-slate-900 mb-4">Danh sách nhóm ({groups.length})</h2>
+          <div className="lg:col-span-7 bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Danh sách nhóm ({groups.length})</h2>
             {groups.length === 0 ? (
-              <div className="text-sm text-slate-500">Chưa có nhóm nào</div>
+              <div className="text-sm text-muted-foreground">Chưa có nhóm nào</div>
             ) : (
               <div className="space-y-2">
                 {groups.map((g) => (
-                  <div key={g.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50">
+                  <div key={g.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-muted/20">
                     <div>
-                      <div className="text-sm font-bold text-slate-900">{g.name}</div>
-                      {g.description ? <div className="text-xs text-slate-500 mt-0.5">{g.description}</div> : null}
+                      <div className="text-sm font-semibold text-foreground">{g.name}</div>
+                      {g.description ? <div className="text-xs text-muted-foreground mt-0.5">{g.description}</div> : null}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -151,7 +151,7 @@ export function EmployeeGroups() {
                           setGroupName(g.name || "");
                           setGroupDesc(g.description || "");
                         }}
-                        className="p-2 rounded-lg text-slate-500 hover:bg-white border border-transparent hover:border-slate-200"
+                        className="p-2 rounded-lg text-muted-foreground hover:bg-accent border border-transparent hover:border-border transition-colors"
                         title="Sửa"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -177,7 +177,7 @@ export function EmployeeGroups() {
                             setSaving(false);
                           }
                         }}
-                        className="p-2 rounded-lg text-slate-500 hover:bg-white border border-transparent hover:border-slate-200"
+                        className="p-2 rounded-lg text-muted-foreground hover:bg-destructive hover:text-destructive-foreground border border-transparent hover:border-destructive/40 transition-colors"
                         title="Xóa"
                       >
                         <Trash2 className="w-4 h-4" />

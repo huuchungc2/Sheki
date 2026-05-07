@@ -29,10 +29,10 @@ const API_URL =
   "/api";
 
 const tierColors: Record<string, string> = {
-  Silver: "bg-slate-100 text-slate-600",
-  Gold: "bg-amber-100 text-amber-700",
-  Platinum: "bg-blue-100 text-blue-700",
-  Diamond: "bg-indigo-100 text-indigo-700",
+  Silver: "bg-muted text-muted-foreground border border-border",
+  Gold: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50",
+  Platinum: "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900/50",
+  Diamond: "bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-900/50",
 };
 
 function getAuthToken(): string | null {
@@ -212,19 +212,19 @@ export function CustomerList() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Quản lý khách hàng</h1>
-          <p className="text-slate-500 text-sm mt-1">Theo dõi hành vi mua sắm và hạng thành viên.</p>
+          <h1 className="text-xl font-semibold tracking-tight">Quản lý khách hàng</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Theo dõi hành vi mua sắm và hạng thành viên.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+          <button onClick={handleExport} className="flex items-center gap-2 h-10 px-4 bg-background border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors">
             <Download className="w-4 h-4" />
             Xuất dữ liệu
           </button>
-          <Link to="/customers/import" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+          <Link to="/customers/import" className="flex items-center gap-2 h-10 px-4 bg-background border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors">
             <Upload className="w-4 h-4" />
             Nhập hàng loạt
           </Link>
-          <Link to="/customers/new" state={{ customersListReturn }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
+          <Link to="/customers/new" state={{ customersListReturn }} className="flex items-center gap-2 h-10 px-4 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity">
             <Plus className="w-4 h-4" />
             Thêm khách hàng
           </Link>
@@ -232,27 +232,27 @@ export function CustomerList() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng khách hàng</p>
-          <p className="text-xl font-bold text-slate-900 mt-2">{total.toLocaleString()}</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng khách hàng</p>
+          <p className="text-xl font-semibold text-foreground mt-2 tabular-nums">{total.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Khách hàng mới (Tháng)</p>
-          <p className="text-xl font-bold text-blue-600 mt-2">—</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Khách hàng mới (Tháng)</p>
+          <p className="text-xl font-semibold text-foreground mt-2">—</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tỷ lệ quay lại</p>
-          <p className="text-xl font-bold text-emerald-600 mt-2">—</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tỷ lệ quay lại</p>
+          <p className="text-xl font-semibold text-foreground mt-2">—</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hạng Diamond</p>
-          <p className="text-xl font-bold text-indigo-600 mt-2">{customers.filter((c: any) => c.tier === "Diamond").length}</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Hạng Diamond</p>
+          <p className="text-xl font-semibold text-foreground mt-2 tabular-nums">{customers.filter((c: any) => c.tier === "Diamond").length}</p>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="bg-card p-4 rounded-lg border border-border flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             value={searchInput}
@@ -263,18 +263,18 @@ export function CustomerList() {
               setSearchInput((e.target as HTMLInputElement).value);
             }}
             placeholder="Tìm theo tên, SĐT, email..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+            className="w-full h-10 pl-9 pr-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-100 transition-all">
+          <button className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 bg-background border border-border text-foreground rounded-md text-sm font-semibold hover:bg-accent transition-colors">
             <Filter className="w-4 h-4" />
             Bộ lọc
           </button>
           <select
             value={tier}
             onChange={(e) => { patchListParams({ tier: e.target.value || null }, { resetPage: true }); }}
-            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1 md:flex-none h-10 px-3 bg-background border border-input text-foreground rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả hạng</option>
             <option value="Diamond">Diamond</option>
@@ -286,14 +286,14 @@ export function CustomerList() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center justify-between gap-3">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
             <span>{error}</span>
           </div>
           <button
             onClick={fetchCustomers}
-            className="flex items-center gap-1 text-red-600 hover:text-red-800 text-xs font-medium flex-shrink-0"
+            className="flex items-center gap-1 text-destructive hover:opacity-80 text-xs font-medium flex-shrink-0"
           >
             <RefreshCw className="w-3 h-3" />
             Thử lại
@@ -303,51 +303,51 @@ export function CustomerList() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-200">
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Khách hàng</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Liên hệ</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hạng</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng chi tiêu</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Lần cuối</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right"></th>
+                  <tr className="bg-muted border-b border-border">
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Khách hàng</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Liên hệ</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Hạng</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng chi tiêu</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Lần cuối</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {customers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                      <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                         Không có khách hàng nào
                       </td>
                     </tr>
                   ) : (
                     customers.map((customer: any) => (
-                      <tr key={customer.id} className="hover:bg-slate-50/50 transition-all group">
+                      <tr key={customer.id} className="hover:bg-accent/30 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 font-bold group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">
+                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground font-semibold group-hover:bg-accent group-hover:text-foreground transition-colors">
                               {(customer.name || "U").split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                             </div>
                             <div>
-                              <p className="text-sm font-bold text-slate-900">{customer.name}</p>
-                              <p className="text-xs text-slate-500 font-mono uppercase">{customer.id}</p>
+                              <p className="text-sm font-semibold text-foreground">{customer.name}</p>
+                              <p className="text-xs text-muted-foreground font-mono uppercase tabular-nums">{customer.id}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <Phone className="w-3 h-3" />
                               {customer.phone || "—"}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <Mail className="w-3 h-3" />
                               {customer.email || "—"}
                             </div>
@@ -355,32 +355,32 @@ export function CustomerList() {
                         </td>
                         <td className="px-6 py-4">
                           <span className={cn(
-                            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                            tierColors[customer.tier] || "bg-slate-100 text-slate-600"
+                            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide",
+                            tierColors[customer.tier] || "bg-muted text-muted-foreground border border-border"
                           )}>
                             <Star className="w-3 h-3 fill-current" />
                             {customer.tier || "—"}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <p className="text-sm font-bold text-slate-900">{formatCurrency(customer.total_spent || 0)}</p>
+                          <p className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(customer.total_spent || 0)}</p>
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-600">
+                        <td className="px-6 py-4 text-sm text-muted-foreground tabular-nums">
                           {customer.last_visit ? formatDate(customer.last_visit) : "—"}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-400 transition-all">
+                            <button className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
                               <History className="w-4 h-4" />
                             </button>
-                            <Link to={`/customers/edit/${customer.id}`} state={{ customersListReturn }} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
+                            <Link to={`/customers/edit/${customer.id}`} state={{ customersListReturn }} className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
                               <Edit2 className="w-4 h-4" />
                             </Link>
                             {admin && (
                               <button
                                 onClick={() => handleDelete(customer.id)}
                                 disabled={deletingId === customer.id}
-                                className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all disabled:opacity-50"
+                                className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors disabled:opacity-50"
                               >
                                 {deletingId === customer.id ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -401,14 +401,14 @@ export function CustomerList() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between gap-4 px-4">
-              <p className="text-xs font-medium text-slate-400">
-                Hiển thị <span className="text-slate-900">{(page - 1) * limit + 1}-{Math.min(page * limit, total)}</span> trong số <span className="text-slate-900">{total}</span> khách hàng
+              <p className="text-xs font-medium text-muted-foreground">
+                Hiển thị <span className="text-foreground tabular-nums">{(page - 1) * limit + 1}-{Math.min(page * limit, total)}</span> trong số <span className="text-foreground tabular-nums">{total}</span> khách hàng
               </p>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="p-2 text-slate-300 hover:text-blue-600 transition-colors disabled:opacity-30"
+                  className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -417,10 +417,8 @@ export function CustomerList() {
                     key={pn}
                     onClick={() => setPage(pn)}
                     className={cn(
-                      "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
-                      page === pn
-                        ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                        : "hover:bg-slate-100 text-slate-600"
+                      "h-9 w-9 rounded-md text-xs font-semibold tabular-nums border transition-colors",
+                      page === pn ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-accent text-foreground"
                     )}
                   >
                     {pn}
@@ -429,7 +427,7 @@ export function CustomerList() {
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="p-2 text-slate-300 hover:text-blue-600 transition-colors disabled:opacity-30"
+                  className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

@@ -324,7 +324,7 @@ export function CustomerForm() {
   if (fetchLoading) {
     return (
       <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -333,21 +333,36 @@ export function CustomerForm() {
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all">
-            <ArrowLeft className="w-5 h-5" />
+          <button
+            onClick={() => navigate(-1)}
+            className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            aria-label="Quay lại"
+          >
+            <ArrowLeft className="w-4 h-4 mx-auto" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-xl font-semibold tracking-tight">
               {isEdit ? `Chỉnh sửa khách hàng: ${formData.name || id}` : "Thêm khách hàng mới"}
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {isEdit ? "Cập nhật thông tin chi tiết của khách hàng." : "Thu thập thông tin khách hàng để chăm sóc tốt hơn."}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate(-1)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">Hủy bỏ</button>
-          <button type="button" onClick={handleSubmit} disabled={isLoading} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="h-10 px-4 rounded-md bg-background border border-border text-sm font-semibold text-foreground hover:bg-accent transition-colors"
+          >
+            Hủy bỏ
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 inline-flex items-center gap-2"
+          >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             <Save className="w-4 h-4" />
             {isLoading ? "Đang lưu..." : "Lưu khách hàng"}
@@ -356,12 +371,12 @@ export function CustomerForm() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" /><span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 px-4 py-3 text-sm flex items-center gap-2">
           <CheckCircle className="w-4 h-4 flex-shrink-0" /><span>Đã lưu thành công!</span>
         </div>
       )}
@@ -369,20 +384,20 @@ export function CustomerForm() {
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center text-blue-400 mb-4">
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-4">
                 <User className="w-12 h-12" />
               </div>
-              <h3 className="font-bold text-slate-900">Hạng thành viên</h3>
+              <h3 className="font-semibold text-foreground">Hạng thành viên</h3>
               <div className="mt-4 w-full space-y-4">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
+                <div className="p-4 bg-muted/30 rounded-lg border border-border text-left">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hạng hiện tại</span>
-                    <span className="text-[10px] font-bold text-slate-600 bg-slate-200 px-2 py-0.5 rounded-full">{isEdit ? "CŨ" : "MỚI"}</span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Hạng hiện tại</span>
+                    <span className="text-[10px] font-semibold text-muted-foreground bg-background border border-border px-2 py-0.5 rounded-full">{isEdit ? "CŨ" : "MỚI"}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <Star className="w-5 h-5 text-amber-400 fill-current" />
-                    <select value={formData.tier} onChange={(e) => handleChange("tier", e.target.value)} className="text-lg font-bold text-slate-900 bg-transparent outline-none cursor-pointer">
+                    <select value={formData.tier} onChange={(e) => handleChange("tier", e.target.value)} className="text-lg font-semibold text-foreground bg-transparent outline-none cursor-pointer">
                       <option value="new">Mới</option>
                       <option value="silver">Silver</option>
                       <option value="gold">Gold</option>
@@ -393,46 +408,45 @@ export function CustomerForm() {
                 </div>
 
                 <div className="space-y-2 text-left">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ghi chú đặc biệt</label>
-                  <textarea rows={3} value={formData.note} onChange={(e) => handleChange("note", e.target.value)} placeholder="Sở thích, lưu ý khi phục vụ..." className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none resize-none"></textarea>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ghi chú đặc biệt</label>
+                  <textarea rows={3} value={formData.note} onChange={(e) => handleChange("note", e.target.value)} placeholder="Sở thích, lưu ý khi phục vụ..." className="w-full px-3 py-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-none"></textarea>
                 </div>
               </div>
             </div>
 
-            <div className="bg-indigo-600 p-6 rounded-3xl text-white shadow-xl shadow-indigo-600/20">
-              <h3 className="font-bold text-lg">Tích lũy điểm</h3>
-              <p className="text-indigo-100 text-sm mt-1">1 điểm / 10,000₫ chi tiêu. Đổi 1 điểm = 1,000₫.</p>
-              <div className="mt-6 flex items-center justify-between">
-                <div className="text-center">
-                  <p className="text-2xl font-bold">0</p>
-                  <p className="text-[10px] uppercase font-bold text-indigo-200">Điểm hiện có</p>
+            <div className="bg-card p-6 rounded-xl border border-border">
+              <h3 className="font-semibold text-base">Tích lũy điểm</h3>
+              <p className="text-muted-foreground text-sm mt-1">1 điểm / 10,000₫ chi tiêu. Đổi 1 điểm = 1,000₫.</p>
+              <div className="mt-6 grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-border bg-muted/30 p-4 text-center">
+                  <p className="text-2xl font-semibold tabular-nums">0</p>
+                  <p className="text-[10px] uppercase font-medium text-muted-foreground tracking-wide">Điểm hiện có</p>
                 </div>
-                <div className="h-8 w-px bg-indigo-500"></div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold">0 ₫</p>
-                  <p className="text-[10px] uppercase font-bold text-indigo-200">Tổng chi tiêu</p>
+                <div className="rounded-lg border border-border bg-muted/30 p-4 text-center">
+                  <p className="text-2xl font-semibold tabular-nums">0 ₫</p>
+                  <p className="text-[10px] uppercase font-medium text-muted-foreground tracking-wide">Tổng chi tiêu</p>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"><User className="w-4 h-4" /></div>
-                <h2 className="text-lg font-bold text-slate-900">Thông tin cơ bản</h2>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-primary"><User className="w-4 h-4" /></div>
+                <h2 className="text-lg font-semibold text-foreground">Thông tin cơ bản</h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Họ và tên <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="VD: Nguyễn Thị Lan" className={cn("w-full px-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.name ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
-                  {errors.name && <p className="text-xs text-red-500 font-medium">{errors.name}</p>}
+                  <label className="text-xs font-medium text-muted-foreground">Họ và tên <span className="text-destructive ml-0.5">*</span></label>
+                  <input type="text" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="VD: Nguyễn Thị Lan" className={cn("w-full h-10 px-3 bg-background border rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", errors.name ? "border-destructive/50" : "border-input")} />
+                  {errors.name && <p className="text-xs text-destructive font-medium">{errors.name}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Số điện thoại <span className="text-red-500">*</span></label>
+                  <label className="text-xs font-medium text-muted-foreground">Số điện thoại <span className="text-destructive ml-0.5">*</span></label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="tel"
                       inputMode="numeric"
@@ -445,25 +459,25 @@ export function CustomerForm() {
                       placeholder="0912345678"
                       maxLength={10}
                       className={cn(
-                        "w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none",
+                        "w-full h-10 pl-9 pr-3 bg-background border rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         errors.phone
-                          ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50"
-                          : "border-transparent focus:border-blue-500 focus:ring-blue-500/10"
+                          ? "border-destructive/50"
+                          : "border-input"
                       )}
                     />
                   </div>
-                  {errors.phone && <p className="text-xs text-red-500 font-medium">{errors.phone}</p>}
+                  {errors.phone && <p className="text-xs text-destructive font-medium">{errors.phone}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Email</label>
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="lan.nt@gmail.com" className={cn("w-full pl-10 pr-4 py-2.5 bg-slate-50 border focus:bg-white focus:ring-4 rounded-xl text-sm transition-all outline-none", errors.email ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")} />
+                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input type="text" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="lan.nt@gmail.com" className={cn("w-full h-10 pl-9 pr-3 bg-background border rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", errors.email ? "border-destructive/50" : "border-input")} />
                   </div>
-                  {errors.email && <p className="text-xs text-red-500 font-medium">{errors.email}</p>}
+                  {errors.email && <p className="text-xs text-destructive font-medium">{errors.email}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">Ngày sinh</label>
+                  <label className="text-xs font-medium text-muted-foreground">Ngày sinh</label>
                   {/* iOS date picker có thể hiển thị Phật lịch (BE). Dùng GregorianDateSelect để giữ dương lịch. */}
                   <GregorianDateSelect
                     value={formData.birthday}
@@ -474,46 +488,46 @@ export function CustomerForm() {
                     className="max-w-full"
                     monthNumericOptions
                   />
-                  <p className="text-[11px] text-slate-400">Có thể để trống.</p>
+                  <p className="text-[11px] text-muted-foreground">Có thể để trống.</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-card p-8 rounded-xl border border-border shadow-sm">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600"><MapPin className="w-4 h-4" /></div>
-                <h2 className="text-lg font-bold text-slate-900">Địa chỉ & Liên hệ</h2>
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-primary"><MapPin className="w-4 h-4" /></div>
+                <h2 className="text-lg font-semibold text-foreground">Địa chỉ &amp; Liên hệ</h2>
               </div>
 
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="space-y-1">
-                    <select value={formData.city} onChange={(e) => handleChange("city", e.target.value)} className={cn("w-full px-3 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2", errors.city ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")}>
+                    <select value={formData.city} onChange={(e) => handleChange("city", e.target.value)} className={cn("h-10 w-full px-3 bg-background border rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", errors.city ? "border-destructive/50" : "border-input")}>
                     <option value="">Tỉnh/TP</option>
                     {cities.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    {errors.city && <p className="text-[11px] text-red-500 font-medium">{errors.city}</p>}
+                    {errors.city && <p className="text-[11px] text-destructive font-medium">{errors.city}</p>}
                   </div>
                   <div className="space-y-1">
-                    <select value={formData.district} onChange={(e) => handleChange("district", e.target.value)} disabled={!formData.city} className={cn("w-full px-3 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2 disabled:bg-slate-100", errors.district ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")}>
+                    <select value={formData.district} onChange={(e) => handleChange("district", e.target.value)} disabled={!formData.city} className={cn("h-10 w-full px-3 bg-background border rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:bg-muted", errors.district ? "border-destructive/50" : "border-input")}>
                     <option value="">Quận/Huyện</option>
                     {formData.city && districts.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
-                    {errors.district && <p className="text-[11px] text-red-500 font-medium">{errors.district}</p>}
+                    {errors.district && <p className="text-[11px] text-destructive font-medium">{errors.district}</p>}
                   </div>
                   <div className="space-y-1">
-                    <select value={formData.ward} onChange={(e) => handleChange("ward", e.target.value)} disabled={!formData.district} className={cn("w-full px-3 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2 disabled:bg-slate-100", errors.ward ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50" : "border-transparent focus:border-blue-500 focus:ring-blue-500/10")}>
+                    <select value={formData.ward} onChange={(e) => handleChange("ward", e.target.value)} disabled={!formData.district} className={cn("h-10 w-full px-3 bg-background border rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:bg-muted", errors.ward ? "border-destructive/50" : "border-input")}>
                     <option value="">Phường/Xã</option>
                     {formData.city && formData.district && wards.map(w => <option key={w} value={w}>{w}</option>)}
                     </select>
-                    {errors.ward && <p className="text-[11px] text-red-500 font-medium">{errors.ward}</p>}
+                    {errors.ward && <p className="text-[11px] text-destructive font-medium">{errors.ward}</p>}
                   </div>
                 </div>
 
                 {/* Địa chỉ nhà: nằm hàng dưới, full width */}
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">
-                    Địa chỉ nhà <span className="text-red-500">*</span>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Địa chỉ nhà <span className="text-destructive ml-0.5">*</span>
                   </label>
                   <input
                     type="text"
@@ -521,20 +535,20 @@ export function CustomerForm() {
                     onChange={(e) => handleChange("address", e.target.value)}
                     placeholder="Số nhà, tên đường"
                     className={cn(
-                      "w-full px-4 py-3 bg-slate-50 border focus:bg-white rounded-xl text-sm outline-none focus:ring-2",
+                      "w-full h-10 px-3 bg-background border rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       errors.address
-                        ? "border-red-300 focus:border-red-500 focus:ring-red-500/10 bg-red-50"
-                        : "border-transparent focus:border-blue-500 focus:ring-blue-500/10"
+                        ? "border-destructive/50"
+                        : "border-input"
                     )}
                   />
-                  {errors.address && <p className="text-[11px] text-red-500 font-medium">{errors.address}</p>}
+                  {errors.address && <p className="text-[11px] text-destructive font-medium">{errors.address}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Nhân viên phụ trách</label>
-                    <p className="text-[11px] text-slate-400 -mt-0.5 mb-1">Mặc định là bạn khi thêm mới; có thể đổi.</p>
-                    <select value={formData.assigned_employee_id} onChange={(e) => handleChange("assigned_employee_id", e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none">
+                    <label className="text-xs font-medium text-muted-foreground">Nhân viên phụ trách</label>
+                    <p className="text-[11px] text-muted-foreground -mt-0.5 mb-1">Mặc định là bạn khi thêm mới; có thể đổi.</p>
+                    <select value={formData.assigned_employee_id} onChange={(e) => handleChange("assigned_employee_id", e.target.value)} className="h-10 w-full px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                       <option value="">Không gán</option>
                       {employeeOptions.map((emp: any) => (
                         <option key={emp.id} value={emp.id}>{emp.full_name}</option>
@@ -542,8 +556,8 @@ export function CustomerForm() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700">Nguồn khách hàng</label>
-                    <select value={formData.source} onChange={(e) => handleChange("source", e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none">
+                    <label className="text-xs font-medium text-muted-foreground">Nguồn khách hàng</label>
+                    <select value={formData.source} onChange={(e) => handleChange("source", e.target.value)} className="h-10 w-full px-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                       <option value="zalo">Zalo</option>
                       <option value="store">Tại cửa hàng</option>
                       <option value="facebook">Facebook</option>

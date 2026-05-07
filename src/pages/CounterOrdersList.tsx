@@ -98,16 +98,16 @@ function buildPrintHtml(opts: {
   const rowHtml = opts.items
     .map(
       (r) =>
-        `<tr><td style="padding:4px 0;border-bottom:1px solid #eee">${escapeHtml(
+        `<tr><td style="padding:4px 0;border-bottom:1px solid rgb(238 238 238)">${escapeHtml(
           r.name
-        )}</td><td style="text-align:center;padding:4px 0;border-bottom:1px solid #eee">${r.qty}</td><td style="text-align:right;padding:4px 0;border-bottom:1px solid #eee">${formatNumber(
+        )}</td><td style="text-align:center;padding:4px 0;border-bottom:1px solid rgb(238 238 238)">${r.qty}</td><td style="text-align:right;padding:4px 0;border-bottom:1px solid rgb(238 238 238)">${formatNumber(
           r.lineTotal
         )}</td></tr>`
     )
     .join("");
 
   const noteBlock = opts.note.trim()
-    ? `<p style="font-size:12px;margin:8px 0 0;color:#555">Ghi chú: ${escapeHtml(opts.note)}</p>`
+    ? `<p style="font-size:12px;margin:8px 0 0;color:rgb(85 85 85)">Ghi chú: ${escapeHtml(opts.note)}</p>`
     : "";
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Hóa đơn ${escapeHtml(
@@ -119,9 +119,9 @@ function buildPrintHtml(opts: {
     body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
     .wrap { padding: 8mm; }
     h1 { font-size: 14px; margin: 0 0 4px; }
-    .meta { font-size: 11px; color: #555; margin-bottom: 10px; line-height: 1.35; }
+    .meta { font-size: 11px; color: rgb(85 85 85); margin-bottom: 10px; line-height: 1.35; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th { text-align: left; font-size: 10px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ccc; padding: 4px 0; }
+    th { text-align: left; font-size: 10px; text-transform: uppercase; color: rgb(102 102 102); border-bottom: 1px solid rgb(204 204 204); padding: 4px 0; }
     td { vertical-align: top; }
     .tot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; font-weight: 700; }
   </style></head><body>
@@ -324,19 +324,19 @@ export function CounterOrdersList() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4">
+    <div className="max-w-6xl mx-auto space-y-4 min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">
-            <Store className="w-6 h-6 text-emerald-600" />
+          <h1 className="text-xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+            <Store className="w-6 h-6 text-primary" />
             Đơn tại quầy
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">Dùng cùng bộ lọc như “Đơn hàng”, nhưng chỉ lấy đơn tại quầy.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Dùng cùng bộ lọc như “Đơn hàng”, nhưng chỉ lấy đơn tại quầy.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             to="/orders/counter"
-            className="shrink-0 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"
+            className="shrink-0 inline-flex items-center justify-center h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-95 transition-opacity"
           >
             Bán tại quầy
           </Link>
@@ -344,33 +344,33 @@ export function CounterOrdersList() {
       </div>
 
       {/* Filter bar (same shape as OrderList) */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+      <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Mã đơn, tên khách..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-50 rounded-xl text-sm outline-none transition-all"
+              className="w-full h-10 pl-9 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
           </div>
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={productInput}
               onChange={(e) => setProductInput(e.target.value)}
               placeholder="Tên/SKU sản phẩm..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-50 rounded-xl text-sm outline-none transition-all"
+              className="w-full h-10 pl-9 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
           </div>
 
           <select
             value={status}
             onChange={(e) => patchListParams({ status: e.target.value || null }, { resetPage: true })}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[150px]"
+            className="h-10 px-3 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none appearance-none cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background min-w-[150px]"
           >
             <option value="">Tất cả trạng thái</option>
             <option value="pending">Chờ duyệt</option>
@@ -382,7 +382,7 @@ export function CounterOrdersList() {
           <select
             value={groupId}
             onChange={(e) => patchListParams({ group: e.target.value || null }, { resetPage: true })}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[150px]"
+            className="h-10 px-3 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none appearance-none cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background min-w-[150px]"
           >
             <option value="">Tất cả nhóm</option>
             {groups.map((g: any) => (
@@ -396,7 +396,7 @@ export function CounterOrdersList() {
             <select
               value={employeeId}
               onChange={(e) => patchListParams({ employee: e.target.value || null }, { resetPage: true })}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50 rounded-xl text-sm outline-none appearance-none cursor-pointer transition-all min-w-[190px]"
+              className="h-10 px-3 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none appearance-none cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background min-w-[190px]"
               title="Lọc theo nhân viên"
             >
               <option value="">Tất cả nhân viên</option>
@@ -421,7 +421,7 @@ export function CounterOrdersList() {
               const { from, to } = getPresetRange(p);
               patchListParams({ preset: p, from, to }, { resetPage: true });
             }}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50 rounded-xl text-sm outline-none"
+            className="h-10 px-3 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="today">Hôm nay</option>
             <option value="week">Tuần này</option>
@@ -434,19 +434,19 @@ export function CounterOrdersList() {
             type="date"
             value={dateFrom}
             onChange={(e) => patchListParams({ preset: "custom", from: e.target.value }, { resetPage: true })}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50"
+            className="h-10 px-3 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
-          <span className="text-slate-400 text-sm">→</span>
+          <span className="text-muted-foreground text-sm">→</span>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => patchListParams({ preset: "custom", to: e.target.value }, { resetPage: true })}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-50"
+            className="h-10 px-3 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
           <button
             type="button"
             onClick={() => setSp(new URLSearchParams({ preset: "today" }), { replace: true })}
-            className="ml-auto px-3 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 hover:bg-slate-50"
+            className="ml-auto h-10 px-3 rounded-md text-sm font-semibold bg-background border border-border hover:bg-accent transition-colors"
           >
             Reset lọc
           </button>
@@ -455,13 +455,13 @@ export function CounterOrdersList() {
 
       {summary ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Số đơn</div>
-            <div className="mt-1 text-2xl font-black text-slate-900 tabular-nums">{summary.total_orders}</div>
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Số đơn</div>
+            <div className="mt-1 text-2xl font-semibold text-foreground tabular-nums">{summary.total_orders}</div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Tổng giá trị đơn</div>
-            <div className="mt-1 text-2xl font-black text-emerald-700 tabular-nums">
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Tổng giá trị đơn</div>
+            <div className="mt-1 text-2xl font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
               {formatCurrency(summary.total_revenue)}
             </div>
           </div>
@@ -469,32 +469,32 @@ export function CounterOrdersList() {
       ) : null}
 
       {error ? (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm font-bold text-red-700">{error}</div>
+        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 text-sm font-semibold text-destructive">{error}</div>
       ) : null}
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-10 text-sm text-slate-500">Đang tải...</div>
+          <div className="p-10 text-sm text-muted-foreground">Đang tải...</div>
         ) : rows.length === 0 ? (
-          <div className="p-10 text-sm text-slate-500">Chưa có đơn tại quầy.</div>
+          <div className="p-10 text-sm text-muted-foreground">Chưa có đơn tại quầy.</div>
         ) : (
           <div className="overflow-auto">
             <table className="min-w-[1040px] w-full text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-muted/30">
                 <tr>
-                  <th className="text-left px-4 py-3 font-black text-slate-700 border-b border-slate-200">Mã đơn</th>
-                  <th className="text-left px-4 py-3 font-black text-slate-700 border-b border-slate-200">Thời gian</th>
-                  <th className="text-left px-4 py-3 font-black text-slate-700 border-b border-slate-200">Khách</th>
-                  <th className="text-right px-4 py-3 font-black text-slate-700 border-b border-slate-200">Giá trị đơn</th>
-                  <th className="text-right px-4 py-3 font-black text-slate-700 border-b border-slate-200">Thu khách</th>
-                  <th className="text-center px-4 py-3 font-black text-slate-700 border-b border-slate-200">In</th>
-                  <th className="text-center px-4 py-3 font-black text-slate-700 border-b border-slate-200 w-[88px]">Xóa</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground border-b border-border">Mã đơn</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground border-b border-border">Thời gian</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground border-b border-border">Khách</th>
+                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground border-b border-border">Giá trị đơn</th>
+                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground border-b border-border">Thu khách</th>
+                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground border-b border-border">In</th>
+                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground border-b border-border w-[88px]">Xóa</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {rows.map((o) => (
-                  <tr key={o.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-bold text-slate-900">
+                  <tr key={o.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-foreground">
                       {mayEditCounterSaleOrder(currentUser) ? (
                         <Link to={`/orders/counter?edit=${o.id}`} className="hover:underline">
                           {o.code}
@@ -503,15 +503,15 @@ export function CounterOrdersList() {
                         <span>{o.code}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{formatDate(o.created_at)}</td>
-                    <td className="px-4 py-3 text-slate-700">
+                    <td className="px-4 py-3 text-muted-foreground">{formatDate(o.created_at)}</td>
+                    <td className="px-4 py-3 text-foreground">
                       <div className="font-semibold">{o.customer_name || "—"}</div>
-                      <div className="text-xs text-slate-400">{o.customer_phone || ""}</div>
+                      <div className="text-xs text-muted-foreground">{o.customer_phone || ""}</div>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-800 tabular-nums">
+                    <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">
                       {formatCurrency(Number(o.subtotal) || 0)}
                     </td>
-                    <td className="px-4 py-3 text-right font-black text-emerald-700 tabular-nums">
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
                       {formatCurrency(Number(o.customer_collect ?? o.total_amount) || 0)}
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -554,8 +554,8 @@ export function CounterOrdersList() {
                           }
                         }}
                         className={cn(
-                          "inline-flex items-center justify-center w-10 h-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-50",
-                          "text-slate-600 hover:text-slate-900"
+                          "inline-flex items-center justify-center w-10 h-10 rounded-md border border-border bg-background hover:bg-accent transition-colors",
+                          "text-muted-foreground hover:text-foreground"
                         )}
                         aria-label="In bill"
                         title="In bill"
@@ -569,7 +569,7 @@ export function CounterOrdersList() {
                           type="button"
                           onClick={() => handleDeleteOrder(String(o.id))}
                           disabled={deletingId === String(o.id)}
-                          className="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-slate-200 bg-white hover:bg-red-600 hover:text-white hover:border-red-500 text-slate-500 disabled:opacity-50"
+                          className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-border bg-background hover:bg-destructive hover:text-destructive-foreground hover:border-destructive/50 text-muted-foreground transition-colors disabled:opacity-50"
                           aria-label="Xóa đơn tại quầy"
                         >
                           {deletingId === String(o.id) ? (
@@ -579,7 +579,7 @@ export function CounterOrdersList() {
                           )}
                         </button>
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="text-muted-foreground/60">—</span>
                       )}
                     </td>
                   </tr>
@@ -591,16 +591,16 @@ export function CounterOrdersList() {
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-500">
-          Trang <span className="font-bold text-slate-700">{page}</span>/<span className="font-bold text-slate-700">{totalPages}</span> · Tổng{" "}
-          <span className="font-bold text-slate-700">{total}</span> đơn
+        <div className="text-sm text-muted-foreground">
+          Trang <span className="font-semibold text-foreground">{page}</span>/<span className="font-semibold text-foreground">{totalPages}</span> · Tổng{" "}
+          <span className="font-semibold text-foreground">{total}</span> đơn
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => goPage(page - 1)}
             disabled={page <= 1}
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 h-10 px-3 rounded-md border border-border bg-background text-sm font-semibold text-foreground disabled:opacity-50 hover:bg-accent transition-colors"
           >
             <ChevronLeft className="w-4 h-4" /> Trước
           </button>
@@ -608,7 +608,7 @@ export function CounterOrdersList() {
             type="button"
             onClick={() => goPage(page + 1)}
             disabled={page >= totalPages}
-            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 h-10 px-3 rounded-md border border-border bg-background text-sm font-semibold text-foreground disabled:opacity-50 hover:bg-accent transition-colors"
           >
             Sau <ChevronRight className="w-4 h-4" />
           </button>

@@ -43,7 +43,7 @@ function getStatusClass(status: string): string {
     case "in_stock": return "bg-emerald-50 text-emerald-600";
     case "low_stock": return "bg-amber-50 text-amber-600";
     case "out_of_stock": return "bg-red-50 text-red-600";
-    default: return "bg-slate-50 text-slate-500";
+    default: return "bg-muted text-muted-foreground border border-border";
   }
 }
 
@@ -336,19 +336,19 @@ export function ProductList() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Danh sách sản phẩm</h1>
-          <p className="text-slate-500 text-sm mt-1">Quản lý kho hàng và giá bán của bạn.</p>
+          <h1 className="text-xl font-semibold tracking-tight">Danh sách sản phẩm</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Quản lý kho hàng và giá bán của bạn.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+          <button onClick={handleExport} className="flex items-center gap-2 h-10 px-4 bg-background border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors">
             <Download className="w-4 h-4" />
             Xuất Excel
           </button>
-          <Link to="/products/import" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+          <Link to="/products/import" className="flex items-center gap-2 h-10 px-4 bg-background border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors">
             <Upload className="w-4 h-4" />
             Nhập hàng loạt
           </Link>
-          <Link to="/products/new" state={{ productsListReturn }} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
+          <Link to="/products/new" state={{ productsListReturn }} className="flex items-center gap-2 h-10 px-4 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity">
             <Plus className="w-4 h-4" />
             Thêm sản phẩm
           </Link>
@@ -356,33 +356,33 @@ export function ProductList() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng sản phẩm</p>
-          <p className="text-xl font-bold text-slate-900 mt-2">{total.toLocaleString()}</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng sản phẩm</p>
+          <p className="text-xl font-semibold text-foreground mt-2 tabular-nums">{total.toLocaleString()}</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đang kinh doanh</p>
-          <p className="text-xl font-bold text-emerald-600 mt-2">{inStock}</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Đang kinh doanh</p>
+          <p className="text-xl font-semibold text-foreground mt-2 tabular-nums">{inStock}</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sắp hết hàng</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sắp hết hàng</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xl font-bold text-amber-600">{lowStock}</p>
-            <AlertCircle className="w-5 h-5 text-amber-500" />
+            <p className="text-xl font-semibold text-foreground tabular-nums">{lowStock}</p>
+            <AlertCircle className="w-5 h-5 text-muted-foreground" />
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hết hàng</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Hết hàng</p>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xl font-bold text-red-600">{outOfStock}</p>
-            <AlertCircle className="w-5 h-5 text-red-500" />
+            <p className="text-xl font-semibold text-foreground tabular-nums">{outOfStock}</p>
+            <AlertCircle className="w-5 h-5 text-muted-foreground" />
           </div>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="bg-card p-4 rounded-lg border border-border flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input 
             type="text" 
             value={searchInput}
@@ -393,14 +393,14 @@ export function ProductList() {
               setSearchInput((e.target as HTMLInputElement).value);
             }}
             placeholder="Tìm theo tên, SKU, danh mục..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+            className="w-full h-10 pl-9 pr-3 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
           <select 
             value={category}
             onChange={(e) => { patchListParams({ category: e.target.value || null }, { resetPage: true }); }}
-            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1 md:flex-none h-10 px-3 bg-background text-foreground border border-input rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả danh mục</option>
             {categories.map((cat: any) => (
@@ -410,7 +410,7 @@ export function ProductList() {
           <select
             value={warehouseId}
             onChange={(e) => { patchListParams({ warehouse: e.target.value || null }, { resetPage: true }); }}
-            className="flex-1 md:flex-none px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1 md:flex-none h-10 px-3 bg-background text-foreground border border-input rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <option value="">Tất cả kho</option>
             {warehouses.filter((w: any) => w.is_active).map((w: any) => (
@@ -421,15 +421,15 @@ export function ProductList() {
       </div>
 
       {canAdmin && selectedCount > 0 && (
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="text-sm font-bold text-blue-900">
+        <div className="bg-card border border-border rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-foreground">
             Đã chọn {selectedCount} sản phẩm (trên trang này).
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <select
               value={bulkCategoryId}
               onChange={(e) => setBulkCategoryId(e.target.value)}
-              className="px-4 py-2 bg-white border border-blue-200 text-slate-700 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="h-10 px-3 bg-background border border-input text-foreground rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <option value="">Chọn danh mục…</option>
               <option value="__none__">Bỏ danh mục</option>
@@ -444,10 +444,10 @@ export function ProductList() {
               disabled={bulkApplying || bulkCategoryId === ""}
               onClick={applyBulkCategory}
               className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold transition-all inline-flex items-center gap-2",
+                "h-10 px-4 rounded-md text-sm font-semibold transition-colors inline-flex items-center gap-2",
                 bulkApplying || bulkCategoryId === ""
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20"
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-primary text-primary-foreground hover:opacity-95"
               )}
             >
               {bulkApplying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
@@ -456,7 +456,7 @@ export function ProductList() {
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-white border border-transparent hover:border-slate-200"
+              className="h-10 px-4 rounded-md text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent hover:border-border transition-colors"
             >
               Bỏ chọn
             </button>
@@ -465,42 +465,42 @@ export function ProductList() {
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm">{error}</div>
       )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-200">
+                  <tr className="bg-muted border-b border-border">
                     {canAdmin && (
                       <th className="px-4 py-4 w-10">
                         <input
                           type="checkbox"
                           checked={allPageSelected}
                           onChange={toggleSelectAllPage}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                          className="w-4 h-4 rounded border-input accent-primary"
                           aria-label="Chọn tất cả trên trang"
                         />
                       </th>
                     )}
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sản phẩm</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Danh mục</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Giá bán</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Kho hàng</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right"></th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Sản phẩm</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Danh mục</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Giá bán</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Kho hàng</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Trạng thái</th>
+                    <th className="px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wide text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {products.length === 0 ? (
-                    <tr><td colSpan={canAdmin ? 7 : 6} className="px-6 py-12 text-center text-slate-400">Không có sản phẩm nào</td></tr>
+                    <tr><td colSpan={canAdmin ? 7 : 6} className="px-6 py-12 text-center text-muted-foreground">Không có sản phẩm nào</td></tr>
                   ) : products.map((product: any) => {
                     const status = getProductStatus(product);
                     const images = product.images ? (() => { try { return JSON.parse(product.images); } catch { return []; } })() : [];
@@ -509,63 +509,63 @@ export function ProductList() {
                     const checked = canAdmin && Number.isFinite(pid) ? selectedIds.has(pid) : false;
                     
                     return (
-                    <tr key={product.id} className="hover:bg-slate-50/50 transition-all group">
+                    <tr key={product.id} className="hover:bg-accent/30 transition-colors group">
                       {canAdmin && (
                         <td className="px-4 py-4 align-middle">
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleRow(pid)}
-                            className="w-4 h-4 rounded border-slate-300 text-blue-600"
+                            className="w-4 h-4 rounded border-input accent-primary"
                             aria-label={`Chọn sản phẩm ${product.name}`}
                           />
                         </td>
                       )}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 shadow-sm overflow-hidden flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-lg bg-muted border border-border shadow-sm overflow-hidden flex items-center justify-center">
                             {mainImage ? (
-                              <img src={mainImage.startsWith('/') ? `${API_URL.replace('/api', '')}${mainImage}` : mainImage} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).parentElement!.innerHTML = '<svg class="w-6 h-6 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'; }} />
+                              <img src={mainImage.startsWith('/') ? `${API_URL.replace('/api', '')}${mainImage}` : mainImage} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).parentElement!.innerHTML = '<svg class=\"w-6 h-6 text-muted-foreground/60\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"8.5\" cy=\"8.5\" r=\"1.5\"/><path d=\"m21 15-5-5L5 21\"/></svg>'; }} />
                             ) : (
-                              <Package className="w-6 h-6 text-slate-300" />
+                              <Package className="w-6 h-6 text-muted-foreground/60" />
                             )}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-slate-900">{product.name}</p>
-                            <p className="text-xs text-slate-500 font-mono uppercase">{product.sku}</p>
+                            <p className="text-sm font-semibold text-foreground">{product.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono uppercase">{product.sku}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Tag className="w-3 h-3 text-slate-400" />
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Tag className="w-3 h-3 text-muted-foreground" />
                           {product.category_name || "—"}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-bold text-slate-900">{formatCurrency(product.price)}</p>
+                        <p className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(product.price)}</p>
                       </td>
                       <td className="px-6 py-4">
                         <div className="space-y-1.5 min-w-[140px]">
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">CÓ THỂ BÁN</span>
+                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">CÓ THỂ BÁN</span>
                             </div>
-                            <span className="text-sm font-black text-emerald-600">{formatStock(product.available_stock ?? product.stock_qty)}</span>
+                            <span className="text-sm font-semibold text-foreground tabular-nums">{formatStock(product.available_stock ?? product.stock_qty)}</span>
                           </div>
-                          <div className="flex items-center justify-between gap-4 pt-1.5 border-t border-slate-100">
+                          <div className="flex items-center justify-between gap-4 pt-1.5 border-t border-border">
                             <div className="flex items-center gap-1.5">
-                              <div className="w-1.5 h-1.5 rounded-full bg-slate-900"></div>
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">TỔNG TỒN</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-foreground/70"></div>
+                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">TỔNG TỒN</span>
                             </div>
-                            <span className="text-sm font-black text-slate-900">{formatStock(product.stock_qty)}</span>
+                            <span className="text-sm font-semibold text-foreground tabular-nums">{formatStock(product.stock_qty)}</span>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className={cn(
-                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide",
                           getStatusClass(status)
                         )}>
                           {getStatusLabel(status)}
@@ -573,17 +573,17 @@ export function ProductList() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-400 transition-all">
+                          <button className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
                             <BarChart2 className="w-4 h-4" />
                           </button>
-                          <Link to={`/products/edit/${product.id}`} state={{ productsListReturn }} className="p-2 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-400 transition-all">
+                          <Link to={`/products/edit/${product.id}`} state={{ productsListReturn }} className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
                             <Edit2 className="w-4 h-4" />
                           </Link>
                           {canAdmin && (
                             <button
                               type="button"
                               onClick={() => handleDelete(product.id)}
-                              className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all"
+                              className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors"
                               title="Vô hiệu hóa sản phẩm"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -600,12 +600,14 @@ export function ProductList() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between gap-4 px-4">
-              <p className="text-xs font-medium text-slate-400">Hiển thị <span className="text-slate-900">{(page - 1) * limit + 1}-{Math.min(page * limit, total)}</span> trong số <span className="text-slate-900">{total}</span> sản phẩm</p>
+              <p className="text-xs font-medium text-muted-foreground">
+                Hiển thị <span className="text-foreground tabular-nums">{(page - 1) * limit + 1}-{Math.min(page * limit, total)}</span> trong số <span className="text-foreground tabular-nums">{total}</span> sản phẩm
+              </p>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="p-2 text-slate-300 hover:text-blue-600 transition-colors disabled:opacity-30"
+                  className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -614,8 +616,8 @@ export function ProductList() {
                     key={pn}
                     onClick={() => setPage(pn)}
                     className={cn(
-                      "w-8 h-8 rounded-lg text-xs font-bold transition-colors",
-                      page === pn ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "hover:bg-slate-100 text-slate-600"
+                      "h-9 w-9 rounded-md text-xs font-semibold tabular-nums border transition-colors",
+                      page === pn ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-accent text-foreground"
                     )}
                   >
                     {pn}
@@ -624,7 +626,7 @@ export function ProductList() {
                 <button 
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="p-2 text-slate-300 hover:text-blue-600 transition-colors disabled:opacity-30"
+                  className="h-9 w-9 rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

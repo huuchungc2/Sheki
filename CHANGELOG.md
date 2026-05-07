@@ -1,3 +1,11 @@
+## [07/05/2026] - CounterSale: UI theo DESIGN.md (Linear dark)
+### Changed
+- **Bán tại quầy** — Redesign UI theo phong cách Linear (clean/minimal/professional); **giữ nguyên 100% logic/state/API**. Màu sắc dùng **semantic tokens** từ `src/index.css` (không hardcode hex), wrapper `dark` để POS luôn dark; spacing/radius/typography tham khảo `DESIGN.md`. — File: `src/pages/CounterSale.tsx`
+
+## [07/05/2026] - ActivityLog: redesign UI theo design system
+### Changed
+- **Nhật ký hoạt động** — Redesign UI theo `UI_SPEC.md` (header/filter/table/pagination/modal) và semantic tokens từ `src/index.css`; loại bỏ toàn bộ `slate/white/black/blue-*`; **giữ nguyên 100% logic/state/API**. — File: `src/pages/ActivityLog.tsx`
+
 ## [05/05/2026] - OrderForm: phương thức thanh toán (Chuyển khoản, Thu Cod, Tiền mặt)
 ### Changed
 - **Đơn hàng** — Thay «Thẻ ATM» bằng **Thu Cod** (`payment_method=cod`); thứ tự nút: **Chuyển khoản → Thu Cod → Tiền mặt**; đơn cũ `card` khi sửa chuẩn hóa sang `transfer`. — Files: `src/pages/OrderForm.tsx`, `src/pages/OrderList.tsx`, `src/lib/exportExcel.ts`, `src/types.ts`
@@ -1780,6 +1788,30 @@
 ## [23/04/2026] - [DB: Final SQL bundle cho multi-shop + RBAC]
 ### Added
 - Thêm script SQL “final bundle” (idempotent) để áp toàn bộ thay đổi multi-shop → RBAC/scope lên DB backup từ server, chạy 1 lần là đúng. - Files: `migrations/999_final_multishop_rbac.sql`
+
+## [07/05/2026] - [UI: Redesign OrderForm + Dashboard theo design system]
+### Changed
+- Refactor UI của `OrderForm` và `Dashboard` theo semantic tokens từ `src/index.css` (chuẩn hoá header/card/table, states, buttons); loại bỏ toàn bộ `slate-*`, `bg-white`, và màu hex hardcode trong biểu đồ; **giữ nguyên 100% logic/state/API**. - Files: `src/pages/OrderForm.tsx`, `src/pages/Dashboard.tsx`
+
+## [07/05/2026] - [UI: Redesign CommissionReport + CollaboratorsPage + PayrollPeriods theo design system]
+### Changed
+- Refactor UI của `CommissionReport`, `CollaboratorsPage`, `PayrollPeriods` theo semantic tokens từ `src/index.css` (header/card/table/modal/pagination/states); loại bỏ `slate/white/black/blue-*` và màu hardcode; **giữ nguyên 100% logic/state/API**. - Files: `src/pages/CommissionReport.tsx`, `src/pages/CollaboratorsPage.tsx`, `src/pages/PayrollPeriods.tsx`
+
+## [07/05/2026] - [UI: Redesign SalesReturnsList + InventoryExport + InventoryHistory theo design system]
+### Changed
+- Refactor UI của `SalesReturnsList`, `InventoryExport`, `InventoryHistory` theo semantic tokens từ `src/index.css` (header/card/table/popover/pagination/states); loại bỏ `slate/white/black/blue/red/amber/emerald-*` và màu hardcode; **giữ nguyên 100% logic/state/API**. - Files: `src/pages/SalesReturnsList.tsx`, `src/pages/InventoryExport.tsx`, `src/pages/InventoryHistory.tsx`
+
+## [07/05/2026] - [UI: Redesign EmployeeDetail + CommissionRules + CTV commission reports + BulkImport + OrderCommissionDetail theo design system]
+### Changed
+- Refactor UI của `EmployeeDetail`, `CommissionRules`, `CollaboratorsCommissionReport`, `CollaboratorsCommissionsReport`, `BulkImport`, `OrderCommissionDetail` theo semantic tokens từ `src/index.css` (states/header/filter/cards/tables/modals); loại bỏ `slate/white/black/blue/red/amber/emerald/indigo/purple/green-*` và màu hardcode; **giữ nguyên 100% logic/state/API**. - Files: `src/pages/EmployeeDetail.tsx`, `src/pages/CommissionRules.tsx`, `src/pages/CollaboratorsCommissionReport.tsx`, `src/pages/CollaboratorsCommissionsReport.tsx`, `src/pages/BulkImport.tsx`, `src/pages/OrderCommissionDetail.tsx`, `src/pages/OrderForm.tsx`
+
+## [07/05/2026] - [UI: Login brand + SuperAdminRecovery hướng dẫn reset]
+### Changed
+- Đổi brand “Sheki” → “Smart Erp” ở màn Login; cập nhật màn khôi phục Super Admin bỏ yêu cầu `SUPERADMIN_RESET_KEY`, hướng dẫn reset bằng script local MySQL. - Files: `src/pages/Login.tsx`, `src/pages/SuperAdminRecovery.tsx`
+
+## [07/05/2026] - [UI: Login gắn logo + default light mode]
+### Changed
+- Gắn logo từ `public/favicon.svg` vào header Login; set default theme `light` (trong `src/main.tsx`, đồng thời Login ép `light` khi mở/đăng nhập) để vào hệ thống mặc định là light mode. - Files: `src/main.tsx`, `src/components/Layout.tsx`, `src/pages/Login.tsx`
 
 ### Business Rules Implemented
 - Mã đơn hàng: `DH-YYYYMMDD-XXXX` (reset theo ngày)

@@ -188,7 +188,7 @@ export function CollaboratorsPage() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -197,58 +197,63 @@ export function CollaboratorsPage() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 mx-auto text-red-400 mb-4" />
-          <p className="text-red-500 font-medium">{error}</p>
-          <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm">Quay lại</button>
+          <AlertCircle className="w-12 h-12 mx-auto text-destructive/70 mb-4" />
+          <p className="text-destructive font-medium">{error}</p>
+          <button onClick={() => navigate(-1)} className="mt-4 h-10 px-4 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity">Quay lại</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 min-w-0">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-accent rounded-lg text-muted-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Cộng tác viên</h1>
-            <p className="text-slate-500 text-sm mt-1">Quản lý cộng tác viên của {user?.full_name}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cộng tác viên</h1>
+            <p className="text-muted-foreground text-sm mt-1">Quản lý cộng tác viên của {user?.full_name}</p>
           </div>
         </div>
-        <button
-          onClick={() => { setShowAddModal(true); fetchAvailableUsers(); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all"
-        >
-          <Plus className="w-4 h-4" /> Thêm CTV
-        </button>
-        <Link to={`/employees/${id}/collaborators/commissions`} className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-medium ml-2 hover:bg-green-700 transition-all">
-          <BarChart className="w-4 h-4" /> Báo cáo CTV
-        </Link>
+        <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2">
+          <button
+            onClick={() => { setShowAddModal(true); fetchAvailableUsers(); }}
+            className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity"
+          >
+            <Plus className="w-4 h-4" /> Thêm CTV
+          </button>
+          <Link
+            to={`/employees/${id}/collaborators/commissions`}
+            className="inline-flex items-center gap-2 h-10 px-4 border border-border bg-background text-foreground rounded-md text-sm font-semibold hover:bg-accent transition-colors"
+          >
+            <BarChart className="w-4 h-4" /> Báo cáo CTV
+          </Link>
+        </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-xl text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300">
           <CheckCircle2 className="w-4 h-4 shrink-0" /> {success}
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Users className="w-4 h-4 text-blue-600" /> Danh sách cộng tác viên
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" /> Danh sách cộng tác viên
           </h2>
-          <span className="text-sm text-slate-500">{collaborators.length} người</span>
+          <span className="text-sm text-muted-foreground">{collaborators.length} người</span>
         </div>
 
         {collaborators.length === 0 ? (
-          <div className="px-6 py-12 text-center text-slate-400">
+          <div className="px-6 py-12 text-center text-muted-foreground">
             <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="font-medium">Chưa có cộng tác viên nào</p>
             <p className="text-sm mt-1">Nhấn "Thêm CTV" để bắt đầu</p>
@@ -257,38 +262,38 @@ export function CollaboratorsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nhân viên</th>
-                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Liên hệ</th>
-                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Phòng ban / Chức vụ</th>
-                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Hoa hồng (%)</th>
-                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Trạng thái</th>
-                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Thao tác</th>
+                <tr className="bg-muted/30">
+                  <th className="px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nhân viên</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Liên hệ</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phòng ban / Chức vụ</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Hoa hồng (%)</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Trạng thái</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {collaborators.map((collab) => (
-                  <tr key={collab.id} className="hover:bg-slate-50/50 transition-all group">
+                  <tr key={collab.id} className="hover:bg-muted/20 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm">
+                        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">
                           {collab.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-900">{collab.full_name}</p>
-                          <p className="text-xs text-slate-500 font-mono uppercase">{collab.role}</p>
+                          <p className="text-sm font-semibold text-foreground">{collab.full_name}</p>
+                          <p className="text-xs text-muted-foreground font-mono uppercase">{collab.role}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
-                        <p className="text-xs text-slate-500">{collab.email}</p>
-                        <p className="text-xs text-slate-500">{collab.phone || '-'}</p>
+                        <p className="text-xs text-muted-foreground">{collab.email}</p>
+                        <p className="text-xs text-muted-foreground">{collab.phone || '-'}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-slate-900">{collab.position || '-'}</p>
-                      <p className="text-xs text-slate-500">{collab.department || '-'}</p>
+                      <p className="text-sm text-foreground">{collab.position || '-'}</p>
+                      <p className="text-xs text-muted-foreground">{collab.department || '-'}</p>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="text-sm font-bold text-emerald-600">{collab.commission_rate}%</span>
@@ -296,7 +301,9 @@ export function CollaboratorsPage() {
                     <td className="px-6 py-4 text-center">
                       <span className={cn(
                         "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                        collab.is_active ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
+                        collab.is_active
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50"
+                          : "bg-muted text-muted-foreground border border-border"
                       )}>
                         {collab.is_active ? "Đang làm việc" : "Đã nghỉ"}
                       </span>
@@ -305,7 +312,7 @@ export function CollaboratorsPage() {
                       <button
                         onClick={() => handleDelete(collab.collaborator_id)}
                         disabled={deleting === collab.collaborator_id}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-muted text-muted-foreground rounded-md text-[10px] font-bold uppercase tracking-wider hover:bg-destructive hover:text-destructive-foreground transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
                       >
                         {deleting === collab.collaborator_id ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
@@ -324,37 +331,39 @@ export function CollaboratorsPage() {
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Thêm cộng tác viên</h2>
-              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all">
+        <div className="fixed inset-0 bg-foreground/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+          <div className="bg-card rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col border border-border" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">Thêm cộng tác viên</h2>
+              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-accent rounded-xl text-muted-foreground transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto">
               <div className="relative mb-4">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
                   placeholder="Tìm theo tên, email, SĐT..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-input rounded-md text-sm font-medium text-foreground shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 />
               </div>
 
               <div className="space-y-2 mb-4">
                 {filteredAvailable.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-4">Không tìm thấy nhân viên nào</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">Không tìm thấy nhân viên nào</p>
                 ) : (
                   filteredAvailable.map(u => (
                     <label
                       key={u.id}
                       className={cn(
                         "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                        selectedCollabId === u.id ? "bg-blue-50 border-blue-200" : "bg-slate-50 border-slate-200 hover:border-blue-200"
+                        selectedCollabId === u.id
+                          ? "bg-accent border-border"
+                          : "bg-muted/20 border-border hover:bg-muted/30"
                       )}
                     >
                       <input
@@ -362,15 +371,17 @@ export function CollaboratorsPage() {
                         name="collaborator"
                         checked={selectedCollabId === u.id}
                         onChange={() => setSelectedCollabId(u.id)}
-                        className="w-4 h-4 border-slate-300 text-blue-600 focus:ring-blue-500"
+                        className="w-4 h-4 border-input text-primary focus:ring-ring"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">{u.full_name}</p>
-                        <p className="text-xs text-slate-400">{u.email} • {u.phone || '-'}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{u.full_name}</p>
+                        <p className="text-xs text-muted-foreground">{u.email} • {u.phone || '-'}</p>
                       </div>
                       <span className={cn(
                         "text-xs font-bold px-2 py-0.5 rounded-full",
-                        u.role === 'admin' ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
+                        u.role === 'admin'
+                          ? "bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-900/50"
+                          : "bg-muted text-primary border border-border"
                       )}>{u.role}</span>
                     </label>
                   ))
@@ -379,11 +390,11 @@ export function CollaboratorsPage() {
 
               <div className="space-y-2">
                 <div>
-                  <label className="text-sm font-medium text-slate-700 block mb-1">Sale quản lý</label>
+                  <label className="text-sm font-medium text-foreground block mb-1">Sale quản lý</label>
                   <select
                     value={selectedSalesId}
                     onChange={(e) => setSelectedSalesId(e.target.value)}
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full px-4 py-2 bg-background border border-input rounded-md text-sm font-medium text-foreground shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <option value="">-- Chọn Sale --</option>
                     {salesUsers.map((s) => (
@@ -391,7 +402,7 @@ export function CollaboratorsPage() {
                     ))}
                   </select>
                 </div>
-                <label className="text-sm font-bold text-slate-700">Tỷ lệ hoa hồng (%)</label>
+                <label className="text-sm font-semibold text-foreground">Tỷ lệ hoa hồng (%)</label>
                 <input
                   type="number"
                   min="0"
@@ -400,18 +411,18 @@ export function CollaboratorsPage() {
                   value={commissionRate}
                   onChange={(e) => setCommissionRate(Number(e.target.value))}
                   placeholder="0"
-                  className="w-full px-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                  className="w-full px-4 py-2.5 bg-background border border-input rounded-md text-sm font-medium text-foreground shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 />
-                <p className="text-xs text-slate-400">Để sau tính hoa hồng, mặc định 0%</p>
+                <p className="text-xs text-muted-foreground">Để sau tính hoa hồng, mặc định 0%</p>
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
-              <button onClick={() => setShowAddModal(false)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">Hủy</button>
+            <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3">
+              <button onClick={() => setShowAddModal(false)} className="h-10 px-4 bg-background border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors">Hủy</button>
               <button
                 onClick={handleAdd}
                 disabled={!selectedCollabId || adding}
-                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-2 h-10 px-6 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50"
               >
                 {adding && <Loader2 className="w-4 h-4 animate-spin" />}
                 <Plus className="w-4 h-4" /> Thêm

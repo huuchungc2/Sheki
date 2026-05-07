@@ -232,7 +232,7 @@ export function InventoryImport() {
     return (
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       </div>
     );
@@ -241,7 +241,7 @@ export function InventoryImport() {
   if (dataError) {
     return (
       <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex flex-col items-center justify-center py-20 text-red-500">
+        <div className="flex flex-col items-center justify-center py-20 text-destructive">
           <AlertCircle className="w-10 h-10 mb-3" />
           <p className="text-sm font-medium">{dataError}</p>
         </div>
@@ -256,27 +256,27 @@ export function InventoryImport() {
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all"
+            className="p-2 hover:bg-accent rounded-lg text-muted-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Tạo phiếu nhập kho</h1>
-            <p className="text-slate-500 text-sm mt-1">Nhập hàng mới vào kho hệ thống.</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tạo phiếu nhập kho</h1>
+            <p className="text-muted-foreground text-sm mt-1">Nhập hàng mới vào kho hệ thống.</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={() => handleSubmit("draft")}
             disabled={submitting}
-            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50"
+            className="h-10 px-4 bg-background border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors disabled:opacity-50"
           >
             Lưu nháp
           </button>
           <button 
             onClick={() => handleSubmit("completed")}
             disabled={submitting}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50"
+            className="flex items-center gap-2 h-10 px-6 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Hoàn tất nhập kho
@@ -285,7 +285,7 @@ export function InventoryImport() {
       </div>
 
       {success && (
-        <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-700">
+        <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/50 rounded-xl text-emerald-700 dark:text-emerald-300">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
           <p className="text-sm font-medium">Nhập kho thành công! Đang chuyển hướng...</p>
         </div>
@@ -294,20 +294,20 @@ export function InventoryImport() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Form: Items List */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-muted text-primary flex items-center justify-center">
                   <Package className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-wide">Danh sách sản phẩm</h2>
-                  <p className="text-[11px] text-slate-400">Tìm kiếm và thêm sản phẩm vào phiếu</p>
+                  <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Danh sách sản phẩm</h2>
+                  <p className="text-[11px] text-muted-foreground">Tìm kiếm và thêm sản phẩm vào phiếu</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative w-[320px]" ref={productBoxRef}>
-                  <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     value={productQuery}
                     onChange={(e) => {
@@ -316,11 +316,11 @@ export function InventoryImport() {
                     }}
                     onFocus={() => productQuery.trim().length > 0 && setShowProductSuggestions(true)}
                     placeholder="Tìm sản phẩm, SKU..."
-                    className="w-full pr-9 pl-4 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm outline-none transition-all"
+                    className="w-full h-11 pr-9 pl-4 py-2.5 bg-background border border-input rounded-md text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
 
                   {showProductSuggestions && (
-                    <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50">
+                    <div className="absolute left-0 right-0 top-full mt-2 bg-popover text-popover-foreground border border-border rounded-xl shadow-xl overflow-hidden z-50">
                       <div className="max-h-64 overflow-y-auto">
                         {productSuggestions.length > 0 ? (
                           productSuggestions.map((p) => (
@@ -328,22 +328,22 @@ export function InventoryImport() {
                               key={p.id}
                               type="button"
                               onClick={() => addProduct(p)}
-                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-accent/50 transition-colors text-left border-b border-border last:border-0"
                             >
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold text-slate-900 truncate">{p.name}</p>
-                                <p className="text-[11px] text-slate-400 font-mono uppercase tracking-wide">{p.sku} • {p.unit}</p>
+                                <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
+                                <p className="text-[11px] text-muted-foreground font-mono uppercase tracking-wide">{p.sku} • {p.unit}</p>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="text-sm font-bold text-slate-900">
+                                <p className="text-sm font-semibold text-foreground tabular-nums">
                                   {formatCurrency((Number(p.cost_price ?? 0) || 0) > 0 ? (Number(p.cost_price) || 0) : (Number(p.price) || 0))}
                                 </p>
-                                <p className="text-[10px] text-slate-400">Thêm</p>
+                                <p className="text-[10px] text-muted-foreground">Thêm</p>
                               </div>
                             </button>
                           ))
                         ) : (
-                          <div className="px-4 py-8 text-center text-slate-400 text-sm">
+                          <div className="px-4 py-8 text-center text-muted-foreground text-sm">
                             Không tìm thấy sản phẩm
                           </div>
                         )}
@@ -353,7 +353,7 @@ export function InventoryImport() {
                 </div>
                 <button
                   onClick={addItem}
-                  className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl text-sm font-semibold transition-all"
+                  className="flex items-center gap-2 h-11 px-3 py-2 bg-background border border-border hover:bg-accent text-foreground rounded-md text-sm font-semibold transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   Thêm dòng
@@ -364,20 +364,20 @@ export function InventoryImport() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Sản phẩm</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">SL</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Đơn giá</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Thành tiền</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right"></th>
+                  <tr className="bg-muted/30 border-b border-border">
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sản phẩm</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-24">SL</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Đơn giá</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Thành tiền</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {items.filter(i => i.product_id).length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-14 text-center text-slate-400">
+                      <td colSpan={5} className="px-6 py-14 text-center text-muted-foreground">
                         <div className="flex flex-col items-center gap-2">
-                          <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
+                          <div className="w-12 h-12 rounded-2xl bg-muted/30 border border-border flex items-center justify-center text-muted-foreground">
                             <Package className="w-6 h-6" />
                           </div>
                           <p className="text-sm font-medium">Chưa có sản phẩm.</p>
@@ -387,15 +387,15 @@ export function InventoryImport() {
                     </tr>
                   ) : null}
                   {items.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/30 transition-all group">
+                    <tr key={item.id} className="hover:bg-muted/30 transition-colors group">
                       <td className="px-6 py-4">
                         {item.product_id ? (
                           <>
-                            <p className="text-sm font-bold text-slate-900">{item.name}</p>
-                            <p className="text-xs text-slate-500 font-mono mt-1">{item.sku} • {item.unit}</p>
+                            <p className="text-sm font-semibold text-foreground">{item.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono mt-1">{item.sku} • {item.unit}</p>
                           </>
                         ) : (
-                          <p className="text-sm text-slate-400">Chưa chọn sản phẩm (dùng ô tìm kiếm phía trên)</p>
+                          <p className="text-sm text-muted-foreground">Chưa chọn sản phẩm (dùng ô tìm kiếm phía trên)</p>
                         )}
                       </td>
                       <td className="px-6 py-4">
@@ -405,7 +405,7 @@ export function InventoryImport() {
                           onChange={(e) => updateItem(item.id, "quantity", Number(e.target.value))}
                           min={0}
                           step="0.001"
-                          className="w-full px-2 py-1 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-lg text-sm transition-all outline-none"
+                          className="w-full h-9 px-2 py-1 bg-background border border-input rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         />
                       </td>
                       <td className="px-6 py-4">
@@ -414,16 +414,16 @@ export function InventoryImport() {
                           value={item.price}
                           onChange={(e) => updateItem(item.id, "price", Number(e.target.value))}
                           min={0}
-                          className="w-full px-2 py-1 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 rounded-lg text-sm transition-all outline-none"
+                          className="w-full h-9 px-2 py-1 bg-background border border-input rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         />
                       </td>
-                      <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                      <td className="px-6 py-4 text-sm font-semibold text-foreground tabular-nums">
                         {formatCurrency(item.quantity * item.price)}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button 
                           onClick={() => removeItem(item.id)}
-                          className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all"
+                          className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-lg text-muted-foreground transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -434,64 +434,64 @@ export function InventoryImport() {
               </table>
             </div>
             
-            <div className="p-6 bg-slate-50/50 border-t border-slate-100">
+            <div className="p-6 bg-muted/30 border-t border-border">
               <div className="flex flex-col items-end gap-2">
-                <div className="flex items-center gap-8 text-sm text-slate-500">
+                <div className="flex items-center gap-8 text-sm text-muted-foreground">
                   <span>Tổng số lượng:</span>
-                  <span className="font-bold text-slate-900">{items.reduce((s, i) => s + i.quantity, 0)}</span>
+                  <span className="font-semibold text-foreground tabular-nums">{items.reduce((s, i) => s + i.quantity, 0)}</span>
                 </div>
-                <div className="flex items-center gap-8 text-lg font-bold text-slate-900">
+                <div className="flex items-center gap-8 text-lg font-semibold text-foreground">
                   <span>Tổng tiền nhập:</span>
-                  <span className="text-blue-600">{formatCurrency(total)}</span>
+                  <span className="text-primary tabular-nums">{formatCurrency(total)}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Ghi chú nhập kho</h2>
+          <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Ghi chú nhập kho</h2>
             <textarea 
               rows={4}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Nhập ghi chú hoặc lý do nhập kho (nếu có)..."
-              className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-2xl text-sm transition-all outline-none resize-none"
+              className="w-full px-4 py-3 bg-background border border-input rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-none"
             ></textarea>
           </div>
         </div>
 
         {/* Sidebar: Metadata */}
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+          <div className="bg-card p-6 rounded-xl border border-border shadow-sm space-y-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-border">
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-primary">
                 <FileText className="w-4 h-4" />
               </div>
-              <h2 className="text-lg font-bold text-slate-900">Thông tin chung</h2>
+              <h2 className="text-lg font-semibold text-foreground">Thông tin chung</h2>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mã phiếu</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Mã phiếu</label>
                 <input 
                   type="text" 
                   value="PNK-AUTO" 
                   disabled
-                  className="w-full px-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-sm font-mono transition-all outline-none"
+                  className="w-full px-4 py-2.5 bg-muted/30 border border-border rounded-md text-sm font-mono outline-none"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ngày nhập</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ngày nhập</label>
                 <GregorianDateSelect value={date} onChange={setDate} />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kho nhập</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kho nhập</label>
                 <div className="relative">
-                  <Warehouse className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Warehouse className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <select 
                     value={warehouseId}
                     onChange={(e) => setWarehouseId(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                    className="w-full h-11 pl-10 pr-4 py-2.5 bg-background border border-input rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     {warehouses.map((wh) => (
                       <option key={wh.id} value={wh.id}>{wh.name}</option>
@@ -500,26 +500,26 @@ export function InventoryImport() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Người lập phiếu</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Người lập phiếu</label>
                 <div className="relative">
-                  <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input 
                     type="text" 
                     value="Admin Sheki" 
                     disabled
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent rounded-xl text-sm transition-all outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 bg-muted/30 border border-border rounded-md text-sm outline-none"
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 space-y-3">
-            <h3 className="font-bold text-amber-900 flex items-center gap-2">
+          <div className="bg-amber-50 p-6 rounded-xl border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50 space-y-3">
+            <h3 className="font-semibold text-amber-900 dark:text-amber-100 flex items-center gap-2">
               <Package className="w-4 h-4" />
               Lưu ý quan trọng
             </h3>
-            <p className="text-xs text-amber-700 leading-relaxed">
+            <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
               Sau khi nhấn "Hoàn tất nhập kho", số lượng tồn kho của các sản phẩm trên sẽ được cộng trực tiếp vào kho đã chọn. Hành động này không thể hoàn tác.
             </p>
           </div>

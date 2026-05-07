@@ -69,29 +69,27 @@ function OrderLinePanel(props: {
 
   const rowClass = (active: boolean) =>
     cn(
-      "flex flex-col gap-3 rounded-xl border px-4 py-3.5 transition-colors sm:flex-row sm:items-center sm:justify-between sm:gap-4",
-      active
-        ? "border-blue-200/80 bg-blue-50/40 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.06)]"
-        : "border-slate-100 bg-slate-50/25"
+      "flex flex-col gap-3 rounded-lg border px-4 py-3.5 transition-colors sm:flex-row sm:items-center sm:justify-between sm:gap-4",
+      active ? "border-primary/25 bg-accent/40" : "border-border bg-muted/20"
     );
 
   const pctInputClass = (enabled: boolean) =>
     cn(
-      "w-full rounded-lg border px-3 py-2.5 pr-8 text-sm font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:max-w-[7.5rem]",
+      "w-full rounded-md border px-3 py-2.5 pr-8 text-sm font-semibold bg-background text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:max-w-[7.5rem]",
       enabled
-        ? "border-slate-200 bg-white text-slate-900 focus:border-blue-300"
-        : "border-slate-100 bg-slate-100/80 text-slate-400 cursor-not-allowed"
+        ? "border-input"
+        : "border-border bg-muted text-muted-foreground cursor-not-allowed"
     );
 
   return (
-    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden min-h-0">
-      <div className="flex items-start gap-3 px-5 py-4 border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white border border-slate-200/80 text-blue-600 shadow-sm">
+    <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm overflow-hidden min-h-0">
+      <div className="flex items-start gap-3 px-5 py-4 border-b border-border bg-muted/30">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background border border-border text-primary shadow-sm">
           {icon}
         </div>
         <div className="min-w-0 pt-0.5">
-          <h3 className="text-sm font-black text-slate-900 tracking-tight">{heading}</h3>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">{subheading}</p>
+          <h3 className="text-sm font-semibold tracking-tight">{heading}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">{subheading}</p>
         </div>
       </div>
       <div className="p-5 flex flex-col gap-2.5">
@@ -101,15 +99,15 @@ function OrderLinePanel(props: {
               type="checkbox"
               checked={state.show_discount}
               onChange={(e) => setState((s) => ({ ...s, show_discount: e.target.checked }))}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-blue-600"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary"
             />
             <span className="min-w-0">
-              <span className="text-sm font-bold text-slate-900">CK — Chiết khấu</span>
-              <span className="block text-xs text-slate-500 mt-0.5 leading-snug">Hiện cột chiết khấu trên bảng dòng.</span>
+              <span className="text-sm font-semibold">CK — Chiết khấu</span>
+              <span className="block text-xs text-muted-foreground mt-0.5 leading-snug">Hiện cột chiết khấu trên bảng dòng.</span>
             </span>
           </label>
           <div className="shrink-0 w-full sm:w-auto sm:min-w-[7.5rem]">
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">% CK mặc định</span>
+            <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">% CK mặc định</span>
             <div className="relative">
               <input
                 type="number"
@@ -127,7 +125,7 @@ function OrderLinePanel(props: {
                   }));
                 }}
               />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">%</span>
             </div>
           </div>
         </div>
@@ -138,15 +136,15 @@ function OrderLinePanel(props: {
               type="checkbox"
               checked={state.show_commission}
               onChange={(e) => setState((s) => ({ ...s, show_commission: e.target.checked }))}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-blue-600"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary"
             />
             <span className="min-w-0">
-              <span className="text-sm font-bold text-slate-900">HH — Hoa hồng</span>
-              <span className="block text-xs text-slate-500 mt-0.5 leading-snug">Hiện cột hoa hồng trên bảng dòng.</span>
+              <span className="text-sm font-semibold">HH — Hoa hồng</span>
+              <span className="block text-xs text-muted-foreground mt-0.5 leading-snug">Hiện cột hoa hồng trên bảng dòng.</span>
             </span>
           </label>
           <div className="shrink-0 w-full sm:w-auto sm:min-w-[7.5rem]">
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">% HH mặc định</span>
+            <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">% HH mặc định</span>
             <div className="relative">
               <input
                 type="number"
@@ -164,7 +162,7 @@ function OrderLinePanel(props: {
                   }));
                 }}
               />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">%</span>
             </div>
           </div>
         </div>
@@ -175,14 +173,14 @@ function OrderLinePanel(props: {
               type="checkbox"
               checked={state.qty_allow_decimal}
               onChange={(e) => setState((s) => ({ ...s, qty_allow_decimal: e.target.checked }))}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-blue-600"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary"
             />
             <span className="min-w-0">
-              <span className="text-sm font-bold text-slate-900">SL — Số lượng</span>
-              <span className="block text-xs text-slate-500 mt-0.5 leading-snug">Cho phép nhập số lượng lẻ (thập phân), không chỉ số nguyên.</span>
+              <span className="text-sm font-semibold">SL — Số lượng</span>
+              <span className="block text-xs text-muted-foreground mt-0.5 leading-snug">Cho phép nhập số lượng lẻ (thập phân), không chỉ số nguyên.</span>
             </span>
           </label>
-          <div className="hidden sm:flex shrink-0 w-[7.5rem] items-center justify-end text-xs font-semibold text-slate-400 tabular-nums">
+          <div className="hidden sm:flex shrink-0 w-[7.5rem] items-center justify-end text-xs font-semibold text-muted-foreground tabular-nums">
             —
           </div>
         </div>
@@ -466,13 +464,13 @@ export function Settings() {
     (tab === "permissions" || tab === "scopes" ? matrixLoading : orderLineLoading);
 
   return (
-    <div className="min-h-screen bg-slate-50 -m-8 p-8">
-      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight">
             {tab === "order-line" ? "Cài đặt" : "Phân quyền"}
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">
+          <p className="text-sm text-muted-foreground mt-0.5">
             {tab === "order-line"
               ? "Hiển thị cột số lượng / chiết khấu / hoa hồng và % mặc định cho form đơn giao và bán tại quầy (theo shop hiện tại)."
               : "Lưu ý: hệ thống sẽ lưu phân quyền ngay theo dữ liệu bạn chọn bên dưới."}
@@ -483,7 +481,7 @@ export function Settings() {
             <button
               onClick={seedDefaultsForAll}
               disabled={saving || matrixLoading}
-              className="px-4 py-2 rounded-xl text-sm font-bold bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+              className="h-10 px-4 rounded-md text-sm font-semibold bg-background border border-border hover:bg-accent disabled:opacity-50"
             >
               Khởi tạo phân quyền mặc định
             </button>
@@ -491,7 +489,7 @@ export function Settings() {
           <button
             onClick={tabSave}
             disabled={tabSaveDisabled}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+            className="h-10 px-4 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:opacity-95 disabled:opacity-50 inline-flex items-center gap-2"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? "Đang lưu..." : "Lưu"}
@@ -499,12 +497,12 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="flex items-center gap-6 mb-4 border-b border-slate-200 flex-wrap">
+      <div className="flex items-center gap-6 border-b border-border flex-wrap">
         <button
           onClick={() => setTabAndSyncUrl("permissions")}
           className={cn(
-            "text-sm font-bold pb-2 border-b-2 -mb-px",
-            tab === "permissions" ? "text-blue-600 border-blue-600" : "text-slate-400 border-transparent"
+            "text-sm font-semibold pb-2 border-b-2 -mb-px",
+            tab === "permissions" ? "text-foreground border-primary" : "text-muted-foreground border-transparent"
           )}
         >
           Phân quyền nhóm
@@ -512,8 +510,8 @@ export function Settings() {
         <button
           onClick={() => setTabAndSyncUrl("scopes")}
           className={cn(
-            "text-sm font-bold pb-2 border-b-2 -mb-px",
-            tab === "scopes" ? "text-blue-600 border-blue-600" : "text-slate-400 border-transparent"
+            "text-sm font-semibold pb-2 border-b-2 -mb-px",
+            tab === "scopes" ? "text-foreground border-primary" : "text-muted-foreground border-transparent"
           )}
         >
           Phân quyền xem dữ liệu
@@ -521,8 +519,8 @@ export function Settings() {
         <button
           onClick={() => setTabAndSyncUrl("order-line")}
           className={cn(
-            "text-sm font-bold pb-2 border-b-2 -mb-px",
-            tab === "order-line" ? "text-blue-600 border-blue-600" : "text-slate-400 border-transparent"
+            "text-sm font-semibold pb-2 border-b-2 -mb-px",
+            tab === "order-line" ? "text-foreground border-primary" : "text-muted-foreground border-transparent"
           )}
         >
           Form đơn &amp; quầy
@@ -530,37 +528,37 @@ export function Settings() {
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold">
-          <AlertCircle className="w-5 h-5 shrink-0" /> {error}
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-600 text-sm font-bold">
-          <CheckCircle2 className="w-5 h-5 shrink-0" /> Lưu thành công!
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 px-4 py-3 text-sm flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> Lưu thành công!
         </div>
       )}
 
       {tab === "permissions" && matrixLoading ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-slate-500 font-medium">
+        <div className="bg-card rounded-xl border border-border p-10 text-muted-foreground font-medium">
           Đang tải...
         </div>
       ) : tab === "permissions" ? (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
           <div className="overflow-auto max-h-[min(70vh,calc(100vh-12rem))]">
             <table className="min-w-[720px] w-full text-xs">
-              <thead className="sticky top-0 z-20 bg-slate-100 shadow-[0_1px_0_0_rgb(226,232,240)]">
+              <thead className="sticky top-0 z-20 bg-muted border-b border-border">
                 <tr>
-                  <th className="text-left px-3 py-2 font-black text-slate-700 w-[min(40vw,280px)] border-b border-slate-200">
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide w-[min(40vw,280px)] border-b border-border">
                     Chức năng
                   </th>
                   {roles.map((r) => (
                     <th
                       key={r.id}
-                      className="px-2 py-2 font-black text-slate-700 border-b border-slate-200 text-center align-bottom"
+                      className="px-2 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border text-center align-bottom"
                     >
                       <div className="min-w-[92px] mx-auto">
-                        <p className="text-[11px] font-bold text-slate-800 leading-tight line-clamp-2">{r.name}</p>
-                        <p className="text-[9px] text-slate-400 font-extrabold uppercase mt-0.5 tracking-wide">
+                        <p className="text-[11px] font-semibold text-foreground leading-tight line-clamp-2">{r.name}</p>
+                        <p className="text-[9px] text-muted-foreground font-semibold uppercase mt-0.5 tracking-wide">
                           {String(r.code)}
                         </p>
                       </div>
@@ -570,15 +568,15 @@ export function Settings() {
               </thead>
               {permissionGroups.map((g) => (
                 <tbody key={g.groupKey}>
-                  <tr className="bg-slate-100/95">
-                    <td colSpan={1 + roles.length} className="px-3 py-1.5 border-b border-slate-200/90">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-slate-600">
+                  <tr className="bg-muted/60">
+                    <td colSpan={1 + roles.length} className="px-3 py-1.5 border-b border-border">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {g.groupName}
                       </span>
                     </td>
                   </tr>
                   {g.rows.map((f) => (
-                    <tr key={f.key} className="hover:bg-slate-50/80 border-b border-slate-100 last:border-0">
+                    <tr key={f.key} className="hover:bg-accent/30 border-b border-border last:border-0">
                       <td className="px-3 py-1.5 align-middle">
                         <div
                           className="flex flex-wrap items-baseline gap-x-2 gap-y-0"
@@ -586,13 +584,13 @@ export function Settings() {
                         >
                           <span
                             className={cn(
-                              "font-semibold text-slate-800 leading-snug",
-                              f.depth ? "text-slate-700" : "text-slate-900"
+                              "font-medium text-foreground leading-snug",
+                              f.depth ? "text-foreground/90" : "text-foreground"
                             )}
                           >
                             {f.name}
                           </span>
-                          <code className="text-[10px] text-slate-400 font-mono font-medium">{f.key}</code>
+                          <code className="text-[10px] text-muted-foreground font-mono font-medium">{f.key}</code>
                         </div>
                       </td>
                       {roles.map((r) => {
@@ -603,7 +601,7 @@ export function Settings() {
                               type="checkbox"
                               checked={checked}
                               onChange={() => toggle(r.id, f.key)}
-                              className="h-3.5 w-3.5 rounded border-slate-300 accent-blue-600"
+                              className="h-3.5 w-3.5 rounded border-input accent-primary"
                             />
                           </td>
                         );
@@ -616,23 +614,23 @@ export function Settings() {
           </div>
         </div>
       ) : tab === "scopes" && matrixLoading ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-slate-500 font-medium">
+        <div className="bg-card rounded-xl border border-border p-10 text-muted-foreground font-medium">
           Đang tải...
         </div>
       ) : tab === "scopes" ? (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="overflow-auto">
             <table className="min-w-[980px] w-full text-sm">
-              <thead className="sticky top-0 bg-slate-50 z-10">
+              <thead className="sticky top-0 bg-muted z-10">
                 <tr>
-                  <th className="text-left px-4 py-3 font-black text-slate-700 border-b border-slate-200 w-[320px]">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border w-[320px]">
                     Dữ liệu
                   </th>
                   {roles.map((r) => (
-                    <th key={r.id} className="px-3 py-3 font-black text-slate-700 border-b border-slate-200 text-center">
+                    <th key={r.id} className="px-3 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border text-center">
                       <div className="min-w-[110px]">
-                        <p className="text-xs">{r.name}</p>
-                        <p className="text-[10px] text-slate-400 font-extrabold uppercase mt-0.5">{String(r.code)}</p>
+                        <p className="text-xs text-foreground font-semibold normal-case">{r.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-semibold uppercase mt-0.5">{String(r.code)}</p>
                       </div>
                     </th>
                   ))}
@@ -640,18 +638,18 @@ export function Settings() {
               </thead>
               <tbody>
                 {scopeTargets.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 border-b border-slate-100 font-bold text-slate-800">
-                      {t.name} <span className="text-[10px] text-slate-400 font-semibold ml-2">{t.id}</span>
+                  <tr key={t.id} className="hover:bg-accent/30">
+                    <td className="px-4 py-2 border-b border-border font-medium text-foreground">
+                      {t.name} <span className="text-[10px] text-muted-foreground font-semibold ml-2">{t.id}</span>
                     </td>
                     {roles.map((r) => {
                       const v = scopes?.[r.id]?.[t.id] || "own";
                       return (
-                        <td key={r.id} className="px-3 py-2 border-b border-slate-100 text-center">
+                        <td key={r.id} className="px-3 py-2 border-b border-border text-center">
                           <select
                             value={v}
                             onChange={(e) => setScope(r.id, t.id, e.target.value as any)}
-                            className="text-xs font-bold bg-white border border-slate-200 rounded-lg px-2 py-1"
+                            className="text-xs font-semibold bg-background border border-input rounded-md px-2 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           >
                             {scopeLevels.map((sl) => (
                               <option key={sl.id} value={sl.id}>
@@ -670,24 +668,24 @@ export function Settings() {
         </div>
       ) : tab === "order-line" ? (
         orderLineLoading ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-10 text-slate-500 font-medium flex items-center gap-3">
-            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+          <div className="bg-card rounded-xl border border-border p-10 text-muted-foreground font-medium flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             Đang tải cấu hình dòng đơn...
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/80">
-              <h2 className="text-base font-black text-slate-900 tracking-tight">Cột &amp; giá trị mặc định trên form</h2>
-              <p className="text-sm text-slate-500 font-medium mt-1 max-w-3xl leading-relaxed">
-                Tách riêng <span className="text-slate-700 font-bold">đơn giao</span> và{" "}
-                <span className="text-slate-700 font-bold">bán quầy</span>. Thay đổi có hiệu lực sau khi bấm Lưu (và khi mở lại màn tạo/sửa đơn).
+          <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-border bg-muted/30">
+              <h2 className="text-base font-semibold tracking-tight">Cột &amp; giá trị mặc định trên form</h2>
+              <p className="text-sm text-muted-foreground mt-1 max-w-3xl leading-relaxed">
+                Tách riêng <span className="text-foreground font-semibold">đơn giao</span> và{" "}
+                <span className="text-foreground font-semibold">bán quầy</span>. Thay đổi có hiệu lực sau khi bấm Lưu (và khi mở lại màn tạo/sửa đơn).
               </p>
             </div>
             <div className="p-6">
-              <div className="flex gap-3 rounded-xl border border-sky-100 bg-sky-50/60 px-4 py-3 text-sm text-sky-950/90">
-                <Info className="w-5 h-5 shrink-0 text-sky-600 opacity-90 mt-0.5" />
+              <div className="flex gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
+                <Info className="w-5 h-5 shrink-0 text-muted-foreground opacity-90 mt-0.5" />
                 <p className="leading-relaxed">
-                  Chỉ <strong className="font-bold">quản trị shop</strong> mới lưu được cấu hình này. Super admin không chỉnh qua API này.
+                  Chỉ <strong className="font-semibold">quản trị shop</strong> mới lưu được cấu hình này. Super admin không chỉnh qua API này.
                 </p>
               </div>
               <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">

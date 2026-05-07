@@ -93,7 +93,7 @@ function MoneyAmountField({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         className={cn(
-          "min-w-[7rem] max-w-[12rem] px-2 py-0.5 border border-blue-300 rounded text-right font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 tabular-nums",
+          "min-w-[7rem] max-w-[12rem] px-2 py-0.5 border border-input rounded-md bg-background text-right font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background tabular-nums",
           inputClassName
         )}
       />
@@ -105,7 +105,7 @@ function MoneyAmountField({
       type="button"
       onClick={openEdit}
       className={cn(
-        "max-w-[12rem] text-right font-medium text-slate-700 tabular-nums hover:text-slate-900 rounded px-1 py-0.5 -mr-1 hover:bg-slate-50",
+        "max-w-[12rem] text-right font-medium text-foreground tabular-nums rounded px-1 py-0.5 -mr-1 hover:bg-accent/50",
         className
       )}
     >
@@ -886,15 +886,15 @@ export function OrderForm() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="w-8 h-8 flex items-center justify-center border border-slate-200 rounded-lg text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-all"
+            className="w-9 h-9 flex items-center justify-center border border-border rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+            <h1 className="text-xl font-semibold tracking-tight">
               {isEdit ? `Chỉnh sửa đơn #${id}` : 'Tạo đơn hàng mới'}
             </h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {isEdit
                 ? 'Cập nhật thông tin đơn hàng và trạng thái vận chuyển.'
                 : 'Đơn ghi nhận nhân viên bán hàng (sales) là người đang đăng nhập.'}
@@ -905,7 +905,7 @@ export function OrderForm() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-slate-50 transition-all"
+            className="flex-1 sm:flex-none h-10 px-4 border border-border rounded-md text-sm font-semibold text-foreground hover:bg-accent transition-colors"
           >
             Hủy
           </button>
@@ -913,7 +913,7 @@ export function OrderForm() {
             type="button"
             onClick={submitOrder}
             disabled={isEdit && payrollPeriodStatus === "closed"}
-            className="hidden sm:flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="hidden sm:flex items-center gap-2 h-10 px-5 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
@@ -923,7 +923,7 @@ export function OrderForm() {
 
       {/* Error banner */}
       {formError && (
-        <div className="flex items-center gap-3 mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="flex items-center gap-3 mb-4 px-4 py-3 rounded-lg border border-destructive/30 bg-destructive/10 text-sm text-destructive">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span className="font-medium">{formError}</span>
         </div>
@@ -935,29 +935,30 @@ export function OrderForm() {
         <div className="flex flex-col gap-4">
 
           {/* Card: Khách hàng */}
-          <div className="bg-white border border-slate-100 rounded-xl p-5">
+          <div className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center">
-                <User className="w-3.5 h-3.5 text-blue-600" />
+              <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center">
+                <User className="w-3.5 h-3.5 text-primary" />
               </div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Thông tin khách hàng</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Thông tin khách hàng</span>
             </div>
 
             {/* Kho + Nhóm — 2 cột */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <div className="hidden sm:block">
-                <label className="text-[11px] text-slate-400 mb-1 flex items-center gap-1">
+                <label className="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
                   Kho xuất hàng
-                  <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
+                  <span className="bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
                 </label>
                 <select
                   value={selectedWarehouseId ?? ""}
                   onChange={(e) => setSelectedWarehouseId(e.target.value ? Number(e.target.value) : null)}
                   className={cn(
-                    "w-full px-3 py-2 border rounded-lg text-sm outline-none transition-all bg-white",
+                    "w-full h-10 px-3 py-2 border rounded-md text-sm outline-none transition-colors bg-background",
+                    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     !selectedWarehouseId
-                      ? "border-amber-300 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                      : "border-slate-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                      ? "border-amber-300"
+                      : "border-input"
                   )}
                 >
                   <option value="">— Chọn kho xuất hàng —</option>
@@ -967,9 +968,9 @@ export function OrderForm() {
                 </select>
               </div>
               <div>
-                <label className="text-[11px] text-slate-400 mb-1 flex items-center gap-1">
+                <label className="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
                   Nhóm bán hàng
-                  <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
+                  <span className="bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
                 </label>
                 <select
                   value={selectedGroupId ?? ""}
@@ -980,10 +981,11 @@ export function OrderForm() {
                     if (id && directManagerId != null) setEditIncludeManagerId(directManagerId);
                   }}
                   className={cn(
-                    "w-full px-3 py-2 border rounded-lg text-sm outline-none transition-all bg-white",
+                    "w-full h-10 px-3 py-2 border rounded-md text-sm outline-none transition-colors bg-background",
+                    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     !selectedGroupId
-                      ? "border-amber-300 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                      : "border-slate-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                      ? "border-amber-300"
+                      : "border-input"
                   )}
                 >
                   <option value="">— Chọn nhóm bán hàng —</option>
@@ -997,9 +999,9 @@ export function OrderForm() {
             {/* Tìm khách hàng + Địa chỉ — 2 cột */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] text-slate-400 mb-1 block">Tìm khách hàng</label>
+                <label className="text-[11px] text-muted-foreground mb-1 block">Tìm khách hàng</label>
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <Search className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="text"
                     placeholder="Tìm theo tên hoặc SĐT..."
@@ -1010,51 +1012,51 @@ export function OrderForm() {
                       fetchCustomerSuggestions(e.target.value);
                     }}
                     onFocus={() => customerQuery.length > 0 && setShowCustomerSuggestions(true)}
-                    className="w-full pr-9 pl-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all"
+                    className="w-full h-10 pr-9 pl-3 py-2 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                   {showCustomerSuggestions && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-lg shadow-lg z-50 overflow-hidden">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 overflow-hidden">
                       <div className="max-h-52 overflow-y-auto">
                         {customerSuggestions.length > 0 ? (
                           customerSuggestions.map(customer => (
                             <button
                               key={customer.id}
                               onClick={() => selectCustomer(customer)}
-                              className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                              className="w-full px-4 py-3 flex items-center gap-3 hover:bg-accent/50 transition-colors text-left border-b border-border last:border-0"
                             >
-                              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-[11px] font-semibold text-blue-600 flex-shrink-0">
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[11px] font-semibold text-primary flex-shrink-0">
                                 {(customer.name || '').split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-slate-800">{customer.name}</p>
-                                <p className="text-[11px] text-slate-400">{customer.phone || ''}</p>
+                                <p className="text-sm font-medium text-foreground">{customer.name}</p>
+                                <p className="text-[11px] text-muted-foreground">{customer.phone || ''}</p>
                               </div>
                             </button>
                           ))
                         ) : (
-                          <div className="px-4 py-6 text-center text-slate-400 text-sm">Không tìm thấy khách hàng</div>
+                          <div className="px-4 py-6 text-center text-muted-foreground text-sm">Không tìm thấy khách hàng</div>
                         )}
                       </div>
                     </div>
                   )}
                 </div>
                 {selectedCustomer && (
-                  <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-                    <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-semibold text-blue-600 flex-shrink-0">
+                  <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-lg border border-border">
+                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-primary flex-shrink-0">
                       {selectedCustomer.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('') || '?'}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{selectedCustomer.name || 'Chưa chọn'}</p>
-                      <p className="text-[11px] text-slate-400">{selectedCustomer.phone || ''}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{selectedCustomer.name || 'Chưa chọn'}</p>
+                      <p className="text-[11px] text-muted-foreground">{selectedCustomer.phone || ''}</p>
                     </div>
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400 mb-1 block">Địa chỉ giao hàng</label>
+                <label className="text-[11px] text-muted-foreground mb-1 block">Địa chỉ giao hàng</label>
                 <div className="relative">
-                  <MapPin className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-300" />
+                  <MapPin className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted-foreground" />
                   <textarea
                     placeholder="Nhập địa chỉ chi tiết..."
                     value={shipmentAddress}
@@ -1062,7 +1064,7 @@ export function OrderForm() {
                       setShipmentAddressTouched(true);
                       setShipmentAddress(e.target.value);
                     }}
-                    className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all resize-none"
+                    className="w-full pl-8 pr-3 py-2 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-none"
                     rows={3}
                   />
                 </div>
@@ -1071,16 +1073,16 @@ export function OrderForm() {
           </div>
 
           {/* Card: Sản phẩm */}
-          <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-green-50 flex items-center justify-center">
-                  <Package className="w-3.5 h-3.5 text-green-600" />
+                <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center">
+                  <Package className="w-3.5 h-3.5 text-primary" />
                 </div>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Danh sách sản phẩm</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Danh sách sản phẩm</span>
               </div>
               <div className="relative hidden sm:block w-56">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
                   placeholder="Tìm sản phẩm, SKU..."
@@ -1091,20 +1093,20 @@ export function OrderForm() {
                     fetchProductSuggestions(e.target.value);
                   }}
                   onFocus={() => productQuery.length > 0 && setShowResults(true)}
-                  className="w-full pr-3 pl-9 py-1.5 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all"
+                  className="w-full h-10 pr-3 pl-9 py-1.5 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 />
                 {showResults && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-lg shadow-lg z-50 overflow-hidden">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 overflow-hidden">
                     <div className="max-h-52 overflow-y-auto">
                       {productSuggestions.length > 0 ? (
                         productSuggestions.map(product => (
                           <button
                             key={product.id}
                             onClick={() => addProduct(product)}
-                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-accent/50 transition-colors text-left border-b border-border last:border-0"
                           >
                             <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                              <div className="w-9 h-9 rounded-lg bg-muted border border-border overflow-hidden flex items-center justify-center flex-shrink-0">
                                 {resolveImageSrc(product.image) ? (
                                   <img
                                     src={resolveImageSrc(product.image) as string}
@@ -1116,22 +1118,22 @@ export function OrderForm() {
                                     }}
                                   />
                                 ) : (
-                                  <Package className="w-4 h-4 text-slate-300" />
+                                  <Package className="w-4 h-4 text-muted-foreground/60" />
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm font-medium text-slate-800 truncate">{product.name}</p>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono truncate">{product.sku}</p>
+                                <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-mono truncate">{product.sku}</p>
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm font-medium text-slate-800">{formatCurrency(product.price)}</p>
-                              <p className="text-[10px] text-slate-400">Thêm</p>
+                              <p className="text-sm font-medium text-foreground tabular-nums">{formatCurrency(product.price)}</p>
+                              <p className="text-[10px] text-muted-foreground">Thêm</p>
                             </div>
                           </button>
                         ))
                       ) : (
-                        <div className="px-4 py-6 text-center text-slate-400 text-sm">Không tìm thấy sản phẩm</div>
+                        <div className="px-4 py-6 text-center text-muted-foreground text-sm">Không tìm thấy sản phẩm</div>
                       )}
                     </div>
                   </div>
@@ -1140,19 +1142,20 @@ export function OrderForm() {
             </div>
 
             {/* Mobile: Kho xuất hàng nằm cùng khu vực chọn sản phẩm */}
-            <div className="sm:hidden px-4 py-3 border-b border-slate-100 bg-white">
-              <label className="text-[11px] text-slate-500 mb-1 flex items-center gap-1">
+            <div className="sm:hidden px-4 py-3 border-b border-border bg-card">
+              <label className="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
                 Kho xuất hàng
-                <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
+                <span className="bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50 text-[10px] px-1.5 py-0.5 rounded font-medium">bắt buộc</span>
               </label>
               <select
                 value={selectedWarehouseId ?? ""}
                 onChange={(e) => setSelectedWarehouseId(e.target.value ? Number(e.target.value) : null)}
                 className={cn(
-                  "w-full h-10 px-3 border rounded-lg text-sm outline-none transition-all bg-white",
+                  "w-full h-10 px-3 border rounded-md text-sm outline-none transition-colors bg-background",
+                  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   !selectedWarehouseId
-                    ? "border-amber-300 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                    : "border-slate-200 focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+                    ? "border-amber-300"
+                    : "border-input"
                 )}
               >
                 <option value="">— Chọn kho xuất hàng —</option>
@@ -1165,10 +1168,10 @@ export function OrderForm() {
             </div>
 
             {/* Mobile product picker: 1 hàng ngang (input + nút) */}
-            <div className="sm:hidden px-4 py-3 border-b border-slate-100 bg-white">
+            <div className="sm:hidden px-4 py-3 border-b border-border bg-card">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     ref={productInputRef}
                     type="text"
@@ -1182,20 +1185,20 @@ export function OrderForm() {
                     onFocus={() => {
                       if (productQuery.length > 0) setShowResults(true);
                     }}
-                    className="w-full h-10 pl-10 pr-3 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
+                    className="w-full h-10 pl-10 pr-3 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   />
                   {showResults && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-lg shadow-lg z-50 overflow-hidden">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 overflow-hidden">
                       <div className="max-h-64 overflow-y-auto">
                         {productSuggestions.length > 0 ? (
                           productSuggestions.map((product) => (
                             <button
                               key={product.id}
                               onClick={() => addProduct(product)}
-                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-accent/50 transition-colors text-left border-b border-border last:border-0"
                             >
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                <div className="w-9 h-9 rounded-lg bg-muted border border-border overflow-hidden flex items-center justify-center flex-shrink-0">
                                   {resolveImageSrc(product.image) ? (
                                     <img
                                       src={resolveImageSrc(product.image) as string}
@@ -1207,22 +1210,22 @@ export function OrderForm() {
                                       }}
                                     />
                                   ) : (
-                                    <Package className="w-4 h-4 text-slate-300" />
+                                    <Package className="w-4 h-4 text-muted-foreground/60" />
                                   )}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-sm font-medium text-slate-800 truncate">{product.name}</p>
-                                  <p className="text-[10px] text-slate-400 uppercase tracking-wide font-mono truncate">{product.sku}</p>
+                                  <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
+                                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-mono truncate">{product.sku}</p>
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0 pl-3">
-                                <p className="text-sm font-semibold text-slate-800">{formatCurrency(product.price)}</p>
-                                <p className="text-[10px] text-slate-400">Thêm</p>
+                                <p className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(product.price)}</p>
+                                <p className="text-[10px] text-muted-foreground">Thêm</p>
                               </div>
                             </button>
                           ))
                         ) : (
-                          <div className="px-4 py-6 text-center text-slate-400 text-sm">Không tìm thấy sản phẩm</div>
+                          <div className="px-4 py-6 text-center text-muted-foreground text-sm">Không tìm thấy sản phẩm</div>
                         )}
                       </div>
                     </div>
@@ -1236,7 +1239,7 @@ export function OrderForm() {
                     setShowResults(true);
                     if (productQuery.length > 0) fetchProductSuggestions(productQuery);
                   }}
-                  className="h-10 w-10 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-green-700 hover:bg-green-50 hover:border-green-200 transition-colors"
+                  className="h-10 w-10 rounded-md border border-border bg-background flex items-center justify-center text-primary hover:bg-accent transition-colors"
                   aria-label="Mở tìm sản phẩm"
                 >
                   <Plus className="w-5 h-5" />
@@ -1245,8 +1248,8 @@ export function OrderForm() {
             </div>
 
             {!isAdmin && (
-              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/70">
-                <label className="mb-1.5 block text-[11px] font-medium text-slate-600">
+              <div className="px-5 py-3 border-b border-border bg-muted/20">
+                <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
                   Quản lý (nhận HH trực tiếp)
                 </label>
                 <select
@@ -1258,7 +1261,7 @@ export function OrderForm() {
                     if (id) setEditIncludeManagerId(mid);
                     applyCommissionForManager(mid);
                   }}
-                  className="w-full max-w-md rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-green-400 focus:ring-2 focus:ring-green-50"
+                  className="w-full max-w-md h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <option value="">— Tôi nhận HH (người tạo đơn) —</option>
                   {managerOptions.map((m) => (
@@ -1267,15 +1270,15 @@ export function OrderForm() {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1.5 text-[10px] text-slate-400 leading-relaxed">
+                <p className="mt-1.5 text-[10px] text-muted-foreground leading-relaxed">
                   Mặc định: quản lý trực tiếp đầu tiên trong danh sách. Để trống “Tôi nhận HH”: đơn bán trực tiếp (HH thuộc người tạo đơn). Chọn quản lý: đơn ghi nhận quản lý là người bán (HH trực tiếp thuộc quản lý).
                 </p>
               </div>
             )}
 
             {items.length === 0 ? (
-              <div className="py-12 text-center text-slate-400">
-                <Package className="w-7 h-7 mx-auto mb-2 text-slate-200" />
+              <div className="py-12 text-center text-muted-foreground">
+                <Package className="w-7 h-7 mx-auto mb-2 text-muted-foreground/40" />
                 <p className="text-sm">Chưa có sản phẩm. Tìm và thêm bên trên.</p>
               </div>
             ) : (
@@ -1284,8 +1287,8 @@ export function OrderForm() {
                 <div className="block sm:hidden">
                   <div className="overflow-x-auto">
                     <div className="min-w-0" style={{ minWidth: lineGridMinPx }}>
-                      <div className="sticky top-0 z-10 px-4 pt-3 pb-2 border-b border-slate-100 bg-slate-50">
-                        <div className="flex gap-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                      <div className="sticky top-0 z-10 px-4 pt-3 pb-2 border-b border-border bg-muted/30">
+                        <div className="flex gap-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                           <div className="w-[260px]">Sản phẩm</div>
                           <div className="w-[190px] text-center">Số lượng</div>
                           <div className="w-[140px] text-right">Đơn giá</div>
@@ -1296,7 +1299,7 @@ export function OrderForm() {
                         </div>
                       </div>
 
-                      <div className="px-4 py-2 divide-y divide-slate-100">
+                      <div className="px-4 py-2 divide-y divide-border">
                       {items.map((item) => {
                         const { maxAllowed, overStock } = computeStockMeta(item as any);
                         const lineTotal = item.quantity * item.price - item.discountAmount;
@@ -1310,7 +1313,7 @@ export function OrderForm() {
                           >
                             <div className="w-[260px] min-w-0">
                               <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                                <div className="w-9 h-9 rounded-lg bg-muted border border-border overflow-hidden flex items-center justify-center flex-shrink-0">
                                   {resolveImageSrc((item as any).image) ? (
                                     <img
                                       src={resolveImageSrc((item as any).image) as string}
@@ -1322,15 +1325,15 @@ export function OrderForm() {
                                       }}
                                     />
                                   ) : (
-                                    <Package className="w-4 h-4 text-slate-300" />
+                                    <Package className="w-4 h-4 text-muted-foreground/60" />
                                   )}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-[13px] font-semibold text-slate-800 truncate">{item.productName}</p>
-                                  <p className="mt-0.5 text-[10px] text-slate-400 font-mono uppercase tracking-wide truncate">{item.sku}</p>
+                                  <p className="text-[13px] font-semibold text-foreground truncate">{item.productName}</p>
+                                  <p className="mt-0.5 text-[10px] text-muted-foreground font-mono uppercase tracking-wide truncate">{item.sku}</p>
                                 </div>
                               </div>
-                              <p className={cn("mt-0.5 text-[10px]", overStock ? "text-red-600 font-medium" : "text-slate-500")}>
+                              <p className={cn("mt-0.5 text-[10px]", overStock ? "text-destructive font-medium" : "text-muted-foreground")}>
                                 Có thể bán: {maxAllowed.toFixed(3).replace(/\.?0+$/, "")}
                                 {overStock && <span className="ml-1">— Vượt tồn</span>}
                               </p>
@@ -1344,7 +1347,7 @@ export function OrderForm() {
                                     const v = roundQty(item.quantity - 1);
                                     updateItem(item.productId, { quantity: v });
                                   }}
-                                  className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600"
+                                  className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors"
                                 >
                                   <Minus className="w-4 h-4" />
                                 </button>
@@ -1361,8 +1364,8 @@ export function OrderForm() {
                                   className={cn(
                                     "w-20 h-8 rounded-lg border px-2 text-center text-[13px] font-semibold outline-none",
                                     overStock
-                                      ? "border-red-300 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-100"
-                                      : "border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-50"
+                                      ? "border-destructive/40 bg-destructive/10 text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                      : "border-input bg-background text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                   )}
                                 />
                                 <button
@@ -1371,7 +1374,7 @@ export function OrderForm() {
                                     const v = roundQty(item.quantity + 1);
                                     updateItem(item.productId, { quantity: v });
                                   }}
-                                  className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600"
+                                  className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors"
                                 >
                                   <Plus className="w-4 h-4" />
                                 </button>
@@ -1387,7 +1390,7 @@ export function OrderForm() {
                                   const p = Math.max(0, Number(e.target.value) || 0);
                                   updateItem(item.productId, { price: p });
                                 }}
-                                className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-right text-[13px] font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-50"
+                                className="w-full h-8 rounded-md border border-input bg-background px-2 text-right text-[13px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                               />
                             </div>
 
@@ -1418,15 +1421,15 @@ export function OrderForm() {
                                     const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                                     updateItem(item.productId, { commissionRate: r });
                                   }}
-                                  className="w-16 h-8 rounded-lg border border-green-200 bg-green-50 px-2 text-center text-[13px] font-semibold text-green-800 outline-none focus:ring-2 focus:ring-green-100"
+                                  className="w-16 h-8 rounded-lg border border-input bg-background px-2 text-center text-[13px] font-semibold text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                 />
                               </div>
                             ) : null}
 
                             <div className="w-[120px] text-right">
-                              <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(lineTotal)}</p>
+                              <p className="text-[13px] font-semibold text-foreground">{formatCurrency(lineTotal)}</p>
                               {showCommCols ? (
-                                <p className="mt-0.5 text-[10px] font-semibold text-green-700">
+                                <p className="mt-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
                                   HH: {formatCurrency(item.commissionAmount)}
                                 </p>
                               ) : null}
@@ -1436,7 +1439,7 @@ export function OrderForm() {
                               <button
                                 type="button"
                                 onClick={() => removeItem(item.productId)}
-                                className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+                                className="w-8 h-8 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/10 transition-colors"
                                 aria-label="Xóa sản phẩm"
                               >
                                 <X className="w-4 h-4" />
@@ -1446,11 +1449,11 @@ export function OrderForm() {
                         );
                       })}
                       {/* Mobile: tổng dòng (khớp desktop tfoot — có tổng CK, không VAT) */}
-                      <div className="flex gap-3 items-center py-2.5 border-t border-slate-200 bg-slate-50 text-[11px]">
-                        <div className="w-[260px] shrink-0 font-semibold text-slate-600">
+                      <div className="flex gap-3 items-center py-2.5 border-t border-border bg-muted/30 text-[11px]">
+                        <div className="w-[260px] shrink-0 font-semibold text-muted-foreground">
                           Giá trị đơn ({items.length} SP)
                         </div>
-                        <div className="w-[190px] shrink-0 text-center font-medium text-slate-700">
+                        <div className="w-[190px] shrink-0 text-center font-medium text-foreground">
                           {items
                             .reduce((s, i) => s + i.quantity, 0)
                             .toFixed(qtyPrecision)
@@ -1458,15 +1461,15 @@ export function OrderForm() {
                         </div>
                         <div className="w-[140px] shrink-0" />
                         {showDiscCols ? (
-                          <div className="w-[90px] shrink-0 text-center text-red-600 font-medium tabular-nums">
+                          <div className="w-[90px] shrink-0 text-center text-destructive font-medium tabular-nums">
                             {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
                           </div>
                         ) : null}
                         {showCommCols ? <div className="w-[90px] shrink-0" /> : null}
                         <div className="w-[120px] shrink-0 text-right">
-                          <p className="text-[13px] font-semibold text-slate-800">{formatCurrency(subtotal)}</p>
+                          <p className="text-[13px] font-semibold text-foreground">{formatCurrency(subtotal)}</p>
                           {showCommCols ? (
-                            <p className="mt-0.5 text-[10px] font-semibold text-green-700">
+                            <p className="mt-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
                               HH: {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
                             </p>
                           ) : null}
@@ -1487,16 +1490,16 @@ export function OrderForm() {
                     ))}
                   </colgroup>
                   <thead>
-                    <tr className="border-b border-slate-100 text-slate-400 text-[11px] uppercase tracking-wide">
-                      <th className="px-4 py-2 text-left font-medium">Sản phẩm</th>
-                      <th className="px-3 py-2 text-center font-medium">Số lượng</th>
-                      <th className="px-3 py-2 text-right font-medium">Đơn giá</th>
+                    <tr className="border-b border-border text-muted-foreground text-[11px] uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left font-semibold">Sản phẩm</th>
+                      <th className="px-3 py-2 text-center font-semibold">Số lượng</th>
+                      <th className="px-3 py-2 text-right font-semibold">Đơn giá</th>
                       {showDiscCols ? (
-                        <th className="px-2 py-2 text-center font-medium">CK%</th>
+                        <th className="px-2 py-2 text-center font-semibold">CK%</th>
                       ) : null}
-                      <th className="px-3 py-2 text-right font-medium">Thành tiền</th>
+                      <th className="px-3 py-2 text-right font-semibold">Thành tiền</th>
                       {showCommCols ? (
-                        <th className="px-3 py-2 text-center font-medium">Hoa hồng</th>
+                        <th className="px-3 py-2 text-center font-semibold">Hoa hồng</th>
                       ) : null}
                       <th className="px-2 py-2"></th>
                     </tr>
@@ -1509,13 +1512,13 @@ export function OrderForm() {
                         <tr
                           key={item.productId}
                           className={cn(
-                            "group border-b border-slate-50 last:border-0 transition-colors",
-                            overStock ? "bg-red-50/70" : "hover:bg-slate-50/60"
+                            "group border-b border-border last:border-0 transition-colors",
+                            overStock ? "bg-destructive/10" : "hover:bg-muted/30"
                           )}
                         >
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                              <div className="w-8 h-8 rounded-lg bg-muted border border-border overflow-hidden flex items-center justify-center flex-shrink-0">
                                 {resolveImageSrc((item as any).image) ? (
                                   <img
                                     src={resolveImageSrc((item as any).image) as string}
@@ -1527,13 +1530,13 @@ export function OrderForm() {
                                     }}
                                   />
                                 ) : (
-                                  <Package className="w-4 h-4 text-slate-300" />
+                                  <Package className="w-4 h-4 text-muted-foreground/60" />
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-slate-800 truncate text-xs leading-tight">{item.productName}</p>
-                                <p className="text-slate-400 font-mono text-[10px] leading-tight">{item.sku}</p>
-                                <p className={cn("text-[10px] leading-tight", overStock ? "text-red-500 font-medium" : "text-slate-400")}>
+                                <p className="font-medium text-foreground truncate text-xs leading-tight">{item.productName}</p>
+                                <p className="text-muted-foreground font-mono text-[10px] leading-tight">{item.sku}</p>
+                                <p className={cn("text-[10px] leading-tight", overStock ? "text-destructive font-medium" : "text-muted-foreground")}>
                                   Có thể bán: {maxAllowed.toFixed(3).replace(/\.?0+$/, '')}
                                   {overStock && <span className="ml-1">⚠ Vượt!</span>}
                                 </p>
@@ -1548,7 +1551,7 @@ export function OrderForm() {
                                   const v = roundQty(item.quantity - 1);
                                   updateItem(item.productId, { quantity: v });
                                 }}
-                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
+                                className="w-6 h-6 rounded-md bg-muted hover:bg-accent flex items-center justify-center text-muted-foreground transition-colors flex-shrink-0"
                               >
                                 <Minus className="w-2.5 h-2.5" />
                               </button>
@@ -1563,8 +1566,8 @@ export function OrderForm() {
                                 className={cn(
                                   "w-11 h-6 px-1 border rounded text-center text-xs font-medium outline-none focus:ring-1 transition-colors",
                                   overStock
-                                    ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100 text-red-700"
-                                    : "border-slate-200 bg-white focus:border-blue-300 focus:ring-blue-100"
+                                      ? "border-destructive/40 bg-destructive/10 focus-visible:ring-ring text-destructive"
+                                      : "border-input bg-background focus-visible:ring-ring text-foreground"
                                 )}
                               />
                               <button
@@ -1573,7 +1576,7 @@ export function OrderForm() {
                                   const v = roundQty(item.quantity + 1);
                                   updateItem(item.productId, { quantity: v });
                                 }}
-                                className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
+                                className="w-6 h-6 rounded-md bg-muted hover:bg-accent flex items-center justify-center text-muted-foreground transition-colors flex-shrink-0"
                               >
                                 <Plus className="w-2.5 h-2.5" />
                               </button>
@@ -1587,7 +1590,7 @@ export function OrderForm() {
                                 const p = Math.max(0, Number(e.target.value) || 0);
                                 updateItem(item.productId, { price: p });
                               }}
-                              className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-right text-xs font-medium text-slate-700 outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
+                              className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-border focus:bg-background focus:border-input rounded-md text-right text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors"
                             />
                           </td>
                           {showDiscCols ? (
@@ -1600,14 +1603,14 @@ export function OrderForm() {
                                     const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                                     updateItem(item.productId, { discountRate: r });
                                   }}
-                                  className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-rose-50 border border-transparent hover:border-rose-200 focus:bg-white focus:border-rose-400 rounded-md text-center text-sm font-semibold text-rose-800 outline-none focus:ring-2 focus:ring-rose-100 transition-colors"
+                                  className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-muted/30 border border-transparent hover:border-border focus:bg-background focus:border-input rounded-md text-center text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors"
                                 />
-                                <span className="text-rose-500 text-xs font-semibold">%</span>
+                                <span className="text-muted-foreground text-xs font-semibold">%</span>
                               </div>
                             </td>
                           ) : null}
                           <td className="px-3 py-2.5 text-right">
-                            <span className="font-medium text-slate-900 text-xs">{formatCurrency(lineTotal)}</span>
+                            <span className="font-medium text-foreground text-xs tabular-nums">{formatCurrency(lineTotal)}</span>
                           </td>
                           {showCommCols ? (
                             <td className="px-3 py-2.5">
@@ -1621,11 +1624,11 @@ export function OrderForm() {
                                         const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
                                         updateItem(item.productId, { commissionRate: r });
                                       }}
-                                      className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded-md text-center text-sm font-semibold text-green-700 outline-none focus:ring-2 focus:ring-green-100 transition-colors"
+                                      className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-muted/30 border border-transparent hover:border-border focus:bg-background focus:border-input rounded-md text-center text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors"
                                     />
-                                    <span className="text-green-600 text-xs font-semibold">%</span>
+                                    <span className="text-muted-foreground text-xs font-semibold">%</span>
                                   </div>
-                                  <span className="text-green-600 text-[10px] font-medium">{formatCurrency(item.commissionAmount)}</span>
+                                  <span className="text-emerald-700 dark:text-emerald-300 text-[10px] font-semibold tabular-nums">{formatCurrency(item.commissionAmount)}</span>
                                 </>
                               </div>
                             </td>
@@ -1634,7 +1637,7 @@ export function OrderForm() {
                             <button
                               type="button"
                               onClick={() => removeItem(item.productId)}
-                              className="w-5 h-5 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -1644,9 +1647,9 @@ export function OrderForm() {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-slate-50 border-t border-slate-100 text-xs">
-                      <td className="px-4 py-2 text-slate-500 font-medium">Giá trị đơn ({items.length} SP)</td>
-                      <td className="px-3 py-2 text-center font-medium text-slate-700">
+                    <tr className="bg-muted/30 border-t border-border text-xs">
+                      <td className="px-4 py-2 text-muted-foreground font-medium">Giá trị đơn ({items.length} SP)</td>
+                      <td className="px-3 py-2 text-center font-medium text-foreground">
                         {items
                           .reduce((s, i) => s + i.quantity, 0)
                           .toFixed(qtyPrecision)
@@ -1654,16 +1657,16 @@ export function OrderForm() {
                       </td>
                       <td className="px-3 py-2"></td>
                       {showDiscCols ? (
-                        <td className="px-2 py-2 text-center text-red-500 text-[10px]">
+                        <td className="px-2 py-2 text-center text-destructive text-[10px]">
                           {items.some(i => i.discountAmount > 0) ? `-${formatCurrency(items.reduce((s, i) => s + i.discountAmount, 0))}` : '—'}
                         </td>
                       ) : null}
-                      <td className="px-3 py-2 text-right font-medium text-slate-700">
+                      <td className="px-3 py-2 text-right font-medium text-foreground tabular-nums">
                         {formatCurrency(items.reduce((s, i) => s + (i.quantity * i.price - i.discountAmount), 0))}
                       </td>
                       {showCommCols ? (
                         <td className="px-3 py-2 text-center">
-                          <span className="inline-block bg-green-50 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                          <span className="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50 text-[10px] font-semibold px-2 py-0.5 rounded-full tabular-nums">
                             {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
                           </span>
                         </td>
@@ -1682,53 +1685,53 @@ export function OrderForm() {
         <div className="flex flex-col gap-4">
 
           {/* Tổng kết */}
-          <div className="bg-white border border-slate-100 rounded-xl p-5">
+          <div className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-md bg-red-50 flex items-center justify-center">
-                <Calculator className="w-3.5 h-3.5 text-red-500" />
+              <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center">
+                <Calculator className="w-3.5 h-3.5 text-primary" />
               </div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tổng kết đơn hàng</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng kết đơn hàng</span>
             </div>
             <div className="space-y-1">
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
+              <div className="flex items-center justify-between py-1.5 border-b border-border text-sm">
                 <div className="min-w-0 pr-2">
-                  <span className="text-slate-400">Mã ĐH</span>
+                  <span className="text-muted-foreground">Mã ĐH</span>
                   {!isEdit && (
-                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">Lưu đơn để tạo mã</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Lưu đơn để tạo mã</p>
                   )}
                 </div>
-                <span className="font-medium text-slate-800">{isEdit ? (orderCode || `#${id}`) : "—"}</span>
+                <span className="font-semibold text-foreground">{isEdit ? (orderCode || `#${id}`) : "—"}</span>
               </div>
               {showDiscCols ? (
-                <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                  <span className="text-slate-400">Tổng CK</span>
-                  <span className="font-medium text-red-600">
+                <div className="flex items-center justify-between py-1.5 border-b border-border text-sm">
+                  <span className="text-muted-foreground">Tổng CK</span>
+                  <span className="font-semibold text-destructive">
                     {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
                   </span>
                 </div>
               ) : null}
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <div className="flex items-center justify-between py-2 border-b border-border">
                 <div>
-                  <span className="text-sm font-semibold text-slate-700">Giá trị đơn</span>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Tổng sau chiết khấu dòng</p>
+                  <span className="text-sm font-semibold text-foreground">Giá trị đơn</span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Tổng sau chiết khấu dòng</p>
                 </div>
-                <span className="text-xl font-semibold text-red-600 tabular-nums">{formatCurrency(subtotal)}</span>
+                <span className="text-xl font-semibold text-primary tabular-nums">{formatCurrency(subtotal)}</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
-                <span className="text-slate-400 shrink-0">Phí vận chuyển</span>
+              <div className="flex items-center justify-between py-1.5 border-b border-border text-sm gap-2">
+                <span className="text-muted-foreground shrink-0">Phí vận chuyển</span>
                 <MoneyAmountField value={shippingFee} onChange={setShippingFee} className="text-sm" />
               </div>
-              <div className="py-1.5 border-b border-slate-50">
-                <span className="text-slate-400 text-sm block mb-1.5">Phí ship do</span>
+              <div className="py-1.5 border-b border-border">
+                <span className="text-muted-foreground text-sm block mb-1.5">Phí ship do</span>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setShipPayer("shop")}
                     className={cn(
-                      "py-2 rounded-lg text-xs font-medium border transition-colors",
+                      "py-2 rounded-md text-xs font-semibold border transition-colors",
                       shipPayer === "shop"
-                        ? "border-amber-400 bg-amber-50 text-amber-900"
-                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+                        ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+                        : "border-border bg-muted/30 text-muted-foreground hover:bg-accent/50"
                     )}
                   >
                     Shop trả
@@ -1737,40 +1740,40 @@ export function OrderForm() {
                     type="button"
                     onClick={() => setShipPayer("customer")}
                     className={cn(
-                      "py-2 rounded-lg text-xs font-medium border transition-colors",
+                      "py-2 rounded-md text-xs font-semibold border transition-colors",
                       shipPayer === "customer"
-                        ? "border-amber-400 bg-amber-50 text-amber-900"
-                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+                        ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+                        : "border-border bg-muted/30 text-muted-foreground hover:bg-accent/50"
                     )}
                   >
                     Khách trả
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
-                <span className="text-slate-400 shrink-0">Đặt cọc</span>
+              <div className="flex items-center justify-between py-1.5 border-b border-border text-sm gap-2">
+                <span className="text-muted-foreground shrink-0">Đặt cọc</span>
                 <MoneyAmountField value={deposit} onChange={setDeposit} className="text-sm" />
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm gap-2">
+              <div className="flex items-center justify-between py-1.5 border-b border-border text-sm gap-2">
                 <div className="min-w-0 pr-2">
-                  <span className="text-slate-400">Tiền NV chịu</span>
-                  <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">NV tự bỏ ra, trừ vào Lương</p>
+                  <span className="text-muted-foreground">Tiền NV chịu</span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">NV tự bỏ ra, trừ vào Lương</p>
                 </div>
                 <MoneyAmountField value={salespersonAbsorbedAmount} onChange={setSalespersonAbsorbedAmount} className="text-sm" />
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">Thu khách</span>
-                <span className="font-medium text-slate-800">{formatCurrency(customerCollect)}</span>
+              <div className="flex items-center justify-between py-1.5 border-b border-border text-sm">
+                <span className="text-muted-foreground">Thu khách</span>
+                <span className="font-semibold text-foreground tabular-nums">{formatCurrency(customerCollect)}</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">Shop thu</span>
-                <span className="font-medium text-indigo-700">{formatCurrency(shopCollect)}</span>
+              <div className="flex items-center justify-between py-1.5 border-b border-border text-sm">
+                <span className="text-muted-foreground">Shop thu</span>
+                <span className="font-semibold text-foreground tabular-nums">{formatCurrency(shopCollect)}</span>
               </div>
             </div>
             {showCommCols ? (
-              <div className="mt-3 flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg">
-                <span className="text-xs text-green-700">Tổng hoa hồng</span>
-                <span className="text-sm font-semibold text-green-800">
+              <div className="mt-3 flex items-center justify-between px-3 py-2 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/50 rounded-lg">
+                <span className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold">Tổng hoa hồng</span>
+                <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 tabular-nums">
                   {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
                 </span>
               </div>
@@ -1778,16 +1781,16 @@ export function OrderForm() {
           </div>
 
           {/* Cài đặt */}
-          <div className="bg-white border border-slate-100 rounded-xl p-5 space-y-4">
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center">
-                <Info className="w-3.5 h-3.5 text-slate-500" />
+              <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center">
+                <Info className="w-3.5 h-3.5 text-primary" />
               </div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Cài đặt đơn hàng</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cài đặt đơn hàng</span>
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 mb-1.5 block">Phương thức thanh toán</label>
+              <label className="text-[11px] text-muted-foreground mb-1.5 block">Phương thức thanh toán</label>
               <div className="flex gap-2">
                 {[
                   { id: "transfer", label: "Chuyển khoản", icon: ArrowRight },
@@ -1799,10 +1802,10 @@ export function OrderForm() {
                     type="button"
                     onClick={() => setPaymentMethod(m.id)}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-1 py-2 border rounded-lg text-[10px] font-medium transition-all",
+                      "flex-1 flex flex-col items-center gap-1 py-2 border rounded-md text-[10px] font-semibold transition-colors",
                       paymentMethod === m.id
-                        ? "border-blue-400 bg-blue-50 text-blue-700"
-                        : "border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200"
+                        ? "border-border bg-accent text-accent-foreground"
+                        : "border-border bg-muted/30 text-muted-foreground hover:bg-accent/50"
                     )}
                   >
                     <m.icon className="w-3.5 h-3.5" />
@@ -1813,11 +1816,11 @@ export function OrderForm() {
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 mb-1.5 block">Trạng thái đơn hàng</label>
+              <label className="text-[11px] text-muted-foreground mb-1.5 block">Trạng thái đơn hàng</label>
               <select
                 value={orderStatus}
                 onChange={(e) => setOrderStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
+                className="w-full h-10 px-3 py-2 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <option value="pending">Chờ duyệt</option>
                 <option value="shipping">Đang giao</option>
@@ -1832,32 +1835,32 @@ export function OrderForm() {
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 mb-1.5 block">Nhân viên phụ trách</label>
-              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-semibold text-blue-600 flex-shrink-0">
+              <label className="text-[11px] text-muted-foreground mb-1.5 block">Nhân viên phụ trách</label>
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-lg border border-border">
+                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-primary flex-shrink-0">
                   {responsibleSalesInitials}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{responsibleSalesDisplay}</p>
-                  <p className="text-[10px] text-slate-400">Nhân viên bán hàng (sales) — người lên đơn</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{responsibleSalesDisplay}</p>
+                  <p className="text-[10px] text-muted-foreground">Nhân viên bán hàng (sales) — người lên đơn</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 mb-1.5 block">Ghi chú đơn hàng</label>
+              <label className="text-[11px] text-muted-foreground mb-1.5 block">Ghi chú đơn hàng</label>
               <textarea
                 rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Ghi chú thêm về đơn hàng, yêu cầu đặc biệt..."
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all resize-none"
+                className="w-full px-3 py-2 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-none"
               />
             </div>
 
-            <div className="flex items-start gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-              <Info className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
-              <p className="text-[11px] text-blue-600 leading-relaxed">
+            <div className="flex items-start gap-2 px-3 py-2 bg-muted/30 rounded-lg border border-border">
+              <Info className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
                 Đơn hàng tự động vào báo cáo doanh thu sau khi chuyển sang "Đã giao".
               </p>
             </div>
@@ -1867,7 +1870,7 @@ export function OrderForm() {
             type="button"
             onClick={submitOrder}
             disabled={isEdit && payrollPeriodStatus === "closed"}
-            className="hidden lg:flex w-full items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
+            className="hidden lg:flex w-full items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
@@ -1879,17 +1882,17 @@ export function OrderForm() {
       <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden pb-[env(safe-area-inset-bottom,0px)]">
         <div className="mx-auto max-w-6xl px-3 pb-3">
           {!mobileSummaryExpanded ? (
-            <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur shadow-md flex items-stretch gap-2 px-2 py-2">
+            <div className="rounded-xl border border-border bg-background/95 backdrop-blur shadow-md flex items-stretch gap-2 px-2 py-2">
               <button
                 type="button"
                 onClick={() => setMobileSummaryExpanded(true)}
-                className="flex-1 min-w-0 text-left pl-1 py-0.5 rounded-lg hover:bg-slate-50 transition-colors"
+                className="flex-1 min-w-0 text-left pl-1 py-0.5 rounded-lg hover:bg-accent/50 transition-colors"
               >
-                <div className="text-[10px] text-slate-500">Thu khách</div>
-                <div className="text-base font-semibold text-slate-900 tabular-nums leading-tight">
+                <div className="text-[10px] text-muted-foreground">Thu khách</div>
+                <div className="text-base font-semibold text-foreground tabular-nums leading-tight">
                   {formatCurrency(customerCollect)}
                 </div>
-                <div className="text-[9px] text-slate-400 mt-0.5">
+                <div className="text-[9px] text-muted-foreground mt-0.5">
                   Chạm để xem phí ship, cọc
                   {showDiscCols ? ", CK" : ""}
                   {showCommCols ? ", HH" : ""}…
@@ -1898,7 +1901,7 @@ export function OrderForm() {
               <button
                 type="button"
                 onClick={() => setMobileSummaryExpanded(true)}
-                className="shrink-0 w-10 flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                className="shrink-0 w-10 flex items-center justify-center rounded-lg border border-border bg-muted/30 text-muted-foreground hover:bg-accent/50"
                 aria-label="Mở tổng kết chi tiết"
               >
                 <ChevronUp className="w-5 h-5" />
@@ -1906,48 +1909,48 @@ export function OrderForm() {
               <button
                 type="button"
                 onClick={submitOrder}
-                className="shrink-0 flex flex-col items-center justify-center gap-0.5 px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-all min-w-[5.5rem]"
+                className="shrink-0 flex flex-col items-center justify-center gap-0.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:opacity-95 transition-opacity min-w-[5.5rem]"
               >
                 <Save className="w-4 h-4" />
                 {isEdit ? "Lưu" : "Lưu đơn"}
               </button>
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-200 bg-white/95 backdrop-blur shadow-lg max-h-[min(70vh,520px)] overflow-y-auto">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50/80">
-                <span className="text-xs font-semibold text-slate-600">Tổng kết đơn</span>
+            <div className="rounded-xl border border-border bg-background/95 backdrop-blur shadow-lg max-h-[min(70vh,520px)] overflow-y-auto">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
+                <span className="text-xs font-semibold text-foreground">Tổng kết đơn</span>
                 <button
                   type="button"
                   onClick={() => setMobileSummaryExpanded(false)}
-                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800 py-1 px-2 rounded-lg hover:bg-slate-100"
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground py-1 px-2 rounded-lg hover:bg-accent/50"
                 >
                   <ChevronDown className="w-4 h-4" />
                   Thu gọn
                 </button>
               </div>
-              <div className="px-3 py-2 border-b border-slate-100 space-y-1.5">
+              <div className="px-3 py-2 border-b border-border space-y-1.5">
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500">Mã ĐH</span>
-                  <span className="font-medium text-slate-800">{isEdit ? (orderCode || `#${id}`) : "—"}</span>
+                  <span className="text-muted-foreground">Mã ĐH</span>
+                  <span className="font-semibold text-foreground">{isEdit ? (orderCode || `#${id}`) : "—"}</span>
                 </div>
-                {!isEdit && <div className="text-[9px] text-slate-400 -mt-0.5">Lưu đơn để tạo mã</div>}
+                {!isEdit && <div className="text-[9px] text-muted-foreground -mt-0.5">Lưu đơn để tạo mã</div>}
                 {showDiscCols ? (
                   <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-slate-500">Tổng CK</span>
-                    <span className="font-medium text-red-600">
+                    <span className="text-muted-foreground">Tổng CK</span>
+                    <span className="font-semibold text-destructive">
                       {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
                     </span>
                   </div>
                 ) : null}
-                <div className="flex items-center justify-between gap-2 pt-0.5 border-b border-slate-50 pb-1.5">
+                <div className="flex items-center justify-between gap-2 pt-0.5 border-b border-border pb-1.5">
                   <div>
-                    <span className="text-[10px] font-semibold text-slate-700">Giá trị đơn</span>
-                    <p className="text-[9px] text-slate-400">Sau CK dòng</p>
+                    <span className="text-[10px] font-semibold text-foreground">Giá trị đơn</span>
+                    <p className="text-[9px] text-muted-foreground">Sau CK dòng</p>
                   </div>
-                  <span className="text-base font-semibold text-red-600 tabular-nums">{formatCurrency(subtotal)}</span>
+                  <span className="text-base font-semibold text-primary tabular-nums">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-[10px]">
-                  <span className="text-slate-500 shrink-0">Phí ship</span>
+                  <span className="text-muted-foreground shrink-0">Phí ship</span>
                   <MoneyAmountField
                     value={shippingFee}
                     onChange={setShippingFee}
@@ -1962,8 +1965,8 @@ export function OrderForm() {
                     className={cn(
                       "py-1.5 rounded-lg text-[10px] font-medium border",
                       shipPayer === "shop"
-                        ? "border-amber-400 bg-amber-50 text-amber-900"
-                        : "border-slate-200 bg-slate-50 text-slate-600"
+                        ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+                        : "border-border bg-muted/30 text-muted-foreground"
                     )}
                   >
                     Shop trả ship
@@ -1974,15 +1977,15 @@ export function OrderForm() {
                     className={cn(
                       "py-1.5 rounded-lg text-[10px] font-medium border",
                       shipPayer === "customer"
-                        ? "border-amber-400 bg-amber-50 text-amber-900"
-                        : "border-slate-200 bg-slate-50 text-slate-600"
+                        ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+                        : "border-border bg-muted/30 text-muted-foreground"
                     )}
                   >
                     Khách trả ship
                   </button>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-[10px]">
-                  <span className="text-slate-500 shrink-0">Đặt cọc</span>
+                  <span className="text-muted-foreground shrink-0">Đặt cọc</span>
                   <MoneyAmountField
                     value={deposit}
                     onChange={setDeposit}
@@ -1991,7 +1994,7 @@ export function OrderForm() {
                   />
                 </div>
                 <div className="flex items-center justify-between gap-2 text-[10px]">
-                  <span className="text-slate-500 shrink-0">Tiền NV chịu</span>
+                  <span className="text-muted-foreground shrink-0">Tiền NV chịu</span>
                   <MoneyAmountField
                     value={salespersonAbsorbedAmount}
                     onChange={setSalespersonAbsorbedAmount}
@@ -2000,17 +2003,17 @@ export function OrderForm() {
                   />
                 </div>
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500">Thu khách</span>
-                  <span className="font-semibold text-slate-800">{formatCurrency(customerCollect)}</span>
+                  <span className="text-muted-foreground">Thu khách</span>
+                  <span className="font-semibold text-foreground tabular-nums">{formatCurrency(customerCollect)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500">Shop thu</span>
-                  <span className="font-semibold text-indigo-700">{formatCurrency(shopCollect)}</span>
+                  <span className="text-muted-foreground">Shop thu</span>
+                  <span className="font-semibold text-foreground tabular-nums">{formatCurrency(shopCollect)}</span>
                 </div>
                 {showCommCols ? (
                   <div className="flex items-center justify-between text-[10px] pb-0.5">
-                    <span className="text-slate-500">Hoa hồng</span>
-                    <span className="font-semibold text-green-700">
+                    <span className="text-muted-foreground">Hoa hồng</span>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
                       {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
                     </span>
                   </div>
@@ -2020,7 +2023,7 @@ export function OrderForm() {
                 <button
                   type="button"
                   onClick={submitOrder}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-95 transition-opacity"
                 >
                   <Save className="w-4 h-4" />
                   {isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}

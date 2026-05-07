@@ -30,18 +30,14 @@ const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
   "/api";
 
-/** Sheki primary — UI_SPEC */
-const PRIMARY = "#E31837";
-const PRIMARY_SOFT = "#fce8ec";
-
 const selectCls =
-  "min-h-[44px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-[#E31837] focus:ring-2 focus:ring-[#E31837]/15";
+  "min-h-[44px] rounded-md border border-input bg-background px-3 py-2.5 text-sm font-semibold text-foreground shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function rankStyle(i: number) {
   if (i === 0) return "bg-amber-100 text-amber-800 ring-1 ring-amber-200";
-  if (i === 1) return "bg-slate-200 text-slate-700 ring-1 ring-slate-300";
+  if (i === 1) return "bg-muted text-muted-foreground ring-1 ring-border";
   if (i === 2) return "bg-orange-100 text-orange-800 ring-1 ring-orange-200";
-  return "bg-slate-100 text-slate-500";
+  return "bg-muted/30 text-muted-foreground";
 }
 
 export function RevenueReport() {
@@ -226,8 +222,8 @@ export function RevenueReport() {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
-        <Loader2 className="h-10 w-10 animate-spin text-[#E31837]" />
-        <p className="text-sm text-slate-500">Đang tải báo cáo doanh thu…</p>
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Đang tải báo cáo doanh thu…</p>
       </div>
     );
   }
@@ -235,14 +231,14 @@ export function RevenueReport() {
   if (error) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
-          <AlertCircle className="h-8 w-8 text-[#E31837]" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+          <AlertCircle className="h-8 w-8 text-destructive" />
         </div>
-        <p className="text-lg font-semibold text-slate-900">{error}</p>
+        <p className="text-lg font-semibold text-foreground">{error}</p>
         <button
           type="button"
           onClick={fetchReport}
-          className="rounded-lg bg-[#E31837] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#C41230]"
+          className="h-10 rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-95"
         >
           Thử lại
         </button>
@@ -255,42 +251,42 @@ export function RevenueReport() {
       {/* Tiêu đề — cùng nhịp với Dashboard */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <nav className="mb-2 flex flex-wrap items-center gap-1 text-xs text-slate-500">
-            <Link to="/" className="transition hover:text-[#E31837]">
+          <nav className="mb-2 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            <Link to="/" className="transition-colors hover:text-primary">
               Trang chủ
             </Link>
-            <ChevronRight className="h-3 w-3 text-slate-400" />
-            <span className="font-medium text-slate-700">Doanh thu</span>
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            <span className="font-medium text-foreground">Doanh thu</span>
           </nav>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Báo cáo doanh thu</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Báo cáo doanh thu</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Doanh số và hoa hồng theo nhân viên — lọc theo tháng/năm hoặc kỳ lương (đơn bán theo kỳ đã gán trên đơn; giá trị hoàn theo ngày tạo đơn hoàn trong kỳ).
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <CalendarRange className="h-5 w-5 text-[#E31837]" />
+        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+          <CalendarRange className="h-5 w-5 text-primary" />
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Kỳ</p>
-            <p className="text-sm font-bold text-slate-900">{periodLabel}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Kỳ</p>
+            <p className="text-sm font-semibold text-foreground">{periodLabel}</p>
           </div>
         </div>
       </div>
 
       {/* Bộ lọc — một khối gọn */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-        <div className="mb-4 flex items-center gap-2 text-slate-800">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
+        <div className="mb-4 flex items-center gap-2 text-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <Filter className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-900">Lọc báo cáo</p>
-            <p className="text-xs text-slate-500">Chọn nhóm và kỳ (tháng/năm hoặc kỳ lương)</p>
+            <p className="text-sm font-semibold text-foreground">Lọc báo cáo</p>
+            <p className="text-xs text-muted-foreground">Chọn nhóm và kỳ (tháng/năm hoặc kỳ lương)</p>
           </div>
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-1 lg:flex-wrap lg:gap-3">
             <label className="flex min-w-0 flex-col gap-1.5 lg:min-w-[200px]">
-              <span className="text-xs font-medium text-slate-600">Nhóm bán hàng</span>
+              <span className="text-xs font-medium text-muted-foreground">Nhóm bán hàng</span>
               <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={selectCls}>
                 <option value="">Tất cả nhóm</option>
                 {groups.map((g) => (
@@ -301,17 +297,17 @@ export function RevenueReport() {
               </select>
             </label>
             <div className="flex min-w-0 flex-col gap-1.5">
-              <span className="text-xs font-medium text-slate-600">Cách lọc kỳ</span>
+              <span className="text-xs font-medium text-muted-foreground">Cách lọc kỳ</span>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                <div className="inline-flex rounded-xl border border-border bg-muted/30 p-1">
                   <button
                     type="button"
                     onClick={() => setFilterMode("payroll")}
                     className={cn(
                       "rounded-lg px-3 py-2 text-xs font-semibold transition",
                       filterMode === "payroll"
-                        ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
+                        ? "bg-background text-foreground shadow-sm border border-border"
+                        : "text-muted-foreground hover:text-foreground"
                     )}
                   >
                     Kỳ lương
@@ -322,8 +318,8 @@ export function RevenueReport() {
                     className={cn(
                       "rounded-lg px-3 py-2 text-xs font-semibold transition",
                       filterMode === "month"
-                        ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
+                        ? "bg-background text-foreground shadow-sm border border-border"
+                        : "text-muted-foreground hover:text-foreground"
                     )}
                   >
                     Tháng
@@ -350,7 +346,7 @@ export function RevenueReport() {
                       type="button"
                       title="Làm mới danh sách kỳ"
                       onClick={() => void fetchPayrollPeriods()}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground hover:bg-accent transition-colors"
                     >
                       <RefreshCcw className="h-4 w-4" />
                     </button>
@@ -387,8 +383,8 @@ export function RevenueReport() {
             onClick={handleExport}
             disabled={exporting || salesData.length === 0}
             className={cn(
-              "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white shadow-sm transition",
-              "bg-[#E31837] hover:bg-[#C41230] disabled:cursor-not-allowed disabled:opacity-50"
+              "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-primary-foreground shadow-sm transition",
+              "bg-primary hover:opacity-95 transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
             )}
           >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -399,59 +395,56 @@ export function RevenueReport() {
 
       {/* KPI — giống Dashboard: icon tròn + số rõ */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl"
-              style={{ backgroundColor: PRIMARY_SOFT, color: PRIMARY }}
-            >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary">
               <TrendingUp className="h-5 w-5" />
             </div>
           </div>
-          <p className="text-xs font-medium text-slate-500">Tổng doanh số</p>
-          <p className="mt-1 truncate text-lg font-bold tabular-nums text-slate-900 md:text-xl">
+          <p className="text-xs font-medium text-muted-foreground">Tổng doanh số</p>
+          <p className="mt-1 truncate text-lg font-semibold tabular-nums text-foreground md:text-xl">
             {formatCurrency(summary?.totalSales || 0)}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary">
               <ShoppingCart className="h-5 w-5" />
             </div>
           </div>
-          <p className="text-xs font-medium text-slate-500">Tổng đơn hàng</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-slate-900 md:text-xl">{totalOrders}</p>
+          <p className="text-xs font-medium text-muted-foreground">Tổng đơn hàng</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground md:text-xl">{totalOrders}</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary">
               <Users className="h-5 w-5" />
             </div>
           </div>
-          <p className="text-xs font-medium text-slate-500">Nhân viên (Sales)</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-slate-900 md:text-xl">{summary?.totalEmployees ?? 0}</p>
+          <p className="text-xs font-medium text-muted-foreground">Nhân viên (Sales)</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground md:text-xl">{summary?.totalEmployees ?? 0}</p>
         </div>
       </div>
 
       {sortedRows.length > 0 && (
         <div className="space-y-6">
           {/* Biểu đồ full width — dễ đọc hơn */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-4 md:px-6">
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border bg-muted/30 px-5 py-4 md:px-6">
               <div className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-[#E31837]" />
+                  <BarChart3 className="h-5 w-5 text-primary" />
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">Xếp hạng doanh số</h2>
-                  <p className="text-xs text-slate-500">Tối đa 12 nhân viên có doanh số trong kỳ</p>
+                    <h2 className="text-base font-semibold text-foreground">Xếp hạng doanh số</h2>
+                    <p className="text-xs text-muted-foreground">Tối đa 12 nhân viên có doanh số trong kỳ</p>
                 </div>
               </div>
             </div>
             <div className="p-4 md:p-6">
               <div className="w-full" style={{ height: rankChartHeight }}>
                 {performanceData.length === 0 ? (
-                  <div className="flex h-full min-h-[140px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">
+                  <div className="flex h-full min-h-[140px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
                     Không có doanh số để hiển thị biểu đồ
                   </div>
                 ) : (
@@ -461,7 +454,7 @@ export function RevenueReport() {
                       layout="vertical"
                       margin={{ left: 0, right: 16, top: 4, bottom: 4 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="#e2e8f0" />
+                      <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="hsl(var(--border))" />
                       <XAxis type="number" hide />
                       <YAxis
                         dataKey="label"
@@ -469,14 +462,14 @@ export function RevenueReport() {
                         width={112}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "#64748b", fontSize: 11 }}
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                         interval={0}
                       />
                       <Tooltip
-                        cursor={{ fill: "rgba(227, 24, 55, 0.05)" }}
+                        cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
                         contentStyle={{
                           borderRadius: "12px",
-                          border: "1px solid #e2e8f0",
+                          border: "1px solid hsl(var(--border))",
                           boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.08)",
                         }}
                         formatter={(value: number) => [formatCurrency(value), "Doanh số"]}
@@ -493,7 +486,16 @@ export function RevenueReport() {
                         barCategoryGap="4%"
                       >
                         {performanceData.map((_, index) => (
-                          <Cell key={`c-${index}`} fill={index === 0 ? PRIMARY : index < 3 ? "#e11d48" : "#94a3b8"} />
+                          <Cell
+                            key={`c-${index}`}
+                            fill={
+                              index === 0
+                                ? "hsl(var(--primary))"
+                                : index < 3
+                                  ? "hsl(var(--primary) / 0.85)"
+                                  : "hsl(var(--muted-foreground) / 0.55)"
+                            }
+                          />
                         ))}
                       </Bar>
                     </BarChart>
@@ -504,38 +506,38 @@ export function RevenueReport() {
           </div>
 
           {/* Bảng chi tiết */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-4 md:px-6">
-              <h2 className="text-base font-bold text-slate-900">Chi tiết theo nhân viên</h2>
-              <p className="mt-0.5 text-xs text-slate-500">Bấm tên để mở hồ sơ nhân viên</p>
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border bg-muted/30 px-5 py-4 md:px-6">
+              <h2 className="text-base font-semibold text-foreground">Chi tiết theo nhân viên</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">Bấm tên để mở hồ sơ nhân viên</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] border-collapse text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="whitespace-nowrap px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-border">
+                    <th className="whitespace-nowrap px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       #
                     </th>
-                    <th className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Nhân viên</th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nhân viên</th>
+                    <th className="whitespace-nowrap px-4 py-3.5 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Đơn
                     </th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Doanh số
                     </th>
-                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="whitespace-nowrap px-4 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Hoa hồng
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {sortedRows.map((item, idx) => {
                     const totalHh =
                       item.total_all_commission != null
                         ? item.total_all_commission
                         : (item.total_commission || 0) + (item.override_commission || 0);
                     return (
-                      <tr key={item.id} className="transition-colors hover:bg-slate-50/80">
+                      <tr key={item.id} className="transition-colors hover:bg-muted/30">
                         <td className="px-4 py-3.5">
                           <span
                             className={cn(
@@ -549,23 +551,23 @@ export function RevenueReport() {
                         <td className="px-4 py-3.5">
                           <Link
                             to={`/employees/${item.id}`}
-                            className="font-semibold text-slate-900 transition hover:text-[#E31837]"
+                            className="font-semibold text-foreground transition-colors hover:text-primary"
                           >
                             {item.full_name}
                           </Link>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-muted-foreground">
                             HH mặc định {item.commission_rate ?? "—"}%
                             {(item.override_commission || 0) > 0 && (
-                              <span className="text-emerald-600"> · có HH CTV</span>
+                              <span className="text-emerald-700 dark:text-emerald-300"> · có HH CTV</span>
                             )}
                           </p>
                         </td>
-                        <td className="px-4 py-3.5 text-center tabular-nums text-slate-800">{item.total_orders || 0}</td>
-                        <td className="px-4 py-3.5 text-right font-medium tabular-nums text-slate-900">
+                        <td className="px-4 py-3.5 text-center tabular-nums text-muted-foreground">{item.total_orders || 0}</td>
+                        <td className="px-4 py-3.5 text-right font-medium tabular-nums text-foreground">
                           {formatCurrency(item.total_sales)}
                         </td>
                         <td className="px-4 py-3.5 text-right">
-                          <span className="font-semibold tabular-nums text-emerald-600">{formatCurrency(totalHh)}</span>
+                          <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{formatCurrency(totalHh)}</span>
                         </td>
                       </tr>
                     );
@@ -578,12 +580,12 @@ export function RevenueReport() {
       )}
 
       {sortedRows.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-            <BarChart3 className="h-8 w-8 text-slate-400" />
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center shadow-sm">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <BarChart3 className="h-8 w-8 text-muted-foreground" />
           </div>
-          <p className="text-base font-semibold text-slate-900">Chưa có dữ liệu doanh thu</p>
-          <p className="mt-1 max-w-md text-sm text-slate-500">
+          <p className="text-base font-semibold text-foreground">Chưa có dữ liệu doanh thu</p>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
             Trong kỳ {periodLabel}
             {groupName ? ` — nhóm «${groupName}»` : ""} chưa ghi nhận đơn hoàn thành phân bổ cho nhân viên. Thử đổi kỳ lương / tháng-năm hoặc nhóm.
           </p>

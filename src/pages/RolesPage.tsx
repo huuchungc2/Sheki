@@ -128,62 +128,62 @@ export function RolesPage() {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl min-w-0">
       <div className="flex items-center gap-3">
-        <Shield className="w-8 h-8 text-blue-600" />
+        <Shield className="w-8 h-8 text-primary" />
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Vai trò (Roles)</h1>
-          <p className="text-sm text-slate-500">Định nghĩa vai trò và gán cho nhân viên ở form nhân viên.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Vai trò (Roles)</h1>
+          <p className="text-sm text-muted-foreground">Định nghĩa vai trò và gán cho nhân viên ở form nhân viên.</p>
         </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+        <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 border border-destructive/30 rounded-xl px-4 py-3">
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h2 className="text-sm font-bold text-slate-700 mb-4">{editing ? "Sửa vai trò" : "Thêm vai trò"}</h2>
+      <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+        <h2 className="text-sm font-semibold text-foreground mb-4">{editing ? "Sửa vai trò" : "Thêm vai trò"}</h2>
         <form onSubmit={submit} className="space-y-4">
           {!editing && (
             <div>
-              <label className="text-xs font-semibold text-slate-500">Mã (slug)</label>
+              <label className="text-xs font-semibold text-muted-foreground">Mã (slug)</label>
               <input
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                 placeholder="vd: nhan_vien_ban_hang"
-                className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                className="w-full mt-1 h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 required={!editing}
                 disabled={!!editing}
               />
             </div>
           )}
           <div>
-            <label className="text-xs font-semibold text-slate-500">Tên hiển thị</label>
+            <label className="text-xs font-semibold text-muted-foreground">Tên hiển thị</label>
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
+              className="w-full mt-1 h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               required
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-500">Mô tả</label>
+            <label className="text-xs font-semibold text-muted-foreground">Mô tả</label>
             <input
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl text-sm"
+              className="w-full mt-1 h-10 px-3 border border-input bg-background rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm text-foreground">
             <input
               type="checkbox"
               checked={form.can_access_admin}
@@ -198,7 +198,7 @@ export function RolesPage() {
             Quyền quản trị (menu &amp; API admin)
           </label>
           {!form.can_access_admin && (
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-sm text-foreground">
               <input
                 type="checkbox"
                 checked={form.scope_own_data}
@@ -212,7 +212,7 @@ export function RolesPage() {
               type="submit"
               disabled={saving}
               className={cn(
-                "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700",
+                "inline-flex items-center gap-2 h-10 px-4 rounded-md text-sm font-semibold text-primary-foreground bg-primary hover:opacity-95 transition-opacity",
                 saving && "opacity-60"
               )}
             >
@@ -220,7 +220,7 @@ export function RolesPage() {
               {editing ? "Cập nhật" : "Tạo mới"}
             </button>
             {editing && (
-              <button type="button" onClick={resetForm} className="px-4 py-2 rounded-xl text-sm border border-slate-200">
+              <button type="button" onClick={resetForm} className="h-10 px-4 rounded-md text-sm font-semibold border border-border bg-background text-foreground hover:bg-accent transition-colors">
                 Hủy
               </button>
             )}
@@ -228,30 +228,30 @@ export function RolesPage() {
         </form>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-100 text-left text-xs font-bold text-slate-500 uppercase">
+            <tr className="bg-muted/30 border-b border-border text-left text-xs font-semibold text-muted-foreground uppercase">
               <th className="px-4 py-3">Mã</th>
               <th className="px-4 py-3">Tên</th>
               <th className="px-4 py-3">Quyền</th>
               <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-border">
             {rows.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50/80">
+              <tr key={r.id} className="hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs">{r.code}</td>
-                <td className="px-4 py-3 font-medium">{r.name}</td>
-                <td className="px-4 py-3 text-xs text-slate-600">
+                <td className="px-4 py-3 font-medium text-foreground">{r.name}</td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">
                   {r.can_access_admin ? "Quản trị" : r.scope_own_data ? "Phạm vi cá nhân" : "Toàn hệ thống (đọc)"}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button type="button" onClick={() => startEdit(r)} className="p-1.5 text-slate-500 hover:text-blue-600">
+                  <button type="button" onClick={() => startEdit(r)} className="p-1.5 text-muted-foreground hover:text-primary transition-colors">
                     <Pencil className="w-4 h-4" />
                   </button>
                   {!r.is_system && (
-                    <button type="button" onClick={() => remove(r)} className="p-1.5 text-slate-500 hover:text-red-600">
+                    <button type="button" onClick={() => remove(r)} className="p-1.5 text-muted-foreground hover:text-destructive transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}

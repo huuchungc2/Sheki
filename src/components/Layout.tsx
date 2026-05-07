@@ -19,6 +19,8 @@ import {
   ClipboardList,
   Upload,
   Building2,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { cn, isAdminUser } from "../lib/utils";
 import { api } from "../lib/api";
@@ -192,6 +194,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const [openSubmenu, setOpenSubmenu] = React.useState<string | null>(null);
   const [showNotifMenu, setShowNotifMenu] = React.useState(false);
+  const [isDark, setIsDark] = React.useState(() => {
+    return (localStorage.getItem("sheki-theme") ?? "light") === "dark";
+  });
+
+  const toggleTheme = () => {
+    const next = isDark ? "light" : "dark";
+    setIsDark(!isDark);
+    localStorage.setItem("sheki-theme", next);
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add(next);
+  };
   const [notifCount, setNotifCount] = React.useState(0);
   const [notifItems, setNotifItems] = React.useState<any[]>([]);
   const location = useLocation();
@@ -417,7 +430,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
       {isMobile && isSidebarOpen && (
         <div
@@ -428,7 +441,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
       <aside 
         className={cn(
-          "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed h-full",
+          "bg-sidebar border-r border-sidebar-border transition-all duration-300 flex flex-col fixed h-full",
           /* Mobile: drawer đóng — hạ z dưới <main> (z-40) để iOS/Safari không còn layer sidebar đè full viewport che nút menu.
              Mở drawer — z-50 trên backdrop + nội dung. Desktop: luôn z-50. */
           isMobile
@@ -445,7 +458,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             S
           </div>
           {isSidebarOpen && (
-            <span className="font-bold text-xl text-slate-900 tracking-tight">
+            <span className="font-bold text-xl text-sidebar-foreground tracking-tight">
               {currentShopName || "—"}
             </span>
           )}
@@ -475,16 +488,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all group text-left",
                       isActive
-                        ? "bg-blue-50 text-blue-600 font-medium"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        ? "bg-sidebar-accent text-sidebar-primary font-medium"
+                        : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                     )}
                   >
-                    <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
+                    <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70")} />
                     <span className="text-sm">{item.name}</span>
                     <ChevronDown className={cn("w-4 h-4 ml-auto shrink-0 transition-transform", isSubmenuOpen ? "rotate-180" : "")} />
                   </button>
                   {isSubmenuOpen && (
-                    <div className="ml-2 pl-3 border-l border-slate-200 mt-0.5 mb-1 space-y-0.5">
+                    <div className="ml-2 pl-3 border-l border-sidebar-border mt-0.5 mb-1 space-y-0.5">
                       {(children || []).map((child) => {
                         const isChildActive = pathActive(location.pathname, child.href);
                         return (
@@ -494,8 +507,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             className={cn(
                               "flex items-center gap-2 px-2 py-1.5 rounded-md transition-all text-sm",
                               isChildActive
-                                ? "bg-blue-50 text-blue-600 font-medium"
-                                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                ? "bg-sidebar-accent text-sidebar-primary font-medium"
+                                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                             )}
                           >
                             <span>{child.name}</span>
@@ -519,11 +532,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "flex items-center justify-center px-3 py-2 rounded-lg transition-all group",
                     isActive
-                      ? "bg-blue-50 text-blue-600"
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-sidebar-accent text-sidebar-primary"
+                      : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   )}
                 >
-                  <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
+                  <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70")} />
                 </Link>
               );
             }
@@ -535,31 +548,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg transition-all group",
                   isActive
-                    ? "bg-blue-50 text-blue-600 font-medium"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                    ? "bg-sidebar-accent text-sidebar-primary font-medium"
+                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )}
               >
-                <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
+                <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70")} />
                 {isSidebarOpen && <span className="text-sm">{item.name}</span>}
                 {isActive && isSidebarOpen && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-sidebar-primary shrink-0" />
                 )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-100 space-y-1">
+        <div className="p-4 border-t border-sidebar-border space-y-1">
           <Link 
             to={isAdmin ? "/settings" : "/profile"}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
               location.pathname === "/settings" || location.pathname === "/profile"
-                ? "bg-blue-50 text-blue-600 font-medium" 
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                ? "bg-sidebar-accent text-sidebar-primary font-medium" 
+                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
             )}
           >
-            <Settings className={cn("w-5 h-5 shrink-0", location.pathname === "/settings" ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
+            <Settings className={cn("w-5 h-5 shrink-0", location.pathname === "/settings" ? "text-sidebar-primary" : "text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70")} />
             {isSidebarOpen && <span>{isAdmin ? "Cài đặt" : "Tài khoản"}</span>}
           </Link>
           {!isAdmin && (
@@ -568,11 +581,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
                 location.pathname === "/change-password"
-                  ? "bg-blue-50 text-blue-600 font-medium"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-sidebar-accent text-sidebar-primary font-medium"
+                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
               )}
             >
-              <KeyRound className={cn("w-5 h-5 shrink-0", location.pathname === "/change-password" ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600")} />
+              <KeyRound className={cn("w-5 h-5 shrink-0", location.pathname === "/change-password" ? "text-sidebar-primary" : "text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70")} />
               {isSidebarOpen && <span>Đổi mật khẩu</span>}
             </Link>
           )}
@@ -598,7 +611,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* TopBar — safe-area-inset-top: PWA standalone (iPhone) tránh menu 3 gạch dính sát / dưới giờ pin */}
         <header
           className={cn(
-            "bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 isolate touch-manipulation supports-[backdrop-filter]:bg-white/80",
+            "bg-background/90 backdrop-blur-md border-b border-border sticky top-0 z-50 isolate touch-manipulation supports-[backdrop-filter]:bg-background/80",
             "pt-[env(safe-area-inset-top,0px)]",
             isMobile && isSidebarOpen && "pointer-events-auto relative z-[60]"
           )}
@@ -610,30 +623,38 @@ export function Layout({ children }: { children: React.ReactNode }) {
               aria-label={isSidebarOpen ? "Đóng menu" : "Mở menu"}
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className={cn(
-                "shrink-0 flex items-center justify-center rounded-lg text-slate-500 transition-all hover:bg-slate-100 active:bg-slate-200",
+                "shrink-0 flex items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-accent active:bg-accent/80",
                 "min-h-[44px] min-w-[44px] p-2 -ml-1 sm:min-h-0 sm:min-w-0 sm:p-2 sm:ml-0"
               )}
             >
               <Menu className="w-5 h-5" />
             </button>
             <div className="relative hidden md:block">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input 
                 type="text" 
                 placeholder="Tìm kiếm nhanh..." 
-                className="pl-10 pr-4 py-2 bg-slate-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm w-64 transition-all outline-none"
+                className="pl-10 pr-4 py-2 bg-muted border-transparent focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 rounded-xl text-sm w-64 transition-all outline-none"
               />
             </div>
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Dark/Light toggle */}
+            <button
+              onClick={toggleTheme}
+              aria-label={isDark ? "Chuyển sang sáng" : "Chuyển sang tối"}
+              className="p-2 hover:bg-accent rounded-lg text-muted-foreground transition-colors"
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
             <div className="relative">
               <button
                 onClick={() => {
                   setShowNotifMenu(v => !v);
                   setNotifCount(0);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 relative"
+                className="p-2 hover:bg-accent rounded-lg text-muted-foreground relative"
                 aria-label="Thông báo"
               >
                 <Bell className="w-5 h-5" />
@@ -647,20 +668,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {showNotifMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowNotifMenu(false)} />
-                  <div className="absolute right-0 top-12 z-50 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                      <p className="text-sm font-bold text-slate-900">Thông báo</p>
+                  <div className="absolute right-0 top-12 z-50 w-80 bg-popover rounded-2xl shadow-xl border border-border overflow-hidden">
+                    <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                      <p className="text-sm font-bold text-foreground">Thông báo</p>
                       <button
                         onClick={() => { setNotifItems([]); setNotifCount(0); setShowNotifMenu(false); }}
-                        className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                        className="text-xs font-semibold text-muted-foreground hover:text-foreground"
                       >
                         Xoá
                       </button>
                     </div>
                     {notifItems.length === 0 ? (
-                      <div className="px-4 py-10 text-center text-sm text-slate-400">Chưa có thông báo</div>
+                      <div className="px-4 py-10 text-center text-sm text-muted-foreground">Chưa có thông báo</div>
                     ) : (
-                      <div className="max-h-96 overflow-y-auto divide-y divide-slate-50">
+                      <div className="max-h-96 overflow-y-auto divide-y divide-border">
                         {notifItems.map((n, idx) => (
                           <button
                             key={idx}
@@ -668,14 +689,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                               setShowNotifMenu(false);
                               if (n?.order_id) navigate(`/orders/edit/${n.order_id}`);
                             }}
-                            className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-all"
+                            className="w-full text-left px-4 py-3 hover:bg-accent transition-all"
                           >
-                            <p className="text-sm font-semibold text-slate-800">
+                            <p className="text-sm font-semibold text-foreground">
                               {n.type === "created"
                                 ? `Đơn mới: ${n.order_code || "—"}`
                                 : `Đổi trạng thái: ${n.order_code || "—"}`}
                             </p>
-                            <p className="text-xs text-slate-500 mt-0.5">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {n.type === "created"
                                 ? `Trạng thái: ${n.status}`
                                 : `${n.old_status} → ${n.status}`}
@@ -688,7 +709,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </>
               )}
             </div>
-            <div className="h-8 w-px bg-slate-200 mx-1 sm:mx-2 shrink-0" aria-hidden />
+            <div className="h-8 w-px bg-border mx-1 sm:mx-2 shrink-0" aria-hidden />
             {shopSwitcherOptions.length > 1 && (
               <div className="flex items-center min-w-0 max-w-[min(100vw-12rem,220px)] sm:max-w-[220px]">
                 <label className="sr-only" htmlFor="layout-shop-select">
@@ -696,7 +717,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </label>
                 <select
                   id="layout-shop-select"
-                  className="text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-2 py-1.5 w-full min-w-0 truncate"
+                  className="text-xs font-semibold text-foreground bg-muted border border-border rounded-lg px-2 py-1.5 w-full min-w-0 truncate"
                   title="Chọn shop làm ngữ cảnh (đơn, báo cáo…)"
                   value={String(currentUser?.shop_id ?? "")}
                   onChange={async (e) => {
@@ -742,16 +763,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
             )}
             {currentUser?.is_super_admin && shopSwitcherOptions.length === 1 && (
-              <span className="text-[11px] font-semibold text-slate-500 truncate max-w-[140px] sm:max-w-[200px]" title={shopSwitcherOptions[0]?.name}>
+              <span className="text-[11px] font-semibold text-muted-foreground truncate max-w-[140px] sm:max-w-[200px]" title={shopSwitcherOptions[0]?.name}>
                 Shop: {shopSwitcherOptions[0]?.name ?? "—"}
               </span>
             )}
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-slate-900 leading-none">
+                <p className="text-sm font-semibold text-foreground leading-none">
                   {currentUser?.full_name || "Người dùng"}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {currentUser?.email || "Chưa đăng nhập"}
                 </p>
               </div>
@@ -760,7 +781,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               >
                 {currentUser?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || "U"}
               </div>
-              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+              <span className="text-xs font-bold text-muted-foreground bg-muted px-2 py-1 rounded">
                 {isAdmin ? "ADMIN" : (currentUser?.role_name || String(currentUser?.role || "USER").toUpperCase())}
               </span>
 
@@ -768,23 +789,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {showUserMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-                  <div className="absolute right-4 top-20 z-50 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-                    <div className="p-4 border-b border-slate-100">
-                      <p className="text-sm font-bold text-slate-900">{currentUser?.full_name}</p>
-                      <p className="text-xs text-slate-500">{currentUser?.email}</p>
+                  <div className="absolute right-4 top-20 z-50 w-56 bg-popover rounded-2xl shadow-xl border border-border overflow-hidden">
+                    <div className="p-4 border-b border-border">
+                      <p className="text-sm font-bold text-foreground">{currentUser?.full_name}</p>
+                      <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
                     </div>
                     <div className="py-1">
                       <Link
                         to="/change-password"
                         onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent transition-all"
                       >
-                        <KeyRound className="w-4 h-4 text-slate-400" />
+                        <KeyRound className="w-4 h-4 text-muted-foreground" />
                         Đổi mật khẩu
                       </Link>
                       <button
                         onClick={() => { setShowUserMenu(false); handleLogout(); }}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-all"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
                       >
                         <LogOut className="w-4 h-4" />
                         Đăng xuất

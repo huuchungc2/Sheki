@@ -67,130 +67,154 @@ export function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="max-w-[1000px] w-full bg-white rounded-[48px] shadow-2xl shadow-slate-200/50 overflow-hidden flex flex-col md:flex-row border border-slate-100">
-        <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-between relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-2xl font-black mb-8 shadow-lg shadow-blue-600/20">
-              S
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
+        <div className="bg-card border border-border rounded-xl shadow-sm">
+          <div className="p-6 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-semibold">
+                S
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold tracking-tight">Tạo tài khoản</h1>
+                <p className="text-sm text-muted-foreground mt-0.5">Điền thông tin để bắt đầu.</p>
+              </div>
             </div>
-            <h1 className="text-4xl font-black tracking-tight mb-4">
-              Smart <span className="text-blue-500">Retail</span>
-            </h1>
-            <p className="text-slate-400 font-medium text-lg leading-relaxed">
-              Bắt đầu hành trình tối ưu hóa doanh nghiệp của bạn ngay hôm nay.
+          </div>
+
+          <div className="p-6">
+            <form onSubmit={handleRegister} className="space-y-4">
+              {error && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="min-w-0">{error}</span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Họ và tên</label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    required
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    placeholder="VD: Lê Hoàng"
+                    className={cn(
+                      "h-10 w-full pl-9 pr-3 rounded-md bg-background text-foreground text-sm",
+                      "border border-input outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Tên đăng nhập</label>
+                <div className="relative">
+                  <AtSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    required
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    placeholder="3–32 ký tự: chữ, số, _"
+                    className={cn(
+                      "h-10 w-full pl-9 pr-3 rounded-md bg-background text-foreground text-sm",
+                      "border border-input outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Email</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="email@company.com"
+                    className={cn(
+                      "h-10 w-full pl-9 pr-3 rounded-md bg-background text-foreground text-sm",
+                      "border border-input outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Số điện thoại</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="tel"
+                    required
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="090 123 4567"
+                    className={cn(
+                      "h-10 w-full pl-9 pr-3 rounded-md bg-background text-foreground text-sm",
+                      "border border-input outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Mật khẩu</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="password"
+                    required
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="••••••••"
+                    className={cn(
+                      "h-10 w-full pl-9 pr-3 rounded-md bg-background text-foreground text-sm",
+                      "border border-input outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={cn(
+                  "w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold",
+                  "hover:opacity-95 transition-opacity",
+                  "disabled:opacity-50 disabled:pointer-events-none",
+                  "inline-flex items-center justify-center gap-2",
+                )}
+              >
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                ) : (
+                  <>
+                    Đăng ký
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              Đã có tài khoản?{" "}
+              <Link to="/login" className="text-primary font-semibold hover:underline">
+                Đăng nhập
+              </Link>
             </p>
           </div>
-
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-bold text-slate-300">Miễn phí 14 ngày dùng thử</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-bold text-slate-300">Không cần thẻ tín dụng</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-bold text-slate-300">Hỗ trợ kỹ thuật 24/7</p>
-            </div>
-          </div>
-
-          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/5 rounded-full blur-3xl"></div>
-        </div>
-
-        <div className="md:w-1/2 p-12 md:p-16">
-          <div className="mb-10">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Tạo tài khoản mới</h2>
-            <p className="text-slate-400 font-bold mt-2">Điền thông tin để bắt đầu trải nghiệm.</p>
-          </div>
-
-          <form onSubmit={handleRegister} className="space-y-5">
-            {error && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-xs font-bold">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                {error}
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HỌ VÀ TÊN</label>
-              <div className="relative">
-                <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input type="text" required value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} placeholder="VD: Lê Hoàng" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">TÊN ĐĂNG NHẬP</label>
-              <div className="relative">
-                <AtSign className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input
-                  type="text"
-                  autoComplete="username"
-                  required
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  placeholder="3–32 ký tự: chữ, số, _"
-                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">EMAIL</label>
-              <div className="relative">
-                <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@company.com" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">SỐ ĐIỆN THOẠI</label>
-              <div className="relative">
-                <Phone className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input type="tel" required value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="090 123 4567" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">MẬT KHẨU</label>
-              <div className="relative">
-                <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input type="password" required value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium" />
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 px-1 py-2">
-              <input type="checkbox" required className="mt-1 w-4 h-4 rounded border-slate-200 text-blue-600 focus:ring-blue-500" />
-              <p className="text-[10px] font-bold text-slate-400 leading-relaxed">
-                Tôi đồng ý với <span className="text-blue-600">Điều khoản dịch vụ</span> và <span className="text-blue-600">Chính sách bảo mật</span> của Sheki Retail.
-              </p>
-            </div>
-
-            <button type="submit" disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-[24px] text-sm font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50">
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  Đăng ký tài khoản
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          <p className="mt-10 text-center text-sm font-bold text-slate-400">
-            Đã có tài khoản?{" "}
-            <Link to="/login" className="text-blue-600 hover:underline">Đăng nhập ngay</Link>
-          </p>
         </div>
       </div>
     </div>

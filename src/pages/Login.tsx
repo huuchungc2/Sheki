@@ -20,6 +20,13 @@ export function Login() {
   const [allShops, setAllShops] = React.useState<{ id: number; name: string; code?: string }[]>([]);
   const [selectedShopId, setSelectedShopId] = React.useState<string>("");
 
+  // Login screen: luôn hiển thị light mode mặc định
+  React.useEffect(() => {
+    localStorage.setItem("sheki-theme", "light");
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add("light");
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -41,7 +48,7 @@ export function Login() {
         );
       };
 
-      // Non-superadmin: ưu tiên shop lần trước nếu có (tránh default shops[0] -> hay rơi về Sheki).
+      // Non-superadmin: ưu tiên shop lần trước nếu có (tránh default shops[0] -> hay rơi về Smart Erp).
       let sentLastShopId = false;
       const body1: Record<string, unknown> = { ...baseBody };
       if (!needsShopSelect) {
@@ -98,6 +105,11 @@ export function Login() {
       }
       
       logger.info('Login success', { username, user: data.user });
+
+      // Default theme after login: light mode
+      localStorage.setItem("sheki-theme", "light");
+      document.documentElement.classList.remove("dark", "light");
+      document.documentElement.classList.add("light");
       
       // Store token and user
       localStorage.setItem("token", data.token);
@@ -164,143 +176,145 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="max-w-[1000px] w-full bg-white rounded-[48px] shadow-2xl shadow-slate-200/50 overflow-hidden flex flex-col md:flex-row border border-slate-100">
-        {/* Left Side: Branding & Info */}
-        <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-between relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-2xl font-black mb-8 shadow-lg shadow-blue-600/20">
-              S
-            </div>
-            <h1 className="text-4xl font-black tracking-tight mb-4">
-              Smart <span className="text-blue-500">ERP</span>
-            </h1>
-            <p className="text-slate-400 font-medium text-lg leading-relaxed">
-              Hệ thống quản lý bán hàng, nhân sự và kho bãi tích hợp mạnh mẽ nhất cho doanh nghiệp của bạn.
-            </p>
-          </div>
-
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
+        <div className="bg-card border border-border rounded-xl shadow-sm">
+          <div className="p-6 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center overflow-hidden">
+                <img
+                  src="/favicon.svg"
+                  alt="Smart Erp"
+                  className="h-6 w-6"
+                  draggable={false}
+                />
               </div>
-              <p className="text-sm font-bold text-slate-300">Quản lý kho hàng thời gian thực</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold tracking-tight">Smart Erp</h1>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Đăng nhập để tiếp tục quản lý hệ thống.
+                </p>
               </div>
-              <p className="text-sm font-bold text-slate-300">Báo cáo doanh thu chi tiết</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-bold text-slate-300">Phân quyền nhân viên linh hoạt</p>
             </div>
           </div>
 
-          {/* Decorative elements */}
-          <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/5 rounded-full blur-3xl"></div>
+          <div className="p-6">
+            <form onSubmit={handleLogin} className="space-y-5">
+              {error && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="min-w-0">{error}</span>
+                </div>
+              )}
+
+              {needsShopSelect && allShops.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Shop
+                  </label>
+                  <select
+                    value={selectedShopId}
+                    onChange={(e) => setSelectedShopId(e.target.value)}
+                    className={cn(
+                      "h-10 w-full rounded-md bg-background text-foreground text-sm",
+                      "border border-input px-3 outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  >
+                    {allShops.map((s) => (
+                      <option key={s.id} value={String(s.id)}>
+                        {s.name}{s.code ? ` (${s.code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">Super Admin: chọn shop rồi bấm đăng nhập lại.</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Tên đăng nhập
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Nhập username"
+                    className={cn(
+                      "h-10 w-full pl-9 pr-3 rounded-md bg-background text-foreground text-sm",
+                      "border border-input outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Chỉ đăng nhập bằng username — không dùng email.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Mật khẩu
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className={cn(
+                      "h-10 w-full pl-9 pr-3 rounded-md bg-background text-foreground text-sm",
+                      "border border-input outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={cn(
+                  "w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-semibold",
+                  "hover:opacity-95 transition-opacity",
+                  "disabled:opacity-50 disabled:pointer-events-none",
+                  "inline-flex items-center justify-center gap-2",
+                )}
+              >
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                ) : (
+                  <>
+                    Đăng nhập
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 space-y-2 text-center">
+              <p className="text-sm text-muted-foreground">
+                Chưa có tài khoản?{" "}
+                <Link to="/register" className="text-primary font-semibold hover:underline">
+                  Đăng ký ngay
+                </Link>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                <Link to="/super-admin-recovery" className="hover:underline underline-offset-2">
+                  Quên mật khẩu Super Admin?
+                </Link>
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Right Side: Login Form */}
-        <div className="md:w-1/2 p-12 md:p-16 overflow-y-auto">
-          <div className="mb-10">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Chào mừng trở lại</h2>
-            <p className="text-slate-400 font-bold mt-2">Đăng nhập để tiếp tục quản lý hệ thống.</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            {error && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-xs font-bold">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                {error}
-              </div>
-            )}
-            {needsShopSelect && allShops.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">SHOP</label>
-                <select
-                  value={selectedShopId}
-                  onChange={(e) => setSelectedShopId(e.target.value)}
-                  className="w-full px-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
-                >
-                  {allShops.map((s) => (
-                    <option key={s.id} value={String(s.id)}>
-                      {s.name}{s.code ? ` (${s.code})` : ""}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-400 px-1">Super Admin: chọn shop rồi bấm đăng nhập lại.</p>
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">TÊN ĐĂNG NHẬP</label>
-              <div className="relative">
-                <User className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input 
-                  type="text" 
-                  autoComplete="username"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Tên đăng nhập (username)"
-                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
-                />
-              </div>
-              <p className="text-[11px] text-slate-400 px-1">Chỉ đăng nhập bằng username — không dùng email.</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">MẬT KHẨU</label>
-              </div>
-              <div className="relative">
-                <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                <input 
-                  type="password" 
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" 
-                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border-transparent focus:bg-white focus:border-blue-200 focus:ring-4 focus:ring-blue-500/5 rounded-[24px] text-sm transition-all outline-none font-medium"
-                />
-              </div>
-            </div>
-
-            <button 
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-[24px] text-sm font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50"
-            >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  Đăng nhập hệ thống
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Link đăng ký */}
-          <div className="mt-8 text-center space-y-2">
-            <p className="text-sm text-slate-400 font-medium">
-              Chưa có tài khoản?{" "}
-              <Link to="/register" className="text-blue-600 font-bold hover:underline">
-                Đăng ký ngay
-              </Link>
-            </p>
-            <p className="text-xs text-slate-400">
-              <Link to="/super-admin-recovery" className="text-slate-500 hover:text-slate-700 underline underline-offset-2">
-                Quên mật khẩu Super Admin?
-              </Link>
-            </p>
-          </div>
+        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>Quản lý kho • đơn hàng • báo cáo • phân quyền</span>
         </div>
       </div>
     </div>

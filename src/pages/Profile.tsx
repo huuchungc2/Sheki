@@ -130,25 +130,25 @@ export function Profile() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
+    <div className="max-w-2xl mx-auto space-y-8 min-w-0">
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-all">
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-accent rounded-lg text-muted-foreground transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Thông tin cá nhân</h1>
-          <p className="text-slate-500 text-sm mt-1">Cập nhật thông tin nhân viên đang đăng nhập.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Thông tin cá nhân</h1>
+          <p className="text-muted-foreground text-sm mt-1">Cập nhật thông tin nhân viên đang đăng nhập.</p>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold">
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-xl flex items-center gap-3 text-destructive text-sm font-semibold">
           <AlertCircle className="w-5 h-5 shrink-0" />
           {error}
         </div>
       )}
       {success && (
-        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-700 text-sm font-bold">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-700 text-sm font-semibold dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300">
           <CheckCircle2 className="w-5 h-5 shrink-0" />
           Đã cập nhật thông tin.
         </div>
@@ -156,81 +156,81 @@ export function Profile() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : (
-      <form onSubmit={submit} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+      <form onSubmit={submit} className="bg-card p-8 rounded-2xl border border-border shadow-sm space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-bold text-slate-700">Họ và tên</label>
+            <label className="text-sm font-semibold text-foreground">Họ và tên</label>
             <div className="relative">
-              <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={form.full_name}
                 onChange={(e) => setForm((p) => ({ ...p, full_name: e.target.value }))}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                className="w-full h-11 pl-10 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 placeholder="Họ tên"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Số điện thoại</label>
+            <label className="text-sm font-semibold text-foreground">Số điện thoại</label>
             <div className="relative">
-              <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 inputMode="numeric"
                 value={form.phone}
                 onChange={(e) => setForm((p) => ({ ...p, phone: cleanPhone(e.target.value) }))}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                className="w-full h-11 pl-10 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 placeholder="0912345678"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Email</label>
+            <label className="text-sm font-semibold text-foreground">Email</label>
             <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={form.email}
                 onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                className="w-full h-11 pl-10 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 placeholder="email@domain.com"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Phòng ban</label>
+            <label className="text-sm font-semibold text-foreground">Phòng ban</label>
             <div className="relative">
-              <Building2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Building2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={form.department}
                 onChange={(e) => setForm((p) => ({ ...p, department: e.target.value }))}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                className="w-full h-11 pl-10 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 placeholder="Kinh doanh"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Chức vụ</label>
+            <label className="text-sm font-semibold text-foreground">Chức vụ</label>
             <div className="relative">
-              <BadgeCheck className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <BadgeCheck className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={form.position}
                 onChange={(e) => setForm((p) => ({ ...p, position: e.target.value }))}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                className="w-full h-11 pl-10 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 placeholder="Nhân viên"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Ngày vào làm</label>
+            <label className="text-sm font-semibold text-foreground">Ngày vào làm</label>
             <div className="relative">
-              <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-[1]" />
+              <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-[1]" />
               <div className="pl-8">
                 <GregorianDateSelect
                   value={form.join_date}
@@ -243,38 +243,38 @@ export function Profile() {
                 />
               </div>
             </div>
-            <p className="text-[11px] text-slate-400">Có thể để trống.</p>
+            <p className="text-[11px] text-muted-foreground">Có thể để trống.</p>
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-bold text-slate-700">Địa chỉ</label>
+            <label className="text-sm font-semibold text-foreground">Địa chỉ</label>
             <div className="relative">
-              <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={form.address}
                 onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+                className="w-full h-11 pl-10 pr-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 placeholder="Số nhà, tên đường"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Tỉnh/TP</label>
+            <label className="text-sm font-semibold text-foreground">Tỉnh/TP</label>
             <input
               value={form.city}
               onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
-              className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+              className="w-full h-11 px-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               placeholder="VD: Thành phố Hà Nội"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">Quận/Huyện</label>
+            <label className="text-sm font-semibold text-foreground">Quận/Huyện</label>
             <input
               value={form.district}
               onChange={(e) => setForm((p) => ({ ...p, district: e.target.value }))}
-              className="w-full px-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm transition-all outline-none"
+              className="w-full h-11 px-4 bg-background border border-input rounded-md text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               placeholder="VD: Cầu Giấy"
             />
           </div>
@@ -284,8 +284,8 @@ export function Profile() {
           type="submit"
           disabled={saving}
           className={cn(
-            "w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all shadow-lg",
-            saving ? "bg-slate-200 text-slate-500" : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20"
+            "w-full h-11 flex items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors shadow-sm",
+            saving ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground hover:opacity-95 transition-opacity"
           )}
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
