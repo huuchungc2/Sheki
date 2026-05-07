@@ -8,11 +8,15 @@ import {
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { cn, formatCurrency, formatDate } from "../lib/utils";
 import { parseListPage, getVisiblePageNumbers } from "../lib/listUrl";
+import { mayDeleteCounterSaleOrder } from "../lib/counterOrderAccess";
 import { exportOrdersList } from "../lib/exportExcel";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
   "/api";
+
+/** Danh sách «Quản lý đơn hàng» chỉ đơn không tại quầy; đơn quầy xem tại `/orders/counter-list`. */
+const ORDER_LIST_API_COUNTER = "0";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending:   { label: "Chờ duyệt", color: "bg-amber-100 text-amber-700",    icon: Clock },
@@ -28,10 +32,14 @@ const paymentConfig: Record<string, { label: string; icon: any }> = {
   card:     { label: "Thẻ ATM",      icon: CreditCard },
 };
 
-/** Khớp `DELETE /orders/:id`: `requirePermission('orders','delete')` + `requireFeature('orders.delete')` */
-function userMayDeleteOrders(user: any): boolean {
+/** Khớp `DELETE /orders/:id` — đơn quầy: `orders.counter_delete` hoặc (module delete + feature orders.delete). */
+function userMayDeleteOrderRow(user: any, order: any): boolean {
   if (!user) return false;
   if (user.is_super_admin) return true;
+  const isCounter =
+    Number(order?.is_counter_sale) === 1 ||
+    String(order?.shipping_address || "").trim() === "Mua tại cửa hàng";
+  if (isCounter) return mayDeleteCounterSaleOrder(user);
   const perm = !!user._caps?.orders?.delete;
   const c2 = user._caps2;
   const feat = c2 && typeof c2 === "object" ? !!c2["orders.delete"] : false;
@@ -112,7 +120,6 @@ export function OrderList() {
   })();
   const isAdmin =
     currentUser?.can_access_admin === true || currentUser?.role === "admin";
-  const showDeleteColumn = userMayDeleteOrders(currentUser);
 
   /** NV phạm vi cá nhân (scope_own_data): không sửa/xóa/bulk chọn đơn đang giao hoặc đã giao — Admin & role xem toàn hệ thống giữ quyền */
   const canSalesMutateOrderRow = React.useCallback(
@@ -175,6 +182,12 @@ export function OrderList() {
     },
     [setSearchParams]
   );
+
+  // Gỡ `counter` khỏi URL (bookmark cũ) — màn này luôn chỉ tải đơn không tại quầy qua API.
+  React.useEffect(() => {
+    if (!searchParams.get("counter")) return;
+    patchListParams({ counter: null }, { resetPage: false });
+  }, [searchParams, patchListParams]);
 
   const setPage = React.useCallback(
     (p: number | ((prev: number) => number)) => {
@@ -298,6 +311,7 @@ export function OrderList() {
         status: st,
         page: String(p),
         limit: String(limit),
+        counter: ORDER_LIST_API_COUNTER,
         ...(df && { date_from: df }),
         ...(dt && { date_to: dt }),
         ...(eid && { employee: eid }),
@@ -372,6 +386,7 @@ export function OrderList() {
         status,
         page: "1",
         limit: "10000",
+        counter: ORDER_LIST_API_COUNTER,
         ...(dateFrom && { date_from: dateFrom }),
         ...(dateTo && { date_to: dateTo }),
         ...(employeeId && { employee: employeeId }),
@@ -987,7 +1002,7 @@ export function OrderList() {
                               <Edit2 className="w-3.5 h-3.5" />
                             </Link>
                           ) : null}
-                          {rowCanMutate && showDeleteColumn ? (
+                          {rowCanMutate && userMayDeleteOrderRow(currentUser, order) ? (
                             <button
                               type="button"
                               onClick={() => handleDelete(order.id)}

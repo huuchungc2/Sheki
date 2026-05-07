@@ -52,6 +52,9 @@ function buildNonAdminNavigation(caps: any) {
   const salesChildren: { name: string; href: string }[] = [];
   if (can("orders.list", "orders", "view")) {
     salesChildren.push({ name: "Đơn hàng", href: "/orders" });
+    if (can("orders.counter")) {
+      salesChildren.push({ name: "Đơn tại quầy", href: "/orders/counter-list" });
+    }
   }
   if (can("customers.list", "customers", "view")) {
     salesChildren.push({ name: "Khách hàng", href: "/customers" });
@@ -109,6 +112,7 @@ const navigationAdmin = [
     icon: ShoppingCart,
     children: [
       { name: "Đơn hàng", href: "/orders" },
+      { name: "Đơn tại quầy", href: "/orders/counter-list" },
       { name: "Khách hàng", href: "/customers" },
       { name: "Đơn hoàn", href: "/returns" },
     ],
@@ -168,6 +172,7 @@ const navigationSales = [
     icon: ShoppingCart,
     children: [
       { name: "Đơn hàng", href: "/orders" },
+      { name: "Đơn tại quầy", href: "/orders/counter-list" },
       { name: "Khách hàng", href: "/customers" },
       { name: "Đơn hoàn", href: "/returns" },
     ],

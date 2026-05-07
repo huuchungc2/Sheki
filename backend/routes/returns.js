@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
+const requirePermission = require('../middleware/requirePermission');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
 const { isShopDateTimeInClosedPayrollPeriod } = require('../services/payrollPeriod');
@@ -96,7 +97,7 @@ async function getOverrideTierRate(pool, ctvRate, shopId) {
 
 // GET /api/returns — danh sách đơn hoàn (bảng returns)
 // Sales: chỉ đơn gốc do mình bán; Admin: tất cả
-router.get('/', auth, requireShop, async (req, res, next) => {
+router.get('/', auth, requireShop, requirePermission('orders', 'view'), async (req, res, next) => {
   try {
     const pool = await getPool();
     const { page = 1, limit = 50, q, date_from, date_to, group_id } = req.query;
@@ -223,7 +224,13 @@ router.get('/', auth, requireShop, async (req, res, next) => {
 
 // ADMIN: xóa đơn hoàn (rollback: kho + bút toán hoa hồng + trạng thái request nếu có)
 // DELETE /api/returns/:id
-router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.delete(
+  '/:id',
+  auth,
+  requireShop,
+  requirePermission('orders', 'delete'),
+  authorize('admin'),
+  async (req, res, next) => {
   let conn;
   try {
     const pool = await getPool();
@@ -308,7 +315,13 @@ router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, ne
 
 // ADMIN: tạo yêu cầu hoàn (Sales không được tạo từ UI/API)
 // POST /api/returns/requests
-router.post('/requests', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post(
+  '/requests',
+  auth,
+  requireShop,
+  requirePermission('orders', 'edit'),
+  authorize('admin'),
+  async (req, res, next) => {
   try {
     const pool = await getPool();
     const sid = req.shopId;
@@ -382,7 +395,13 @@ router.post('/requests', auth, requireShop, authorize('admin'), async (req, res,
 });
 
 // GET /api/returns/requests — Admin: danh sách yêu cầu hoàn (Sales dùng GET /returns)
-router.get('/requests', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.get(
+  '/requests',
+  auth,
+  requireShop,
+  requirePermission('orders', 'view'),
+  authorize('admin'),
+  async (req, res, next) => {
   try {
     const pool = await getPool();
     const { status, page = 1, limit = 20 } = req.query;
@@ -506,7 +525,13 @@ router.get('/requests', auth, requireShop, authorize('admin'), async (req, res, 
 
 // ADMIN: duyệt và tạo đơn hoàn + bút toán hoa hồng âm + cộng kho
 // POST /api/returns/requests/:id/approve
-router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post(
+  '/requests/:id/approve',
+  auth,
+  requireShop,
+  requirePermission('orders', 'edit'),
+  authorize('admin'),
+  async (req, res, next) => {
   try {
     const pool = await getPool();
     const sid = req.shopId;
@@ -698,7 +723,13 @@ router.post('/requests/:id/approve', auth, requireShop, authorize('admin'), asyn
 
 // ADMIN: từ chối yêu cầu hoàn
 // POST /api/returns/requests/:id/reject
-router.post('/requests/:id/reject', auth, requireShop, authorize('admin'), async (req, res, next) => {
+router.post(
+  '/requests/:id/reject',
+  auth,
+  requireShop,
+  requirePermission('orders', 'edit'),
+  authorize('admin'),
+  async (req, res, next) => {
   try {
     const pool = await getPool();
     const requestId = parseInt(req.params.id);

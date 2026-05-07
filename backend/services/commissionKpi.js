@@ -163,6 +163,8 @@ async function sumDirectGrossForOrderFiltersByOrderCreatedAt(pool, {
   date_from,
   date_to,
   group_id,
+  counterSaleOnly,
+  counterSaleExclude,
 }) {
   const params = [];
   let sql = `
@@ -211,6 +213,12 @@ async function sumDirectGrossForOrderFiltersByOrderCreatedAt(pool, {
   if (date_to) {
     sql += ' AND DATE(o.created_at) <= ?';
     params.push(date_to);
+  }
+  if (counterSaleOnly) {
+    sql += ' AND o.is_counter_sale = 1';
+  }
+  if (counterSaleExclude) {
+    sql += ' AND o.is_counter_sale = 0';
   }
 
   const [[row]] = await pool.query(sql, params);

@@ -75,6 +75,68 @@ async function loadShopsForUser(pool, userId) {
   }));
 }
 
+/** Cấu hình cột HH trên OrderForm (bảng shops). */
+const { packOrderLineRow } = require('../utils/shopOrderLinePack');
+
+async function fetchShopOrderLineSettings(pool, shopId) {
+  if (shopId == null || shopId === '') return null;
+  const sid = parseInt(shopId, 10);
+  if (!Number.isFinite(sid)) return null;
+  try {
+    const [[r]] = await pool.query(
+      `SELECT order_line_show_commission, order_line_show_discount, order_default_commission_rate,
+              order_default_discount_rate,
+              counter_order_line_show_commission, counter_order_line_show_discount,
+              counter_order_default_discount_rate, counter_order_default_commission_rate,
+              order_qty_allow_decimal, counter_order_qty_allow_decimal
+       FROM shops WHERE id = ? LIMIT 1`,
+      [sid]
+    );
+    if (!r) return null;
+    return packOrderLineRow(r);
+  } catch (e) {
+    if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+      try {
+        const [[r2]] = await pool.query(
+          'SELECT order_line_show_commission, order_line_show_discount, order_default_commission_rate, order_default_discount_rate FROM shops WHERE id = ? LIMIT 1',
+          [sid]
+        );
+        if (!r2) return null;
+        const flat = packOrderLineRow({
+          ...r2,
+          counter_order_line_show_commission: r2.order_line_show_commission,
+          counter_order_line_show_discount: r2.order_line_show_discount,
+          counter_order_default_commission_rate: r2.order_default_commission_rate,
+          order_default_discount_rate: r2.order_default_discount_rate,
+          counter_order_default_discount_rate: r2.counter_order_default_discount_rate,
+          order_qty_allow_decimal: 1,
+          counter_order_qty_allow_decimal: 1,
+        });
+        return flat;
+      } catch (e2) {
+        if (e2 && e2.code === 'ER_BAD_FIELD_ERROR') {
+          return {
+            delivery: {
+              show_commission: true,
+              show_discount: true,
+              default_commission_rate: 10,
+              default_discount_rate: 0,
+            },
+            counter: {
+              show_commission: true,
+              show_discount: true,
+              default_commission_rate: 10,
+              default_discount_rate: 0,
+            },
+          };
+        }
+        throw e2;
+      }
+    }
+    throw e;
+  }
+}
+
 function buildPayloadFromShop(user, shop) {
   return {
     id: user.id,
@@ -256,9 +318,10 @@ router.get('/me', auth, async (req, res, next) => {
     };
     const caps = await computePermissionCaps(pool, effUser);
     const caps2 = await computeFeatureCaps(pool, effUser);
+    const shopOrderLine = await fetchShopOrderLineSettings(pool, req.user.shop_id);
 
     res.json({
-      data: { ...row, _caps: caps, _caps2: caps2 },
+      data: { ...row, shop_order_line: shopOrderLine, _caps: caps, _caps2: caps2 },
       shops,
       all_shops: allShops,
       current_shop_id: req.user.shop_id != null ? Number(req.user.shop_id) : null,
@@ -455,6 +518,8 @@ router.post('/login', async (req, res, next) => {
       allShops = all;
     }
 
+    const shopOrderLineLogin = await fetchShopOrderLineSettings(pool, shop.id);
+
     res.json({
       token,
       shops,
@@ -473,6 +538,7 @@ router.post('/login', async (req, res, next) => {
         commission_rate: user.commission_rate,
         shop_id: shop.id,
         is_super_admin: isSuperAdmin,
+        shop_order_line: shopOrderLineLogin,
       },
     });
   } catch (err) {
@@ -657,4 +723,5 @@ router.post('/register', async (req, res, next) => {
   }
 });
 
+router.computePermissionCaps = computePermissionCaps;
 module.exports = router;

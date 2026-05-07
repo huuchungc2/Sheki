@@ -42,13 +42,13 @@ router.get('/', auth, requireShop, requirePermission('products', 'view'), async 
         ws.reserved_stock as warehouse_reserved_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN warehouse_stock ws ON ws.product_id = p.id ${warehouse_id ? 'AND ws.warehouse_id = ?' : ''}
+      LEFT JOIN warehouse_stock ws ON ws.product_id = p.id AND ws.shop_id = p.shop_id ${warehouse_id ? 'AND ws.warehouse_id = ?' : ''}
       WHERE p.shop_id = ?
     `;
     let countQuery = `
       SELECT COUNT(*) as total
       FROM products p
-      LEFT JOIN warehouse_stock ws ON ws.product_id = p.id ${warehouse_id ? 'AND ws.warehouse_id = ?' : ''}
+      LEFT JOIN warehouse_stock ws ON ws.product_id = p.id AND ws.shop_id = p.shop_id ${warehouse_id ? 'AND ws.warehouse_id = ?' : ''}
       WHERE p.shop_id = ?
     `;
     const params = [];

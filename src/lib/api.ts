@@ -108,6 +108,17 @@ const api = {
     if (!res.ok) throw new Error(data.message || data.error || "Lỗi API");
     return data;
   },
+  patch: async (endpoint: string, body: any) => {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || data.error || "Lỗi API");
+    return data;
+  },
   delete: async (endpoint: string) => {
     const token = localStorage.getItem("token");
     const res = await fetch(`${API_URL}${endpoint}`, {

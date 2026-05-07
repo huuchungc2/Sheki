@@ -42,12 +42,27 @@ const FEATURE_TREE = [
     key: 'orders',
     name: 'Đơn hàng',
     children: [
-      { key: 'orders.list', name: 'Danh sách đơn hàng' },
-      { key: 'orders.view', name: 'Xem chi tiết đơn' },
-      { key: 'orders.create', name: 'Tạo đơn' },
-      { key: 'orders.edit', name: 'Sửa đơn' },
-      { key: 'orders.delete', name: 'Xóa đơn' },
-      { key: 'orders.export_items', name: 'Xuất Excel (chi tiết sản phẩm)' },
+      {
+        key: 'orders_block_delivery',
+        name: 'Đơn giao & quản lý (không tại quầy)',
+        children: [
+          { key: 'orders.list', name: 'Danh sách đơn hàng' },
+          { key: 'orders.view', name: 'Xem chi tiết đơn' },
+          { key: 'orders.create', name: 'Tạo đơn' },
+          { key: 'orders.edit', name: 'Sửa đơn' },
+          { key: 'orders.delete', name: 'Xóa đơn' },
+          { key: 'orders.export_items', name: 'Xuất Excel (chi tiết sản phẩm)' },
+        ],
+      },
+      {
+        key: 'orders_block_counter',
+        name: 'Bán tại quầy',
+        children: [
+          { key: 'orders.counter', name: 'Màn bán quầy & danh sách đơn tại quầy' },
+          { key: 'orders.counter_edit', name: 'Sửa đơn tại quầy (mở chỉnh sửa, lưu PUT)' },
+          { key: 'orders.counter_delete', name: 'Xóa đơn tại quầy (DELETE đơn quầy)' },
+        ],
+      },
     ],
   },
   {

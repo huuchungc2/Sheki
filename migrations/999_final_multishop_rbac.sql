@@ -1,5 +1,5 @@
 -- 999_final_multishop_rbac.sql
--- Final bundle: MULTI-SHOP + RBAC/SCOPES (from first multi-shop to current)
+-- Final bundle: MULTI-SHOP + RBAC/SCOPES + Payroll (031) + Order line shop config (032–037) + counter-sale flag
 -- Safe to run on a DB backup from server (idempotent as much as possible).
 --
 -- MySQL 5.7+
@@ -486,6 +486,104 @@ CALL sp_exec_if_table_exists(
    WHERE LOWER(TRIM(r.code)) = ''sales''
      AND rs.target IN (''orders'', ''customers'', ''reports'')'
 );
+
+-- =========================================================
+-- F) Payroll periods (031) — kỳ lương + orders.payroll_period_id
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS `payroll_periods` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `shop_id` INT UNSIGNED NOT NULL,
+  `from_at` DATETIME NOT NULL,
+  `to_at` DATETIME DEFAULT NULL,
+  `status` ENUM('open','closed') NOT NULL DEFAULT 'open',
+  `closed_at` DATETIME DEFAULT NULL,
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_payroll_periods_shop` (`shop_id`),
+  KEY `idx_payroll_periods_status` (`status`),
+  KEY `idx_payroll_periods_from` (`from_at`),
+  CONSTRAINT `fk_payroll_periods_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_payroll_periods_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `payroll_settlements` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `shop_id` INT UNSIGNED NOT NULL,
+  `payroll_period_id` INT UNSIGNED NOT NULL,
+  `user_id` INT UNSIGNED NOT NULL,
+  `direct_commission` DECIMAL(12,2) NOT NULL DEFAULT 0,
+  `override_commission` DECIMAL(12,2) NOT NULL DEFAULT 0,
+  `return_commission_abs` DECIMAL(12,2) NOT NULL DEFAULT 0,
+  `ship_khach_tra` DECIMAL(12,2) NOT NULL DEFAULT 0,
+  `nv_chiu` DECIMAL(12,2) NOT NULL DEFAULT 0,
+  `total_luong` DECIMAL(12,2) NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_settlement_period_user` (`payroll_period_id`, `user_id`),
+  KEY `idx_settlement_shop` (`shop_id`),
+  KEY `idx_settlement_period` (`payroll_period_id`),
+  CONSTRAINT `fk_settlement_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_settlement_period` FOREIGN KEY (`payroll_period_id`) REFERENCES `payroll_periods` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_settlement_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `payroll_adjustments` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `shop_id` INT UNSIGNED NOT NULL,
+  `from_period_id` INT UNSIGNED DEFAULT NULL COMMENT 'kỳ bị ảnh hưởng (đã chốt)',
+  `to_period_id` INT UNSIGNED NOT NULL COMMENT 'kỳ nhận điều chỉnh (thường là kỳ đang mở)',
+  `user_id` INT UNSIGNED NOT NULL,
+  `order_id` INT UNSIGNED DEFAULT NULL,
+  `amount` DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'âm = trừ lương',
+  `reason` VARCHAR(255) DEFAULT NULL,
+  `created_by` INT UNSIGNED DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_adj_shop` (`shop_id`),
+  KEY `idx_adj_to_period` (`to_period_id`),
+  KEY `idx_adj_user` (`user_id`),
+  KEY `idx_adj_order` (`order_id`),
+  CONSTRAINT `fk_adj_shop` FOREIGN KEY (`shop_id`) REFERENCES `shops` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_adj_from_period` FOREIGN KEY (`from_period_id`) REFERENCES `payroll_periods` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_adj_to_period` FOREIGN KEY (`to_period_id`) REFERENCES `payroll_periods` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_adj_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_adj_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_adj_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CALL sp_add_column_if_not_exists('orders', 'payroll_period_id', 'ALTER TABLE `orders` ADD COLUMN `payroll_period_id` INT UNSIGNED NULL DEFAULT NULL AFTER `shop_id`');
+CALL sp_add_index_if_not_exists('orders', 'idx_orders_payroll_period', 'ALTER TABLE `orders` ADD KEY `idx_orders_payroll_period` (`payroll_period_id`)');
+CALL sp_add_fk_if_not_exists('orders', 'fk_orders_payroll_period', 'ALTER TABLE `orders` ADD CONSTRAINT `fk_orders_payroll_period` FOREIGN KEY (`payroll_period_id`) REFERENCES `payroll_periods` (`id`) ON DELETE SET NULL');
+
+-- =========================================================
+-- G) shops: OrderForm / Counter line (032–037) + orders.is_counter_sale (033)
+-- Thứ tự ALTER khớp migration gốc (035 rồi 036) để cột nằm đúng vị trí.
+-- =========================================================
+
+CALL sp_add_column_if_not_exists('shops', 'order_line_show_commission', 'ALTER TABLE `shops` ADD COLUMN `order_line_show_commission` TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''1=hiện cột HH trên OrderForm'' AFTER `valid_until`');
+CALL sp_add_column_if_not_exists('shops', 'order_default_commission_rate', 'ALTER TABLE `shops` ADD COLUMN `order_default_commission_rate` DECIMAL(5,2) NOT NULL DEFAULT 10.00 COMMENT ''% HH mặc định dòng mới'' AFTER `order_line_show_commission`');
+CALL sp_add_column_if_not_exists('shops', 'order_line_show_discount', 'ALTER TABLE `shops` ADD COLUMN `order_line_show_discount` TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''1=hiện cột CK% đơn giao'' AFTER `order_default_commission_rate`');
+CALL sp_add_column_if_not_exists('shops', 'counter_order_line_show_commission', 'ALTER TABLE `shops` ADD COLUMN `counter_order_line_show_commission` TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''1=hiện cột HH bán tại quầy'' AFTER `order_line_show_discount`');
+CALL sp_add_column_if_not_exists('shops', 'counter_order_line_show_discount', 'ALTER TABLE `shops` ADD COLUMN `counter_order_line_show_discount` TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''1=hiện cột CK% bán tại quầy'' AFTER `counter_order_line_show_commission`');
+CALL sp_add_column_if_not_exists('shops', 'counter_order_default_commission_rate', 'ALTER TABLE `shops` ADD COLUMN `counter_order_default_commission_rate` DECIMAL(5,2) NOT NULL DEFAULT 10.00 COMMENT ''% HH mặc định dòng mới (quầy)'' AFTER `counter_order_line_show_discount`');
+CALL sp_add_column_if_not_exists('shops', 'order_default_discount_rate', 'ALTER TABLE `shops` ADD COLUMN `order_default_discount_rate` DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT ''% CK mặc định dòng mới (đơn giao)'' AFTER `order_line_show_discount`');
+CALL sp_add_column_if_not_exists('shops', 'counter_order_default_discount_rate', 'ALTER TABLE `shops` ADD COLUMN `counter_order_default_discount_rate` DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT ''% CK mặc định dòng mới (quầy)'' AFTER `counter_order_line_show_discount`');
+CALL sp_add_column_if_not_exists('shops', 'order_qty_allow_decimal', 'ALTER TABLE `shops` ADD COLUMN `order_qty_allow_decimal` TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''1=cho SL lẻ bước 0.1 (đơn giao)'' AFTER `order_default_discount_rate`');
+CALL sp_add_column_if_not_exists('shops', 'counter_order_qty_allow_decimal', 'ALTER TABLE `shops` ADD COLUMN `counter_order_qty_allow_decimal` TINYINT(1) NOT NULL DEFAULT 1 COMMENT ''1=cho SL lẻ bước 0.1 (quầy)'' AFTER `counter_order_default_discount_rate`');
+
+-- Đồng bộ lần đầu (giống 035); chạy lại bundle có thể ghi đè chỉnh tay cột counter — tránh chạy 999 nhiều lần trên DB production đã cấu hình.
+UPDATE `shops` SET
+  `counter_order_line_show_commission` = `order_line_show_commission`,
+  `counter_order_line_show_discount` = `order_line_show_discount`,
+  `counter_order_default_commission_rate` = `order_default_commission_rate`;
+
+CALL sp_add_column_if_not_exists('orders', 'is_counter_sale', 'ALTER TABLE `orders` ADD COLUMN `is_counter_sale` TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''1=đơn bán tại quầy'' AFTER `collaborator_user_id`');
+CALL sp_add_index_if_not_exists('orders', 'idx_orders_counter_sale', 'ALTER TABLE `orders` ADD KEY `idx_orders_counter_sale` (`is_counter_sale`)');
+
+-- Bổ sung cột thuế (schema hiện tại) nếu DB backup cũ thiếu
+CALL sp_add_column_if_not_exists('orders', 'tax_amount', 'ALTER TABLE `orders` ADD COLUMN `tax_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER `discount`');
 
 -- =========================================================
 -- Cleanup helpers (optional)

@@ -53,7 +53,8 @@ function deriveModulePermissionsFromFeatures(featureMap) {
     f('orders.create') ||
     f('orders.edit') ||
     f('orders.delete') ||
-    f('orders.export_items')
+    f('orders.export_items') ||
+    f('orders.counter')
   ) {
     set('orders', 'view', true);
   }

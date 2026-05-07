@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { EmployeeList } from "./pages/EmployeeList";
@@ -14,6 +14,8 @@ import { CustomerList } from "./pages/CustomerList";
 import { CustomerForm } from "./pages/CustomerForm";
 import { OrderList } from "./pages/OrderList";
 import { OrderForm } from "./pages/OrderForm";
+import { CounterSale } from "./pages/CounterSale";
+import { CounterOrdersList } from "./pages/CounterOrdersList";
 import { Settings } from "./pages/Settings";
 import { EmployeeGroups } from "./pages/EmployeeGroups";
 import { Login } from "./pages/Login";
@@ -39,6 +41,7 @@ import { Categories } from "./pages/Categories";
 import { SuperAdminShops } from "./pages/SuperAdminShops";
 import { SuperAdminRecovery } from "./pages/SuperAdminRecovery";
 import { isAdminUser } from "./lib/utils";
+import { mayEditCounterSaleOrder } from "./lib/counterOrderAccess";
 
 function getStoredUser() {
   const raw = localStorage.getItem("user");
@@ -47,6 +50,21 @@ function getStoredUser() {
 
 function capTrue(u: any, mod: string, act: string) {
   return !!u?._caps?.[mod]?.[act];
+}
+
+function cap2True(u: any, featureKey: string) {
+  return !!u?._caps2?.[featureKey];
+}
+
+function featureKeyForModuleAction(module: string, action: string) {
+  const m = String(module || "").trim();
+  const a = String(action || "").trim();
+  if (!m || !a) return null;
+  if (a === "view") return `${m}.list`;
+  if (a === "create") return `${m}.create`;
+  if (a === "edit") return `${m}.edit`;
+  if (a === "delete") return `${m}.delete`;
+  return null;
 }
 
 // Route /reports/commissions/ctv — Admin thấy toàn hệ thống, Sales thấy CTV của mình
@@ -83,6 +101,35 @@ function PermissionRoute({
   if ((u as { is_super_admin?: boolean }).is_super_admin) return <>{children}</>;
   if (isAdminUser(u)) return <>{children}</>;
   if (capTrue(u, module, action)) return <>{children}</>;
+  const fk = featureKeyForModuleAction(module, action);
+  if (fk && cap2True(u, fk)) return <>{children}</>;
+  return <Navigate to="/" replace />;
+}
+
+/** Bán tại quầy / đơn tại quầy — bật trong Cài đặt → Phân quyền (`orders.counter`) */
+function CounterOrdersFeatureRoute({ children }: { children: React.ReactNode }) {
+  const u = getStoredUser();
+  if (!u) return <Navigate to="/login" replace />;
+  if ((u as { is_super_admin?: boolean }).is_super_admin) return <>{children}</>;
+  if (isAdminUser(u)) return <>{children}</>;
+  if (cap2True(u, "orders.counter")) return <>{children}</>;
+  return <Navigate to="/" replace />;
+}
+
+/** `/orders/counter` — cần `orders.counter` + (`orders.create` | `orders.counter_edit` | `orders.edit` khi sửa) */
+function CounterSaleEntryRoute({ children }: { children: React.ReactNode }) {
+  const [searchParams] = useSearchParams();
+  const isEdit = Boolean(String(searchParams.get("edit") || "").trim());
+  const u = getStoredUser();
+  if (!u) return <Navigate to="/login" replace />;
+  if ((u as { is_super_admin?: boolean }).is_super_admin) return <>{children}</>;
+  if (isAdminUser(u)) return <>{children}</>;
+  if (!cap2True(u, "orders.counter")) return <Navigate to="/" replace />;
+  if (isEdit) {
+    if (mayEditCounterSaleOrder(u)) return <>{children}</>;
+    return <Navigate to="/" replace />;
+  }
+  if (capTrue(u, "orders", "create") || cap2True(u, "orders.create")) return <>{children}</>;
   return <Navigate to="/" replace />;
 }
 
@@ -219,7 +266,25 @@ export default function App() {
                   <Route path="/customers/edit/:id" element={<PermissionRoute module="customers" action="edit"><CustomerForm /></PermissionRoute>} />
                   <Route path="/customers/import" element={<PermissionRoute module="customers" action="view"><BulkImport /></PermissionRoute>} />
                   <Route path="/orders" element={<PermissionRoute module="orders" action="view"><OrderList /></PermissionRoute>} />
+                  <Route
+                    path="/orders/counter-list"
+                    element={
+                      <PermissionRoute module="orders" action="view">
+                        <CounterOrdersFeatureRoute>
+                          <CounterOrdersList />
+                        </CounterOrdersFeatureRoute>
+                      </PermissionRoute>
+                    }
+                  />
                   <Route path="/orders/new" element={<PermissionRoute module="orders" action="create"><OrderForm /></PermissionRoute>} />
+                  <Route
+                    path="/orders/counter"
+                    element={
+                      <CounterSaleEntryRoute>
+                        <CounterSale />
+                      </CounterSaleEntryRoute>
+                    }
+                  />
                   <Route path="/orders/edit/:id" element={<PermissionRoute module="orders" action="edit"><OrderForm /></PermissionRoute>} />
                   <Route path="/orders/search/*" element={<Navigate to="/orders" replace />} />
                   <Route path="/inventory" element={<InventoryViewRoute><InventoryHistory /></InventoryViewRoute>} />
@@ -250,7 +315,14 @@ export default function App() {
                       </AdminRoute>
                     }
                   />
-                  <Route path="/returns" element={<SalesReturnsList />} />
+                  <Route
+                    path="/returns"
+                    element={
+                      <PermissionRoute module="orders" action="view">
+                        <SalesReturnsList />
+                      </PermissionRoute>
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

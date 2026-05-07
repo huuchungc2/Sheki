@@ -4,6 +4,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const requireSuperAdmin = require('../middleware/requireSuperAdmin');
 const { getPool } = require('../config/db');
+const { packOrderLineRow } = require('../utils/shopOrderLinePack');
 
 const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,31}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -355,6 +356,157 @@ async function attachAdminsAndExpiry(pool, shops) {
     return row;
   });
 }
+
+// Admin shop: cấu hình cột HH + % mặc định trên form đơn (theo shop hiện tại)
+router.patch('/me/order-line', auth, async (req, res, next) => {
+  try {
+    if (req.user.is_super_admin) {
+      return res.status(403).json({
+        error:
+          'Chỉ quản trị viên của shop cấu hình (Cài đặt → Form đơn hàng). Super admin không chỉnh được.',
+      });
+    }
+    if (!req.user.can_access_admin) {
+      return res.status(403).json({ error: 'Chỉ quản trị shop mới được chỉnh cấu hình này' });
+    }
+    const shopId = req.user.shop_id != null ? parseInt(req.user.shop_id, 10) : null;
+    if (!shopId) return res.status(400).json({ error: 'Chưa chọn shop' });
+
+    const pool = await getPool();
+    const [[mem]] = await pool.query(
+      'SELECT 1 AS ok FROM user_shops WHERE user_id = ? AND shop_id = ? LIMIT 1',
+      [req.user.id, shopId]
+    );
+    if (!mem) return res.status(403).json({ error: 'Không có quyền shop này' });
+
+    const body = req.body || {};
+    let show = undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'order_line_show_commission')) {
+      show = body.order_line_show_commission ? 1 : 0;
+    }
+    let showDisc = undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'order_line_show_discount')) {
+      showDisc = body.order_line_show_discount ? 1 : 0;
+    }
+    let rate = undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'order_default_commission_rate')) {
+      const n = Number(body.order_default_commission_rate);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return res.status(400).json({ error: 'order_default_commission_rate phải từ 0 đến 100' });
+      }
+      rate = n;
+    }
+    let discRate = undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'order_default_discount_rate')) {
+      const n = Number(body.order_default_discount_rate);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return res.status(400).json({ error: 'order_default_discount_rate phải từ 0 đến 100' });
+      }
+      discRate = n;
+    }
+    let cShow = undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'counter_order_line_show_commission')) {
+      cShow = body.counter_order_line_show_commission ? 1 : 0;
+    }
+    let cShowDisc = undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'counter_order_line_show_discount')) {
+      cShowDisc = body.counter_order_line_show_discount ? 1 : 0;
+    }
+    let cRate = undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'counter_order_default_commission_rate')) {
+      const n = Number(body.counter_order_default_commission_rate);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return res.status(400).json({ error: 'counter_order_default_commission_rate phải từ 0 đến 100' });
+      }
+      cRate = n;
+    }
+    let cDiscRate = undefined;
+    if (Object.prototype.hasOwnProperty.call(body, 'counter_order_default_discount_rate')) {
+      const n = Number(body.counter_order_default_discount_rate);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return res.status(400).json({ error: 'counter_order_default_discount_rate phải từ 0 đến 100' });
+      }
+      cDiscRate = n;
+    }
+    if (
+      show === undefined &&
+      showDisc === undefined &&
+      rate === undefined &&
+      discRate === undefined &&
+      cShow === undefined &&
+      cShowDisc === undefined &&
+      cRate === undefined &&
+      cDiscRate === undefined &&
+      !Object.prototype.hasOwnProperty.call(body, 'order_qty_allow_decimal') &&
+      !Object.prototype.hasOwnProperty.call(body, 'counter_order_qty_allow_decimal')
+    ) {
+      return res.status(400).json({ error: 'Không có thay đổi' });
+    }
+    const parts = [];
+    const params = [];
+    if (show !== undefined) {
+      parts.push('order_line_show_commission = ?');
+      params.push(show);
+    }
+    if (showDisc !== undefined) {
+      parts.push('order_line_show_discount = ?');
+      params.push(showDisc);
+    }
+    if (rate !== undefined) {
+      parts.push('order_default_commission_rate = ?');
+      params.push(rate);
+    }
+    if (discRate !== undefined) {
+      parts.push('order_default_discount_rate = ?');
+      params.push(discRate);
+    }
+    if (cShow !== undefined) {
+      parts.push('counter_order_line_show_commission = ?');
+      params.push(cShow);
+    }
+    if (cShowDisc !== undefined) {
+      parts.push('counter_order_line_show_discount = ?');
+      params.push(cShowDisc);
+    }
+    if (cRate !== undefined) {
+      parts.push('counter_order_default_commission_rate = ?');
+      params.push(cRate);
+    }
+    if (cDiscRate !== undefined) {
+      parts.push('counter_order_default_discount_rate = ?');
+      params.push(cDiscRate);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'order_qty_allow_decimal')) {
+      parts.push('order_qty_allow_decimal = ?');
+      params.push(body.order_qty_allow_decimal ? 1 : 0);
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'counter_order_qty_allow_decimal')) {
+      parts.push('counter_order_qty_allow_decimal = ?');
+      params.push(body.counter_order_qty_allow_decimal ? 1 : 0);
+    }
+    params.push(shopId);
+    await pool.query(`UPDATE shops SET ${parts.join(', ')} WHERE id = ?`, params);
+
+    const [[row]] = await pool.query(
+      `SELECT order_line_show_commission, order_line_show_discount, order_default_commission_rate,
+              order_default_discount_rate,
+              counter_order_line_show_commission, counter_order_line_show_discount,
+              counter_order_default_discount_rate, counter_order_default_commission_rate,
+              order_qty_allow_decimal, counter_order_qty_allow_decimal
+       FROM shops WHERE id = ?`,
+      [shopId]
+    );
+    res.json({ data: packOrderLineRow(row) });
+  } catch (e) {
+    if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+      return res.status(500).json({
+        error:
+          'Thiếu cột shops (migrations 032, 034/035, 036_order_default_discount_rate.sql)',
+      });
+    }
+    next(e);
+  }
+});
 
 // Super admin: list shops (kèm toàn bộ admin + hạn dùng)
 router.get('/', auth, requireSuperAdmin, async (req, res, next) => {

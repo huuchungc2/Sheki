@@ -23,6 +23,7 @@ import { cn, formatCurrency, isAdminUser } from "../lib/utils";
 import { API_URL, api } from "../lib/api";
 import type { OrderItem } from "../types";
 import { computeOrderCollects, type ShipPayer } from "../lib/orderCollect";
+import { coerceOrderLineBool, pickShopOrderLineBlock } from "../lib/shopOrderLine";
 
 type CustomerLite = { id: string; name: string; phone?: string; address?: string };
 type ProductLite = { id: string; name: string; sku: string; price: number };
@@ -32,6 +33,26 @@ function joinAddressParts(parts: Array<string | null | undefined>) {
     .map((p) => (p ?? "").trim())
     .filter(Boolean)
     .join(", ");
+}
+
+function normalizeOrderLineItems(
+  list: OrderItem[],
+  orderLineShowDiscount: boolean,
+  orderLineShowCommission: boolean
+): OrderItem[] {
+  return list.map((it) => {
+    const rate = orderLineShowDiscount ? Math.min(100, Math.max(0, Number(it.discountRate) || 0)) : 0;
+    const da = orderLineShowDiscount ? Math.round(it.price * it.quantity * (rate / 100) * 100) / 100 : 0;
+    const net = it.price * it.quantity - da;
+    const r = orderLineShowCommission ? Math.min(100, Math.max(0, Number(it.commissionRate) || 0)) : 0;
+    return {
+      ...it,
+      discountRate: rate,
+      discountAmount: da,
+      commissionRate: r,
+      commissionAmount: orderLineShowCommission ? Math.round(net * (r / 100) * 100) / 100 : 0,
+    };
+  });
 }
 
 /** Phí ship / cọc: hiển thị như các dòng tiền (formatCurrency), click để nhập số */
@@ -146,20 +167,53 @@ export function OrderForm() {
     }
   };
 
+  const [items, setItems] = React.useState<OrderItem[]>([]);
+  /** Theo cấu hình shop: hiển thị cột HH + % mặc định dòng mới */
+  const [orderLineShowCommission, setOrderLineShowCommission] = React.useState(true);
+  /** Theo cấu hình shop: hiển thị cột CK% trên dòng đơn */
+  const [orderLineShowDiscount, setOrderLineShowDiscount] = React.useState(true);
+  const [defaultCommissionRate, setDefaultCommissionRate] = React.useState(10);
+  const [defaultDiscountRate, setDefaultDiscountRate] = React.useState(0);
+  const [qtyAllowDecimal, setQtyAllowDecimal] = React.useState(true);
+
+  const qtyStep = qtyAllowDecimal ? 0.1 : 1;
+  const qtyMin = qtyAllowDecimal ? 0.1 : 1;
+  const qtyPrecision = qtyAllowDecimal ? 1 : 0;
+  const roundQty = React.useCallback(
+    (n: number) => {
+      const x = Number(n) || 0;
+      if (!qtyAllowDecimal) return Math.max(qtyMin, Math.round(x));
+      return Math.max(qtyMin, parseFloat(x.toFixed(qtyPrecision)));
+    },
+    [qtyAllowDecimal, qtyMin, qtyPrecision]
+  );
+
   const addProduct = (product: any) => {
     const existing = items.find(i => i.productId === product.id);
-    const defaultRate = 10;
+    const defaultRate = orderLineShowCommission ? defaultCommissionRate : 0;
     if (existing) {
       setItems(items.map(i => {
         if (i.productId !== product.id) return i;
-        const q = parseFloat((i.quantity + 1).toFixed(1));
-        const rate = Math.min(100, Math.max(0, Number(i.discountRate) || 0));
-        const da = Math.round(i.price * q * (rate / 100) * 100) / 100;
+        const q = roundQty(i.quantity + 1);
+        const rate = orderLineShowDiscount ? Math.min(100, Math.max(0, Number(i.discountRate) || 0)) : 0;
+        const da = orderLineShowDiscount ? Math.round(i.price * q * (rate / 100) * 100) / 100 : 0;
         const net = i.price * q - da;
-        return { ...i, quantity: q, discountAmount: da, commissionAmount: Math.round(net * (i.commissionRate / 100) * 100) / 100 };
+        const cr = orderLineShowCommission ? Math.min(100, Math.max(0, Number(i.commissionRate) || 0)) : 0;
+        return {
+          ...i,
+          quantity: q,
+          discountRate: rate,
+          discountAmount: da,
+          commissionRate: cr,
+          commissionAmount: orderLineShowCommission ? Math.round(net * (cr / 100) * 100) / 100 : 0,
+        };
       }));
     } else {
-      const net = product.price - 0;
+      const discR = orderLineShowDiscount ? Math.min(100, Math.max(0, defaultDiscountRate)) : 0;
+      const da = orderLineShowDiscount
+        ? Math.round(product.price * 1 * (discR / 100) * 100) / 100
+        : 0;
+      const net = product.price - da;
       setItems([...items, {
         productId: product.id,
         productName: product.name,
@@ -168,10 +222,10 @@ export function OrderForm() {
         price: product.price,
         availableStock: product.available_stock ?? 0,
         quantity: 1,
-        discountRate: 0,
-        discountAmount: 0,
+        discountRate: discR,
+        discountAmount: da,
         commissionRate: defaultRate,
-        commissionAmount: Math.round(net * (defaultRate / 100) * 100) / 100
+        commissionAmount: orderLineShowCommission ? Math.round(net * (defaultRate / 100) * 100) / 100 : 0,
       }]);
     }
     setSearchQuery("");
@@ -179,7 +233,6 @@ export function OrderForm() {
     setProductQuery("");
   };
 
-  const [items, setItems] = React.useState<OrderItem[]>([]);
   const [shipmentAddress, setShipmentAddress] = React.useState<string>("");
   const [shipmentAddressTouched, setShipmentAddressTouched] = React.useState(false);
   const [shippingFee, setShippingFee] = React.useState<number>(0);
@@ -243,11 +296,22 @@ export function OrderForm() {
 
   const applyLinesCommission = React.useCallback(
     (list: { id: number; commission_rate?: number }[], managerId: number | null) => {
+      if (!orderLineShowCommission) {
+        setItems((prev) =>
+          prev.map((it) => ({
+            ...it,
+            commissionRate: 0,
+            commissionAmount: 0,
+          }))
+        );
+        return;
+      }
       setItems((prev) =>
         prev.map((it) => {
           const net = it.price * it.quantity - it.discountAmount;
+          const defR = defaultCommissionRate;
           if (managerId == null) {
-            const r = Number(it.commissionRate) || 10;
+            const r = Number(it.commissionRate) || defR;
             return {
               ...it,
               commissionRate: r,
@@ -256,7 +320,7 @@ export function OrderForm() {
           }
           // Khi chọn quản lý: hoa hồng direct vẫn thuộc về người lên đơn (CTV),
           // nên giữ nguyên commissionRate từng dòng; chỉ đảm bảo tính lại commissionAmount.
-          const r = Number(it.commissionRate) || 10;
+          const r = Number(it.commissionRate) || defR;
           return {
             ...it,
             commissionRate: r,
@@ -265,8 +329,38 @@ export function OrderForm() {
         })
       );
     },
-    []
+    [defaultCommissionRate, orderLineShowCommission]
   );
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await api.get("/auth/me");
+        const d = res?.data ?? res;
+        const delivery = pickShopOrderLineBlock(d?.shop_order_line, "delivery");
+        if (cancelled) return;
+        if (delivery) {
+          setOrderLineShowCommission(coerceOrderLineBool(delivery.show_commission, true));
+          setOrderLineShowDiscount(coerceOrderLineBool(delivery.show_discount, true));
+          setQtyAllowDecimal(coerceOrderLineBool(delivery.qty_allow_decimal, true));
+          const dr = Number(delivery.default_commission_rate);
+          if (Number.isFinite(dr)) {
+            setDefaultCommissionRate(Math.min(100, Math.max(0, dr)));
+          }
+          const ddr = Number(delivery.default_discount_rate);
+          if (Number.isFinite(ddr)) {
+            setDefaultDiscountRate(Math.min(100, Math.max(0, ddr)));
+          }
+        }
+      } catch {
+        // giữ mặc định
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!id) {
@@ -324,9 +418,9 @@ export function OrderForm() {
     return myManagers.map((m: any) => ({
       id: m.id,
       full_name: m.full_name,
-      commission_rate: Number(m.commission_rate) || 10,
+      commission_rate: Number(m.commission_rate) || defaultCommissionRate,
     }));
-  }, [myManagers]);
+  }, [myManagers, defaultCommissionRate]);
 
   const applyCommissionForManager = React.useCallback(
     (mid: number | null) => {
@@ -457,8 +551,15 @@ export function OrderForm() {
     if (!id) return;
     (async () => {
       try {
-        const res: any = await api.get(`/orders/${id}`);
+        const [res, meJson]: any[] = await Promise.all([
+          api.get(`/orders/${id}`),
+          api.get("/auth/me").catch(() => null),
+        ]);
         const order = res?.data ?? res;
+        const meD = meJson?.data ?? meJson;
+        const delivery = pickShopOrderLineBlock(meD?.shop_order_line, "delivery");
+        const discOn = coerceOrderLineBool(delivery?.show_discount, true);
+        const commOn = coerceOrderLineBool(delivery?.show_commission, true);
         const st = String(order?.status ?? "");
         const salesScoped = !isAdmin && currentUser?.scope_own_data !== false;
         if (salesScoped && (st === "shipping" || st === "completed")) {
@@ -491,7 +592,9 @@ export function OrderForm() {
           commissionRate: Number(it.commission_rate ?? 10),
           commissionAmount: Number(it.commission_amount ?? 0),
         }));
-        if (itemsData.length) setItems(itemsData as any);
+        if (itemsData.length) {
+          setItems(normalizeOrderLineItems(itemsData as OrderItem[], discOn, commOn) as any);
+        }
 
         setShipmentAddress(order?.shipping_address ?? '');
         setShipmentAddressTouched(Boolean(String(order?.shipping_address ?? '').trim()));
@@ -694,18 +797,23 @@ export function OrderForm() {
       prev.map((it) => {
         if (it.productId !== productId) return it;
         const next = { ...it, ...patch } as OrderItem;
-        const rate = Math.min(100, Math.max(0, Number(next.discountRate) || 0));
-        const da = Math.round(next.price * next.quantity * (rate / 100) * 100) / 100;
+        const rate = orderLineShowDiscount ? Math.min(100, Math.max(0, Number(next.discountRate) || 0)) : 0;
+        const da = orderLineShowDiscount ? Math.round(next.price * next.quantity * (rate / 100) * 100) / 100 : 0;
         const withDisc = { ...next, discountRate: rate, discountAmount: da };
         const net = withDisc.price * withDisc.quantity - withDisc.discountAmount;
-        const r = Number(withDisc.commissionRate) || 0;
+        const r = orderLineShowCommission ? Math.min(100, Math.max(0, Number(withDisc.commissionRate) || 0)) : 0;
         return {
           ...withDisc,
-          commissionAmount: Math.round(net * (r / 100) * 100) / 100,
+          commissionRate: r,
+          commissionAmount: orderLineShowCommission ? Math.round(net * (r / 100) * 100) / 100 : 0,
         };
       })
     );
-  }, []);
+  }, [orderLineShowDiscount, orderLineShowCommission]);
+
+  React.useEffect(() => {
+    setItems((prev) => normalizeOrderLineItems(prev, orderLineShowDiscount, orderLineShowCommission));
+  }, [orderLineShowDiscount, orderLineShowCommission]);
 
   const computeStockMeta = React.useCallback(
     (item: any) => {
@@ -747,6 +855,19 @@ export function OrderForm() {
     }
     return n.slice(0, 2).toUpperCase();
   }, [responsibleSalesDisplay]);
+
+  const showCommCols = orderLineShowCommission;
+  const showDiscCols = orderLineShowDiscount;
+  const lineGridMinPx = React.useMemo(
+    () => 260 + 190 + 140 + 120 + 30 + (showDiscCols ? 90 : 0) + (showCommCols ? 90 : 0),
+    [showDiscCols, showCommCols]
+  );
+  const orderDesktopColPercents = React.useMemo((): number[] => {
+    if (showDiscCols && showCommCols) return [34, 13, 13, 9, 14, 13, 4];
+    if (showDiscCols && !showCommCols) return [38, 14, 14, 10, 20, 4];
+    if (!showDiscCols && showCommCols) return [36, 14, 14, 22, 10, 4];
+    return [44, 18, 18, 16, 4];
+  }, [showDiscCols, showCommCols]);
 
   /** Mobile: thanh dưới mặc định thu gọn — tránh “popup” che màn hình khi vừa vào trang */
   const [mobileSummaryExpanded, setMobileSummaryExpanded] = React.useState(false);
@@ -1162,14 +1283,14 @@ export function OrderForm() {
                 {/* Mobile: 1 dòng / 1 sản phẩm (dạng bảng, cuộn ngang nếu cần) */}
                 <div className="block sm:hidden">
                   <div className="overflow-x-auto">
-                    <div className="min-w-[920px]">
+                    <div className="min-w-0" style={{ minWidth: lineGridMinPx }}>
                       <div className="sticky top-0 z-10 px-4 pt-3 pb-2 border-b border-slate-100 bg-slate-50">
                         <div className="flex gap-3 text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                           <div className="w-[260px]">Sản phẩm</div>
                           <div className="w-[190px] text-center">Số lượng</div>
                           <div className="w-[140px] text-right">Đơn giá</div>
-                          <div className="w-[90px] text-center">CK%</div>
-                          <div className="w-[90px] text-center">HH%</div>
+                          {showDiscCols ? <div className="w-[90px] text-center">CK%</div> : null}
+                          {showCommCols ? <div className="w-[90px] text-center">HH%</div> : null}
                           <div className="w-[120px] text-right">Thành tiền</div>
                           <div className="w-[30px]"></div>
                         </div>
@@ -1220,7 +1341,7 @@ export function OrderForm() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const v = Math.max(0.1, parseFloat((item.quantity - 1).toFixed(1)));
+                                    const v = roundQty(item.quantity - 1);
                                     updateItem(item.productId, { quantity: v });
                                   }}
                                   className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600"
@@ -1229,13 +1350,13 @@ export function OrderForm() {
                                 </button>
                                 <input
                                   type="number"
-                                  min={0.1}
-                                  step={0.1}
+                                  min={qtyMin}
+                                  step={qtyStep}
                                   value={item.quantity}
                                   onChange={(e) => {
-                                    const raw = parseFloat(parseFloat(e.target.value).toFixed(1));
-                                    const v = Number.isFinite(raw) && raw > 0 ? raw : 0.1;
-                                    updateItem(item.productId, { quantity: v });
+                                    const raw = parseFloat(e.target.value);
+                                    const v = Number.isFinite(raw) && raw > 0 ? raw : qtyMin;
+                                    updateItem(item.productId, { quantity: roundQty(v) });
                                   }}
                                   className={cn(
                                     "w-20 h-8 rounded-lg border px-2 text-center text-[13px] font-semibold outline-none",
@@ -1247,7 +1368,7 @@ export function OrderForm() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const v = parseFloat((item.quantity + 1).toFixed(1));
+                                    const v = roundQty(item.quantity + 1);
                                     updateItem(item.productId, { quantity: v });
                                   }}
                                   className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600"
@@ -1270,39 +1391,45 @@ export function OrderForm() {
                               />
                             </div>
 
-                            <div className="w-[90px] flex justify-center">
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={item.discountRate}
-                                onChange={(e) => {
-                                  const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                  updateItem(item.productId, { discountRate: r });
-                                }}
-                                className="w-16 h-8 rounded-lg border border-rose-200 bg-rose-50 px-2 text-center text-[13px] font-semibold text-rose-800 outline-none focus:ring-2 focus:ring-rose-100"
-                              />
-                            </div>
+                            {showDiscCols ? (
+                              <div className="w-[90px] flex justify-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={item.discountRate}
+                                  onChange={(e) => {
+                                    const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                    updateItem(item.productId, { discountRate: r });
+                                  }}
+                                  className="w-16 h-8 rounded-lg border border-rose-200 bg-rose-50 px-2 text-center text-[13px] font-semibold text-rose-800 outline-none focus:ring-2 focus:ring-rose-100"
+                                />
+                              </div>
+                            ) : null}
 
-                            <div className="w-[90px] flex justify-center">
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={item.commissionRate}
-                                onChange={(e) => {
-                                  const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                  updateItem(item.productId, { commissionRate: r });
-                                }}
-                                className="w-16 h-8 rounded-lg border border-green-200 bg-green-50 px-2 text-center text-[13px] font-semibold text-green-800 outline-none focus:ring-2 focus:ring-green-100"
-                              />
-                            </div>
+                            {showCommCols ? (
+                              <div className="w-[90px] flex justify-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={item.commissionRate}
+                                  onChange={(e) => {
+                                    const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                    updateItem(item.productId, { commissionRate: r });
+                                  }}
+                                  className="w-16 h-8 rounded-lg border border-green-200 bg-green-50 px-2 text-center text-[13px] font-semibold text-green-800 outline-none focus:ring-2 focus:ring-green-100"
+                                />
+                              </div>
+                            ) : null}
 
                             <div className="w-[120px] text-right">
                               <p className="text-[13px] font-semibold text-slate-900">{formatCurrency(lineTotal)}</p>
-                              <p className="mt-0.5 text-[10px] font-semibold text-green-700">
-                                HH: {formatCurrency(item.commissionAmount)}
-                              </p>
+                              {showCommCols ? (
+                                <p className="mt-0.5 text-[10px] font-semibold text-green-700">
+                                  HH: {formatCurrency(item.commissionAmount)}
+                                </p>
+                              ) : null}
                             </div>
 
                             <div className="w-[30px] flex justify-end">
@@ -1324,18 +1451,25 @@ export function OrderForm() {
                           Giá trị đơn ({items.length} SP)
                         </div>
                         <div className="w-[190px] shrink-0 text-center font-medium text-slate-700">
-                          {items.reduce((s, i) => s + i.quantity, 0).toFixed(1).replace(/\.0$/, "")}
+                          {items
+                            .reduce((s, i) => s + i.quantity, 0)
+                            .toFixed(qtyPrecision)
+                            .replace(/\.?0+$/, "")}
                         </div>
                         <div className="w-[140px] shrink-0" />
-                        <div className="w-[90px] shrink-0 text-center text-red-600 font-medium tabular-nums">
-                          {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
-                        </div>
-                        <div className="w-[90px] shrink-0" />
+                        {showDiscCols ? (
+                          <div className="w-[90px] shrink-0 text-center text-red-600 font-medium tabular-nums">
+                            {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
+                          </div>
+                        ) : null}
+                        {showCommCols ? <div className="w-[90px] shrink-0" /> : null}
                         <div className="w-[120px] shrink-0 text-right">
                           <p className="text-[13px] font-semibold text-slate-800">{formatCurrency(subtotal)}</p>
-                          <p className="mt-0.5 text-[10px] font-semibold text-green-700">
-                            HH: {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
-                          </p>
+                          {showCommCols ? (
+                            <p className="mt-0.5 text-[10px] font-semibold text-green-700">
+                              HH: {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="w-[30px] shrink-0" />
                       </div>
@@ -1348,22 +1482,22 @@ export function OrderForm() {
                 <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
                   <colgroup>
-                    <col style={{ width: '34%' }} />
-                    <col style={{ width: '13%' }} />
-                    <col style={{ width: '13%' }} />
-                    <col style={{ width: '9%' }} />
-                    <col style={{ width: '14%' }} />
-                    <col style={{ width: '13%' }} />
-                    <col style={{ width: '4%' }} />
+                    {orderDesktopColPercents.map((pct, i) => (
+                      <col key={i} style={{ width: `${pct}%` }} />
+                    ))}
                   </colgroup>
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400 text-[11px] uppercase tracking-wide">
                       <th className="px-4 py-2 text-left font-medium">Sản phẩm</th>
                       <th className="px-3 py-2 text-center font-medium">Số lượng</th>
                       <th className="px-3 py-2 text-right font-medium">Đơn giá</th>
-                      <th className="px-2 py-2 text-center font-medium">CK%</th>
+                      {showDiscCols ? (
+                        <th className="px-2 py-2 text-center font-medium">CK%</th>
+                      ) : null}
                       <th className="px-3 py-2 text-right font-medium">Thành tiền</th>
-                      <th className="px-3 py-2 text-center font-medium">Hoa hồng</th>
+                      {showCommCols ? (
+                        <th className="px-3 py-2 text-center font-medium">Hoa hồng</th>
+                      ) : null}
                       <th className="px-2 py-2"></th>
                     </tr>
                   </thead>
@@ -1411,7 +1545,7 @@ export function OrderForm() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const v = Math.max(0.1, parseFloat((item.quantity - 1).toFixed(1)));
+                                  const v = roundQty(item.quantity - 1);
                                   updateItem(item.productId, { quantity: v });
                                 }}
                                 className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
@@ -1419,12 +1553,12 @@ export function OrderForm() {
                                 <Minus className="w-2.5 h-2.5" />
                               </button>
                               <input
-                                type="number" min={0.1} step={0.1}
+                                type="number" min={qtyMin} step={qtyStep}
                                 value={item.quantity}
                                 onChange={(e) => {
-                                  const raw = parseFloat(parseFloat(e.target.value).toFixed(1));
-                                  const v = Number.isFinite(raw) && raw > 0 ? raw : 0.1;
-                                  updateItem(item.productId, { quantity: v });
+                                  const raw = parseFloat(e.target.value);
+                                  const v = Number.isFinite(raw) && raw > 0 ? raw : qtyMin;
+                                  updateItem(item.productId, { quantity: roundQty(v) });
                                 }}
                                 className={cn(
                                   "w-11 h-6 px-1 border rounded text-center text-xs font-medium outline-none focus:ring-1 transition-colors",
@@ -1436,7 +1570,7 @@ export function OrderForm() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const v = parseFloat((item.quantity + 1).toFixed(1));
+                                  const v = roundQty(item.quantity + 1);
                                   updateItem(item.productId, { quantity: v });
                                 }}
                                 className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
@@ -1456,42 +1590,46 @@ export function OrderForm() {
                               className="w-full h-6 px-2 bg-transparent border border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-300 rounded text-right text-xs font-medium text-slate-700 outline-none focus:ring-1 focus:ring-blue-100 transition-colors"
                             />
                           </td>
-                          <td className="px-2 py-2.5">
-                            <div className="flex items-center justify-center gap-1">
-                              <input
-                                type="number" min={0} max={100}
-                                value={item.discountRate}
-                                onChange={(e) => {
-                                  const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                  updateItem(item.productId, { discountRate: r });
-                                }}
-                                className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-rose-50 border border-transparent hover:border-rose-200 focus:bg-white focus:border-rose-400 rounded-md text-center text-sm font-semibold text-rose-800 outline-none focus:ring-2 focus:ring-rose-100 transition-colors"
-                              />
-                              <span className="text-rose-500 text-xs font-semibold">%</span>
-                            </div>
-                          </td>
+                          {showDiscCols ? (
+                            <td className="px-2 py-2.5">
+                              <div className="flex items-center justify-center gap-1">
+                                <input
+                                  type="number" min={0} max={100}
+                                  value={item.discountRate}
+                                  onChange={(e) => {
+                                    const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                    updateItem(item.productId, { discountRate: r });
+                                  }}
+                                  className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-rose-50 border border-transparent hover:border-rose-200 focus:bg-white focus:border-rose-400 rounded-md text-center text-sm font-semibold text-rose-800 outline-none focus:ring-2 focus:ring-rose-100 transition-colors"
+                                />
+                                <span className="text-rose-500 text-xs font-semibold">%</span>
+                              </div>
+                            </td>
+                          ) : null}
                           <td className="px-3 py-2.5 text-right">
                             <span className="font-medium text-slate-900 text-xs">{formatCurrency(lineTotal)}</span>
                           </td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex flex-col items-center gap-0.5">
-                              <>
-                                <div className="flex items-center gap-1 justify-center">
-                                  <input
-                                    type="number" min={0} max={100}
-                                    value={item.commissionRate}
-                                    onChange={(e) => {
-                                      const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                      updateItem(item.productId, { commissionRate: r });
-                                    }}
-                                    className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded-md text-center text-sm font-semibold text-green-700 outline-none focus:ring-2 focus:ring-green-100 transition-colors"
-                                  />
-                                  <span className="text-green-600 text-xs font-semibold">%</span>
-                                </div>
-                                <span className="text-green-600 text-[10px] font-medium">{formatCurrency(item.commissionAmount)}</span>
-                              </>
-                            </div>
-                          </td>
+                          {showCommCols ? (
+                            <td className="px-3 py-2.5">
+                              <div className="flex flex-col items-center gap-0.5">
+                                <>
+                                  <div className="flex items-center gap-1 justify-center">
+                                    <input
+                                      type="number" min={0} max={100}
+                                      value={item.commissionRate}
+                                      onChange={(e) => {
+                                        const r = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                        updateItem(item.productId, { commissionRate: r });
+                                      }}
+                                      className="w-14 h-8 min-w-[3.5rem] px-1.5 bg-green-50 border border-transparent hover:border-green-200 focus:bg-white focus:border-green-400 rounded-md text-center text-sm font-semibold text-green-700 outline-none focus:ring-2 focus:ring-green-100 transition-colors"
+                                    />
+                                    <span className="text-green-600 text-xs font-semibold">%</span>
+                                  </div>
+                                  <span className="text-green-600 text-[10px] font-medium">{formatCurrency(item.commissionAmount)}</span>
+                                </>
+                              </div>
+                            </td>
+                          ) : null}
                           <td className="px-2 py-2.5 text-center">
                             <button
                               type="button"
@@ -1509,20 +1647,27 @@ export function OrderForm() {
                     <tr className="bg-slate-50 border-t border-slate-100 text-xs">
                       <td className="px-4 py-2 text-slate-500 font-medium">Giá trị đơn ({items.length} SP)</td>
                       <td className="px-3 py-2 text-center font-medium text-slate-700">
-                        {items.reduce((s, i) => s + i.quantity, 0).toFixed(1).replace(/\.0$/, '')}
+                        {items
+                          .reduce((s, i) => s + i.quantity, 0)
+                          .toFixed(qtyPrecision)
+                          .replace(/\.?0+$/, "")}
                       </td>
                       <td className="px-3 py-2"></td>
-                      <td className="px-2 py-2 text-center text-red-500 text-[10px]">
-                        {items.some(i => i.discountAmount > 0) ? `-${formatCurrency(items.reduce((s, i) => s + i.discountAmount, 0))}` : '—'}
-                      </td>
+                      {showDiscCols ? (
+                        <td className="px-2 py-2 text-center text-red-500 text-[10px]">
+                          {items.some(i => i.discountAmount > 0) ? `-${formatCurrency(items.reduce((s, i) => s + i.discountAmount, 0))}` : '—'}
+                        </td>
+                      ) : null}
                       <td className="px-3 py-2 text-right font-medium text-slate-700">
                         {formatCurrency(items.reduce((s, i) => s + (i.quantity * i.price - i.discountAmount), 0))}
                       </td>
-                      <td className="px-3 py-2 text-center">
-                        <span className="inline-block bg-green-50 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                          {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
-                        </span>
-                      </td>
+                      {showCommCols ? (
+                        <td className="px-3 py-2 text-center">
+                          <span className="inline-block bg-green-50 text-green-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                            {formatCurrency(items.reduce((s, i) => s + i.commissionAmount, 0))}
+                          </span>
+                        </td>
+                      ) : null}
                       <td></td>
                     </tr>
                   </tfoot>
@@ -1554,12 +1699,14 @@ export function OrderForm() {
                 </div>
                 <span className="font-medium text-slate-800">{isEdit ? (orderCode || `#${id}`) : "—"}</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
-                <span className="text-slate-400">Tổng CK</span>
-                <span className="font-medium text-red-600">
-                  {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
-                </span>
-              </div>
+              {showDiscCols ? (
+                <div className="flex items-center justify-between py-1.5 border-b border-slate-50 text-sm">
+                  <span className="text-slate-400">Tổng CK</span>
+                  <span className="font-medium text-red-600">
+                    {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between py-2 border-b border-slate-100">
                 <div>
                   <span className="text-sm font-semibold text-slate-700">Giá trị đơn</span>
@@ -1620,12 +1767,14 @@ export function OrderForm() {
                 <span className="font-medium text-indigo-700">{formatCurrency(shopCollect)}</span>
               </div>
             </div>
-            <div className="mt-3 flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg">
-              <span className="text-xs text-green-700">Tổng hoa hồng</span>
-              <span className="text-sm font-semibold text-green-800">
-                {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
-              </span>
-            </div>
+            {showCommCols ? (
+              <div className="mt-3 flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg">
+                <span className="text-xs text-green-700">Tổng hoa hồng</span>
+                <span className="text-sm font-semibold text-green-800">
+                  {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
+                </span>
+              </div>
+            ) : null}
           </div>
 
           {/* Cài đặt */}
@@ -1740,7 +1889,11 @@ export function OrderForm() {
                 <div className="text-base font-semibold text-slate-900 tabular-nums leading-tight">
                   {formatCurrency(customerCollect)}
                 </div>
-                <div className="text-[9px] text-slate-400 mt-0.5">Chạm để xem phí ship, cọc, HH…</div>
+                <div className="text-[9px] text-slate-400 mt-0.5">
+                  Chạm để xem phí ship, cọc
+                  {showDiscCols ? ", CK" : ""}
+                  {showCommCols ? ", HH" : ""}…
+                </div>
               </button>
               <button
                 type="button"
@@ -1778,12 +1931,14 @@ export function OrderForm() {
                   <span className="font-medium text-slate-800">{isEdit ? (orderCode || `#${id}`) : "—"}</span>
                 </div>
                 {!isEdit && <div className="text-[9px] text-slate-400 -mt-0.5">Lưu đơn để tạo mã</div>}
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-500">Tổng CK</span>
-                  <span className="font-medium text-red-600">
-                    {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
-                  </span>
-                </div>
+                {showDiscCols ? (
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-slate-500">Tổng CK</span>
+                    <span className="font-medium text-red-600">
+                      {lineDiscountTotal > 0 ? `-${formatCurrency(lineDiscountTotal)}` : "—"}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between gap-2 pt-0.5 border-b border-slate-50 pb-1.5">
                   <div>
                     <span className="text-[10px] font-semibold text-slate-700">Giá trị đơn</span>
@@ -1852,12 +2007,14 @@ export function OrderForm() {
                   <span className="text-slate-500">Shop thu</span>
                   <span className="font-semibold text-indigo-700">{formatCurrency(shopCollect)}</span>
                 </div>
-                <div className="flex items-center justify-between text-[10px] pb-0.5">
-                  <span className="text-slate-500">Hoa hồng</span>
-                  <span className="font-semibold text-green-700">
-                    {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
-                  </span>
-                </div>
+                {showCommCols ? (
+                  <div className="flex items-center justify-between text-[10px] pb-0.5">
+                    <span className="text-slate-500">Hoa hồng</span>
+                    <span className="font-semibold text-green-700">
+                      {formatCurrency(items.reduce((sum, item) => sum + item.commissionAmount, 0))}
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <div className="p-3">
                 <button

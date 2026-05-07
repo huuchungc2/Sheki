@@ -27,6 +27,7 @@ const {
 } = require('../services/commissionKpi');
 const { getScope } = require('../utils/scope');
 const { ensureOpenPayrollPeriod, getOrderPayrollPeriod } = require('../services/payrollPeriod');
+const { requireOrderPutAccess, requireOrderDeleteAccess } = require('../middleware/orderCounterAccess');
 
 const DEFAULT_LINE_COMMISSION_RATE = 10;
 
@@ -41,10 +42,104 @@ async function loadUserGroupIds(pool, shopId, userId) {
   return rows.map((r) => Number(r.group_id)).filter((n) => Number.isFinite(n) && n > 0);
 }
 
+const COUNTER_SALE_ADDRESS = 'Mua tại cửa hàng';
+
+/** List/export: `counter=1|true` chỉ đơn quầy; `counter=0|false` loại đơn quầy; khác = không lọc */
+async function getCounterSaleListFilter(pool, counter) {
+  const cRaw = String(counter ?? '').trim().toLowerCase();
+  const wantCounterOnly = cRaw === '1' || cRaw === 'true';
+  const wantNonCounterOnly = cRaw === '0' || cRaw === 'false';
+  if (!wantCounterOnly && !wantNonCounterOnly) {
+    return {
+      active: false,
+      counterSaleOnly: false,
+      counterSaleExclude: false,
+      fragments: { main: '', count: '', summary: '', extra: [], extraSummary: [] },
+    };
+  }
+
+  let hasCounterFlag = false;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'is_counter_sale'");
+    hasCounterFlag = Array.isArray(cols) && cols.length > 0;
+  } catch {
+    hasCounterFlag = false;
+  }
+
+  if (hasCounterFlag) {
+    if (wantCounterOnly) {
+      return {
+        active: true,
+        counterSaleOnly: true,
+        counterSaleExclude: false,
+        fragments: {
+          main: ' AND o.is_counter_sale = 1',
+          count: ' AND is_counter_sale = 1',
+          summary: ' AND o.is_counter_sale = 1',
+          extra: [],
+          extraSummary: [],
+        },
+      };
+    }
+    return {
+      active: true,
+      counterSaleOnly: false,
+      counterSaleExclude: true,
+      fragments: {
+        main: ' AND o.is_counter_sale = 0',
+        count: ' AND is_counter_sale = 0',
+        summary: ' AND o.is_counter_sale = 0',
+        extra: [],
+        extraSummary: [],
+      },
+    };
+  }
+
+  if (wantCounterOnly) {
+    return {
+      active: true,
+      counterSaleOnly: false,
+      counterSaleExclude: false,
+      fragments: {
+        main: ' AND o.shipping_address = ?',
+        count: ' AND shipping_address = ?',
+        summary: ' AND o.shipping_address = ?',
+        extra: [COUNTER_SALE_ADDRESS],
+        extraSummary: [COUNTER_SALE_ADDRESS],
+      },
+    };
+  }
+
+  return {
+    active: true,
+    counterSaleOnly: false,
+    counterSaleExclude: false,
+    fragments: {
+      main: ' AND (o.shipping_address IS NULL OR o.shipping_address <> ?)',
+      count: ' AND (shipping_address IS NULL OR shipping_address <> ?)',
+      summary: ' AND (o.shipping_address IS NULL OR o.shipping_address <> ?)',
+      extra: [COUNTER_SALE_ADDRESS],
+      extraSummary: [COUNTER_SALE_ADDRESS],
+    },
+  };
+}
+
 router.get('/', auth, requireShop, requirePermission('orders', 'view'), requireFeature('orders.list'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, status, employee, warehouse, date_from, date_to, group_id, product, page = 1, limit = 20 } = req.query;
+    const {
+      search,
+      status,
+      employee,
+      warehouse,
+      date_from,
+      date_to,
+      group_id,
+      product,
+      counter,
+      page = 1,
+      limit = 20,
+    } = req.query;
     const offset = (page - 1) * limit;
 
     let query = `
@@ -79,6 +174,16 @@ router.get('/', auth, requireShop, requirePermission('orders', 'view'), requireF
     summaryQuery += ' AND o.shop_id = ?';
     params.push(req.shopId);
     summaryParams.push(req.shopId);
+
+    const listCf = await getCounterSaleListFilter(pool, counter);
+    const cfFrag = listCf.fragments;
+    if (cfFrag.main) {
+      query += cfFrag.main;
+      countQuery += cfFrag.count;
+      summaryQuery += cfFrag.summary;
+      params.push(...cfFrag.extra);
+      summaryParams.push(...cfFrag.extraSummary);
+    }
 
     const scope = await getScope(req, 'orders');
     if (scope === 'own') {
@@ -204,7 +309,7 @@ router.get('/', auth, requireShop, requirePermission('orders', 'view'), requireF
     // Cùng tháng đủ ngày + không lọc hẹp → dùng đúng `getCommissionMonthKpi` như báo cáo HH (tránh lệch DATE vs MONTH/YEAR).
     const fullMonth = tryParseFullCalendarMonthFromRange(date_from, date_to);
     const narrowFilters =
-      !!(search || status || employee || warehouse || product);
+      !!(search || status || employee || warehouse || product || listCf.active);
     let totalCommissionDirect;
     if (fullMonth && !narrowFilters) {
       const kpi = await getCommissionMonthKpi(pool, {
@@ -229,6 +334,8 @@ router.get('/', auth, requireShop, requirePermission('orders', 'view'), requireF
         date_from,
         date_to,
         group_id,
+        counterSaleOnly: listCf.counterSaleOnly,
+        counterSaleExclude: listCf.counterSaleExclude,
       });
     }
 
@@ -272,7 +379,7 @@ router.get('/', auth, requireShop, requirePermission('orders', 'view'), requireF
 router.get('/export-items', auth, requireShop, requirePermission('orders', 'view'), requireFeature('orders.export_items'), async (req, res, next) => {
   try {
     const pool = await getPool();
-    const { search, status, employee, warehouse, date_from, date_to, group_id, product } = req.query;
+    const { search, status, employee, warehouse, date_from, date_to, group_id, product, counter } = req.query;
 
     let query = `
       SELECT
@@ -306,6 +413,13 @@ router.get('/export-items', auth, requireShop, requirePermission('orders', 'view
 
     query += ' AND o.shop_id = ?';
     params.push(req.shopId);
+
+    const exportCf = await getCounterSaleListFilter(pool, counter);
+    const exFrag = exportCf.fragments;
+    if (exFrag.main) {
+      query += exFrag.main;
+      params.push(...exFrag.extra);
+    }
 
     const scope = await getScope(req, 'orders');
     if (scope === 'own') {
@@ -689,11 +803,13 @@ router.post('/', auth, requireShop, requirePermission('orders', 'create'), requi
       salesperson_absorbed_amount,
       payment_method,
       discount,
+      tax_amount,
       note,
       items,
       source_type,
       manager_salesperson_id,
       collaborator_user_id,
+      is_counter_sale,
     } = req.body;
 
     if (!customer_id || !warehouse_id || !items || items.length === 0) {
@@ -795,41 +911,93 @@ router.post('/', auth, requireShop, requirePermission('orders', 'create'), requi
     const shipPayerVal = ship_payer === 'shop' ? 'shop' : 'customer';
     const depositVal = round2(deposit);
     const salespersonAbsorbedVal = round2(salesperson_absorbed_amount);
-    const { customer_collect, shop_collect } = computeOrderCollects(subtotal, shipFee, depositVal, shipPayerVal);
+    const discountVal = round2(discount);
+    const taxVal = round2(tax_amount);
+    if (discountVal > round2(subtotal)) {
+      return res.status(400).json({ error: 'Giảm giá không được lớn hơn giá trị đơn hàng' });
+    }
+    const baseSubtotal = round2(subtotal - discountVal + taxVal);
+    const { customer_collect, shop_collect } = computeOrderCollects(baseSubtotal, shipFee, depositVal, shipPayerVal);
     const totalAmount = customer_collect;
 
     // Dùng status từ request, mặc định 'pending' (KHÔNG dùng 'draft')
     const orderStatus = req.body.status || 'pending';
 
-    const [orderResult] = await pool.query(
-      `INSERT INTO orders (shop_id, payroll_period_id, code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, ship_payer, deposit, customer_collect, shop_collect, salesperson_absorbed_amount, payment_method, subtotal, discount, total_amount, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.shopId,
-        payrollPeriodId,
-        code,
-        customer_id,
-        finalSalespersonId,
-        warehouse_id,
-        group_id || null,
-        finalSourceType,
-        finalCollaboratorUserId,
-        orderStatus,
-        shipping_address,
-        carrier_service,
-        shipFee,
-        shipPayerVal,
-        depositVal,
-        customer_collect,
-        shop_collect,
-        salespersonAbsorbedVal,
-        payment_method || 'cash',
-        subtotal,
-        discount || 0,
-        totalAmount,
-        note,
-      ]
-    );
+    const requestedCounterFlag =
+      is_counter_sale === true ||
+      is_counter_sale === 1 ||
+      is_counter_sale === '1' ||
+      is_counter_sale === 'true';
+    const isCounterSale = requestedCounterFlag || String(shipping_address || '').trim() === 'Mua tại cửa hàng';
+
+    let orderResult;
+    try {
+      // Prefer new schema with `is_counter_sale`
+      [orderResult] = await pool.query(
+        `INSERT INTO orders (shop_id, payroll_period_id, code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, is_counter_sale, status, shipping_address, carrier_service, shipping_fee, ship_payer, deposit, customer_collect, shop_collect, salesperson_absorbed_amount, payment_method, subtotal, discount, tax_amount, total_amount, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          req.shopId,
+          payrollPeriodId,
+          code,
+          customer_id,
+          finalSalespersonId,
+          warehouse_id,
+          group_id || null,
+          finalSourceType,
+          finalCollaboratorUserId,
+          isCounterSale ? 1 : 0,
+          orderStatus,
+          shipping_address,
+          carrier_service,
+          shipFee,
+          shipPayerVal,
+          depositVal,
+          customer_collect,
+          shop_collect,
+          salespersonAbsorbedVal,
+          payment_method || 'cash',
+          subtotal,
+          discountVal,
+          taxVal,
+          totalAmount,
+          note,
+        ]
+      );
+    } catch (e) {
+      // Legacy DB: column missing
+      if (!e || e.code !== 'ER_BAD_FIELD_ERROR') throw e;
+      [orderResult] = await pool.query(
+        `INSERT INTO orders (shop_id, payroll_period_id, code, customer_id, salesperson_id, warehouse_id, group_id, source_type, collaborator_user_id, status, shipping_address, carrier_service, shipping_fee, ship_payer, deposit, customer_collect, shop_collect, salesperson_absorbed_amount, payment_method, subtotal, discount, tax_amount, total_amount, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          req.shopId,
+          payrollPeriodId,
+          code,
+          customer_id,
+          finalSalespersonId,
+          warehouse_id,
+          group_id || null,
+          finalSourceType,
+          finalCollaboratorUserId,
+          orderStatus,
+          shipping_address,
+          carrier_service,
+          shipFee,
+          shipPayerVal,
+          depositVal,
+          customer_collect,
+          shop_collect,
+          salespersonAbsorbedVal,
+          payment_method || 'cash',
+          subtotal,
+          discountVal,
+          taxVal,
+          totalAmount,
+          note,
+        ]
+      );
+    }
 
     const orderId = orderResult.insertId;
 
@@ -870,7 +1038,7 @@ router.post('/', auth, requireShop, requirePermission('orders', 'create'), requi
   }
 });
 
-router.put('/:id', auth, requireShop, requirePermission('orders', 'edit'), requireFeature('orders.edit'), async (req, res, next) => {
+router.put('/:id', auth, requireShop, requireOrderPutAccess, async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -900,10 +1068,14 @@ router.put('/:id', auth, requireShop, requirePermission('orders', 'edit'), requi
     }
 
     const isAdminOrderPut = req.user.can_access_admin === true || req.user.role === 'admin';
+    const isCounterOrderPut =
+      Number(order.is_counter_sale) === 1 ||
+      String(order.shipping_address || '').trim() === COUNTER_SALE_ADDRESS;
     if (
       !isAdminOrderPut &&
       scope === 'own' &&
-      ['shipping', 'completed'].includes(String(order.status))
+      ['shipping', 'completed'].includes(String(order.status)) &&
+      !isCounterOrderPut
     ) {
       return res.status(403).json({ error: 'Không được sửa đơn đang giao hoặc đã giao' });
     }
@@ -921,6 +1093,7 @@ router.put('/:id', auth, requireShop, requirePermission('orders', 'edit'), requi
       salesperson_absorbed_amount,
       payment_method,
       discount,
+      tax_amount,
       note,
       items,
       source_type,
@@ -1002,8 +1175,10 @@ router.put('/:id', auth, requireShop, requirePermission('orders', 'edit'), requi
     }
 
     if (itemsForPut && itemsForPut.length) {
-      // Validate stock with baseline add-back for current order (pending/shipping only)
-      const addBackAllowed = ['pending', 'shipping'].includes(String(oldStatus)) && String(targetWarehouseId) === String(order.warehouse_id);
+      // Validate stock with baseline add-back for current order (edit mode).
+      // Because current stock already reflects this order (reserved/deducted),
+      // allow adding back baseline qty when editing within the same warehouse.
+      const addBackAllowed = String(targetWarehouseId) === String(order.warehouse_id);
       const [oldItems] = await pool.query(
         'SELECT product_id, qty FROM order_items WHERE order_id = ?',
         [req.params.id]
@@ -1071,16 +1246,20 @@ router.put('/:id', auth, requireShop, requirePermission('orders', 'edit'), requi
       salesperson_absorbed_amount !== undefined
         ? round2(salesperson_absorbed_amount)
         : round2(order.salesperson_absorbed_amount != null ? order.salesperson_absorbed_amount : 0);
-    const { customer_collect: custCol, shop_collect: shopCol } = computeOrderCollects(
-      subtotal,
-      shipFeePut,
-      depositPut,
-      shipPayerPut
-    );
+    const discountPut = round2(discount !== undefined ? discount : order.discount);
+    const taxPut = round2(tax_amount !== undefined ? tax_amount : order.tax_amount);
+    if (discountPut > round2(subtotal)) {
+      return res.status(400).json({ error: 'Giảm giá không được lớn hơn giá trị đơn hàng' });
+    }
+    const baseSubtotalPut = round2(subtotal - discountPut + taxPut);
+    if (depositPut > baseSubtotalPut) {
+      return res.status(400).json({ error: 'Tiền cọc không được lớn hơn giá trị đơn hàng' });
+    }
+    const { customer_collect: custCol, shop_collect: shopCol } = computeOrderCollects(baseSubtotalPut, shipFeePut, depositPut, shipPayerPut);
     const totalAmount = custCol;
 
     await pool.query(
-      `UPDATE orders SET customer_id = ?, warehouse_id = ?, group_id = ?, salesperson_id = ?, source_type = ?, collaborator_user_id = ?, status = ?, shipping_address = ?, carrier_service = ?, shipping_fee = ?, ship_payer = ?, deposit = ?, customer_collect = ?, shop_collect = ?, salesperson_absorbed_amount = ?, payment_method = ?, subtotal = ?, discount = ?, total_amount = ?, note = ?
+      `UPDATE orders SET customer_id = ?, warehouse_id = ?, group_id = ?, salesperson_id = ?, source_type = ?, collaborator_user_id = ?, status = ?, shipping_address = ?, carrier_service = ?, shipping_fee = ?, ship_payer = ?, deposit = ?, customer_collect = ?, shop_collect = ?, salesperson_absorbed_amount = ?, payment_method = ?, subtotal = ?, discount = ?, tax_amount = ?, total_amount = ?, note = ?
        WHERE id = ? AND shop_id = ?`,
       [
         customer_id || order.customer_id,
@@ -1100,7 +1279,8 @@ router.put('/:id', auth, requireShop, requirePermission('orders', 'edit'), requi
         salespersonAbsorbedPut,
         payment_method || order.payment_method,
         subtotal,
-        discount !== undefined ? discount : order.discount,
+        discountPut,
+        taxPut,
         totalAmount,
         note || order.note,
         req.params.id,
@@ -1172,7 +1352,7 @@ router.post('/:id/cancel-with-payroll-adjustment', auth, requireShop, requirePer
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', auth, requireShop, requirePermission('orders', 'delete'), requireFeature('orders.delete'), async (req, res, next) => {
+router.delete('/:id', auth, requireShop, requireOrderDeleteAccess, async (req, res, next) => {
   try {
     const pool = await getPool();
 
@@ -1201,9 +1381,13 @@ router.delete('/:id', auth, requireShop, requirePermission('orders', 'delete'), 
       }
     }
 
+    const isCounterOrderDelete =
+      Number(order.is_counter_sale) === 1 ||
+      String(order.shipping_address || '').trim() === COUNTER_SALE_ADDRESS;
     if (
       scope === 'own' &&
-      ['shipping', 'completed'].includes(String(order.status))
+      ['shipping', 'completed'].includes(String(order.status)) &&
+      !isCounterOrderDelete
     ) {
       return res.status(403).json({ error: 'Không được xóa đơn đang giao hoặc đã giao' });
     }
