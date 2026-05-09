@@ -1,13 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
-
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
@@ -15,6 +13,11 @@
   html {
     font-size: 13px;
     @apply font-sans;
+  }
+  @media (min-width: 768px) {
+    html {
+      font-size: 14px;
+    }
   }
   body {
     @apply font-sans antialiased leading-[1.4] bg-background text-foreground;
@@ -44,7 +47,7 @@
 ══════════════════════════════════════════════════════════ */
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -127,15 +130,27 @@
   --chart-4:                oklch(0.62 0.22 29);      /* red */
   --chart-5:                oklch(0.72 0.18 140);     /* green */
 
+  /* ─── Recharts / SVG fill vars (oklch không dùng được trong SVG attr) ─── */
+  --recharts-primary:       #0d9488;   /* teal-600 */
+  --recharts-primary-80:    #14b8a6cc; /* teal-500 80% */
+  --recharts-primary-55:    #14b8a68c; /* teal-500 55% */
+  --recharts-muted:         #94a3b8;   /* slate-400 */
+  --recharts-muted-55:      #94a3b88c;
+  --recharts-grid:          #e2e8f0;   /* slate-200 */
+  --recharts-amber:         #f59e0b;
+  --recharts-red:           #ef4444;
+  --recharts-green:         #22c55e;
+  --recharts-lavender:      #818cf8;
+
   /* Sidebar */
-  --sidebar:                oklch(0.97 0.005 180);    /* trắng xanh nhạt */
-  --sidebar-foreground:     oklch(0.14 0.01 264);
-  --sidebar-primary:        oklch(0.55 0.12 180);     /* teal */
+  --sidebar:                oklch(0.975 0.003 180);
+  --sidebar-foreground:     oklch(0.22 0.01 264);
+  --sidebar-primary:        oklch(0.52 0.13 180);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent:         oklch(0.92 0.01 180);
-  --sidebar-accent-foreground: oklch(0.35 0.08 180);
-  --sidebar-border:         oklch(0.90 0 0);
-  --sidebar-ring:           oklch(0.55 0.12 180);
+  --sidebar-accent:         oklch(0.90 0.018 180);
+  --sidebar-accent-foreground: oklch(0.28 0.10 180);
+  --sidebar-border:         oklch(0.87 0.005 180);
+  --sidebar-ring:           oklch(0.52 0.13 180);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -150,9 +165,9 @@
   --popover:                oklch(0.14 0.003 264);    /* #141516 surface-2 */
   --popover-foreground:     oklch(0.972 0.002 264);
 
-  /* Primary — Linear lavender #5e6ad2 */
-  --primary:                oklch(0.52 0.18 264);
-  --primary-foreground:     oklch(1 0 0);
+  /* Primary — Teal */
+  --primary:                oklch(0.58 0.14 180);
+  --primary-foreground:     oklch(0.08 0.01 180);
 
   /* Secondary */
   --secondary:              oklch(0.12 0.003 264);
@@ -172,22 +187,34 @@
   /* Borders — hairline */
   --border:                 oklch(0.22 0.004 264);    /* #23252a */
   --input:                  oklch(0.26 0.005 264);    /* #34343a */
-  --ring:                   oklch(0.52 0.18 264);
+  --ring:                   oklch(0.58 0.14 180);
 
   /* Charts */
-  --chart-1:                oklch(0.52 0.18 264);     /* lavender */
-  --chart-2:                oklch(0.55 0.15 160);     /* teal */
+  --chart-1:                oklch(0.58 0.14 180);     /* teal */
+  --chart-2:                oklch(0.52 0.18 264);     /* lavender */
   --chart-3:                oklch(0.65 0.18 60);      /* amber */
   --chart-4:                oklch(0.62 0.22 29);      /* red */
   --chart-5:                oklch(0.72 0.18 140);     /* green */
 
+  /* ─── Recharts / SVG fill vars — dark mode ─── */
+  --recharts-primary:       #6366f1;   /* indigo-500 — đẹp trong dark */
+  --recharts-primary-80:    #6366f1cc;
+  --recharts-primary-55:    #6366f18c;
+  --recharts-muted:         #64748b;
+  --recharts-muted-55:      #64748b8c;
+  --recharts-grid:          #23252a;
+  --recharts-amber:         #fbbf24;
+  --recharts-red:           #f87171;
+  --recharts-green:         #4ade80;
+  --recharts-lavender:      #a5b4fc;
+
   /* Sidebar */
-  --sidebar:                oklch(0.12 0.003 264);    /* surface-1 */
-  --sidebar-foreground:     oklch(0.972 0.002 264);
-  --sidebar-primary:        oklch(0.52 0.18 264);     /* lavender */
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent:         oklch(0.16 0.003 264);
-  --sidebar-accent-foreground: oklch(0.972 0.002 264);
-  --sidebar-border:         oklch(0.22 0.004 264);
-  --sidebar-ring:           oklch(0.52 0.18 264);
+  --sidebar:                oklch(0.10 0.004 180);    /* tối hơn, hơi xanh teal */
+  --sidebar-foreground:     oklch(0.92 0.005 180);
+  --sidebar-primary:        oklch(0.58 0.14 180);     /* teal sáng trong dark */
+  --sidebar-primary-foreground: oklch(0.08 0.01 180);
+  --sidebar-accent:         oklch(0.16 0.008 180);
+  --sidebar-accent-foreground: oklch(0.88 0.008 180);
+  --sidebar-border:         oklch(0.20 0.006 180);
+  --sidebar-ring:           oklch(0.58 0.14 180);
 }

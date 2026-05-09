@@ -73,7 +73,12 @@ export function Register() {
           <div className="p-6 border-b border-border">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-semibold">
-                S
+                <img
+                  src="/favicon.svg"
+                  alt="Smart ERP"
+                  className="h-6 w-6"
+                  draggable={false}
+                />
               </div>
               <div className="min-w-0">
                 <h1 className="text-xl font-semibold tracking-tight">Tạo tài khoản</h1>

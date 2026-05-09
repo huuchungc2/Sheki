@@ -13,6 +13,21 @@ import {
 } from "recharts";
 import { cn, formatCurrency, isAdminUser } from "../lib/utils";
 
+/* ── Chart colors — hex tĩnh để SVG fill đọc được ── */
+const CHART_COLORS = {
+  light: { primary: "#0d9488", primary80: "#14b8a6cc", primary55: "#14b8a68c", muted: "#94a3b8", grid: "#e2e8f0" },
+  dark:  { primary: "#6366f1", primary80: "#6366f1cc", primary55: "#6366f18c", muted: "#64748b", grid: "#23252a" },
+};
+function useIsDark() {
+  const [isDark, setIsDark] = React.useState(() => document.documentElement.classList.contains("dark"));
+  React.useEffect(() => {
+    const obs = new MutationObserver(() => setIsDark(document.documentElement.classList.contains("dark")));
+    obs.observe(document.documentElement, { attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return isDark;
+}
+
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
   "/api";
@@ -45,6 +60,8 @@ function ChangeBadge({ pct }: { pct: string | null }) {
 }
 
 export function Dashboard() {
+  const isDark = useIsDark();
+  const C = isDark ? CHART_COLORS.dark : CHART_COLORS.light;
   const [data, setData]       = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError]     = React.useState<string | null>(null);
@@ -424,9 +441,9 @@ export function Dashboard() {
               <div className="p-5">
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={topProducts} barSize={36}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} dy={6} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: C.muted, fontSize: 11 }} dy={6} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: C.muted, fontSize: 11 }}
                       tickFormatter={(v) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K` : v} />
                     <Tooltip formatter={(v: number) => [formatCurrency(v), "Doanh thu"]}
                       contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
@@ -434,15 +451,7 @@ export function Dashboard() {
                       {topProducts.map((_: any, i: number) => (
                         <Cell
                           key={i}
-                          fill={
-                            i === 0
-                              ? "hsl(var(--primary))"
-                              : i === 1
-                                ? "hsl(var(--primary) / 0.9)"
-                                : i === 2
-                                  ? "hsl(var(--primary) / 0.8)"
-                                  : "hsl(var(--primary) / 0.65)"
-                          }
+                          fill={i === 0 ? C.primary : i === 1 ? C.primary80 : i === 2 ? C.primary55 : C.primary55}
                         />
                       ))}
                     </Bar>
@@ -589,9 +598,9 @@ export function Dashboard() {
                 <div className="p-5">
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={topProducts} barSize={32}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} dy={6} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.grid} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: C.muted, fontSize: 11 }} dy={6} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: C.muted, fontSize: 11 }}
                         tickFormatter={(v) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K` : v} />
                       <Tooltip formatter={(v: number) => [formatCurrency(v), "Doanh thu"]}
                         contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
@@ -599,13 +608,7 @@ export function Dashboard() {
                         {topProducts.map((_: any, i: number) => (
                           <Cell
                             key={i}
-                            fill={
-                              i === 0
-                                ? "hsl(var(--primary))"
-                                : i === 1
-                                  ? "hsl(var(--primary) / 0.85)"
-                                  : "hsl(var(--primary) / 0.7)"
-                            }
+                            fill={i === 0 ? C.primary : i === 1 ? C.primary80 : C.primary55}
                           />
                         ))}
                       </Bar>

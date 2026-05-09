@@ -454,8 +454,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       >
         {/* safe-area-top: PWA “Thêm vào Màn hình chính” (standalone) — tránh logo/shop dính dưới status bar */}
         <div className="px-6 pb-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
-            S
+          <div className="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center text-sidebar-primary-foreground font-bold">
+            <img
+                  src="/favicon.svg"
+                  alt="Smart ERP"
+                  className="h-6 w-6"
+                  draggable={false}
+                />
           </div>
           {isSidebarOpen && (
             <span className="font-bold text-xl text-sidebar-foreground tracking-tight">
@@ -591,7 +596,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           )}
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 transition-all"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
           >
             <LogOut className="w-5 h-5 shrink-0" />
             {isSidebarOpen && <span>Đăng xuất</span>}
@@ -611,7 +616,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* TopBar — safe-area-inset-top: PWA standalone (iPhone) tránh menu 3 gạch dính sát / dưới giờ pin */}
         <header
           className={cn(
-            "bg-background/90 backdrop-blur-md border-b border-border sticky top-0 z-50 isolate touch-manipulation supports-[backdrop-filter]:bg-background/80",
+            "bg-background/95 backdrop-blur-md border-b border-border shadow-sm sticky top-0 z-50 isolate touch-manipulation supports-[backdrop-filter]:bg-background/90",
             "pt-[env(safe-area-inset-top,0px)]",
             isMobile && isSidebarOpen && "pointer-events-auto relative z-[60]"
           )}
@@ -634,7 +639,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <input 
                 type="text" 
                 placeholder="Tìm kiếm nhanh..." 
-                className="pl-10 pr-4 py-2 bg-muted border-transparent focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 rounded-xl text-sm w-64 transition-all outline-none"
+                className="pl-10 pr-4 py-2 bg-muted border border-border focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 rounded-xl text-sm w-64 transition-all outline-none"
               />
             </div>
           </div>
@@ -776,7 +781,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {currentUser?.email || "Chưa đăng nhập"}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white font-bold shadow-lg shadow-teal-500/20 cursor-pointer hover:ring-2 hover:ring-teal-300 transition-all"
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
                 {currentUser?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || "U"}

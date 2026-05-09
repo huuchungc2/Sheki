@@ -25,6 +25,21 @@ import {
   Cell,
 } from "recharts";
 import { formatCurrency, cn, formatDate } from "../lib/utils";
+
+/* ── Chart colors — hex tĩnh để SVG fill đọc được ── */
+const CHART_COLORS = {
+  light: { primary: "#0d9488", primary80: "#14b8a6cc", primary55: "#14b8a68c", muted: "#94a3b8", muted55: "#94a3b88c", grid: "#e2e8f0" },
+  dark:  { primary: "#6366f1", primary80: "#6366f1cc", primary55: "#6366f18c", muted: "#64748b", muted55: "#64748b8c", grid: "#23252a" },
+};
+function useIsDark() {
+  const [isDark, setIsDark] = React.useState(() => document.documentElement.classList.contains("dark"));
+  React.useEffect(() => {
+    const obs = new MutationObserver(() => setIsDark(document.documentElement.classList.contains("dark")));
+    obs.observe(document.documentElement, { attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return isDark;
+}
 import { exportRevenueReport } from "../lib/exportExcel";
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -41,6 +56,8 @@ function rankStyle(i: number) {
 }
 
 export function RevenueReport() {
+  const isDark = useIsDark();
+  const C = isDark ? CHART_COLORS.dark : CHART_COLORS.light;
   const [loading, setLoading] = React.useState(true);
   const [exporting, setExporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -454,7 +471,7 @@ export function RevenueReport() {
                       layout="vertical"
                       margin={{ left: 0, right: 16, top: 4, bottom: 4 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="hsl(var(--border))" />
+                      <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke={C.grid} />
                       <XAxis type="number" hide />
                       <YAxis
                         dataKey="label"
@@ -462,14 +479,14 @@ export function RevenueReport() {
                         width={112}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                        tick={{ fill: C.muted, fontSize: 11 }}
                         interval={0}
                       />
                       <Tooltip
-                        cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
+                        cursor={{ fill: C.primary55 }}
                         contentStyle={{
                           borderRadius: "12px",
-                          border: "1px solid hsl(var(--border))",
+                          border: `1px solid ${C.grid}`,
                           boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.08)",
                         }}
                         formatter={(value: number) => [formatCurrency(value), "Doanh số"]}
@@ -488,13 +505,7 @@ export function RevenueReport() {
                         {performanceData.map((_, index) => (
                           <Cell
                             key={`c-${index}`}
-                            fill={
-                              index === 0
-                                ? "hsl(var(--primary))"
-                                : index < 3
-                                  ? "hsl(var(--primary) / 0.85)"
-                                  : "hsl(var(--muted-foreground) / 0.55)"
-                            }
+                            fill={index === 0 ? C.primary : index < 3 ? C.primary80 : C.muted55}
                           />
                         ))}
                       </Bar>

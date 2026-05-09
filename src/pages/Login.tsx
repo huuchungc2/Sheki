@@ -184,13 +184,13 @@ export function Login() {
               <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center overflow-hidden">
                 <img
                   src="/favicon.svg"
-                  alt="Smart Erp"
+                  alt="Smart ERP"
                   className="h-6 w-6"
                   draggable={false}
                 />
               </div>
               <div className="min-w-0">
-                <h1 className="text-xl font-semibold tracking-tight">Smart Erp</h1>
+                <h1 className="text-xl font-semibold tracking-tight">Smart ERP</h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   Đăng nhập để tiếp tục quản lý hệ thống.
                 </p>

@@ -373,23 +373,23 @@ export function EmployeeList() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-            <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border border-border rounded-xl">
-              <Filter className="w-4 h-4 text-muted-foreground" />
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto px-3 py-2 bg-muted/30 border border-border rounded-xl">
+              <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
               <select
                 value={department}
                 onChange={(e) => { patchListParams({ department: e.target.value || null }, { resetPage: true }); }}
-                className="bg-transparent text-sm font-semibold text-foreground outline-none cursor-pointer"
+                className="bg-transparent text-sm font-semibold text-foreground outline-none cursor-pointer min-w-0"
               >
                 <option value="">Tất cả phòng ban</option>
                 {departmentOptions.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
-              <div className="w-px h-5 bg-border" />
+              <div className="hidden sm:block w-px h-5 bg-border" />
               <select
                 value={roleCode}
                 onChange={(e) => { patchListParams({ role: e.target.value || null }, { resetPage: true }); }}
-                className="bg-transparent text-sm font-semibold text-foreground outline-none cursor-pointer"
+                className="bg-transparent text-sm font-semibold text-foreground outline-none cursor-pointer min-w-0"
               >
                 <option value="">Tất cả vai trò</option>
                 {roles.map((r) => (
@@ -398,13 +398,13 @@ export function EmployeeList() {
                   </option>
                 ))}
               </select>
-              <div className="w-px h-5 bg-border" />
+              <div className="hidden sm:block w-px h-5 bg-border" />
               <select
                 value={statusFilter}
                 onChange={(e) => {
                   patchListParams({ status: e.target.value }, { resetPage: true });
                 }}
-                className="bg-transparent text-sm font-semibold text-foreground outline-none cursor-pointer"
+                className="bg-transparent text-sm font-semibold text-foreground outline-none cursor-pointer min-w-0"
                 title="Trạng thái làm việc"
               >
                 <option value="active">Đang làm việc</option>
@@ -477,7 +477,7 @@ export function EmployeeList() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-muted/30 border-b border-border">
-                <th className="px-6 py-4 w-10">
+                <th className="px-4 py-3 w-10">
                   <input
                     type="checkbox"
                     checked={employees.length > 0 && selected.size === employees.length}
@@ -485,13 +485,13 @@ export function EmployeeList() {
                     className="w-4 h-4 rounded border-input cursor-pointer"
                   />
                 </th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nhân viên</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phòng ban / Chức vụ</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Liên hệ</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phân quyền</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ngày gia nhập</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Trạng thái</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Thao tác</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nhân viên</th>
+                <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phòng ban / Chức vụ</th>
+                <th className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Liên hệ</th>
+                <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phân quyền</th>
+                <th className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ngày gia nhập</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Trạng thái</th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -500,7 +500,7 @@ export function EmployeeList() {
               ) : (
                 employees.map((employee) => (
                   <tr key={employee.id} className="hover:bg-muted/30 transition-colors group">
-                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={selected.has(employee.id)}
@@ -508,23 +508,23 @@ export function EmployeeList() {
                         className="w-4 h-4 rounded border-input cursor-pointer"
                       />
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-foreground font-bold text-sm">
+                        <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center text-foreground font-bold text-sm shrink-0">
                           {(String(employee.full_name || "?").trim().split(/\s+/).filter(Boolean).map((n: string) => n[0]).join("") || "?").slice(0, 2).toUpperCase()}
                         </div>
-                        <div>
-                          <Link to={`/employees/${employee.id}`} state={{ employeesListReturn }} className="text-sm font-semibold text-foreground hover:text-primary transition-colors">{employee.full_name}</Link>
+                        <div className="min-w-0">
+                          <Link to={`/employees/${employee.id}`} state={{ employeesListReturn }} className="text-sm font-semibold text-foreground hover:text-primary transition-colors truncate block">{employee.full_name}</Link>
                           <p className="text-xs text-muted-foreground font-mono">{employee.username}</p>
                           <p className="text-xs text-muted-foreground font-mono uppercase">{employee.role_name || employee.role}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="hidden md:table-cell px-4 py-3">
                       <p className="text-sm font-medium text-foreground">{employee.position || '-'}</p>
                       <p className="text-xs text-muted-foreground">{employee.department || '-'}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="hidden lg:table-cell px-4 py-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Mail className="w-3 h-3" /> {employee.email}
@@ -534,26 +534,26 @@ export function EmployeeList() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-muted/30 text-foreground border border-border">
+                    <td className="hidden md:table-cell px-4 py-3">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-muted/30 text-foreground border border-border">
                         {employee.role_name || employee.role || "—"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                    <td className="hidden lg:table-cell px-4 py-3 text-sm text-muted-foreground">
                       {employee.join_date ? formatDate(employee.join_date) : '-'}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <span className={cn(
-                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap",
                         employee.is_active
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50"
                           : "bg-muted/30 text-muted-foreground border border-border"
                       )}>
-                        {employee.is_active ? "Đang làm việc" : "Đã nghỉ"}
+                        {employee.is_active ? "Đang làm" : "Đã nghỉ"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <Link to={`/employees/edit/${employee.id}`} state={{ employeesListReturn }} className="p-2 hover:bg-accent hover:text-foreground rounded-lg text-muted-foreground transition-colors" title="Chỉnh sửa">
                           <Edit2 className="w-4 h-4" />
                         </Link>
