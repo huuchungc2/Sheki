@@ -116,7 +116,8 @@ async function replaceRolePermissionsFromModules(pool, shopId, roleId, mods) {
     for (const a of RBAC_ACTIONS) {
       const allowed = !!(mods[m.id] && mods[m.id][a.id]);
       if (!legacyMode) {
-        rows.push([shopId, roleId, m.id, a.id, allowed ? 1 : 0]);
+        // Luôn ghi `role` (legacy NOT NULL trên một số DB / sql_mode strict)
+        rows.push([shopId, roleId, codeLower, m.id, a.id, allowed ? 1 : 0]);
       } else {
         rows.push([shopId, codeLower, m.id, a.id, allowed ? 1 : 0]);
       }
@@ -127,7 +128,7 @@ async function replaceRolePermissionsFromModules(pool, shopId, roleId, mods) {
 
   if (!legacyMode) {
     await pool.query(
-      'INSERT INTO role_permissions (shop_id, role_id, module, action, allowed) VALUES ?',
+      'INSERT INTO role_permissions (shop_id, role_id, role, module, action, allowed) VALUES ?',
       [rows]
     );
   } else {

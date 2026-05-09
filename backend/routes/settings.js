@@ -406,11 +406,12 @@ router.put('/:roleId/permissions', auth, requireShop, requirePermission('setting
       await pool.query('DELETE FROM role_permissions WHERE shop_id = ? AND role = ?', [sid, String(r.code || '').toLowerCase()]);
     }
 
+    const roleCode = String(r.code || '').toLowerCase();
     for (const perm of permissions) {
       if (!legacyMode) {
         await pool.query(
-          'INSERT INTO role_permissions (shop_id, role_id, module, action, allowed) VALUES (?, ?, ?, ?, ?)',
-          [sid, r.id, perm.module, perm.action, perm.allowed ? 1 : 0]
+          'INSERT INTO role_permissions (shop_id, role_id, role, module, action, allowed) VALUES (?, ?, ?, ?, ?, ?)',
+          [sid, r.id, roleCode, perm.module, perm.action, perm.allowed ? 1 : 0]
         );
       } else {
         await pool.query(

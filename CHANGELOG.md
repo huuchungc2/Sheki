@@ -1,3 +1,7 @@
+## [09/05/2026] - VPS: INSERT role_permissions luôn có cột `role` (strict MySQL)
+### Fixed
+- **Settings / đồng bộ ma trận** — Một số DB có `role_permissions.role` NOT NULL; code chỉ ghi `role_id` nên MySQL strict báo *Field 'role' doesn't have a default value*. `PUT .../permissions` và `rolePermissionSync` giờ luôn ghi thêm `roles.code` (lowercase) cùng `role_id`. — Files: `backend/routes/settings.js`, `backend/services/rolePermissionSync.js`
+
 ## [07/05/2026] - CounterSale: UI theo DESIGN.md (Linear dark)
 ### Changed
 - **Bán tại quầy** — Redesign UI theo phong cách Linear (clean/minimal/professional); **giữ nguyên 100% logic/state/API**. Màu sắc dùng **semantic tokens** từ `src/index.css` (không hardcode hex), wrapper `dark` để POS luôn dark; spacing/radius/typography tham khảo `DESIGN.md`. — File: `src/pages/CounterSale.tsx`
