@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Dashboard: Top khách hàng chỉ hiển thị tên** — Bảng “Top khách hàng theo doanh số (tháng này)” cột khách hàng chỉ hiển thị tên, không hiển thị số điện thoại. — File: `src/pages/Dashboard.tsx`
 - [x] **Backend: INSERT `role_permissions` gồm cột `role` (tương thích DB NOT NULL / strict)** — Tránh lỗi trên VPS khi lưu phân quyền Settings / sync ma trận. — Files: `backend/routes/settings.js`, `backend/services/rolePermissionSync.js`
 - [x] **ActivityLog: redesign UI theo design system** — Refactor UI/list/table/filter/modal theo `UI_SPEC.md` + semantic tokens (`src/index.css`); bỏ toàn bộ `slate/white/black/blue-*`; **giữ nguyên 100% logic/state/API**. — File: `src/pages/ActivityLog.tsx`
 - [x] **UI: Login brand + SuperAdminRecovery hướng dẫn reset** — Đổi brand “Sheki” → “Smart Erp” ở login; cập nhật màn khôi phục Super Admin bỏ yêu cầu `SUPERADMIN_RESET_KEY`, hướng dẫn reset bằng script local MySQL. — Files: `src/pages/Login.tsx`, `src/pages/SuperAdminRecovery.tsx`

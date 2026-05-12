@@ -413,7 +413,6 @@ export function Dashboard() {
                       <td className="px-5 py-3">
                         <div className="min-w-0">
                           <p className="font-semibold text-foreground truncate">{c.name || "—"}</p>
-                          <p className="text-xs text-muted-foreground">{c.phone || ""}</p>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-center text-muted-foreground tabular-nums">{c.total_orders || 0}</td>
@@ -685,7 +684,6 @@ export function Dashboard() {
                       <td className="px-5 py-3">
                         <div className="min-w-0">
                           <p className="font-semibold text-foreground truncate">{c.name || "—"}</p>
-                          <p className="text-xs text-muted-foreground">{c.phone || ""}</p>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-center text-muted-foreground tabular-nums">{c.total_orders || 0}</td>
