@@ -163,7 +163,7 @@
   --kpi-success-border: #A7F3D0; /* emerald-200 */
 
   /* Dashboard KPI palette (theo tên KPI) */
-  --kpi-revenue: #2563FF; /* blue */
+  --kpi-revenue: #1E40AF; /* blue-800 (đậm hơn) */
   --kpi-orders: #4F46E5; /* indigo */
   --kpi-commission: #2563FF; /* primary */
   --kpi-commission-direct: #16A34A; /* green */
@@ -255,7 +255,7 @@
   --kpi-success-border: color-mix(in oklab, #34D399 30%, transparent);
 
   /* Dashboard KPI palette (theo tên KPI) */
-  --kpi-revenue: #60A5FA; /* blue-400 */
+  --kpi-revenue: #60A5FA; /* blue-400 (đậm + dễ đọc trên dark) */
   --kpi-orders: #A5B4FC; /* indigo/lavender */
   --kpi-commission: #93C5FD; /* blue-300 */
   --kpi-commission-direct: #4ADE80; /* green-400 */
@@ -331,6 +331,11 @@
   .kpi-card--salary {
     --kpi-card-bg: color-mix(in oklab, var(--kpi-accent) 7%, var(--card));
     --kpi-card-border: color-mix(in oklab, var(--kpi-accent) 18%, var(--border));
+  }
+  /* Doanh thu nổi hơn chút */
+  .kpi-card--revenue {
+    --kpi-card-bg: color-mix(in oklab, var(--kpi-accent) 10%, var(--card));
+    --kpi-card-border: color-mix(in oklab, var(--kpi-accent) 24%, var(--border));
   }
 
   .kpi-icon {
