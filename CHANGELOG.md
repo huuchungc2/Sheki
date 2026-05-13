@@ -1821,6 +1821,16 @@
 ### Changed
 - Gắn logo từ `public/favicon.svg` vào header Login; set default theme `light` (trong `src/main.tsx`, đồng thời Login ép `light` khi mở/đăng nhập) để vào hệ thống mặc định là light mode. - Files: `src/main.tsx`, `src/components/Layout.tsx`, `src/pages/Login.tsx`
 
+## [13/05/2026] - [UI: Recharts + Dashboard status tokens]
+### Changed
+- Tách hook `useChartTheme()` đọc các CSS variables `--recharts-*` từ `src/index.css`, refactor `Dashboard` và `RevenueReport` bỏ palette hex hardcode để chart tự đổi theo light/dark khi đổi theme. - Files: `src/lib/chartTheme.ts`, `src/pages/Dashboard.tsx`, `src/pages/RevenueReport.tsx`, `src/index.css`
+- Đưa palette màu thẻ trạng thái đơn (Chờ duyệt/Đang giao/Đã giao) và badge tăng trưởng (+/− %) ra `src/index.css` (light/dark) bằng utility classes; `Dashboard.tsx` dùng class semantic thay vì hardcode `amber/sky/emerald`. - Files: `src/index.css`, `src/pages/Dashboard.tsx`
+- Thống nhất màu icon + số liệu cho các KPI cards (doanh thu/đơn/hoa hồng/hoàn/ship/NV chịu/lương) bằng utility classes và tokens trong `src/index.css`; `Dashboard.tsx` chỉ dùng class `kpi-icon--*`/`kpi-metric`. - Files: `src/index.css`, `src/pages/Dashboard.tsx`
+- Đặt palette riêng cho từng KPI theo tên (doanh thu/đơn/HH direct/HH CTV/khách/hoàn/ship/NV chịu/lương) bằng CSS vars `--kpi-*` trong `src/index.css` (light/dark) và map vào các class `kpi-icon--*` để đổi 1 chỗ ăn toàn bộ. - File: `src/index.css`
+- KPI cards trên Dashboard giờ tint background/border theo palette `--kpi-*` bằng `kpi-card`/`kpi-card--*` (áp dụng cả Admin/Sales view). - Files: `src/index.css`, `src/pages/Dashboard.tsx`
+- KPI cards: title tint theo màu KPI và số liệu (metric) theo accent để đọc nhanh, đồng bộ với palette `--kpi-*`. - Files: `src/index.css`, `src/pages/Dashboard.tsx`
+- RevenueReport + CommissionReport: KPI cards đồng bộ Dashboard theo `kpi-card/kpi-icon/kpi-title/kpi-metric`, đổi 1 chỗ ở `src/index.css` ăn toàn bộ. - Files: `src/pages/RevenueReport.tsx`, `src/pages/CommissionReport.tsx`, `src/index.css`
+
 ### Business Rules Implemented
 - Mã đơn hàng: `DH-YYYYMMDD-XXXX` (reset theo ngày)
 - Tồn kho 3 chỉ số: stock_qty = available_stock + reserved_stock

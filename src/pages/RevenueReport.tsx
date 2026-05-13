@@ -618,36 +618,36 @@ export function RevenueReport() {
 
       {/* KPI — giống Dashboard: icon tròn + số rõ */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
+        <div className="kpi-card kpi-card--revenue rounded-xl p-4 shadow-sm md:p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl kpi-icon kpi-icon--revenue">
               <TrendingUp className="h-5 w-5" />
             </div>
           </div>
-          <p className="text-xs font-medium text-muted-foreground">Tổng doanh số</p>
-          <p className="mt-1 truncate text-lg font-semibold tabular-nums text-foreground md:text-xl">
+          <p className="text-xs font-medium kpi-title kpi-icon--revenue">Tổng doanh số</p>
+          <p className="mt-1 truncate text-lg font-semibold tabular-nums kpi-metric kpi-icon--revenue md:text-xl">
             {formatCurrency(summary?.totalSales || 0)}
           </p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
+        <div className="kpi-card kpi-card--orders rounded-xl p-4 shadow-sm md:p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl kpi-icon kpi-icon--orders">
               <ShoppingCart className="h-5 w-5" />
             </div>
           </div>
-          <p className="text-xs font-medium text-muted-foreground">Tổng đơn hàng</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground md:text-xl">{totalOrders}</p>
+          <p className="text-xs font-medium kpi-title kpi-icon--orders">Tổng đơn hàng</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums kpi-metric kpi-icon--orders md:text-xl">{totalOrders}</p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
+        <div className="kpi-card kpi-card--customers rounded-xl p-4 shadow-sm md:p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl kpi-icon kpi-icon--customers">
               <Users className="h-5 w-5" />
             </div>
           </div>
-          <p className="text-xs font-medium text-muted-foreground">Nhân viên (Sales)</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground md:text-xl">{summary?.totalEmployees ?? 0}</p>
+          <p className="text-xs font-medium kpi-title kpi-icon--customers">Nhân viên (Sales)</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums kpi-metric kpi-icon--customers md:text-xl">{summary?.totalEmployees ?? 0}</p>
         </div>
       </div>
 

@@ -22,11 +22,11 @@ const API_URL =
 const dashSelectCls =
   "min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-const STATUS_CFG: Record<string, { label: string; color: string; icon: any; bg: string }> = {
-  pending:   { label: "Chờ duyệt", color: "text-amber-700 dark:text-amber-300",   icon: Clock,        bg: "bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50" },
-  shipping:  { label: "Đang giao", color: "text-sky-700 dark:text-sky-300",       icon: Truck,        bg: "bg-sky-50 border border-sky-200 dark:bg-sky-950/30 dark:border-sky-900/50" },
-  completed: { label: "Đã giao",   color: "text-emerald-700 dark:text-emerald-300", icon: CheckCircle2, bg: "bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/50" },
-  cancelled: { label: "Đã hủy",    color: "text-destructive",                    icon: XCircle,      bg: "bg-destructive/10 border border-destructive/30" },
+const STATUS_CFG: Record<string, { label: string; icon: any; cls: string }> = {
+  pending:   { label: "Chờ duyệt", icon: Clock,        cls: "kpi-status--pending" },
+  shipping:  { label: "Đang giao", icon: Truck,        cls: "kpi-status--shipping" },
+  completed: { label: "Đã giao",   icon: CheckCircle2, cls: "kpi-status--completed" },
+  cancelled: { label: "Đã hủy",    icon: XCircle,      cls: "bg-destructive/10 border border-destructive/30 text-destructive" },
 };
 
 function greet(name: string) {
@@ -40,7 +40,7 @@ function ChangeBadge({ pct }: { pct: string | null }) {
   const up = parseFloat(pct) >= 0;
   return (
     <span className={cn("inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full border",
-      up ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/50"
+      up ? "kpi-badge-success"
          : "bg-destructive/10 text-destructive border-destructive/30"
     )}>
       {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
@@ -503,15 +503,15 @@ export function Dashboard() {
           {/* Stat cards hàng 1 */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Doanh thu tháng */}
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
+            <div className="kpi-card kpi-card--revenue p-5 rounded-xl shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center kpi-icon kpi-icon--revenue">
                   <DollarSign className="w-4 h-4" />
                 </div>
                 {thisMonth.revenue_change != null ? <ChangeBadge pct={thisMonth.revenue_change} /> : null}
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Doanh thu — {periodLabelDash}</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(thisMonth.revenue || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--revenue">Doanh thu — {periodLabelDash}</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--revenue">{formatCurrency(thisMonth.revenue || 0)}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(today.revenue || 0)}</p>
               ) : null}
@@ -519,82 +519,82 @@ export function Dashboard() {
             </div>
 
             {/* Tổng đơn */}
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
+            <div className="kpi-card kpi-card--orders p-5 rounded-xl shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center kpi-icon kpi-icon--orders">
                   <ShoppingCart className="w-4 h-4" />
                 </div>
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Đơn hàng — {periodLabelDash}</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{thisMonth.total_orders || 0}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--orders">Đơn hàng — {periodLabelDash}</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--orders">{thisMonth.total_orders || 0}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.total_orders || 0} đơn</p>
               ) : null}
             </div>
 
             {/* Hoa hồng */}
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
+            <div className="kpi-card kpi-card--commission p-5 rounded-xl shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center kpi-icon kpi-icon--commission">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng hoa hồng — {periodLabelDash}</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(commission.total || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--commission">Tổng hoa hồng — {periodLabelDash}</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--commission">{formatCurrency(commission.total || 0)}</p>
               <p className="text-xs text-muted-foreground mt-1">CTV: {formatCurrency(commission.override || 0)}</p>
             </div>
 
             {/* Khách hàng */}
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
+            <div className="kpi-card kpi-card--customers p-5 rounded-xl shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center kpi-icon kpi-icon--customers">
                   <Users className="w-4 h-4" />
                 </div>
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Khách hàng</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{(customers.total || 0).toLocaleString()}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--customers">Khách hàng</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--customers">{(customers.total || 0).toLocaleString()}</p>
               <p className="text-xs text-muted-foreground mt-1">Mới trong kỳ: +{customers.new || 0}</p>
             </div>
           </div>
 
           {/* Return KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
+            <div className="kpi-card kpi-card--returns p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--returns">
                 <TrendingDown className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng doanh số hoàn</p>
-              <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-(thisMonth.return_revenue || 0))}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--returns">Tổng doanh số hoàn</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--returns">{formatCurrency(-(thisMonth.return_revenue || 0))}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-(today.return_revenue || 0))}</p>
               ) : null}
             </div>
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
+            <div className="kpi-card kpi-card--return-commission p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--return-commission">
                 <TrendingDown className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Sale)</p>
-              <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-Math.abs(thisMonth.return_commission_direct || 0))}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--return-commission">HH hoàn (Sale)</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--return-commission">{formatCurrency(-Math.abs(thisMonth.return_commission_direct || 0))}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_direct || 0))}</p>
               ) : null}
             </div>
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
+            <div className="kpi-card kpi-card--return-commission p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--return-commission">
                 <TrendingDown className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Quản lý)</p>
-              <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-Math.abs(thisMonth.return_commission_override || 0))}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--return-commission">HH hoàn (Quản lý)</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--return-commission">{formatCurrency(-Math.abs(thisMonth.return_commission_override || 0))}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_override || 0))}</p>
               ) : null}
             </div>
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
+            <div className="kpi-card kpi-card--returns p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--returns">
                 <ShoppingCart className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng đơn hoàn</p>
-              <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{thisMonth.return_orders || 0}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--returns">Tổng đơn hoàn</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--returns">{thisMonth.return_orders || 0}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.return_orders || 0} đơn</p>
               ) : null}
@@ -603,28 +603,28 @@ export function Dashboard() {
 
           {/* Lương / ship / NV chịu — cùng lưới 2 cột mobile như hàng KPI */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="kpi-card kpi-card--ship p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--ship">
                 <Truck className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ship KH Trả</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--ship">Ship KH Trả</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--ship">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Trong kỳ (theo đơn)</p>
             </div>
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="kpi-card kpi-card--absorbed p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--absorbed">
                 <CircleDollarSign className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tiền NV chịu</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--absorbed">Tiền NV chịu</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--absorbed">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Trong kỳ (theo đơn)</p>
             </div>
-            <div className="col-span-2 lg:col-span-1 bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="col-span-2 lg:col-span-1 kpi-card kpi-card--salary p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--salary">
                 <Wallet className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng lương</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_luong || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--salary">Tổng lương</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--salary">{formatCurrency(luongMonth.total_luong || 0)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Tổng HH + Ship KH Trả − tiền NV chịu</p>
             </div>
           </div>
@@ -632,10 +632,10 @@ export function Dashboard() {
           {/* Trạng thái đơn trong kỳ */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {Object.entries(STATUS_CFG).map(([key, cfg]) => (
-              <div key={key} className={cn("p-4 rounded-xl flex items-center gap-3", cfg.bg)}>
-                <cfg.icon className={cn("w-5 h-5 flex-shrink-0", cfg.color)} />
+              <div key={key} className={cn("p-4 rounded-xl flex items-center gap-3", key === "cancelled" ? cfg.cls : cn("kpi-status", cfg.cls))}>
+                <cfg.icon className={cn("w-5 h-5 flex-shrink-0", key === "cancelled" ? "text-destructive" : "kpi-status__icon")} />
                 <div>
-                  <p className={cn("text-xs font-semibold", cfg.color)}>{cfg.label}</p>
+                  <p className={cn("text-xs font-semibold", key === "cancelled" ? "text-destructive" : "kpi-status__label")}>{cfg.label}</p>
                   <p className="text-xl font-semibold text-foreground tabular-nums">{byStatus[key] || 0}</p>
                 </div>
               </div>
@@ -680,7 +680,7 @@ export function Dashboard() {
                         </td>
                         <td className="px-5 py-3 text-center text-muted-foreground tabular-nums">{s.total_orders}</td>
                         <td className="px-5 py-3 text-right font-semibold text-foreground tabular-nums">{formatCurrency(s.revenue)}</td>
-                        <td className="px-5 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                        <td className="px-5 py-3 text-right font-semibold kpi-text-success tabular-nums">
                           {formatCurrency(s.direct_comm + s.override_comm)}
                         </td>
                       </tr>
@@ -822,47 +822,47 @@ export function Dashboard() {
         <>
           {/* Stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
+            <div className="kpi-card kpi-card--revenue p-5 rounded-xl shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center kpi-icon kpi-icon--revenue">
                   <DollarSign className="w-4 h-4" />
                 </div>
                 {thisMonth.revenue_change != null ? <ChangeBadge pct={thisMonth.revenue_change} /> : null}
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Doanh thu — {periodLabelDash}</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(thisMonth.revenue || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--revenue">Doanh thu — {periodLabelDash}</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--revenue">{formatCurrency(thisMonth.revenue || 0)}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(today.revenue || 0)}</p>
               ) : null}
               <p className="text-[11px] text-muted-foreground mt-1 leading-snug">Tổng tạm tính (sau CK dòng), không gồm đơn hủy</p>
             </div>
 
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="kpi-card kpi-card--commission-direct p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--commission-direct">
                 <TrendingUp className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH bán hàng</p>
-              <p className="text-xl font-semibold text-emerald-700 dark:text-emerald-300 mt-1 tabular-nums">{formatCurrency(commission.direct || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--commission-direct">HH bán hàng</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--commission-direct">{formatCurrency(commission.direct || 0)}</p>
               <p className="text-xs text-muted-foreground mt-1">Từ đơn tự bán</p>
             </div>
 
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="kpi-card kpi-card--commission p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--commission">
                 <Users className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH từ CTV</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(commission.override || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--commission">HH từ CTV</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--commission">{formatCurrency(commission.override || 0)}</p>
               <p className="text-xs text-muted-foreground mt-1 leading-snug" title="Override cho quản lý khi CTV lên đơn ghi nhận quản lý. Nếu bạn chỉ là CTV, thường = 0; HH của bạn nằm ở «HH bán hàng».">
                 Tổng HH: {formatCurrency(commission.total || 0)}
               </p>
             </div>
 
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="kpi-card kpi-card--orders p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--orders">
                 <ShoppingCart className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Đơn hàng — {periodLabelDash}</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{thisMonth.total_orders || 0}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--orders">Đơn hàng — {periodLabelDash}</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--orders">{thisMonth.total_orders || 0}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.total_orders || 0} đơn</p>
               ) : null}
@@ -871,42 +871,42 @@ export function Dashboard() {
 
           {/* Return KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
+            <div className="kpi-card kpi-card--returns p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--returns">
                 <TrendingDown className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng doanh số hoàn</p>
-              <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-(thisMonth.return_revenue || 0))}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--returns">Tổng doanh số hoàn</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--returns">{formatCurrency(-(thisMonth.return_revenue || 0))}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-(today.return_revenue || 0))}</p>
               ) : null}
             </div>
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
+            <div className="kpi-card kpi-card--return-commission p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--return-commission">
                 <TrendingDown className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Sale)</p>
-              <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-Math.abs(thisMonth.return_commission_direct || 0))}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--return-commission">HH hoàn (Sale)</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--return-commission">{formatCurrency(-Math.abs(thisMonth.return_commission_direct || 0))}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_direct || 0))}</p>
               ) : null}
             </div>
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
+            <div className="kpi-card kpi-card--return-commission p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--return-commission">
                 <TrendingDown className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Quản lý)</p>
-              <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-Math.abs(thisMonth.return_commission_override || 0))}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--return-commission">HH hoàn (Quản lý)</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--return-commission">{formatCurrency(-Math.abs(thisMonth.return_commission_override || 0))}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_override || 0))}</p>
               ) : null}
             </div>
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
+            <div className="kpi-card kpi-card--returns p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--returns">
                 <ShoppingCart className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng đơn hoàn</p>
-              <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{thisMonth.return_orders || 0}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--returns">Tổng đơn hoàn</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--returns">{thisMonth.return_orders || 0}</p>
               {showTodayKpi ? (
                 <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.return_orders || 0} đơn</p>
               ) : null}
@@ -915,28 +915,28 @@ export function Dashboard() {
 
           {/* Lương / ship / NV — cùng lưới 2 cột mobile như hàng KPI */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="kpi-card kpi-card--ship p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--ship">
                 <Truck className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ship KH Trả</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--ship">Ship KH Trả</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--ship">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Đơn bạn phụ trách — trong kỳ</p>
             </div>
-            <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="kpi-card kpi-card--absorbed p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--absorbed">
                 <CircleDollarSign className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tiền NV chịu</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--absorbed">Tiền NV chịu</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--absorbed">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Đơn bạn phụ trách — trong kỳ</p>
             </div>
-            <div className="col-span-2 lg:col-span-1 bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
+            <div className="col-span-2 lg:col-span-1 kpi-card kpi-card--salary p-5 rounded-xl shadow-sm">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3 kpi-icon kpi-icon--salary">
                 <Wallet className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng lương</p>
-              <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_luong || 0)}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--salary">Tổng lương</p>
+              <p className="text-xl font-semibold mt-1 tabular-nums kpi-metric kpi-icon--salary">{formatCurrency(luongMonth.total_luong || 0)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Tổng HH + Ship KH Trả − tiền NV chịu</p>
             </div>
           </div>
@@ -944,10 +944,16 @@ export function Dashboard() {
           {/* Trạng thái đơn */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {Object.entries(STATUS_CFG).map(([key, cfg]) => (
-              <div key={key} className={cn("p-4 rounded-2xl flex items-center gap-3", cfg.bg)}>
-                <cfg.icon className={cn("w-5 h-5 flex-shrink-0", cfg.color)} />
+              <div
+                key={key}
+                className={cn(
+                  "p-4 rounded-2xl flex items-center gap-3",
+                  key === "cancelled" ? cfg.cls : cn("kpi-status", cfg.cls)
+                )}
+              >
+                <cfg.icon className={cn("w-5 h-5 flex-shrink-0", key === "cancelled" ? "text-destructive" : "kpi-status__icon")} />
                 <div>
-                  <p className={cn("text-xs font-semibold", cfg.color)}>{cfg.label}</p>
+                  <p className={cn("text-xs font-semibold", key === "cancelled" ? "text-destructive" : "kpi-status__label")}>{cfg.label}</p>
                   <p className="text-xl font-semibold text-foreground tabular-nums">{byStatus[key] || 0}</p>
                 </div>
               </div>

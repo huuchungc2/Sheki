@@ -11,6 +11,12 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **RevenueReport + CommissionReport: KPI cards theo tokens index.css** — KPI cards (nền/icon/title/số) dùng `kpi-card/kpi-icon/kpi-title/kpi-metric` theo palette `--kpi-*` để đổi 1 chỗ ăn toàn bộ, đồng bộ Dashboard. — Files: `src/pages/RevenueReport.tsx`, `src/pages/CommissionReport.tsx`, `src/index.css`
+- [x] **Dashboard: chữ + số theo màu KPI** — KPI cards: title tint theo màu KPI và số liệu (metric) theo accent để dễ đọc/nhìn nhanh; map qua `kpi-title` + `kpi-metric` dựa trên `--kpi-*` trong `src/index.css`. — Files: `src/index.css`, `src/pages/Dashboard.tsx`
+- [x] **Dashboard: KPI cards tint background theo palette** — Thêm `kpi-card`/`kpi-card--*` để nền + viền KPI cards tint theo `--kpi-*` (light/dark) trong `src/index.css`; áp dụng cho cả Admin/Sales view trên Dashboard. — Files: `src/index.css`, `src/pages/Dashboard.tsx`
+- [x] **Dashboard: KPI palette theo tên (1 chỗ đổi màu)** — Đặt palette riêng cho từng KPI (doanh thu/đơn/HH direct/HH CTV/khách/hoàn/ship/NV chịu/lương) bằng CSS vars `--kpi-*` trong `src/index.css` (light/dark) và map vào các class `kpi-icon--*`. — File: `src/index.css`
+- [x] **Dashboard: KPI colors đưa vào index.css** — Thống nhất màu icon + số liệu cho các KPI cards (doanh thu/đơn/hoa hồng/hoàn/ship/NV chịu/lương) bằng utility classes và tokens trong `src/index.css`; `Dashboard.tsx` chỉ dùng class `kpi-icon--*`/`kpi-metric`. — Files: `src/index.css`, `src/pages/Dashboard.tsx`
+- [x] **Dashboard: màu status/KPI theo tokens index.css** — Đưa màu các thẻ trạng thái (Chờ duyệt/Đang giao/Đã giao) và badge tăng trưởng (+/− %) ra `src/index.css` (light/dark) qua utility classes; `Dashboard.tsx` chỉ dùng class semantic. — Files: `src/index.css`, `src/pages/Dashboard.tsx`
 - [x] **Dashboard: Top khách hàng chỉ hiển thị tên** — Bảng “Top khách hàng theo doanh số (tháng này)” cột khách hàng chỉ hiển thị tên, không hiển thị số điện thoại. — File: `src/pages/Dashboard.tsx`
 - [x] **Backend: INSERT `role_permissions` gồm cột `role` (tương thích DB NOT NULL / strict)** — Tránh lỗi trên VPS khi lưu phân quyền Settings / sync ma trận. — Files: `backend/routes/settings.js`, `backend/services/rolePermissionSync.js`
 - [x] **ActivityLog: redesign UI theo design system** — Refactor UI/list/table/filter/modal theo `UI_SPEC.md` + semantic tokens (`src/index.css`); bỏ toàn bộ `slate/white/black/blue-*`; **giữ nguyên 100% logic/state/API**. — File: `src/pages/ActivityLog.tsx`

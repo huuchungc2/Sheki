@@ -833,33 +833,21 @@ export function CommissionReport() {
 
       {/* KPI — cùng Dashboard; [&>*]:min-w-0 tránh grid làm tràn ngang (min-width: auto mặc định) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full min-w-0 [&>*]:min-w-0">
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300 mb-3">
+        <div className="kpi-card kpi-card--commission-direct p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--commission-direct">
             <TrendingUp className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH bán hàng</p>
-          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300 mt-1 break-words tabular-nums">{formatCurrency(summary.direct_commission || 0)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--commission-direct">HH bán hàng</p>
+          <p className="text-xl font-bold mt-1 break-words tabular-nums kpi-metric kpi-icon--commission-direct">{formatCurrency(summary.direct_commission || 0)}</p>
           <p className="text-xs text-muted-foreground mt-1 break-words">Từ đơn tự bán</p>
         </div>
 
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div
-            className={cn(
-              "w-9 h-9 rounded-xl flex items-center justify-center mb-3",
-              isSalesMyCommission
-                ? "bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300"
-                : "bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300"
-            )}
-          >
+        <div className="kpi-card kpi-card--commission p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--commission">
             <Users className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH từ CTV</p>
-          <p
-            className={cn(
-              "text-xl font-bold mt-1 break-words tabular-nums",
-              isSalesMyCommission ? "text-violet-700 dark:text-violet-300" : "text-sky-700 dark:text-sky-300"
-            )}
-          >
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--commission">HH từ CTV</p>
+          <p className="text-xl font-bold mt-1 break-words tabular-nums kpi-metric kpi-icon--commission">
             {formatCurrency(summary.override_commission || 0)}
           </p>
           {isSalesMyCommission ? (
@@ -875,96 +863,96 @@ export function CommissionReport() {
           )}
         </div>
 
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-950/30 flex items-center justify-center text-violet-700 dark:text-violet-300 mb-3">
+        <div className="kpi-card kpi-card--commission p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--commission">
             <DollarSign className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng hoa hồng</p>
-          <p className="text-xl font-bold text-violet-700 dark:text-violet-300 mt-1 break-words tabular-nums">
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--commission">Tổng hoa hồng</p>
+          <p className="text-xl font-bold mt-1 break-words tabular-nums kpi-metric kpi-icon--commission">
             {formatCurrency((summary.direct_commission || 0) + (summary.override_commission || 0))}
           </p>
           <p className="text-xs text-muted-foreground mt-1 break-words">Bán hàng + CTV</p>
         </div>
 
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center text-amber-700 dark:text-amber-300 mb-3">
+        <div className="kpi-card kpi-card--orders p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--orders">
             <ShoppingCart className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Số đơn hàng</p>
-          <p className="text-xl font-bold text-foreground mt-1 tabular-nums">{totalOrdersWithReturns}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--orders">Số đơn hàng</p>
+          <p className="text-xl font-bold mt-1 tabular-nums kpi-metric kpi-icon--orders">{totalOrdersWithReturns}</p>
           <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
       </div>
 
       {/* Return KPIs — giống Dashboard */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full min-w-0 [&>*]:min-w-0">
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive mb-3">
+        <div className="kpi-card kpi-card--returns p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--returns">
             <DollarSign className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng doanh số hoàn</p>
-          <p className="text-xl font-bold text-destructive mt-1 break-words tabular-nums">
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--returns">Tổng doanh số hoàn</p>
+          <p className="text-xl font-bold mt-1 break-words tabular-nums kpi-metric kpi-icon--returns">
             {formatCurrency(-(returnsSummary.return_revenue || 0))}
           </p>
           <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive mb-3">
+        <div className="kpi-card kpi-card--return-commission p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--return-commission">
             <TrendingUp className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Sale)</p>
-          <p className="text-xl font-bold text-destructive mt-1 break-words tabular-nums">
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--return-commission">HH hoàn (Sale)</p>
+          <p className="text-xl font-bold mt-1 break-words tabular-nums kpi-metric kpi-icon--return-commission">
             −{formatCurrency(returnsSummary.return_commission_direct_abs || 0)}
           </p>
           <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive mb-3">
+        <div className="kpi-card kpi-card--return-commission p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--return-commission">
             <TrendingUp className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Quản lý)</p>
-          <p className="text-xl font-bold text-destructive mt-1 break-words tabular-nums">
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--return-commission">HH hoàn (Quản lý)</p>
+          <p className="text-xl font-bold mt-1 break-words tabular-nums kpi-metric kpi-icon--return-commission">
             −{formatCurrency(returnsSummary.return_commission_override_abs || 0)}
           </p>
           <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive mb-3">
+        <div className="kpi-card kpi-card--returns p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--returns">
             <ShoppingCart className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng đơn hoàn</p>
-          <p className="text-xl font-bold text-destructive mt-1 tabular-nums">{returnsSummary.return_orders || 0}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--returns">Tổng đơn hoàn</p>
+          <p className="text-xl font-bold mt-1 tabular-nums kpi-metric kpi-icon--returns">{returnsSummary.return_orders || 0}</p>
           <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 w-full min-w-0 [&>*]:min-w-0">
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 mb-3">
+        <div className="kpi-card kpi-card--ship p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--ship">
             <Truck className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-sky-600/90 uppercase tracking-wide">Ship KH Trả</p>
-          <p className="text-xl font-bold text-sky-800 mt-1 tabular-nums break-words">{formatCurrency(summary.total_khach_ship || 0)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--ship">Ship KH Trả</p>
+          <p className="text-xl font-bold mt-1 tabular-nums break-words kpi-metric kpi-icon--ship">{formatCurrency(summary.total_khach_ship || 0)}</p>
           <p className="text-xs text-muted-foreground mt-0.5 break-words leading-snug">
             {isSalesMyCommission ? "Đơn bạn phụ trách — tháng này" : "Tháng này (theo đơn)"}
           </p>
         </div>
-        <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 mb-3">
+        <div className="kpi-card kpi-card--absorbed p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--absorbed">
             <CircleDollarSign className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-rose-600/90 uppercase tracking-wide">Tiền NV chịu</p>
-          <p className="text-xl font-bold text-rose-800 mt-1 tabular-nums break-words">{formatCurrency(summary.total_nv_chiu || 0)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--absorbed">Tiền NV chịu</p>
+          <p className="text-xl font-bold mt-1 tabular-nums break-words kpi-metric kpi-icon--absorbed">{formatCurrency(summary.total_nv_chiu || 0)}</p>
           <p className="text-xs text-muted-foreground mt-0.5 break-words leading-snug">
             {isSalesMyCommission ? "Đơn bạn phụ trách — tháng này" : "Tháng này (theo đơn)"}
           </p>
         </div>
-        <div className="col-span-2 lg:col-span-1 bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 mb-3">
+        <div className="col-span-2 lg:col-span-1 kpi-card kpi-card--salary p-5 rounded-xl shadow-sm min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 kpi-icon kpi-icon--salary">
             <Wallet className="w-4 h-4" />
           </div>
-          <p className="text-xs font-semibold text-violet-600/90 uppercase tracking-wide">Tổng lương</p>
-          <p className="text-xl font-bold text-violet-800 mt-1 tabular-nums break-words">{formatCurrency(summary.total_luong || 0)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide kpi-title kpi-icon--salary">Tổng lương</p>
+          <p className="text-xl font-bold mt-1 tabular-nums break-words kpi-metric kpi-icon--salary">{formatCurrency(summary.total_luong || 0)}</p>
           <p className="text-xs text-muted-foreground mt-0.5 break-words leading-snug">
             Tổng HH + Ship KH Trả − tiền NV chịu − HH hoàn (direct)
           </p>

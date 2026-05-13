@@ -145,6 +145,35 @@
   --recharts-green: #22C55E;
   --recharts-lavender: #818CF8;
 
+  /* KPI / Status (Dashboard) */
+  --status-pending-bg: #FFFBEB; /* amber-50 */
+  --status-pending-border: #FDE68A; /* amber-200 */
+  --status-pending-fg: #B45309; /* amber-700 */
+
+  --status-shipping-bg: #F0F9FF; /* sky-50 */
+  --status-shipping-border: #BAE6FD; /* sky-200 */
+  --status-shipping-fg: #0369A1; /* sky-700 */
+
+  --status-completed-bg: #ECFDF5; /* emerald-50 */
+  --status-completed-border: #A7F3D0; /* emerald-200 */
+  --status-completed-fg: #047857; /* emerald-700 */
+
+  --kpi-success-fg: #047857; /* emerald-700 */
+  --kpi-success-bg: #ECFDF5; /* emerald-50 */
+  --kpi-success-border: #A7F3D0; /* emerald-200 */
+
+  /* Dashboard KPI palette (theo tên KPI) */
+  --kpi-revenue: #2563FF; /* blue */
+  --kpi-orders: #4F46E5; /* indigo */
+  --kpi-commission: #2563FF; /* primary */
+  --kpi-commission-direct: #16A34A; /* green */
+  --kpi-customers: #F59E0B; /* amber */
+  --kpi-returns: #EF4444; /* destructive */
+  --kpi-return-commission: #EF4444; /* destructive */
+  --kpi-ship: #0284C7; /* sky */
+  --kpi-absorbed: #E11D48; /* rose */
+  --kpi-salary: #7C3AED; /* violet */
+
   /* Sidebar */
   --sidebar: #FFFFFF;
   --sidebar-foreground: #374151;
@@ -208,6 +237,35 @@
   --recharts-green: #4ADE80;
   --recharts-lavender: #A5B4FC;
 
+  /* KPI / Status (Dashboard) */
+  --status-pending-bg: color-mix(in oklab, #FBBF24 22%, transparent);
+  --status-pending-border: color-mix(in oklab, #FBBF24 35%, transparent);
+  --status-pending-fg: #FDE68A; /* amber-200 */
+
+  --status-shipping-bg: color-mix(in oklab, #38BDF8 18%, transparent);
+  --status-shipping-border: color-mix(in oklab, #38BDF8 30%, transparent);
+  --status-shipping-fg: #7DD3FC; /* sky-300 */
+
+  --status-completed-bg: color-mix(in oklab, #34D399 18%, transparent);
+  --status-completed-border: color-mix(in oklab, #34D399 30%, transparent);
+  --status-completed-fg: #6EE7B7; /* emerald-300 */
+
+  --kpi-success-fg: #6EE7B7; /* emerald-300 */
+  --kpi-success-bg: color-mix(in oklab, #34D399 18%, transparent);
+  --kpi-success-border: color-mix(in oklab, #34D399 30%, transparent);
+
+  /* Dashboard KPI palette (theo tên KPI) */
+  --kpi-revenue: #60A5FA; /* blue-400 */
+  --kpi-orders: #A5B4FC; /* indigo/lavender */
+  --kpi-commission: #93C5FD; /* blue-300 */
+  --kpi-commission-direct: #4ADE80; /* green-400 */
+  --kpi-customers: #FBBF24; /* amber-400 */
+  --kpi-returns: #F87171; /* red-400 */
+  --kpi-return-commission: #F87171; /* red-400 */
+  --kpi-ship: #38BDF8; /* sky-400 */
+  --kpi-absorbed: #FB7185; /* rose-400 */
+  --kpi-salary: #C4B5FD; /* violet-300 */
+
   --sidebar: #111827;
   --sidebar-foreground: #F3F4F6;
 
@@ -219,4 +277,118 @@
 
   --sidebar-border: #1F2937;
   --sidebar-ring: #3B82F6;
+}
+
+@layer utilities {
+  /* Dashboard status tiles */
+  .kpi-status {
+    background-color: var(--kpi-status-bg);
+    border: 1px solid var(--kpi-status-border);
+  }
+  .kpi-status__label,
+  .kpi-status__icon {
+    color: var(--kpi-status-fg);
+  }
+  .kpi-status--pending {
+    --kpi-status-bg: var(--status-pending-bg);
+    --kpi-status-border: var(--status-pending-border);
+    --kpi-status-fg: var(--status-pending-fg);
+  }
+  .kpi-status--shipping {
+    --kpi-status-bg: var(--status-shipping-bg);
+    --kpi-status-border: var(--status-shipping-border);
+    --kpi-status-fg: var(--status-shipping-fg);
+  }
+  .kpi-status--completed {
+    --kpi-status-bg: var(--status-completed-bg);
+    --kpi-status-border: var(--status-completed-border);
+    --kpi-status-fg: var(--status-completed-fg);
+  }
+
+  .kpi-text-success {
+    color: var(--kpi-success-fg);
+  }
+  .kpi-badge-success {
+    background-color: var(--kpi-success-bg);
+    border: 1px solid var(--kpi-success-border);
+    color: var(--kpi-success-fg);
+  }
+
+  /* Dashboard KPI cards (1 nơi đổi màu) */
+  .kpi-card {
+    background-color: var(--kpi-card-bg);
+    border: 1px solid var(--kpi-card-border);
+  }
+  .kpi-card--revenue,
+  .kpi-card--orders,
+  .kpi-card--commission,
+  .kpi-card--commission-direct,
+  .kpi-card--customers,
+  .kpi-card--returns,
+  .kpi-card--return-commission,
+  .kpi-card--ship,
+  .kpi-card--absorbed,
+  .kpi-card--salary {
+    --kpi-card-bg: color-mix(in oklab, var(--kpi-accent) 7%, var(--card));
+    --kpi-card-border: color-mix(in oklab, var(--kpi-accent) 18%, var(--border));
+  }
+
+  .kpi-icon {
+    background-color: var(--kpi-icon-bg);
+    color: var(--kpi-icon-fg);
+  }
+  .kpi-title {
+    color: var(--kpi-title-fg);
+  }
+  .kpi-metric {
+    color: var(--kpi-metric-fg);
+  }
+  .kpi-icon--revenue,
+  .kpi-icon--orders,
+  .kpi-icon--commission,
+  .kpi-icon--customers,
+  .kpi-icon--ship,
+  .kpi-icon--absorbed,
+  .kpi-icon--salary {
+    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 14%, transparent);
+    --kpi-icon-fg: var(--kpi-accent);
+    --kpi-metric-fg: var(--kpi-accent);
+    --kpi-title-fg: color-mix(in oklab, var(--kpi-accent) 75%, var(--muted-foreground));
+  }
+
+  .kpi-icon--commission-direct {
+    --kpi-accent: var(--kpi-commission-direct);
+    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 14%, transparent);
+    --kpi-icon-fg: var(--kpi-accent);
+    --kpi-metric-fg: var(--kpi-accent);
+    --kpi-title-fg: color-mix(in oklab, var(--kpi-accent) 75%, var(--muted-foreground));
+  }
+
+  .kpi-icon--returns,
+  .kpi-icon--return-commission {
+    --kpi-accent: var(--kpi-returns);
+    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 14%, transparent);
+    --kpi-icon-fg: var(--kpi-accent);
+    --kpi-metric-fg: var(--kpi-accent);
+    --kpi-title-fg: color-mix(in oklab, var(--kpi-accent) 78%, var(--muted-foreground));
+  }
+
+  .kpi-card--revenue { --kpi-accent: var(--kpi-revenue); }
+  .kpi-card--orders { --kpi-accent: var(--kpi-orders); }
+  .kpi-card--commission { --kpi-accent: var(--kpi-commission); }
+  .kpi-card--commission-direct { --kpi-accent: var(--kpi-commission-direct); }
+  .kpi-card--customers { --kpi-accent: var(--kpi-customers); }
+  .kpi-card--returns { --kpi-accent: var(--kpi-returns); }
+  .kpi-card--return-commission { --kpi-accent: var(--kpi-return-commission); }
+  .kpi-card--ship { --kpi-accent: var(--kpi-ship); }
+  .kpi-card--absorbed { --kpi-accent: var(--kpi-absorbed); }
+  .kpi-card--salary { --kpi-accent: var(--kpi-salary); }
+
+  .kpi-icon--revenue { --kpi-accent: var(--kpi-revenue); }
+  .kpi-icon--orders { --kpi-accent: var(--kpi-orders); }
+  .kpi-icon--commission { --kpi-accent: var(--kpi-commission); }
+  .kpi-icon--customers { --kpi-accent: var(--kpi-customers); }
+  .kpi-icon--ship { --kpi-accent: var(--kpi-ship); }
+  .kpi-icon--absorbed { --kpi-accent: var(--kpi-absorbed); }
+  .kpi-icon--salary { --kpi-accent: var(--kpi-salary); }
 }
