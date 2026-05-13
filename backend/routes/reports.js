@@ -32,14 +32,68 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
     const pool = await getPool();
     const shopId = req.shopId;
     const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth();
-    const firstDayThisMonth = new Date(y, m, 1);
+    const payrollPidRaw =
+      req.query.payroll_period_id != null && String(req.query.payroll_period_id).trim() !== ''
+        ? parseInt(String(req.query.payroll_period_id), 10)
+        : null;
+    const usePayrollDash = Number.isFinite(payrollPidRaw) && payrollPidRaw > 0;
+    let payrollPr = null;
+    if (usePayrollDash) {
+      const [[prow]] = await pool.query(
+        `SELECT id, from_at, to_at FROM payroll_periods WHERE shop_id = ? AND id = ? LIMIT 1`,
+        [shopId, payrollPidRaw]
+      );
+      if (!prow) {
+        return res.status(404).json({ error: 'Không tìm thấy kỳ lương' });
+      }
+      payrollPr = prow;
+    }
+
+    let ymY = now.getFullYear();
+    let ymM0 = now.getMonth();
+    let yearOnly = false;
+    if (!usePayrollDash) {
+      const qm = req.query.month;
+      const qy = req.query.year;
+      const qmStr = qm != null ? String(qm).trim() : '';
+      const qyStr = qy != null ? String(qy).trim() : '';
+      if (qmStr === 'all' && qyStr !== '') {
+        const yy = parseInt(qyStr, 10);
+        if (Number.isFinite(yy) && yy >= 2000 && yy <= 2100) {
+          ymY = yy;
+          ymM0 = 0;
+          yearOnly = true;
+        }
+      } else if (qmStr !== '' && qyStr !== '') {
+        const mm = parseInt(qmStr, 10);
+        const yy = parseInt(qyStr, 10);
+        if (Number.isFinite(mm) && mm >= 1 && mm <= 12 && Number.isFinite(yy) && yy >= 2000 && yy <= 2100) {
+          ymM0 = mm - 1;
+          ymY = yy;
+        }
+      }
+    }
+
+    const y = ymY;
+    const m = ymM0;
+    const firstDayThisMonth = usePayrollDash
+      ? new Date(payrollPr.from_at)
+      : yearOnly
+        ? new Date(y, 0, 1)
+        : new Date(y, m, 1);
+    const periodEndExcl = usePayrollDash
+      ? new Date(y, m + 1, 1)
+      : yearOnly
+        ? new Date(y + 1, 0, 1)
+        : new Date(y, m + 1, 1);
     const firstDayLastMonth = new Date(y, m - 1, 1);
-    const lastDayLastMonth  = new Date(y, m, 0);
-    const todayStart = new Date(y, m, now.getDate());
+    const lastDayLastMonth = new Date(y, m, 0);
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const showTodayKpi = !usePayrollDash && !yearOnly && ymY === now.getFullYear() && ymM0 === now.getMonth();
     const scope = await getScope(req, 'reports');
     const isScoped = scope !== 'shop';
     const uid = req.user.id;
+    let scopeGroupGids = null;
 
     // Helper: build salesperson filter
     let spFilter = '';
@@ -64,6 +118,7 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
         spFilter = ' AND 1=0';
         spFilterOrdersAlias = ' AND 1=0';
       } else {
+        scopeGroupGids = gids;
         const ph = gids.map(() => '?').join(',');
         spFilter = ` AND group_id IN (${ph})`;
         spParam = gids;
@@ -72,98 +127,199 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
       }
     }
 
-    const salespersonIdForScope = scope === 'own' ? uid : null;
+    /** Admin (scope shop): lọc theo NV bán — `?employee=`; bỏ qua nếu không thuộc shop / không active */
+    let filterEmployeeId = null;
+    if (!isScoped) {
+      const rawEmp = req.query.employee;
+      if (rawEmp != null && String(rawEmp).trim() !== '') {
+        const eid = parseInt(String(rawEmp), 10);
+        if (Number.isFinite(eid) && eid > 0) {
+          const [[empRow]] = await pool.query(
+            `SELECT u.id FROM users u
+             INNER JOIN user_shops us ON us.user_id = u.id
+             WHERE u.id = ? AND us.shop_id = ? AND u.is_active = 1
+             LIMIT 1`,
+            [eid, shopId]
+          );
+          if (empRow) filterEmployeeId = eid;
+        }
+      }
+    }
+    if (filterEmployeeId != null) {
+      spFilter += ' AND salesperson_id = ?';
+      spParam.push(filterEmployeeId);
+      spFilterOrdersAlias += ' AND o.salesperson_id = ?';
+      spFilterOrdersAliasParam.push(filterEmployeeId);
+    }
+
+    let filterGroupId = null;
+    const rawGrp = req.query.group_id;
+    if (rawGrp != null && String(rawGrp).trim() !== '') {
+      const gid = parseInt(String(rawGrp), 10);
+      if (Number.isFinite(gid) && gid > 0) {
+        const [[gRow]] = await pool.query(
+          'SELECT id FROM `groups` WHERE shop_id = ? AND id = ? AND is_active = 1',
+          [shopId, gid]
+        );
+        if (gRow) {
+          if (scope === 'group') {
+            const allowedG = await loadUserGroupIds(pool, shopId, uid);
+            if (allowedG.includes(gid)) filterGroupId = gid;
+          } else {
+            filterGroupId = gid;
+          }
+        }
+      }
+    }
+    if (filterGroupId != null) {
+      spFilter += ' AND group_id = ?';
+      spParam.push(filterGroupId);
+      spFilterOrdersAlias += ' AND o.group_id = ?';
+      spFilterOrdersAliasParam.push(filterGroupId);
+    }
+
+    const salespersonIdForScope =
+      scope === 'own' ? uid : filterEmployeeId != null ? filterEmployeeId : null;
+
+    const ordPeriodSql = usePayrollDash ? ' AND payroll_period_id = ?' : ' AND created_at >= ? AND created_at < ?';
+    const ordPeriodParams = usePayrollDash ? [payrollPidRaw] : [firstDayThisMonth, periodEndExcl];
 
     // Doanh thu = tổng tiền bán hàng (orders.subtotal / Tạm tính), không dùng total_amount (thu khách).
     // Không cộng đơn đã hủy.
-    // ── Tháng này ──
+    // ── Kỳ đang xem (tháng hoặc kỳ lương) ──
     const [thisMonth] = await pool.query(
       `SELECT COUNT(*) as total_orders,
               COALESCE(SUM(CASE WHEN status != 'cancelled' THEN subtotal ELSE 0 END),0) as revenue,
               COALESCE(SUM(CASE WHEN status='completed' THEN subtotal END),0) as completed_revenue
-       FROM orders WHERE shop_id = ? AND created_at >= ? AND created_at < ?${spFilter}`,
-      [shopId, firstDayThisMonth, new Date(y, m+1, 1), ...spParam]
+       FROM orders WHERE shop_id = ?${ordPeriodSql}${spFilter}`,
+      [shopId, ...ordPeriodParams, ...spParam]
     );
     const revReturns = await getReturnRevenueByRange(pool, {
-      from: firstDayThisMonth,
-      to: new Date(y, m + 1, 1),
+      from: usePayrollDash ? null : firstDayThisMonth,
+      to: usePayrollDash ? null : periodEndExcl,
       salespersonId: salespersonIdForScope,
       shopId,
+      groupId: filterGroupId,
+      payrollPeriodId: usePayrollDash ? payrollPidRaw : null,
     });
     const returnOrdersThisMonth = await getReturnOrdersCountByRange(pool, {
-      from: firstDayThisMonth,
-      to: new Date(y, m + 1, 1),
+      from: usePayrollDash ? null : firstDayThisMonth,
+      to: usePayrollDash ? null : periodEndExcl,
       salespersonId: salespersonIdForScope,
       shopId,
+      groupId: filterGroupId,
+      payrollPeriodId: usePayrollDash ? payrollPidRaw : null,
     });
 
-    // ── Tháng trước ──
-    const [lastMonth] = await pool.query(
-      `SELECT COALESCE(SUM(CASE WHEN status != 'cancelled' THEN subtotal ELSE 0 END),0) as revenue
-       FROM orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ?${spFilter}`,
-      [shopId, firstDayLastMonth, lastDayLastMonth, ...spParam]
-    );
-    // last month: inclusive end in old code — keep behavior by using < firstDayThisMonth
-    const revLastReturns = await getReturnRevenueByRange(pool, {
-      from: firstDayLastMonth,
-      to: firstDayThisMonth,
-      salespersonId: salespersonIdForScope,
-      shopId,
-    });
+    // ── Tháng trước (chỉ khi lọc theo tháng — để % thay đổi) ──
+    let lastMonth = [{ revenue: 0 }];
+    let revLastReturns = 0;
+    if (!usePayrollDash) {
+      const [lmRows] = await pool.query(
+        `SELECT COALESCE(SUM(CASE WHEN status != 'cancelled' THEN subtotal ELSE 0 END),0) as revenue
+         FROM orders WHERE shop_id = ? AND created_at >= ? AND created_at <= ?${spFilter}`,
+        [shopId, firstDayLastMonth, lastDayLastMonth, ...spParam]
+      );
+      lastMonth = lmRows;
+      revLastReturns = await getReturnRevenueByRange(pool, {
+        from: firstDayLastMonth,
+        to: firstDayThisMonth,
+        salespersonId: salespersonIdForScope,
+        shopId,
+        groupId: filterGroupId,
+      });
+    }
 
-    // ── Hôm nay ──
-    const [today] = await pool.query(
-      `SELECT COUNT(*) as total_orders,
-              COALESCE(SUM(CASE WHEN status != 'cancelled' THEN subtotal ELSE 0 END),0) as revenue
-       FROM orders WHERE shop_id = ? AND created_at >= ?${spFilter}`,
-      [shopId, todayStart, ...spParam]
-    );
-    const revTodayReturns = await getReturnRevenueByRange(pool, {
-      from: todayStart,
-      to: null,
-      salespersonId: salespersonIdForScope,
-      shopId,
-    });
-    const returnOrdersToday = await getReturnOrdersCountByRange(pool, {
-      from: todayStart,
-      to: null,
-      salespersonId: salespersonIdForScope,
-      shopId,
-    });
+    // ── Hôm nay (chỉ khi đang xem đúng tháng hiện tại — lọc theo tháng) ──
+    let today = [{ total_orders: 0, revenue: 0 }];
+    let revTodayReturns = 0;
+    let returnOrdersToday = 0;
+    if (showTodayKpi) {
+      const [todayRows] = await pool.query(
+        `SELECT COUNT(*) as total_orders,
+                COALESCE(SUM(CASE WHEN status != 'cancelled' THEN subtotal ELSE 0 END),0) as revenue
+         FROM orders WHERE shop_id = ? AND created_at >= ?${spFilter}`,
+        [shopId, todayStart, ...spParam]
+      );
+      today = todayRows;
+      revTodayReturns = await getReturnRevenueByRange(pool, {
+        from: todayStart,
+        to: null,
+        salespersonId: salespersonIdForScope,
+        shopId,
+        groupId: filterGroupId,
+      });
+      returnOrdersToday = await getReturnOrdersCountByRange(pool, {
+        from: todayStart,
+        to: null,
+        salespersonId: salespersonIdForScope,
+        shopId,
+        groupId: filterGroupId,
+      });
+    }
 
-    // ── Đơn theo trạng thái (tháng này) ──
+    // ── Đơn theo trạng thái (cùng kỳ) ──
     const [statusStats] = await pool.query(
       `SELECT status, COUNT(*) as cnt FROM orders
-       WHERE shop_id = ? AND created_at >= ?${spFilter} GROUP BY status`,
-      [shopId, firstDayThisMonth, ...spParam]
+       WHERE shop_id = ?${ordPeriodSql}${spFilter} GROUP BY status`,
+      [shopId, ...ordPeriodParams, ...spParam]
     );
     const byStatus = { pending:0, shipping:0, completed:0, cancelled:0 };
     statusStats.forEach(r => { if (byStatus[r.status] !== undefined) byStatus[r.status] = r.cnt; });
 
-    // ── Hoa hồng tháng này — KPI thống nhất: bám theo orders.created_at (commissionKpi.js) ──
+    const ordPeriodSqlO = usePayrollDash ? ' AND o.payroll_period_id = ?' : ' AND o.created_at >= ? AND o.created_at < ?';
+    const ordPeriodParamsO = usePayrollDash ? [payrollPidRaw] : [firstDayThisMonth, periodEndExcl];
 
     // ── Hoa hồng hoàn (commission_adjustments) ──
     const returnCommissionThisMonth = await getReturnCommissionByRange(pool, {
-      from: firstDayThisMonth,
-      to: new Date(y, m + 1, 1),
-      userId: isScoped ? uid : null,
+      from: usePayrollDash ? null : firstDayThisMonth,
+      to: usePayrollDash ? null : periodEndExcl,
+      userId: isScoped ? uid : filterEmployeeId,
       shopId,
+      groupId: filterGroupId,
+      payrollPeriodId: usePayrollDash ? payrollPidRaw : null,
     });
-    const returnCommissionToday = await getReturnCommissionByRange(pool, {
-      from: todayStart,
-      to: null,
-      userId: isScoped ? uid : null,
-      shopId,
-    });
+    let returnCommissionToday = 0;
+    if (showTodayKpi) {
+      returnCommissionToday = await getReturnCommissionByRange(pool, {
+        from: todayStart,
+        to: null,
+        userId: isScoped ? uid : filterEmployeeId,
+        shopId,
+        groupId: filterGroupId,
+      });
+    }
     // HH hoàn (override/quản lý): dùng để HIỂN THỊ đồng nhất; công thức lương vẫn chỉ trừ direct.
     // Scope:
     // - own: chỉ adjustment của chính user (ca.user_id = uid)
     // - group: theo group_id của order (o.group_id IN gids)
     // - shop: tất cả
-    const overrideAdjCondsMonth = ['ca.type = \'override\'', 'o.shop_id = ?', 'ca.created_at >= ?', 'ca.created_at < ?'];
-    const overrideAdjParamsMonth = [shopId, firstDayThisMonth, new Date(y, m + 1, 1)];
-    const overrideAdjCondsToday = ['ca.type = \'override\'', 'o.shop_id = ?', 'ca.created_at >= ?'];
-    const overrideAdjParamsToday = [shopId, todayStart];
+    let overrideAdjCondsMonth;
+    let overrideAdjParamsMonth;
+    if (usePayrollDash) {
+      overrideAdjCondsMonth = ['ca.type = \'override\'', 'o.shop_id = ?', 'o.payroll_period_id = ?'];
+      overrideAdjParamsMonth = [shopId, payrollPidRaw];
+    } else {
+      overrideAdjCondsMonth = ['ca.type = \'override\'', 'o.shop_id = ?', 'ca.created_at >= ?', 'ca.created_at < ?'];
+      overrideAdjParamsMonth = [shopId, firstDayThisMonth, periodEndExcl];
+    }
+    if (filterGroupId != null) {
+      overrideAdjCondsMonth.push('o.group_id = ?');
+      overrideAdjParamsMonth.push(filterGroupId);
+    }
+    let overrideAdjCondsToday;
+    let overrideAdjParamsToday;
+    if (showTodayKpi && !usePayrollDash) {
+      overrideAdjCondsToday = ['ca.type = \'override\'', 'o.shop_id = ?', 'ca.created_at >= ?'];
+      overrideAdjParamsToday = [shopId, todayStart];
+    } else {
+      overrideAdjCondsToday = ['1=0'];
+      overrideAdjParamsToday = [];
+    }
+    if (filterGroupId != null && showTodayKpi && !usePayrollDash) {
+      overrideAdjCondsToday.push('o.group_id = ?');
+      overrideAdjParamsToday.push(filterGroupId);
+    }
     if (scope === 'own') {
       overrideAdjCondsMonth.push('ca.user_id = ?');
       overrideAdjParamsMonth.push(uid);
@@ -172,7 +328,7 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
     } else if (scope === 'group') {
       // reuse gids computed above (scope === 'group')
       // if gids empty => spFilter already AND 1=0; keep consistent here too
-      const gids = spParam || [];
+      const gids = scopeGroupGids || [];
       if (!gids.length) {
         overrideAdjCondsMonth.push('1=0');
         overrideAdjCondsToday.push('1=0');
@@ -183,6 +339,12 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
         overrideAdjCondsToday.push(`o.group_id IN (${ph})`);
         overrideAdjParamsToday.push(...gids);
       }
+    }
+    if (!isScoped && filterEmployeeId != null) {
+      overrideAdjCondsMonth.push('o.salesperson_id = ?');
+      overrideAdjParamsMonth.push(filterEmployeeId);
+      overrideAdjCondsToday.push('o.salesperson_id = ?');
+      overrideAdjParamsToday.push(filterEmployeeId);
     }
     const [[overrideAdjMonthRow]] = await pool.query(
       `SELECT COALESCE(SUM(ca.amount), 0) AS override_return_commission
@@ -206,41 +368,128 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
     let totalNvChiu = 0;
     const totalReturnCommMonth = returnCommissionThisMonth || 0; // negative
 
-    const monthKpi = isScoped
-      ? await getCommissionMonthKpi(pool, { month: m + 1, year: y, userId: uid, shopId })
-      : await getCommissionMonthKpi(pool, { month: m + 1, year: y, shopId });
-    const directGrossMonth = monthKpi.directGross;
-    const overrideNetMonth = monthKpi.overrideNet;
-    const totalCommGrossMonth = monthKpi.totalHH;
+    const kpiUserId = isScoped ? uid : filterEmployeeId;
+    let directGrossMonth;
+    let overrideNetMonth;
+    let totalCommGrossMonth;
+    if (usePayrollDash) {
+      const baseP = [shopId, payrollPidRaw];
+      let gsql = '';
+      const gpar = [];
+      if (filterGroupId != null) {
+        gsql = ' AND o.group_id = ?';
+        gpar.push(filterGroupId);
+      }
+      const userSql = kpiUserId != null ? ' AND c.user_id = ?' : '';
+      const userPar = kpiUserId != null ? [kpiUserId] : [];
+      const userAdjSql = kpiUserId != null ? ' AND ca.user_id = ?' : '';
+      const userAdjPar = kpiUserId != null ? [kpiUserId] : [];
+      const [[dRow]] = await pool.query(
+        `SELECT COALESCE(SUM(c.commission_amount), 0) AS v
+         FROM commissions c
+         JOIN orders o ON c.order_id = o.id
+         WHERE o.shop_id = ? AND o.payroll_period_id = ? AND o.status != 'cancelled'
+           AND c.type = 'direct'${gsql}${userSql}`,
+        [...baseP, ...gpar, ...userPar]
+      );
+      const [[oRow]] = await pool.query(
+        `SELECT COALESCE(SUM(c.commission_amount), 0) AS v
+         FROM commissions c
+         JOIN orders o ON c.order_id = o.id
+         WHERE o.shop_id = ? AND o.payroll_period_id = ? AND o.status != 'cancelled'
+           AND c.type = 'override'${gsql}${userSql}`,
+        [...baseP, ...gpar, ...userPar]
+      );
+      const [[aRow]] = await pool.query(
+        `SELECT COALESCE(SUM(ca.amount), 0) AS v
+         FROM commission_adjustments ca
+         JOIN orders o ON ca.order_id = o.id
+         WHERE o.shop_id = ? AND o.payroll_period_id = ? AND o.status != 'cancelled'
+           AND ca.type = 'override'${gsql}${userAdjSql}`,
+        [...baseP, ...gpar, ...userAdjPar]
+      );
+      directGrossMonth = parseFloat(dRow?.v) || 0;
+      const ovComm = parseFloat(oRow?.v) || 0;
+      const ovAdj = parseFloat(aRow?.v) || 0;
+      overrideNetMonth = ovComm + ovAdj;
+      totalCommGrossMonth = directGrossMonth + overrideNetMonth;
+    } else {
+      const monthKpi = await getCommissionMonthKpi(pool, {
+        month: m + 1,
+        year: y,
+        userId: kpiUserId,
+        shopId,
+        groupId: filterGroupId,
+      });
+      directGrossMonth = monthKpi.directGross;
+      overrideNetMonth = monthKpi.overrideNet;
+      totalCommGrossMonth = monthKpi.totalHH;
+    }
 
     if (isScoped) {
-      const [shipNvMonth] = await pool.query(
-        `SELECT
-           COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
-           COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
-         FROM orders o
-         WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
-           AND o.shop_id = ?
-           AND o.status != 'cancelled'
-           AND o.salesperson_id = ?`,
-        [m + 1, y, shopId, uid]
-      );
+      const shipGrp = filterGroupId != null ? ' AND o.group_id = ?' : '';
+      const shipGrpP = filterGroupId != null ? [filterGroupId] : [];
+      let shipNvMonth;
+      if (usePayrollDash) {
+        [shipNvMonth] = await pool.query(
+          `SELECT
+             COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+             COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+           FROM orders o
+           WHERE o.payroll_period_id = ?
+             AND o.shop_id = ?
+             AND o.status != 'cancelled'
+             AND o.salesperson_id = ?${shipGrp}`,
+          [payrollPidRaw, shopId, uid, ...shipGrpP]
+        );
+      } else {
+        [shipNvMonth] = await pool.query(
+          `SELECT
+             COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
+             COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
+           FROM orders o
+           WHERE MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?
+             AND o.shop_id = ?
+             AND o.status != 'cancelled'
+             AND o.salesperson_id = ?${shipGrp}`,
+          [m + 1, y, shopId, uid, ...shipGrpP]
+        );
+      }
       totalKhachShip = parseFloat(shipNvMonth[0].total_khach_ship) || 0;
       totalNvChiu = parseFloat(shipNvMonth[0].total_nv_chiu) || 0;
     } else {
-      // Admin: role không ảnh hưởng KPI ship/NV; chỉ cần đơn không bị hủy và người bán còn active.
-      const [[shipAgg]] = await pool.query(
-        `SELECT
-           COALESCE(SUM(CASE WHEN o.ship_payer='shop' THEN 0 ELSE o.shipping_fee END),0) AS total_khach_ship,
-           COALESCE(SUM(o.salesperson_absorbed_amount),0) AS total_nv_chiu
-         FROM orders o
-         JOIN users u ON o.salesperson_id = u.id
-         WHERE MONTH(o.created_at)=? AND YEAR(o.created_at)=?
-           AND o.shop_id = ?
-           AND o.status!='cancelled'
-           AND u.is_active = 1`,
-        [m + 1, y, shopId]
-      );
+      const shipGrp = filterGroupId != null ? ' AND o.group_id = ?' : '';
+      const shipGrpP = filterGroupId != null ? [filterGroupId] : [];
+      const shipBySp = filterEmployeeId != null ? ' AND o.salesperson_id = ?' : '';
+      const shipBySpP = filterEmployeeId != null ? [filterEmployeeId] : [];
+      let shipAgg;
+      if (usePayrollDash) {
+        [[shipAgg]] = await pool.query(
+          `SELECT
+             COALESCE(SUM(CASE WHEN o.ship_payer='shop' THEN 0 ELSE o.shipping_fee END),0) AS total_khach_ship,
+             COALESCE(SUM(o.salesperson_absorbed_amount),0) AS total_nv_chiu
+           FROM orders o
+           JOIN users u ON o.salesperson_id = u.id
+           WHERE o.payroll_period_id = ?
+             AND o.shop_id = ?
+             AND o.status!='cancelled'
+             AND u.is_active = 1${shipGrp}${shipBySp}`,
+          [payrollPidRaw, shopId, ...shipGrpP, ...shipBySpP]
+        );
+      } else {
+        [[shipAgg]] = await pool.query(
+          `SELECT
+             COALESCE(SUM(CASE WHEN o.ship_payer='shop' THEN 0 ELSE o.shipping_fee END),0) AS total_khach_ship,
+             COALESCE(SUM(o.salesperson_absorbed_amount),0) AS total_nv_chiu
+           FROM orders o
+           JOIN users u ON o.salesperson_id = u.id
+           WHERE MONTH(o.created_at)=? AND YEAR(o.created_at)=?
+             AND o.shop_id = ?
+             AND o.status!='cancelled'
+             AND u.is_active = 1${shipGrp}${shipBySp}`,
+          [m + 1, y, shopId, ...shipGrpP, ...shipBySpP]
+        );
+      }
       totalKhachShip = parseFloat(shipAgg?.total_khach_ship) || 0;
       totalNvChiu = parseFloat(shipAgg?.total_nv_chiu) || 0;
     }
@@ -250,14 +499,22 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
       totalCommGrossMonth - Math.abs(totalReturnCommMonth) + totalKhachShip - totalNvChiu;
 
     // ── Khách hàng ──
-    const custFilter = isScoped ? ' AND created_by = ?' : '';
+    const custIds = [];
+    let custExtra = '';
+    if (isScoped) {
+      custExtra = ' AND created_by = ?';
+      custIds.push(uid);
+    } else if (filterEmployeeId != null) {
+      custExtra = ' AND created_by = ?';
+      custIds.push(filterEmployeeId);
+    }
     const [custTotal] = await pool.query(
-      `SELECT COUNT(*) as total FROM customers WHERE shop_id = ?${custFilter}`,
-      isScoped ? [shopId, uid] : [shopId]
+      `SELECT COUNT(*) as total FROM customers WHERE shop_id = ?${custExtra}`,
+      [shopId, ...custIds]
     );
     const [custNew] = await pool.query(
-      `SELECT COUNT(*) as total FROM customers WHERE shop_id = ? AND created_at >= ?${custFilter}`,
-      [shopId, firstDayThisMonth, ...(isScoped ? [uid] : [])]
+      `SELECT COUNT(*) as total FROM customers WHERE shop_id = ? AND created_at >= ?${custExtra}`,
+      [shopId, firstDayThisMonth, ...custIds]
     );
 
     // ── Sản phẩm ──
@@ -273,9 +530,9 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
        FROM orders o
        LEFT JOIN customers c ON o.customer_id = c.id
        LEFT JOIN users u ON o.salesperson_id = u.id
-       WHERE o.shop_id = ?${spFilterOrdersAlias}
+       WHERE o.shop_id = ?${ordPeriodSqlO}${spFilterOrdersAlias}
        ORDER BY o.created_at DESC LIMIT 8`,
-      [shopId, ...spFilterOrdersAliasParam]
+      [shopId, ...ordPeriodParamsO, ...spFilterOrdersAliasParam]
     );
 
     // ── Top sản phẩm tháng này ──
@@ -284,10 +541,10 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
        JOIN orders o ON oi.order_id = o.id
-       WHERE o.shop_id = ? AND p.shop_id = ? AND o.created_at >= ?${spFilterOrdersAlias} AND o.status != 'cancelled'
+       WHERE o.shop_id = ? AND p.shop_id = ?${ordPeriodSqlO}${spFilterOrdersAlias} AND o.status != 'cancelled'
        GROUP BY p.id, p.name, p.sku
        ORDER BY revenue DESC LIMIT 5`,
-      [shopId, shopId, firstDayThisMonth, ...spFilterOrdersAliasParam]
+      [shopId, shopId, ...ordPeriodParamsO, ...spFilterOrdersAliasParam]
     );
 
     // ── Top khách hàng theo doanh số (tháng này) ──
@@ -301,16 +558,46 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
          COALESCE(SUM(o.subtotal), 0) as revenue
        FROM orders o
        JOIN customers c ON o.customer_id = c.id
-       WHERE o.shop_id = ? AND c.shop_id = ? AND o.created_at >= ?${spFilterOrdersAlias} AND o.status != 'cancelled'
+       WHERE o.shop_id = ? AND c.shop_id = ?${ordPeriodSqlO}${spFilterOrdersAlias} AND o.status != 'cancelled'
        GROUP BY c.id, c.name, c.phone
        ORDER BY revenue DESC
        LIMIT 5`,
-      [shopId, shopId, firstDayThisMonth, ...spFilterOrdersAliasParam]
+      [shopId, shopId, ...ordPeriodParamsO, ...spFilterOrdersAliasParam]
     );
 
     // ── Top nhân viên tháng này (admin only) ──
     let topSales = [];
     if (!isScoped) {
+      const tsOrdBase = usePayrollDash
+        ? 'payroll_period_id = ? AND shop_id = ? AND status != \'cancelled\''
+        : 'MONTH(created_at) = ? AND YEAR(created_at) = ? AND shop_id = ? AND status != \'cancelled\'';
+      const tsOrdBaseP = usePayrollDash ? [payrollPidRaw, shopId] : [m + 1, y, shopId];
+      const tsGrpFrag = filterGroupId != null ? ' AND group_id = ?' : '';
+      const tsGrpFragP = filterGroupId != null ? [filterGroupId] : [];
+      const tsOwhere = usePayrollDash
+        ? 'o.shop_id = ? AND o.payroll_period_id = ? AND o.status != \'cancelled\''
+        : 'MONTH(o.created_at) = ? AND YEAR(o.created_at) = ? AND o.shop_id = ? AND o.status != \'cancelled\'';
+      const tsOwhereP = usePayrollDash ? [shopId, payrollPidRaw] : [m + 1, y, shopId];
+      const tsOgrp = filterGroupId != null ? ' AND o.group_id = ?' : '';
+      const tsOgrpP = filterGroupId != null ? [filterGroupId] : [];
+      const tsAdjWhere = usePayrollDash
+        ? 'o.shop_id = ? AND o.payroll_period_id = ? AND o.status != \'cancelled\''
+        : 'MONTH(ca.created_at) = ? AND YEAR(ca.created_at) = ? AND o.shop_id = ? AND o.status != \'cancelled\'';
+      const tsAdjP = usePayrollDash ? [shopId, payrollPidRaw] : [m + 1, y, shopId];
+
+      const tsParams = [
+        ...tsOrdBaseP,
+        ...tsGrpFragP,
+        ...tsOwhereP,
+        ...tsOgrpP,
+        ...tsOwhereP,
+        ...tsOgrpP,
+        ...tsAdjP,
+        ...tsOgrpP,
+        shopId,
+        ...(filterEmployeeId != null ? [filterEmployeeId] : []),
+      ];
+
       const [rows] = await pool.query(
         `SELECT
            u.id, u.full_name,
@@ -326,42 +613,37 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
                   COUNT(*) AS total_orders,
                   COALESCE(SUM(subtotal), 0) AS revenue
            FROM orders
-           WHERE MONTH(created_at)=? AND YEAR(created_at)=?
-             AND shop_id = ?
-             AND status != 'cancelled'
+           WHERE ${tsOrdBase}${tsGrpFrag}
            GROUP BY salesperson_id
          ) o_stats ON o_stats.salesperson_id = u.id
          LEFT JOIN (
            SELECT c.user_id, COALESCE(SUM(c.commission_amount), 0) AS direct_comm
            FROM commissions c
            JOIN orders o ON c.order_id = o.id
-           WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
-             AND o.shop_id = ?
-             AND c.type='direct' AND o.status != 'cancelled'
+           WHERE ${tsOwhere}
+             AND c.type='direct'${tsOgrp}
            GROUP BY c.user_id
          ) d_comm ON d_comm.user_id = u.id
          LEFT JOIN (
            SELECT c.user_id, COALESCE(SUM(c.commission_amount), 0) AS override_comm
            FROM commissions c
            JOIN orders o ON c.order_id = o.id
-           WHERE MONTH(c.created_at)=? AND YEAR(c.created_at)=?
-             AND o.shop_id = ?
-             AND c.type='override' AND o.status != 'cancelled'
+           WHERE ${tsOwhere}
+             AND c.type='override'${tsOgrp}
            GROUP BY c.user_id
          ) o_comm ON o_comm.user_id = u.id
          LEFT JOIN (
            SELECT ca.user_id, COALESCE(SUM(ca.amount), 0) AS override_adj
            FROM commission_adjustments ca
            JOIN orders o ON ca.order_id = o.id
-           WHERE MONTH(ca.created_at)=? AND YEAR(ca.created_at)=?
-             AND o.shop_id = ?
-             AND ca.type='override'
+           WHERE ${tsAdjWhere}
+             AND ca.type='override'${tsOgrp}
            GROUP BY ca.user_id
          ) o_adj ON o_adj.user_id = u.id
-         WHERE us.shop_id = ? AND u.is_active=1
+         WHERE us.shop_id = ? AND u.is_active=1${filterEmployeeId != null ? ' AND u.id = ?' : ''}
          ORDER BY total_comm DESC
          LIMIT 5`,
-        [m + 1, y, shopId, m + 1, y, shopId, m + 1, y, shopId, m + 1, y, shopId, shopId]
+        tsParams
       );
       topSales = rows.map(r => ({
         ...r,
@@ -378,10 +660,18 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
     // Dashboard: hiển thị doanh thu bán hàng (gross). Hoàn hàng hiển thị KPI riêng.
     const rev      = (parseFloat(thisMonth[0].revenue) || 0);
     const revLast  = (parseFloat(lastMonth[0].revenue) || 0);
-    const revChange = revLast > 0 ? ((rev - revLast) / revLast * 100).toFixed(1) : null;
+    const revChange = usePayrollDash || yearOnly ? null : (revLast > 0 ? ((rev - revLast) / revLast * 100).toFixed(1) : null);
 
     res.json({
       data: {
+        meta: {
+          filter: usePayrollDash ? 'payroll' : yearOnly ? 'year' : 'month',
+          payroll_period_id: usePayrollDash ? payrollPidRaw : null,
+          month: yearOnly ? null : m + 1,
+          year: y,
+          group_id: filterGroupId,
+          show_today_kpi: showTodayKpi,
+        },
         thisMonth: {
           revenue:           rev,
           completed_revenue: (parseFloat(thisMonth[0].completed_revenue) || 0),
@@ -451,8 +741,11 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
     const shopId = req.shopId;
     const { month, year, group_id, payroll_period_id } = req.query;
 
-    const currentMonth = month || new Date().getMonth() + 1;
-    const currentYear = year || new Date().getFullYear();
+    const monthStr = month != null ? String(month).trim() : '';
+    const yearStr = year != null ? String(year).trim() : '';
+    const yearOnly = monthStr === 'all' && yearStr !== '';
+    const currentMonth = yearOnly ? null : (monthStr || String(new Date().getMonth() + 1));
+    const currentYear = yearStr || String(new Date().getFullYear());
 
     // Lọc theo "Nhóm BH" của đơn hàng (orders.group_id), KHÔNG dựa trên user_groups.
     // Vì báo cáo hoa hồng theo nhóm đang hiển thị theo o.group_id (CommissionReport).
@@ -1045,33 +1338,83 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
     const totalSales = formattedSalesData.reduce((sum, s) => sum + s.total_sales, 0);
     const totalCommission = formattedSalesData.reduce((sum, s) => sum + s.total_all_commission, 0);
 
-    const cm = parseInt(String(currentMonth), 10);
+    const cm = currentMonth != null ? parseInt(String(currentMonth), 10) : null;
     const cy = parseInt(String(currentYear), 10);
-    const kpiTotals = isScoped
-      ? await getCommissionMonthKpi(pool, {
-          month: cm,
-          year: cy,
-          userId: scopedUserId,
-          groupId: Number.isFinite(groupId) ? groupId : null,
-          shopId,
-        })
-      : await getCommissionMonthKpi(pool, {
-          month: cm,
-          year: cy,
-          groupId: Number.isFinite(groupId) ? groupId : null,
-          shopId,
-        });
+
+    let kpiTotals;
+    if (yearOnly) {
+      const shopCond = ' AND o.shop_id = ?';
+      const groupCond = Number.isFinite(groupId) ? ' AND o.group_id = ?' : '';
+      const userCond = isScoped ? ' AND c.user_id = ?' : '';
+      const userCondAdj = isScoped ? ' AND ca.user_id = ?' : '';
+      const directParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(isScoped ? [scopedUserId] : [])];
+      const ovParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(isScoped ? [scopedUserId] : [])];
+      const adjParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(isScoped ? [scopedUserId] : [])];
+
+      const [[dRow]] = await pool.query(
+        `SELECT COALESCE(SUM(c.commission_amount), 0) AS v
+         FROM commissions c
+         JOIN orders o ON c.order_id = o.id
+         WHERE YEAR(o.created_at) = ?
+           AND c.type = 'direct' AND o.status != 'cancelled'${shopCond}${groupCond}${userCond}`,
+        directParams
+      );
+      const [[oRow]] = await pool.query(
+        `SELECT COALESCE(SUM(c.commission_amount), 0) AS v
+         FROM commissions c
+         JOIN orders o ON c.order_id = o.id
+         WHERE YEAR(o.created_at) = ?
+           AND c.type = 'override' AND o.status != 'cancelled'${shopCond}${groupCond}${userCond}`,
+        ovParams
+      );
+      const [[aRow]] = await pool.query(
+        `SELECT COALESCE(SUM(ca.amount), 0) AS v
+         FROM commission_adjustments ca
+         JOIN orders o ON ca.order_id = o.id
+         WHERE YEAR(ca.created_at) = ?
+           AND ca.type = 'override' AND o.status != 'cancelled'${shopCond}${groupCond}${userCondAdj}`,
+        adjParams
+      );
+      const directGross = parseFloat(dRow?.v) || 0;
+      const overrideComm = parseFloat(oRow?.v) || 0;
+      const overrideAdj = parseFloat(aRow?.v) || 0;
+      const overrideNet = overrideComm + overrideAdj;
+      kpiTotals = { directGross, overrideComm, overrideAdj, overrideNet, totalHH: directGross + overrideNet };
+    } else {
+      kpiTotals = isScoped
+        ? await getCommissionMonthKpi(pool, {
+            month: cm,
+            year: cy,
+            userId: scopedUserId,
+            groupId: Number.isFinite(groupId) ? groupId : null,
+            shopId,
+          })
+        : await getCommissionMonthKpi(pool, {
+            month: cm,
+            year: cy,
+            groupId: Number.isFinite(groupId) ? groupId : null,
+            shopId,
+          });
+    }
 
     // KPI Tổng lương (Admin) phải khớp Dashboard:
     // Tổng lương = Tổng HH (direct gross + override net) − |HH hoàn direct| + Ship KH Trả − NV chịu
     // Lưu ý: danh sách salesData có thể chỉ gồm NV có đơn trong kỳ, nên không dùng sum bảng để làm KPI.
-    const kpiReturnCommission = await getReturnCommissionByMonthYear(pool, {
-      month: cm,
-      year: cy,
-      userId: isScoped ? scopedUserId : null,
-      groupId: Number.isFinite(groupId) ? groupId : null,
-      shopId,
-    }); // negative
+    const kpiReturnCommission = yearOnly
+      ? await getReturnCommissionByRange(pool, {
+          from: new Date(cy, 0, 1),
+          to: new Date(cy + 1, 0, 1),
+          userId: isScoped ? scopedUserId : null,
+          groupId: Number.isFinite(groupId) ? groupId : null,
+          shopId,
+        })
+      : await getReturnCommissionByMonthYear(pool, {
+          month: cm,
+          year: cy,
+          userId: isScoped ? scopedUserId : null,
+          groupId: Number.isFinite(groupId) ? groupId : null,
+          shopId,
+        }); // negative
 
     const [[shipNvAll]] = await pool.query(
       `
@@ -1080,14 +1423,19 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
         COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
       FROM orders o
       JOIN users u ON o.salesperson_id = u.id
-      WHERE o.shop_id = ? AND MONTH(o.created_at) = ?
-        AND YEAR(o.created_at) = ?
+      WHERE o.shop_id = ?
+        AND ${yearOnly ? 'YEAR(o.created_at) = ?' : 'MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?'}
         AND o.status <> 'cancelled'
         AND u.is_active = 1
         ${groupId ? ' AND o.group_id = ?' : ''}
         ${isScoped ? ' AND o.salesperson_id = ?' : ''}
       `,
-      [shopId, cm, cy, ...(groupId ? [groupId] : []), ...(isScoped ? [scopedUserId] : [])]
+      [
+        shopId,
+        ...(yearOnly ? [cy] : [cm, cy]),
+        ...(groupId ? [groupId] : []),
+        ...(isScoped ? [scopedUserId] : []),
+      ]
     );
     const kpiShip = parseFloat(shipNvAll?.total_khach_ship) || 0;
     const kpiNv = parseFloat(shipNvAll?.total_nv_chiu) || 0;
@@ -1126,9 +1474,12 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
     const shopId = req.shopId;
     const { month, year, group_id, payroll_period_id } = req.query;
 
-    const currentMonth = month || new Date().getMonth() + 1;
-    const currentYear = year || new Date().getFullYear();
-    const cm = parseInt(String(currentMonth), 10);
+    const monthStr = month != null ? String(month).trim() : '';
+    const yearStr = year != null ? String(year).trim() : '';
+    const yearOnly = monthStr === 'all' && yearStr !== '';
+    const currentMonth = yearOnly ? null : (monthStr || String(new Date().getMonth() + 1));
+    const currentYear = yearStr || String(new Date().getFullYear());
+    const cm = currentMonth != null ? parseInt(String(currentMonth), 10) : null;
     const cy = parseInt(String(currentYear), 10);
 
     const payrollPidRaw =
@@ -1155,7 +1506,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
               totalReturns: 0,
               totalEmployees: 0,
               payroll_period_id: usePayroll ? payrollPidRaw : null,
-              filter: usePayroll ? 'payroll' : 'month',
+              filter: usePayroll ? 'payroll' : yearOnly ? 'year' : 'month',
             },
           },
         });
@@ -1174,13 +1525,34 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
       if (!pr) return res.status(404).json({ error: 'Không tìm thấy kỳ lương' });
     }
 
+    let filterEmployeeId = null;
+    if (!isScoped && req.query.employee != null && String(req.query.employee).trim() !== '') {
+      const eid = parseInt(String(req.query.employee), 10);
+      if (Number.isFinite(eid) && eid > 0) {
+        const [[er]] = await pool.query(
+          `SELECT u.id FROM users u
+           INNER JOIN user_shops us ON us.user_id = u.id
+           WHERE u.id = ? AND us.shop_id = ? AND u.is_active = 1 LIMIT 1`,
+          [eid, shopId]
+        );
+        if (er) filterEmployeeId = eid;
+      }
+    }
+
+    const empSp = filterEmployeeId != null ? ' AND salesperson_id = ?' : '';
+    const empO = filterEmployeeId != null ? ' AND o.salesperson_id = ?' : '';
+    const empP = filterEmployeeId != null ? [filterEmployeeId] : [];
+
     const orderGroupCond = groupId ? ' AND o.group_id = ?' : '';
+    const oStatsGroup = groupId ? ' AND group_id = ?' : '';
     const oStatsWhere = usePayroll
-      ? 'shop_id = ? AND payroll_period_id = ? AND status != \'cancelled\''
-      : 'shop_id = ? AND MONTH(created_at) = ? AND YEAR(created_at) = ? AND status != \'cancelled\'';
+      ? `shop_id = ? AND payroll_period_id = ? AND status != 'cancelled'${oStatsGroup}${empSp}`
+      : `shop_id = ? AND ${yearOnly ? 'YEAR(created_at) = ?' : 'MONTH(created_at) = ? AND YEAR(created_at) = ?'} AND status != 'cancelled'${oStatsGroup}${empSp}`;
     const oStatsParams = usePayroll
-      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : [])]
-      : [shopId, cm, cy, ...(groupId ? [groupId] : [])];
+      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : []), ...empP]
+      : yearOnly
+        ? [shopId, cy, ...(groupId ? [groupId] : []), ...empP]
+        : [shopId, cm, cy, ...(groupId ? [groupId] : []), ...empP];
 
     const rStatsWhere = usePayroll
       ? `o.shop_id = ? AND EXISTS (
@@ -1188,26 +1560,33 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
            WHERE pp.id = ? AND pp.shop_id = o.shop_id
              AND r.created_at >= pp.from_at
              AND (pp.to_at IS NULL OR r.created_at <= pp.to_at)
-         )${groupId ? ' AND o.group_id = ?' : ''}`
-      : `o.shop_id = ? AND MONTH(r.created_at) = ? AND YEAR(r.created_at) = ?${groupId ? ' AND o.group_id = ?' : ''}`;
+         )${groupId ? ' AND o.group_id = ?' : ''}${empO}`
+      : `o.shop_id = ? AND ${yearOnly ? 'YEAR(r.created_at) = ?' : 'MONTH(r.created_at) = ? AND YEAR(r.created_at) = ?'}${groupId ? ' AND o.group_id = ?' : ''}${empO}`;
     const rStatsParams = usePayroll
-      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : [])]
-      : [shopId, cm, cy, ...(groupId ? [groupId] : [])];
+      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : []), ...empP]
+      : yearOnly
+        ? [shopId, cy, ...(groupId ? [groupId] : []), ...empP]
+        : [shopId, cm, cy, ...(groupId ? [groupId] : []), ...empP];
 
     const joinOrdersTime = usePayroll
-      ? 'o.shop_id = ? AND o.payroll_period_id = ? AND c.type = '
-      : 'o.shop_id = ? AND MONTH(o.created_at) = ? AND YEAR(o.created_at) = ? AND c.type = ';
+      ? `o.shop_id = ? AND o.payroll_period_id = ?${empO} AND c.type = `
+      : `o.shop_id = ? AND ${yearOnly ? 'YEAR(o.created_at) = ?' : 'MONTH(o.created_at) = ? AND YEAR(o.created_at) = ?'}${empO} AND c.type = `;
 
     const joinOrdersParams = usePayroll
-      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : [])]
-      : [shopId, cm, cy, ...(groupId ? [groupId] : [])];
+      ? [shopId, payrollPidRaw, ...empP, ...(groupId ? [groupId] : [])]
+      : yearOnly
+        ? [shopId, cy, ...empP, ...(groupId ? [groupId] : [])]
+        : [shopId, cm, cy, ...empP, ...(groupId ? [groupId] : [])];
 
+    const shipGroup = groupId ? ' AND group_id = ?' : '';
     const shipWhere = usePayroll
-      ? 'shop_id = ? AND payroll_period_id = ? AND status != \'cancelled\''
-      : 'shop_id = ? AND MONTH(created_at) = ? AND YEAR(created_at) = ? AND status != \'cancelled\'';
+      ? `shop_id = ? AND payroll_period_id = ? AND status != 'cancelled'${shipGroup}${empSp}`
+      : `shop_id = ? AND ${yearOnly ? 'YEAR(created_at) = ?' : 'MONTH(created_at) = ? AND YEAR(created_at) = ?'} AND status != 'cancelled'${shipGroup}${empSp}`;
     const shipParams = usePayroll
-      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : [])]
-      : [shopId, cm, cy, ...(groupId ? [groupId] : [])];
+      ? [shopId, payrollPidRaw, ...(groupId ? [groupId] : []), ...empP]
+      : yearOnly
+        ? [shopId, cy, ...(groupId ? [groupId] : []), ...empP]
+        : [shopId, cm, cy, ...(groupId ? [groupId] : []), ...empP];
 
     const [salesData] = await pool.query(
       `SELECT
@@ -1275,7 +1654,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
        ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE us.shop_id = ?
          AND COALESCE(o_stats.total_sales, 0) > 0
-         ${isScoped ? ' AND u.id = ?' : ''}
+         ${isScoped ? ' AND u.id = ?' : filterEmployeeId != null ? ' AND u.id = ?' : ''}
        ORDER BY total_sales DESC`,
       [
         ...oStatsParams,
@@ -1284,7 +1663,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
         ...joinOrdersParams,
         ...shipParams,
         shopId,
-        ...(isScoped ? [scopedUserId] : []),
+        ...(isScoped ? [scopedUserId] : filterEmployeeId != null ? [filterEmployeeId] : []),
       ]
     );
 
@@ -1319,6 +1698,9 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
     if (isScoped) {
       summaryConds.push('o.salesperson_id = ?');
       summaryParams.push(scopedUserId);
+    } else if (filterEmployeeId != null) {
+      summaryConds.push('o.salesperson_id = ?');
+      summaryParams.push(filterEmployeeId);
     }
 
     const [[salesSum]] = await pool.query(
@@ -1354,6 +1736,9 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
     if (isScoped) {
       retWhere.push('o.salesperson_id = ?');
       retParams.push(scopedUserId);
+    } else if (filterEmployeeId != null) {
+      retWhere.push('o.salesperson_id = ?');
+      retParams.push(filterEmployeeId);
     }
 
     const [[retSum]] = await pool.query(
@@ -1386,7 +1771,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
           totalReturns,
           totalEmployees: formatted.length,
           payroll_period_id: usePayroll ? payrollPidRaw : null,
-          filter: usePayroll ? 'payroll' : 'month',
+          filter: usePayroll ? 'payroll' : yearOnly ? 'year' : 'month',
         },
       },
     });
@@ -1402,8 +1787,11 @@ router.get('/returns-summary', auth, requireShop, requirePermission('reports', '
     const pool = await getPool();
     const shopId = req.shopId;
     const { month, year, group_id, user_id, payroll_period_id } = req.query;
-    const m = month ? parseInt(String(month), 10) : null;
-    const y = year ? parseInt(String(year), 10) : null;
+    const monthStr = month != null ? String(month).trim() : '';
+    const yearStr = year != null ? String(year).trim() : '';
+    const m = monthStr && monthStr !== 'all' ? parseInt(monthStr, 10) : null;
+    const y = yearStr ? parseInt(yearStr, 10) : null;
+    const yearOnly = monthStr === 'all' && y != null;
     let groupId = group_id ? parseInt(String(group_id), 10) : null;
 
     const scope = await getScope(req, 'reports');
@@ -1531,47 +1919,103 @@ router.get('/returns-summary', auth, requireShop, requirePermission('reports', '
       returnCommissionDirectAbs = Number(cRowDirect?.v) || 0;
       returnCommissionOverrideAbs = Number(cRowOverride?.v) || 0;
     } else {
-      if (!m || !y) return res.status(400).json({ error: 'Thiếu month/year' });
-      ret = await getReturnRevenueAndOrdersByMonthYear(pool, {
-        month: m,
-        year: y,
-        salespersonId: targetUserId,
-        groupId,
-        shopId,
-      });
-      returnCommissionDirectAbs = await getReturnCommissionByMonthYear(pool, {
-        month: m,
-        year: y,
-        userId: targetUserId,
-        groupId,
-        shopId,
-      });
+      if (!y) return res.status(400).json({ error: 'Thiếu year' });
+      if (!yearOnly && !m) return res.status(400).json({ error: 'Thiếu month/year' });
 
-      const overrideConds = [
-        "ca.type='override'",
-        'o.shop_id = ?',
-        'MONTH(ca.created_at) = ?',
-        'YEAR(ca.created_at) = ?',
-      ];
-      const overrideParams = [shopId, m, y];
-      if (targetUserId) {
-        overrideConds.push('ca.user_id = ?');
-        overrideParams.push(targetUserId);
+      if (yearOnly) {
+        const from = new Date(y, 0, 1);
+        const to = new Date(y + 1, 0, 1);
+        const returnRevenue = await getReturnRevenueByRange(pool, {
+          from,
+          to,
+          salespersonId: targetUserId,
+          groupId,
+          shopId,
+        });
+        const returnOrders = await getReturnOrdersCountByRange(pool, {
+          from,
+          to,
+          salespersonId: targetUserId,
+          groupId,
+          shopId,
+        });
+        ret = { return_orders: returnOrders, return_revenue: returnRevenue };
+
+        returnCommissionDirectAbs = Math.abs(await getReturnCommissionByRange(pool, {
+          from,
+          to,
+          userId: targetUserId,
+          groupId,
+          shopId,
+        }));
+
+        const overrideConds = [
+          "ca.type='override'",
+          'o.shop_id = ?',
+          'ca.created_at >= ?',
+          'ca.created_at < ?',
+        ];
+        const overrideParams = [shopId, from, to];
+        if (targetUserId) {
+          overrideConds.push('ca.user_id = ?');
+          overrideParams.push(targetUserId);
+        }
+        if (groupId) {
+          overrideConds.push('o.group_id = ?');
+          overrideParams.push(groupId);
+        }
+        const [[ovRow]] = await pool.query(
+          `
+          SELECT COALESCE(SUM(ABS(ca.amount)), 0) AS v
+          FROM commission_adjustments ca
+          JOIN orders o ON o.id = ca.order_id
+          WHERE ${overrideConds.join(' AND ')}
+          `,
+          overrideParams
+        );
+        returnCommissionOverrideAbs = Number(ovRow?.v) || 0;
+      } else {
+        ret = await getReturnRevenueAndOrdersByMonthYear(pool, {
+          month: m,
+          year: y,
+          salespersonId: targetUserId,
+          groupId,
+          shopId,
+        });
+        returnCommissionDirectAbs = await getReturnCommissionByMonthYear(pool, {
+          month: m,
+          year: y,
+          userId: targetUserId,
+          groupId,
+          shopId,
+        });
+
+        const overrideConds = [
+          "ca.type='override'",
+          'o.shop_id = ?',
+          'MONTH(ca.created_at) = ?',
+          'YEAR(ca.created_at) = ?',
+        ];
+        const overrideParams = [shopId, m, y];
+        if (targetUserId) {
+          overrideConds.push('ca.user_id = ?');
+          overrideParams.push(targetUserId);
+        }
+        if (groupId) {
+          overrideConds.push('o.group_id = ?');
+          overrideParams.push(groupId);
+        }
+        const [[ovRow]] = await pool.query(
+          `
+          SELECT COALESCE(SUM(ABS(ca.amount)), 0) AS v
+          FROM commission_adjustments ca
+          JOIN orders o ON o.id = ca.order_id
+          WHERE ${overrideConds.join(' AND ')}
+          `,
+          overrideParams
+        );
+        returnCommissionOverrideAbs = Number(ovRow?.v) || 0;
       }
-      if (groupId) {
-        overrideConds.push('o.group_id = ?');
-        overrideParams.push(groupId);
-      }
-      const [[ovRow]] = await pool.query(
-        `
-        SELECT COALESCE(SUM(ABS(ca.amount)), 0) AS v
-        FROM commission_adjustments ca
-        JOIN orders o ON o.id = ca.order_id
-        WHERE ${overrideConds.join(' AND ')}
-        `,
-        overrideParams
-      );
-      returnCommissionOverrideAbs = Number(ovRow?.v) || 0;
     }
 
     res.json({

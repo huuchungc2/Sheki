@@ -49,6 +49,7 @@ export function exportSalesCommission(opts: {
   groupName?: string;
 }) {
   const { orders, summary, userName, month, year, groupName } = opts;
+  const periodLabel = month === "all" ? `Năm ${year}` : `Tháng ${parseInt(month, 10)}/${year}`;
   const wb = XLSX.utils.book_new();
   const totalReturnCommAbs =
     summary?.total_return_commission_abs != null
@@ -63,7 +64,7 @@ export function exportSalesCommission(opts: {
   // Sheet 1: Chi tiết đơn hàng
   const detailRows: any[][] = [
     [`BÁO CÁO HOA HỒNG — ${userName.toUpperCase()}`],
-    [`Kỳ: Tháng ${parseInt(month)}/${year}${groupName ? ` — Nhóm: ${groupName}` : ""}`],
+    [`Kỳ: ${periodLabel}${groupName ? ` — Nhóm: ${groupName}` : ""}`],
     [],
     ["Mã đơn", "Loại HH", "Ngày", "Khách hàng", "Nhóm BH", "Tổng tiền", "Hoa hồng bán hàng", "Ship KH Trả", "Tiền NV chịu", "Lương", "Trạng thái"],
   ];
@@ -100,7 +101,7 @@ export function exportSalesCommission(opts: {
   // Sheet 2: Tổng kết
   const summaryRows: any[][] = [
     ["TỔNG KẾT HOA HỒNG"],
-    [`${userName} — Tháng ${parseInt(month)}/${year}`],
+    [`${userName} — ${periodLabel}`],
     [],
     ["Chỉ số", "Giá trị"],
     ["HH bán hàng (tự bán)", summary.direct_commission],
@@ -123,7 +124,12 @@ export function exportSalesCommission(opts: {
   XLSX.utils.book_append_sheet(wb, wsDetail,  "Chi tiết đơn");
   XLSX.utils.book_append_sheet(wb, wsSummary, "Tổng kết");
 
-  XLSX.writeFile(wb, `HoaHong_${userName.replace(/\s+/g, "_")}_T${parseInt(month)}_${year}.xlsx`);
+  XLSX.writeFile(
+    wb,
+    month === "all"
+      ? `HoaHong_${userName.replace(/\s+/g, "_")}_Y${year}.xlsx`
+      : `HoaHong_${userName.replace(/\s+/g, "_")}_T${parseInt(month, 10)}_${year}.xlsx`
+  );
 }
 
 // ─── Export hoa hồng Admin — bảng tổng hợp nhân viên ─────────────────────
@@ -139,7 +145,7 @@ export function exportAdminCommission(opts: {
 }) {
   const { salesData, orderCommissions, ctvPairs = [], ctvOrders = [], month, year, groupName, periodSummary } = opts;
   const wb = XLSX.utils.book_new();
-  const period = `Tháng ${parseInt(month)}/${year}${groupName ? ` — Nhóm: ${groupName}` : ""}`;
+  const period = `${month === "all" ? `Năm ${year}` : `Tháng ${parseInt(month, 10)}/${year}`}${groupName ? ` — Nhóm: ${groupName}` : ""}`;
 
   // Sheet 1: Tổng hợp nhân viên
   const nvRows: any[][] = [
@@ -269,7 +275,7 @@ export function exportAdminCommission(opts: {
   XLSX.utils.book_append_sheet(wb, wsOrder, "Chi tiết đơn");
   XLSX.utils.book_append_sheet(wb, wsCtv,   "HH từ CTV");
 
-  XLSX.writeFile(wb, `HoaHong_ToanBo_T${parseInt(month)}_${year}.xlsx`);
+  XLSX.writeFile(wb, month === "all" ? `HoaHong_ToanBo_Y${year}.xlsx` : `HoaHong_ToanBo_T${parseInt(month, 10)}_${year}.xlsx`);
 }
 
 // ─── Export HH CTV riêng (Sales view) ────────────────────────────────────
@@ -344,12 +350,14 @@ export function exportRevenueReport(opts: {
   periodDescription?: string;
   /** Có thì tên file xuất `DoanhThu_Ky_{id}.xlsx` */
   payrollPeriodId?: number | string;
+  /** Khi lọc theo NV — suffix tên file Excel */
+  employeeId?: number | string;
 }) {
-  const { salesData, summary, month, year, groupName, periodDescription, payrollPeriodId } = opts;
+  const { salesData, summary, month, year, groupName, periodDescription, payrollPeriodId, employeeId } = opts;
   const wb = XLSX.utils.book_new();
   const period =
     periodDescription?.trim() ||
-    `Tháng ${parseInt(month, 10)}/${year}${groupName ? ` — Nhóm: ${groupName}` : ""}`;
+    `${month === "all" ? `Năm ${year}` : `Tháng ${parseInt(month, 10)}/${year}`}${groupName ? ` — Nhóm: ${groupName}` : ""}`;
 
   const rows: any[][] = [
     ["BÁO CÁO DOANH THU THEO NHÂN VIÊN"],
@@ -385,13 +393,17 @@ export function exportRevenueReport(opts: {
       ),
   ]);
 
+  const empSuffix =
+    employeeId != null && String(employeeId).trim() !== "" ? `_NV_${String(employeeId).trim()}` : "";
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws["!cols"] = [{ wch: 28 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, ws, "Doanh thu");
   const fileName =
     payrollPeriodId != null && String(payrollPeriodId).trim() !== ""
-      ? `DoanhThu_Ky_${payrollPeriodId}.xlsx`
-      : `DoanhThu_T${parseInt(month, 10)}_${year}.xlsx`;
+      ? `DoanhThu_Ky_${payrollPeriodId}${empSuffix}.xlsx`
+      : month === "all"
+        ? `DoanhThu_Y${year}${empSuffix}.xlsx`
+        : `DoanhThu_T${parseInt(month, 10)}_${year}${empSuffix}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
 
@@ -402,8 +414,11 @@ export function exportPayrollPeriodPreview(opts: {
   periodFrom?: string | null;
   periodTo?: string | null;
   periodStatus?: string;
+  /** Khi export sau lọc 1 NV — tên file + dòng tiêu đề phụ */
+  filteredEmployeeId?: number | null;
+  filteredEmployeeName?: string | null;
 }) {
-  const { rows, periodId, periodFrom, periodTo, periodStatus } = opts;
+  const { rows, periodId, periodFrom, periodTo, periodStatus, filteredEmployeeId, filteredEmployeeName } = opts;
   const wb = XLSX.utils.book_new();
   const range =
     periodFrom && periodTo
@@ -417,6 +432,11 @@ export function exportPayrollPeriodPreview(opts: {
     (a, b) => (Number(b.total_luong) || 0) - (Number(a.total_luong) || 0)
   );
 
+  const empLine =
+    filteredEmployeeId != null && Number.isFinite(filteredEmployeeId) && filteredEmployeeId > 0
+      ? `Lọc nhân viên: ${filteredEmployeeName || `#${filteredEmployeeId}`} (ID ${filteredEmployeeId})`
+      : null;
+
   const aoa: any[][] = [
     ["PREVIEW LƯƠNG THEO KỲ LƯƠNG"],
     [
@@ -424,6 +444,7 @@ export function exportPayrollPeriodPreview(opts: {
         range ? ` — ${range}` : ""
       }`,
     ],
+    ...(empLine ? [[empLine] as any[]] : []),
     [
       "Ghi chú: Cột «Điều chỉnh» = tổng cộng/trừ thủ công (payroll_adjustments) gán vào kỳ; cộng vào Tổng lương.",
     ],
@@ -485,7 +506,11 @@ export function exportPayrollPeriodPreview(opts: {
     { wch: 16 },
   ];
   XLSX.utils.book_append_sheet(wb, ws, "Preview lương");
-  XLSX.writeFile(wb, `PreviewLuong_Ky_${periodId}.xlsx`);
+  const empSuffix =
+    filteredEmployeeId != null && Number.isFinite(filteredEmployeeId) && filteredEmployeeId > 0
+      ? `_NV_${filteredEmployeeId}`
+      : "";
+  XLSX.writeFile(wb, `PreviewLuong_Ky_${periodId}${empSuffix}.xlsx`);
 }
 
 /** Báo cáo Thu chi (Admin) */

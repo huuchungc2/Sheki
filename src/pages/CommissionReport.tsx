@@ -1,8 +1,9 @@
 import * as React from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import {
   DollarSign, TrendingUp, Users, Download,
-  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign, ArrowLeft, RefreshCcw
+  Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign, ArrowLeft, RefreshCcw, Search, X,
+  Filter,
 } from "lucide-react";
 import { formatCurrency, formatDate, cn, isAdminUser } from "../lib/utils";
 import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel";
@@ -10,6 +11,10 @@ import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
   "/api";
+
+/** Cùng class select như Dashboard (`dashSelectCls`) */
+const commSelectCls =
+  "min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending:   { label: "Chờ duyệt", color: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50" },
@@ -44,7 +49,7 @@ function initialCommissionReportFilterState(search: string) {
   const m = sp.get("month");
   const y = sp.get("year");
   return {
-    month: m && /^\d{1,2}$/.test(String(m)) ? String(m).padStart(2, "0") : monthDefault,
+    month: m === "all" ? "all" : (m && /^\d{1,2}$/.test(String(m)) ? String(m).padStart(2, "0") : monthDefault),
     year: y && /^\d{4}$/.test(String(y)) ? String(y) : yearDefault,
     filterMode: "month" as const,
     payrollPeriodId: "",
@@ -55,14 +60,39 @@ function initialCommissionReportFilterState(search: string) {
 
 export function CommissionReport() {
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [bootstrapFilters] = React.useState(() =>
     initialCommissionReportFilterState(location.search),
   );
   const { userId: userIdFromRoute } = useParams();
-  const subjectUserId = React.useMemo(() => {
+  /** Drilldown từ route `/reports/commissions/:userId` */
+  const routeSubjectUserId = React.useMemo(() => {
     if (!userIdFromRoute || !/^\d+$/.test(String(userIdFromRoute))) return undefined;
     return parseInt(String(userIdFromRoute), 10);
   }, [userIdFromRoute]);
+
+  const employeeQueryRaw = (searchParams.get("employee") ?? "").trim();
+  /** Chỉ khi không có `:userId` trên path — lọc NV trên trang danh sách */
+  const employeeFromQuery =
+    routeSubjectUserId == null && /^[1-9]\d{0,9}$/.test(employeeQueryRaw)
+      ? parseInt(employeeQueryRaw, 10)
+      : undefined;
+  const filterSubjectUserId = routeSubjectUserId ?? employeeFromQuery;
+
+  const patchEmployeeSearchParam = React.useCallback(
+    (id: string | null) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (id) next.set("employee", id);
+          else next.delete("employee");
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   const [currentUser, setCurrentUser] = React.useState<any>(() => {
     const u = localStorage.getItem("user");
@@ -85,21 +115,32 @@ export function CommissionReport() {
     };
   }, []);
   const isAdmin = isAdminUser(currentUser);
-  /** Admin xem 1 NV: cùng UI/công thức «Hoa hồng của tôi», lọc theo user_id trên URL (không dùng id đăng nhập) */
-  const employeeDrilldown = Boolean(isAdmin && subjectUserId != null);
-  const [subjectUserName, setSubjectUserName] = React.useState<string | null>(null);
+  /** Admin xem 1 NV: cùng UI «Hoa hồng của tôi» — từ route `:userId` hoặc query `?employee=` */
+  const employeeDrilldown = Boolean(isAdmin && filterSubjectUserId != null);
+  const [employeeSelectedName, setEmployeeSelectedName] = React.useState<string>("");
 
   React.useEffect(() => {
-    if (!employeeDrilldown || subjectUserId == null) {
-      setSubjectUserName(null);
+    if (!isAdmin && employeeQueryRaw) {
+      patchEmployeeSearchParam(null);
+    }
+  }, [isAdmin, employeeQueryRaw, patchEmployeeSearchParam]);
+
+  React.useEffect(() => {
+    if (routeSubjectUserId == null || !employeeQueryRaw) return;
+    patchEmployeeSearchParam(null);
+  }, [routeSubjectUserId, employeeQueryRaw, patchEmployeeSearchParam]);
+
+  React.useEffect(() => {
+    if (!employeeDrilldown || filterSubjectUserId == null) {
+      setEmployeeSelectedName("");
       return;
     }
     const token = localStorage.getItem("token");
-    fetch(`${API_URL}/users/${subjectUserId}`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_URL}/users/${filterSubjectUserId}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => (r.ok ? r.json() : null))
-      .then(j => setSubjectUserName(j?.data?.full_name || null))
-      .catch(() => setSubjectUserName(null));
-  }, [employeeDrilldown, subjectUserId]);
+      .then(j => setEmployeeSelectedName(String(j?.data?.full_name || "")))
+      .catch(() => setEmployeeSelectedName(""));
+  }, [employeeDrilldown, filterSubjectUserId]);
 
   const [loading, setLoading]   = React.useState(true);
   const [error, setError]       = React.useState<string | null>(null);
@@ -140,9 +181,15 @@ export function CommissionReport() {
       return;
     }
     if (mode === "month") setFilterMode("month");
-    if (m && /^\d{1,2}$/.test(m)) setMonth(String(m).padStart(2, "0"));
+    if (m === "all") setMonth("all");
+    else if (m && /^\d{1,2}$/.test(m)) setMonth(String(m).padStart(2, "0"));
     if (y && /^\d{4}$/.test(y)) setYear(String(y));
-  }, [location.search, subjectUserId]);
+  }, [location.search, routeSubjectUserId]);
+
+  const periodLabelShort = React.useMemo(() => {
+    if (filterMode === "payroll") return payrollPeriodId ? `Kỳ #${payrollPeriodId}` : "Kỳ lương";
+    return month === "all" ? `Năm ${year}` : `Tháng ${parseInt(month, 10)}/${year}`;
+  }, [filterMode, payrollPeriodId, month, year]);
 
   const buildEmployeeDetailUrl = React.useCallback((uid: number | string) => {
     const sp = new URLSearchParams();
@@ -211,6 +258,37 @@ export function CommissionReport() {
   const [commTotal, setCommTotal]   = React.useState(0);
   const [commLimit, setCommLimit]   = React.useState(20);
   const [exporting, setExporting]   = React.useState(false);
+
+  const [showEmployeeMenu, setShowEmployeeMenu] = React.useState(false);
+  const [employeeQuery, setEmployeeQuery] = React.useState("");
+  const [employeeOptions, setEmployeeOptions] = React.useState<any[]>([]);
+  const [employeeLoading, setEmployeeLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isAdmin || !showEmployeeMenu) return;
+    const q = employeeQuery.trim();
+    const t = window.setTimeout(async () => {
+      try {
+        setEmployeeLoading(true);
+        const token = localStorage.getItem("token") || "";
+        const params = new URLSearchParams({
+          scoped: "1",
+          limit: "20",
+          active_only: "1",
+          ...(q ? { search: q } : {}),
+        });
+        const res = await fetch(`${API_URL}/users?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const j = await res.json();
+        setEmployeeOptions(j?.data || []);
+      } catch {
+        setEmployeeOptions([]);
+      } finally {
+        setEmployeeLoading(false);
+      }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [isAdmin, showEmployeeMenu, employeeQuery]);
 
   // Fetch groups
   React.useEffect(() => {
@@ -296,7 +374,7 @@ export function CommissionReport() {
         params.set("year", year);
       }
       if (groupId) params.set("group_id", groupId);
-      if (employeeDrilldown && subjectUserId != null) params.set("user_id", String(subjectUserId));
+      if (employeeDrilldown && filterSubjectUserId != null) params.set("user_id", String(filterSubjectUserId));
 
       // 1. Chi tiết theo đơn (cùng API «Hoa hồng của tôi»; Admin + user_id = 1 NV)
       const [orderRes, returnsRes] = await Promise.all([
@@ -416,10 +494,10 @@ export function CommissionReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, year, groupId, commPage, commLimit, isAdmin, currentUser?.id, employeeDrilldown, subjectUserId, filterMode, payrollPeriodId]);
+  }, [month, year, groupId, commPage, commLimit, isAdmin, currentUser?.id, employeeDrilldown, filterSubjectUserId, filterMode, payrollPeriodId, payrollReady]);
 
   // Reset page khi filter hoặc limit / NV thay đổi
-  React.useEffect(() => { setCommPage(1); }, [month, year, groupId, commLimit, subjectUserId, filterMode, payrollPeriodId]);
+  React.useEffect(() => { setCommPage(1); }, [month, year, groupId, commLimit, filterSubjectUserId, filterMode, payrollPeriodId]);
 
   React.useEffect(() => { fetchReport(); }, [fetchReport]);
 
@@ -455,7 +533,7 @@ export function CommissionReport() {
         allParams.set("year", year);
       }
       if (groupId) allParams.set("group_id", groupId);
-      if (employeeDrilldown && subjectUserId != null) allParams.set("user_id", String(subjectUserId));
+      if (employeeDrilldown && filterSubjectUserId != null) allParams.set("user_id", String(filterSubjectUserId));
       const allRes = await fetch(`${API_URL}/commissions/orders?${allParams}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -478,7 +556,7 @@ export function CommissionReport() {
         exportSalesCommission({
           orders: allOrders,
           summary: periodSummary,
-          userName: employeeDrilldown ? (subjectUserName || `NV #${subjectUserId}`) : (currentUser?.full_name || "NhanVien"),
+          userName: employeeDrilldown ? (employeeSelectedName || `NV #${filterSubjectUserId}`) : (currentUser?.full_name || "NhanVien"),
           month,
           year,
           groupName,
@@ -512,11 +590,12 @@ export function CommissionReport() {
   const isSalesMyCommission = !isAdmin && !employeeDrilldown;
   const totalOrdersWithReturns = Number(summary.total_orders) || 0;
 
+  // (chart removed per request)
+
   return (
     <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
-      {/* Header + Filter — lọc + Xuất Excel luôn 1 hàng (overflow-x-auto khi màn hẹp) */}
-      <div className="flex flex-col gap-4 min-w-0 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3 min-w-0 sm:min-w-[12rem] sm:flex-1">
+      {/* Tiêu đề */}
+      <div className="flex items-start gap-3 min-w-0">
           {employeeDrilldown && (
             <Link
               to={buildListUrl()}
@@ -529,48 +608,168 @@ export function CommissionReport() {
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground break-words">
               {employeeDrilldown
-                ? `Hoa hồng: ${subjectUserName || `Nhân viên #${subjectUserId}`}`
+                ? `Hoa hồng: ${employeeSelectedName || `Nhân viên #${filterSubjectUserId}`}`
                 : "Báo cáo hoa hồng"}
             </h1>
             <p className="text-muted-foreground text-sm mt-0.5 break-words">
               {employeeDrilldown
-                ? "Cùng cột KPI và bảng đơn như «Hoa hồng của tôi» — theo nhân viên đã chọn (lọc theo user_id trên URL)."
+                ? "Cùng cột KPI và bảng đơn như «Hoa hồng của tôi» — theo nhân viên đã chọn (menu lọc hoặc URL `?employee=` / `/reports/commissions/:id`)."
                 : "Tổng hợp hoa hồng theo menu Admin; dữ liệu sẽ tự co theo phạm vi (cá nhân/nhóm/toàn shop)."}
             </p>
           </div>
-        </div>
-        <div className="flex flex-nowrap items-center justify-start sm:justify-end gap-2 w-full min-w-0 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-          <select value={groupId} onChange={(e) => setGroupId(e.target.value)}
-            className="shrink-0 min-w-[7.5rem] max-w-[46vw] sm:max-w-none sm:min-w-[9rem] px-2.5 py-2 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-            <option value="">Tất cả nhóm</option>
-            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-          <div className="shrink-0 flex items-center gap-1.5 bg-muted/30 border border-border rounded-xl px-1.5 py-1">
-            <button
-              type="button"
-              onClick={() => setFilterMode("payroll")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-semibold",
-                filterMode === "payroll"
-                  ? "bg-background border border-border text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Kỳ lương
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterMode("month")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-semibold",
-                filterMode === "month"
-                  ? "bg-background border border-border text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Tháng
-            </button>
+      </div>
+
+      {/* Lọc — cùng layout/chữ như Dashboard */}
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5 space-y-4">
+        <div className="flex items-center gap-2 text-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Filter className="h-4 w-4" />
           </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Lọc báo cáo</p>
+            <p className="text-xs text-muted-foreground">
+              {isAdmin && !userIdFromRoute ? "Admin: nhân viên, " : ""}
+              nhóm bán hàng, kỳ (tháng/năm hoặc kỳ lương)
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+          {isAdmin && !userIdFromRoute ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmployeeMenu((v) => !v);
+                  setEmployeeQuery("");
+                }}
+                className="flex items-center gap-2 h-10 px-3 bg-background border border-input hover:bg-accent/50 rounded-md text-sm font-medium text-foreground transition-colors min-w-[200px] justify-between"
+                title="Lọc KPI theo nhân viên bán (salesperson)"
+              >
+                <span className="truncate">
+                  {employeeFromQuery
+                    ? employeeSelectedName || `NV #${employeeFromQuery}`
+                    : "Tất cả nhân viên"}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              </button>
+              {showEmployeeMenu && (
+                <div className="absolute top-full left-0 mt-1 w-[18rem] bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                  <div className="p-2 border-b border-border">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={employeeQuery}
+                        onChange={(e) => setEmployeeQuery(e.target.value)}
+                        placeholder="Gõ tên/username/phone..."
+                        className="w-full h-10 pl-9 pr-9 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmployeeMenu(false)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                        title="Đóng"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        patchEmployeeSearchParam(null);
+                        setShowEmployeeMenu(false);
+                      }}
+                      className={cn(
+                        "mt-2 w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
+                        !employeeFromQuery ? "bg-accent text-accent-foreground font-semibold" : "hover:bg-accent/50 text-foreground"
+                      )}
+                    >
+                      Tất cả nhân viên
+                    </button>
+                  </div>
+                  <div className="max-h-72 overflow-auto">
+                    {employeeLoading ? (
+                      <div className="px-3 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang tải...
+                      </div>
+                    ) : employeeOptions.length === 0 ? (
+                      <div className="px-3 py-3 text-sm text-muted-foreground">Không tìm thấy nhân viên</div>
+                    ) : (
+                      employeeOptions.map((emp: any) => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => {
+                            patchEmployeeSearchParam(String(emp.id));
+                            setEmployeeSelectedName(String(emp.full_name || ""));
+                            setShowEmployeeMenu(false);
+                          }}
+                          className={cn(
+                            "w-full text-left px-3 py-2.5 text-sm hover:bg-accent/50 transition-colors",
+                            String(employeeFromQuery) === String(emp.id)
+                              ? "bg-accent text-accent-foreground font-semibold"
+                              : "text-foreground"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate">{emp.full_name}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">#{emp.id}</span>
+                          </div>
+                          {emp.username ? (
+                            <div className="text-xs text-muted-foreground truncate mt-0.5">{emp.username}</div>
+                          ) : null}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+            <label className="flex flex-col gap-1.5 min-w-[180px]">
+              <span className="text-xs font-medium text-muted-foreground">Nhóm bán hàng</span>
+              <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={commSelectCls}>
+                <option value="">Tất cả nhóm</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground">Cách lọc kỳ</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-lg border border-border bg-muted/30 p-1">
+                  <button
+                    type="button"
+                    disabled={payrollPeriods.length === 0}
+                    title={payrollPeriods.length === 0 ? "Chưa có kỳ lương trong shop" : undefined}
+                    onClick={() => setFilterMode("payroll")}
+                    className={cn(
+                      "rounded-md px-3 py-2 text-xs font-semibold transition",
+                      filterMode === "payroll"
+                        ? "bg-background text-foreground shadow-sm border border-border"
+                        : "text-muted-foreground hover:text-foreground",
+                      payrollPeriods.length === 0 && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    Kỳ lương
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode("month")}
+                    className={cn(
+                      "rounded-md px-3 py-2 text-xs font-semibold transition",
+                      filterMode === "month"
+                        ? "bg-background text-foreground shadow-sm border border-border"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Tháng
+                  </button>
+                </div>
 
           {filterMode === "payroll" ? (
             <select
@@ -579,7 +778,7 @@ export function CommissionReport() {
                 setPeriodTouched(true);
                 setPayrollPeriodId(e.target.value);
               }}
-              className="shrink-0 min-w-[12rem] px-2.5 py-2 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className={cn(commSelectCls, "min-w-[12rem]")}
             >
               {payrollPeriods.map((p: any) => (
                 <option key={p.id} value={String(p.id)}>
@@ -590,14 +789,13 @@ export function CommissionReport() {
             </select>
           ) : (
             <>
-              <select value={month} onChange={(e) => setMonth(e.target.value)}
-                className="shrink-0 min-w-[5.5rem] px-2.5 py-2 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+              <select value={month} onChange={(e) => setMonth(e.target.value)} className={cn(commSelectCls, "w-[130px]")}>
+                <option value="all">Tất cả (cả năm)</option>
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={String(i + 1).padStart(2, "0")}>Tháng {i + 1}</option>
                 ))}
               </select>
-              <select value={year} onChange={(e) => setYear(e.target.value)}
-                className="shrink-0 min-w-[4.25rem] px-2.5 py-2 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+              <select value={year} onChange={(e) => setYear(e.target.value)} className={cn(commSelectCls, "w-[100px]")}>
                 {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </>
@@ -606,22 +804,31 @@ export function CommissionReport() {
             <button
               type="button"
               onClick={() => fetchPayrollPeriods()}
-              className="inline-flex shrink-0 items-center gap-2 px-3 py-2 rounded-md border border-border bg-background text-sm font-semibold text-foreground hover:bg-accent transition-colors"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-accent transition-colors"
               title="Làm mới danh sách kỳ lương"
             >
               <RefreshCcw className="w-4 h-4" />
             </button>
           ) : null}
+              </div>
+            </div>
+        </div>
           <button
+            type="button"
             onClick={handleExport}
             disabled={loading || exporting}
-            className="inline-flex shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap px-3 sm:px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity shadow-sm disabled:opacity-50">
+            className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-95 disabled:opacity-50">
             {exporting
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang xuất...</>
               : <><Download className="w-4 h-4" /> Xuất Excel</>
             }
           </button>
         </div>
+        {employeeDrilldown && isAdmin ? (
+          <p className="text-xs text-muted-foreground">
+            KPI theo nhân viên bán (salesperson): hoa hồng trực tiếp/CTV, đơn chi tiết, hoàn, ship/NV chịu, tổng lương trong kỳ đã chọn.
+          </p>
+        ) : null}
       </div>
 
       {/* KPI — cùng Dashboard; [&>*]:min-w-0 tránh grid làm tràn ngang (min-width: auto mặc định) */}
@@ -685,7 +892,7 @@ export function CommissionReport() {
           </div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Số đơn hàng</p>
           <p className="text-xl font-bold text-foreground mt-1 tabular-nums">{totalOrdersWithReturns}</p>
-          <p className="text-xs text-muted-foreground mt-1 break-words">Tháng {month}/{year}</p>
+          <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
       </div>
 
@@ -699,7 +906,7 @@ export function CommissionReport() {
           <p className="text-xl font-bold text-destructive mt-1 break-words tabular-nums">
             {formatCurrency(-(returnsSummary.return_revenue || 0))}
           </p>
-          <p className="text-xs text-muted-foreground mt-1 break-words">Tháng {month}/{year}</p>
+          <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
         <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
           <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive mb-3">
@@ -709,7 +916,7 @@ export function CommissionReport() {
           <p className="text-xl font-bold text-destructive mt-1 break-words tabular-nums">
             −{formatCurrency(returnsSummary.return_commission_direct_abs || 0)}
           </p>
-          <p className="text-xs text-muted-foreground mt-1 break-words">Tháng {month}/{year}</p>
+          <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
         <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
           <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive mb-3">
@@ -719,7 +926,7 @@ export function CommissionReport() {
           <p className="text-xl font-bold text-destructive mt-1 break-words tabular-nums">
             −{formatCurrency(returnsSummary.return_commission_override_abs || 0)}
           </p>
-          <p className="text-xs text-muted-foreground mt-1 break-words">Tháng {month}/{year}</p>
+          <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
         <div className="bg-card p-5 rounded-xl border border-border shadow-sm min-w-0">
           <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive mb-3">
@@ -727,7 +934,7 @@ export function CommissionReport() {
           </div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng đơn hoàn</p>
           <p className="text-xl font-bold text-destructive mt-1 tabular-nums">{returnsSummary.return_orders || 0}</p>
-          <p className="text-xs text-muted-foreground mt-1 break-words">Tháng {month}/{year}</p>
+          <p className="text-xs text-muted-foreground mt-1 break-words">{periodLabelShort}</p>
         </div>
       </div>
 
@@ -802,7 +1009,8 @@ export function CommissionReport() {
             salesData.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground text-sm">Chưa có dữ liệu trong tháng này</div>
             ) : (
-              <div className="min-w-0 overflow-x-auto">
+              <div className="min-w-0">
+                <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-sm min-w-[640px]">
                   <thead>
                     <tr className="bg-muted/30 border-b border-border">
@@ -909,6 +1117,7 @@ export function CommissionReport() {
                     </tr>
                   </tfoot>
                 </table>
+                </div>
               </div>
             )
           )}

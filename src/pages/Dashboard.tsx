@@ -1,36 +1,26 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   DollarSign, Users, Package, ShoppingCart,
   TrendingUp, TrendingDown, Clock, Truck,
   CheckCircle2, XCircle, ChevronRight,
   Loader2, AlertCircle, ArrowUpRight, ArrowDownRight,
-  Wallet, CircleDollarSign,
+  Wallet, CircleDollarSign, Search, ChevronDown, X,
+  Filter, RefreshCcw,
 } from "lucide-react";
 import {
   BarChart, Bar, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
-import { cn, formatCurrency, isAdminUser } from "../lib/utils";
-
-/* ── Chart colors — hex tĩnh để SVG fill đọc được ── */
-const CHART_COLORS = {
-  light: { primary: "#0d9488", primary80: "#14b8a6cc", primary55: "#14b8a68c", muted: "#94a3b8", grid: "#e2e8f0" },
-  dark:  { primary: "#6366f1", primary80: "#6366f1cc", primary55: "#6366f18c", muted: "#64748b", grid: "#23252a" },
-};
-function useIsDark() {
-  const [isDark, setIsDark] = React.useState(() => document.documentElement.classList.contains("dark"));
-  React.useEffect(() => {
-    const obs = new MutationObserver(() => setIsDark(document.documentElement.classList.contains("dark")));
-    obs.observe(document.documentElement, { attributeFilter: ["class"] });
-    return () => obs.disconnect();
-  }, []);
-  return isDark;
-}
+import { cn, formatCurrency, isAdminUser, formatDate } from "../lib/utils";
+import { useChartTheme } from "../lib/chartTheme";
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
   "/api";
+
+const dashSelectCls =
+  "min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const STATUS_CFG: Record<string, { label: string; color: string; icon: any; bg: string }> = {
   pending:   { label: "Chờ duyệt", color: "text-amber-700 dark:text-amber-300",   icon: Clock,        bg: "bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50" },
@@ -60,9 +50,22 @@ function ChangeBadge({ pct }: { pct: string | null }) {
 }
 
 export function Dashboard() {
-  const isDark = useIsDark();
-  const C = isDark ? CHART_COLORS.dark : CHART_COLORS.light;
-  const [data, setData]       = React.useState<any>(null);
+  const C = useChartTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const employeeId = (searchParams.get("employee") ?? "").trim();
+  const groupId = (searchParams.get("group_id") ?? "").trim();
+  const payrollPeriodIdParam = (searchParams.get("payroll_period_id") ?? "").trim();
+  const filterMonth =
+    searchParams.get("month")?.trim() || String(new Date().getMonth() + 1).padStart(2, "0");
+  const filterYear = searchParams.get("year")?.trim() || String(new Date().getFullYear());
+  const filterMode = payrollPeriodIdParam ? "payroll" : "month";
+
+  const yearOptions = React.useMemo(() => {
+    const yy = new Date().getFullYear();
+    return Array.from({ length: yy - 2019 + 2 }, (_, i) => String(2020 + i));
+  }, []);
+
+  const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError]     = React.useState<string | null>(null);
 
@@ -72,6 +75,105 @@ export function Dashboard() {
   });
   const [token, setToken] = React.useState<string>(() => localStorage.getItem("token") || "");
   const isAdmin = isAdminUser(currentUser);
+
+  const patchDashParams = React.useCallback(
+    (patch: Record<string, string | null | undefined>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === undefined || v === "") next.delete(k);
+            else next.set(k, v);
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const [groups, setGroups] = React.useState<any[]>([]);
+  const [payrollPeriods, setPayrollPeriods] = React.useState<any[]>([]);
+  const fetchPayrollPeriodsList = React.useCallback(async (): Promise<any[]> => {
+    const t = localStorage.getItem("token") || "";
+    try {
+      const listRes = await fetch(`${API_URL}/payroll/periods`, { headers: { Authorization: `Bearer ${t}` } });
+      if (!listRes.ok) return [];
+      const listJ = await listRes.json();
+      const list = listJ?.data || [];
+      setPayrollPeriods(list);
+      return list;
+    } catch {
+      setPayrollPeriods([]);
+      return [];
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!token) return;
+    const ep = isAdmin ? "/groups" : `/groups/user/${currentUser?.id}`;
+    fetch(`${API_URL}${ep}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((j) => setGroups(j.data || []))
+      .catch(() => setGroups([]));
+  }, [token, isAdmin, currentUser?.id]);
+
+  // Luôn tải danh sách kỳ khi có token — cần trước khi bấm «Kỳ lương» (lúc đó filterMode vẫn là month).
+  React.useEffect(() => {
+    if (!token) return;
+    void fetchPayrollPeriodsList();
+  }, [token, fetchPayrollPeriodsList]);
+
+  const [showEmployeeMenu, setShowEmployeeMenu] = React.useState(false);
+  const [employeeQuery, setEmployeeQuery] = React.useState("");
+  const [employeeOptions, setEmployeeOptions] = React.useState<any[]>([]);
+  const [employeeLoading, setEmployeeLoading] = React.useState(false);
+  const [employeeSelectedName, setEmployeeSelectedName] = React.useState<string>("");
+
+  React.useEffect(() => {
+    if (!isAdmin || !employeeId) {
+      setEmployeeSelectedName("");
+      return;
+    }
+    let aborted = false;
+    fetch(`${API_URL}/users/${employeeId}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (aborted) return;
+        setEmployeeSelectedName(String(j?.data?.full_name || ""));
+      })
+      .catch(() => {
+        if (aborted) return;
+        setEmployeeSelectedName("");
+      });
+    return () => { aborted = true; };
+  }, [isAdmin, employeeId, token]);
+
+  React.useEffect(() => {
+    if (!isAdmin || !showEmployeeMenu) return;
+    const q = employeeQuery.trim();
+    const t = window.setTimeout(async () => {
+      try {
+        setEmployeeLoading(true);
+        const params = new URLSearchParams({
+          scoped: "1",
+          limit: "20",
+          active_only: "1",
+          ...(q ? { search: q } : {}),
+        });
+        const res = await fetch(`${API_URL}/users?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const j = await res.json();
+        setEmployeeOptions(j?.data || []);
+      } catch {
+        setEmployeeOptions([]);
+      } finally {
+        setEmployeeLoading(false);
+      }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [isAdmin, showEmployeeMenu, employeeQuery, token]);
 
   React.useEffect(() => {
     const syncAuth = () => {
@@ -100,14 +202,23 @@ export function Dashboard() {
     }
     setLoading(true);
     setError(null);
-    fetch(`${API_URL}/reports/dashboard`, {
+    const qs = new URLSearchParams();
+    if (payrollPeriodIdParam) qs.set("payroll_period_id", payrollPeriodIdParam);
+    else {
+      qs.set("month", filterMonth);
+      qs.set("year", filterYear);
+    }
+    if (groupId) qs.set("group_id", groupId);
+    if (isAdminUser(currentUser) && employeeId) qs.set("employee", employeeId);
+    const qstr = qs.toString();
+    fetch(`${API_URL}/reports/dashboard${qstr ? `?${qstr}` : ""}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(r => { if (!r.ok) throw new Error("Không thể tải dữ liệu"); return r.json(); })
       .then(j => setData(j.data))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, employeeId, groupId, filterMonth, filterYear, payrollPeriodIdParam, currentUser]);
 
   if (loading) return (
     <div className="min-h-[60vh] flex items-center justify-center">
@@ -126,6 +237,16 @@ export function Dashboard() {
   );
 
   const d = data;
+  const meta = (d as any)?.meta;
+  const periodLabelDash =
+    meta?.filter === "payroll" && meta?.payroll_period_id != null
+      ? `Kỳ lương #${meta.payroll_period_id}`
+      : meta?.filter === "year" && meta?.year
+        ? `Năm ${meta.year}`
+        : meta?.month && meta?.year
+          ? `Tháng ${meta.month}/${meta.year}`
+          : "Tháng hiện tại";
+  const showTodayKpi = meta?.show_today_kpi !== false;
   const recentOrders = d?.recentOrders || [];
   const topProducts  = d?.topProducts  || [];
   const topCustomers = d?.topCustomers || [];
@@ -154,6 +275,228 @@ export function Dashboard() {
         </div>
       </div>
 
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5 space-y-4">
+        <div className="flex items-center gap-2 text-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Filter className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Lọc tổng quan</p>
+            <p className="text-xs text-muted-foreground">
+              {isAdmin ? "Admin: nhân viên, " : ""}nhóm bán hàng, kỳ (tháng/năm hoặc kỳ lương)
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+          {isAdmin && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmployeeMenu((v) => !v);
+                  setEmployeeQuery("");
+                }}
+                className="flex items-center gap-2 h-10 px-3 bg-background border border-input hover:bg-accent/50 rounded-md text-sm font-medium text-foreground transition-colors min-w-[200px] justify-between"
+                title="Lọc KPI theo nhân viên bán (salesperson)"
+              >
+                <span className="truncate">
+                  {employeeId ? (employeeSelectedName || `NV #${employeeId}`) : "Tất cả nhân viên"}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              </button>
+
+              {showEmployeeMenu && (
+                <div className="absolute top-full left-0 mt-1 w-[18rem] bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                  <div className="p-2 border-b border-border">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={employeeQuery}
+                        onChange={(e) => setEmployeeQuery(e.target.value)}
+                        placeholder="Gõ tên/username/phone..."
+                        className="w-full h-10 pl-9 pr-9 bg-background border border-input rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmployeeMenu(false)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                        title="Đóng"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        patchDashParams({ employee: null });
+                        setShowEmployeeMenu(false);
+                      }}
+                      className={cn(
+                        "mt-2 w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
+                        !employeeId ? "bg-accent text-accent-foreground font-semibold" : "hover:bg-accent/50 text-foreground"
+                      )}
+                    >
+                      Tất cả nhân viên
+                    </button>
+                  </div>
+
+                  <div className="max-h-72 overflow-auto">
+                    {employeeLoading ? (
+                      <div className="px-3 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Đang tải...
+                      </div>
+                    ) : employeeOptions.length === 0 ? (
+                      <div className="px-3 py-3 text-sm text-muted-foreground">
+                        Không tìm thấy nhân viên
+                      </div>
+                    ) : (
+                      employeeOptions.map((emp: any) => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => {
+                            patchDashParams({ employee: String(emp.id) });
+                            setEmployeeSelectedName(String(emp.full_name || ""));
+                            setShowEmployeeMenu(false);
+                          }}
+                          className={cn(
+                            "w-full text-left px-3 py-2.5 text-sm hover:bg-accent/50 transition-colors",
+                            String(employeeId) === String(emp.id) ? "bg-accent text-accent-foreground font-semibold" : "text-foreground"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate">{emp.full_name}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">#{emp.id}</span>
+                          </div>
+                          {emp.username ? (
+                            <div className="text-xs text-muted-foreground truncate mt-0.5">{emp.username}</div>
+                          ) : null}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <label className="flex flex-col gap-1.5 min-w-[180px]">
+            <span className="text-xs font-medium text-muted-foreground">Nhóm bán hàng</span>
+            <select
+              value={groupId}
+              onChange={(e) => patchDashParams({ group_id: e.target.value || null })}
+              className={dashSelectCls}
+            >
+              <option value="">Tất cả nhóm</option>
+              {groups.map((g: any) => (
+                <option key={g.id} value={String(g.id)}>{g.name}</option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <span className="text-xs font-medium text-muted-foreground">Cách lọc kỳ</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-lg border border-border bg-muted/30 p-1">
+                <button
+                  type="button"
+                  disabled={payrollPeriods.length === 0}
+                  title={payrollPeriods.length === 0 ? "Chưa có kỳ lương trong shop" : undefined}
+                  onClick={async () => {
+                    let list = payrollPeriods;
+                    if (!list.length) list = await fetchPayrollPeriodsList();
+                    const first = list[0] ? String(list[0].id) : "";
+                    if (!first) return;
+                    patchDashParams({
+                      payroll_period_id: first,
+                      month: null,
+                      year: null,
+                    });
+                  }}
+                  className={cn(
+                    "rounded-md px-3 py-2 text-xs font-semibold transition",
+                    filterMode === "payroll" ? "bg-background text-foreground shadow-sm border border-border" : "text-muted-foreground hover:text-foreground",
+                    payrollPeriods.length === 0 && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  Kỳ lương
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    patchDashParams({
+                      payroll_period_id: null,
+                      month: filterMonth || String(new Date().getMonth() + 1).padStart(2, "0"),
+                      year: filterYear || String(new Date().getFullYear()),
+                    })
+                  }
+                  className={cn(
+                    "rounded-md px-3 py-2 text-xs font-semibold transition",
+                    filterMode === "month" ? "bg-background text-foreground shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Tháng
+                </button>
+              </div>
+              {filterMode === "payroll" ? (
+                <>
+                  <select
+                    value={payrollPeriodIdParam}
+                    onChange={(e) => {
+                      patchDashParams({ payroll_period_id: e.target.value || null });
+                    }}
+                    className={cn(dashSelectCls, "min-w-[12rem]")}
+                  >
+                    {payrollPeriods.map((p: any) => (
+                      <option key={p.id} value={String(p.id)}>
+                        #{p.id} • {p.status === "open" ? "Đang mở" : "Đã chốt"} • {formatDate(p.from_at)}
+                        {p.to_at ? ` → ${formatDate(p.to_at)}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    title="Làm mới danh sách kỳ"
+                    onClick={() => void fetchPayrollPeriodsList()}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-accent transition-colors"
+                  >
+                    <RefreshCcw className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => patchDashParams({ month: e.target.value })}
+                    className={cn(dashSelectCls, "w-[130px]")}
+                  >
+                    <option value="all">Tất cả (cả năm)</option>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
+                        Tháng {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={filterYear}
+                    onChange={(e) => patchDashParams({ year: e.target.value })}
+                    className={cn(dashSelectCls, "w-[100px]")}
+                  >
+                    {yearOptions.map((yy) => (
+                      <option key={yy} value={yy}>{yy}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {employeeId && isAdmin ? (
+          <p className="text-xs text-muted-foreground">
+            KPI theo nhân viên bán (salesperson): doanh thu, hoa hồng, hoàn, lương (ship/NV chịu), trạng thái đơn, top SP/KH, đơn gần đây.
+          </p>
+        ) : null}
+      </div>
+
       {/* ───── ADMIN VIEW ───── */}
       {isAdmin && (
         <>
@@ -165,34 +508,38 @@ export function Dashboard() {
                 <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
                   <DollarSign className="w-4 h-4" />
                 </div>
-                <ChangeBadge pct={thisMonth.revenue_change} />
+                {thisMonth.revenue_change != null ? <ChangeBadge pct={thisMonth.revenue_change} /> : null}
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Doanh thu tháng này</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Doanh thu — {periodLabelDash}</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(thisMonth.revenue || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(today.revenue || 0)}</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(today.revenue || 0)}</p>
+              ) : null}
               <p className="text-[11px] text-muted-foreground mt-1 leading-snug">Tổng tạm tính (sau CK dòng), không gồm đơn hủy</p>
             </div>
 
-            {/* Tổng đơn tháng */}
+            {/* Tổng đơn */}
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
                   <ShoppingCart className="w-4 h-4" />
                 </div>
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Đơn hàng tháng này</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Đơn hàng — {periodLabelDash}</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{thisMonth.total_orders || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.total_orders || 0} đơn</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.total_orders || 0} đơn</p>
+              ) : null}
             </div>
 
-            {/* Hoa hồng tháng */}
+            {/* Hoa hồng */}
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng hoa hồng tháng</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng hoa hồng — {periodLabelDash}</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(commission.total || 0)}</p>
               <p className="text-xs text-muted-foreground mt-1">CTV: {formatCurrency(commission.override || 0)}</p>
             </div>
@@ -206,7 +553,7 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Khách hàng</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{(customers.total || 0).toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-1">Mới tháng này: +{customers.new || 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">Mới trong kỳ: +{customers.new || 0}</p>
             </div>
           </div>
 
@@ -218,7 +565,9 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng doanh số hoàn</p>
               <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-(thisMonth.return_revenue || 0))}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-(today.return_revenue || 0))}</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-(today.return_revenue || 0))}</p>
+              ) : null}
             </div>
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
@@ -226,7 +575,9 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Sale)</p>
               <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-Math.abs(thisMonth.return_commission_direct || 0))}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_direct || 0))}</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_direct || 0))}</p>
+              ) : null}
             </div>
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
@@ -234,7 +585,9 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Quản lý)</p>
               <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-Math.abs(thisMonth.return_commission_override || 0))}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_override || 0))}</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_override || 0))}</p>
+              ) : null}
             </div>
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
@@ -242,7 +595,9 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng đơn hoàn</p>
               <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{thisMonth.return_orders || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.return_orders || 0} đơn</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.return_orders || 0} đơn</p>
+              ) : null}
             </div>
           </div>
 
@@ -254,7 +609,7 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ship KH Trả</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Tháng này (theo đơn)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Trong kỳ (theo đơn)</p>
             </div>
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
@@ -262,7 +617,7 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tiền NV chịu</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Tháng này (theo đơn)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Trong kỳ (theo đơn)</p>
             </div>
             <div className="col-span-2 lg:col-span-1 bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
@@ -274,7 +629,7 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Trạng thái đơn tháng này */}
+          {/* Trạng thái đơn trong kỳ */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {Object.entries(STATUS_CFG).map(([key, cfg]) => (
               <div key={key} className={cn("p-4 rounded-xl flex items-center gap-3", cfg.bg)}>
@@ -292,7 +647,7 @@ export function Dashboard() {
             {/* Top nhân viên */}
             <div className="lg:col-span-2 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground">Top nhân viên tháng này</h2>
+                <h2 className="text-sm font-semibold text-foreground">Top nhân viên — {periodLabelDash}</h2>
                 <Link to="/employees" className="text-xs text-primary hover:underline flex items-center gap-0.5">
                   Xem tất cả <ChevronRight className="w-3 h-3" />
                 </Link>
@@ -374,7 +729,7 @@ export function Dashboard() {
           {/* Top khách hàng */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">Top khách hàng theo doanh số (tháng này)</h2>
+              <h2 className="text-sm font-semibold text-foreground">Top khách hàng — {periodLabelDash}</h2>
               <Link to="/customers" className="text-xs text-primary hover:underline flex items-center gap-0.5">
                 Xem tất cả <ChevronRight className="w-3 h-3" />
               </Link>
@@ -429,7 +784,7 @@ export function Dashboard() {
           {/* Top sản phẩm */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">Top sản phẩm bán chạy tháng này</h2>
+              <h2 className="text-sm font-semibold text-foreground">Top sản phẩm — {periodLabelDash}</h2>
               <Link to="/products" className="text-xs text-primary hover:underline flex items-center gap-0.5">
                 Xem tất cả <ChevronRight className="w-3 h-3" />
               </Link>
@@ -445,7 +800,7 @@ export function Dashboard() {
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: C.muted, fontSize: 11 }}
                       tickFormatter={(v) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K` : v} />
                     <Tooltip formatter={(v: number) => [formatCurrency(v), "Doanh thu"]}
-                      contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                      contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgb(0 0 0 / 0.10)" }} />
                     <Bar dataKey="revenue" radius={[6, 6, 0, 0]}>
                       {topProducts.map((_: any, i: number) => (
                         <Cell
@@ -468,12 +823,17 @@ export function Dashboard() {
           {/* Stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
-              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
-                <DollarSign className="w-4 h-4" />
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                {thisMonth.revenue_change != null ? <ChangeBadge pct={thisMonth.revenue_change} /> : null}
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Doanh thu tháng</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Doanh thu — {periodLabelDash}</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(thisMonth.revenue || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(today.revenue || 0)}</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(today.revenue || 0)}</p>
+              ) : null}
               <p className="text-[11px] text-muted-foreground mt-1 leading-snug">Tổng tạm tính (sau CK dòng), không gồm đơn hủy</p>
             </div>
 
@@ -501,9 +861,11 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
                 <ShoppingCart className="w-4 h-4" />
               </div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Đơn hàng tháng</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Đơn hàng — {periodLabelDash}</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{thisMonth.total_orders || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.total_orders || 0} đơn</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.total_orders || 0} đơn</p>
+              ) : null}
             </div>
           </div>
 
@@ -515,7 +877,9 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng doanh số hoàn</p>
               <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-(thisMonth.return_revenue || 0))}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-(today.return_revenue || 0))}</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-(today.return_revenue || 0))}</p>
+              ) : null}
             </div>
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
@@ -523,7 +887,9 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Sale)</p>
               <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-Math.abs(thisMonth.return_commission_direct || 0))}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_direct || 0))}</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_direct || 0))}</p>
+              ) : null}
             </div>
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
@@ -531,7 +897,9 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">HH hoàn (Quản lý)</p>
               <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{formatCurrency(-Math.abs(thisMonth.return_commission_override || 0))}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_override || 0))}</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {formatCurrency(-Math.abs(today.return_commission_override || 0))}</p>
+              ) : null}
             </div>
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-destructive mb-3">
@@ -539,7 +907,9 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tổng đơn hoàn</p>
               <p className="text-xl font-semibold text-destructive mt-1 tabular-nums">{thisMonth.return_orders || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.return_orders || 0} đơn</p>
+              {showTodayKpi ? (
+                <p className="text-xs text-muted-foreground mt-1">Hôm nay: {today.return_orders || 0} đơn</p>
+              ) : null}
             </div>
           </div>
 
@@ -551,7 +921,7 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ship KH Trả</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_khach_ship || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Đơn bạn phụ trách — tháng này</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Đơn bạn phụ trách — trong kỳ</p>
             </div>
             <div className="bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
@@ -559,7 +929,7 @@ export function Dashboard() {
               </div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tiền NV chịu</p>
               <p className="text-xl font-semibold text-foreground mt-1 tabular-nums">{formatCurrency(luongMonth.total_nv_chiu || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Đơn bạn phụ trách — tháng này</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Đơn bạn phụ trách — trong kỳ</p>
             </div>
             <div className="col-span-2 lg:col-span-1 bg-card p-5 rounded-xl border border-border shadow-sm">
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-primary mb-3">
@@ -589,7 +959,7 @@ export function Dashboard() {
             {/* Top sản phẩm */}
             <div className="lg:col-span-2 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-border">
-                <h2 className="text-sm font-semibold text-foreground">Top sản phẩm bán chạy tháng này</h2>
+                <h2 className="text-sm font-semibold text-foreground">Top sản phẩm — {periodLabelDash}</h2>
               </div>
               {topProducts.length === 0 ? (
                 <div className="py-10 text-center text-muted-foreground text-sm">Chưa có dữ liệu</div>
@@ -602,7 +972,7 @@ export function Dashboard() {
                       <YAxis axisLine={false} tickLine={false} tick={{ fill: C.muted, fontSize: 11 }}
                         tickFormatter={(v) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K` : v} />
                       <Tooltip formatter={(v: number) => [formatCurrency(v), "Doanh thu"]}
-                        contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
+                        contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgb(0 0 0 / 0.10)" }} />
                       <Bar dataKey="revenue" radius={[6, 6, 0, 0]}>
                         {topProducts.map((_: any, i: number) => (
                           <Cell
@@ -656,7 +1026,7 @@ export function Dashboard() {
           {/* Top khách hàng */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">Top khách hàng theo doanh số (tháng này)</h2>
+              <h2 className="text-sm font-semibold text-foreground">Top khách hàng — {periodLabelDash}</h2>
               <Link to="/customers" className="text-xs text-primary hover:underline flex items-center gap-0.5">
                 Xem tất cả <ChevronRight className="w-3 h-3" />
               </Link>

@@ -76,16 +76,43 @@ async function getReturnRevenueAndOrdersByMonthYear(pool, { month, year, salespe
   };
 }
 
-async function getReturnRevenueByRange(pool, { from, to, salespersonId = null, shopId = null }) {
-  const { conds, params } = buildRangeConds('r', from, to);
-  const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
-    orderAlias: 'o',
-    salespersonId,
-    groupId: null,
-    shopId,
-  });
-  const whereConds = [...conds, ...orderConds];
-  const whereParams = [...params, ...orderParams];
+async function getReturnRevenueByRange(pool, {
+  from,
+  to,
+  salespersonId = null,
+  shopId = null,
+  groupId = null,
+  payrollPeriodId = null,
+}) {
+  let whereConds;
+  let whereParams;
+  if (payrollPeriodId != null) {
+    whereConds = [
+      `EXISTS (SELECT 1 FROM payroll_periods pp
+        WHERE pp.id = ? AND pp.shop_id = o.shop_id
+          AND r.created_at >= pp.from_at
+          AND (pp.to_at IS NULL OR r.created_at <= pp.to_at))`,
+    ];
+    whereParams = [payrollPeriodId];
+    const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
+      orderAlias: 'o',
+      salespersonId,
+      groupId,
+      shopId,
+    });
+    whereConds.push(...orderConds);
+    whereParams.push(...orderParams);
+  } else {
+    const { conds, params } = buildRangeConds('r', from, to);
+    const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
+      orderAlias: 'o',
+      salespersonId,
+      groupId,
+      shopId,
+    });
+    whereConds = [...conds, ...orderConds];
+    whereParams = [...params, ...orderParams];
+  }
 
   const [rows] = await pool.query(
     `
@@ -110,16 +137,43 @@ async function getReturnRevenueByRange(pool, { from, to, salespersonId = null, s
   return parseFloat(rows?.[0]?.return_revenue) || 0;
 }
 
-async function getReturnOrdersCountByRange(pool, { from, to, salespersonId = null, shopId = null }) {
-  const { conds, params } = buildRangeConds('r', from, to);
-  const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
-    orderAlias: 'o',
-    salespersonId,
-    groupId: null,
-    shopId,
-  });
-  const whereConds = [...conds, ...orderConds];
-  const whereParams = [...params, ...orderParams];
+async function getReturnOrdersCountByRange(pool, {
+  from,
+  to,
+  salespersonId = null,
+  shopId = null,
+  groupId = null,
+  payrollPeriodId = null,
+}) {
+  let whereConds;
+  let whereParams;
+  if (payrollPeriodId != null) {
+    whereConds = [
+      `EXISTS (SELECT 1 FROM payroll_periods pp
+        WHERE pp.id = ? AND pp.shop_id = o.shop_id
+          AND r.created_at >= pp.from_at
+          AND (pp.to_at IS NULL OR r.created_at <= pp.to_at))`,
+    ];
+    whereParams = [payrollPeriodId];
+    const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
+      orderAlias: 'o',
+      salespersonId,
+      groupId,
+      shopId,
+    });
+    whereConds.push(...orderConds);
+    whereParams.push(...orderParams);
+  } else {
+    const { conds, params } = buildRangeConds('r', from, to);
+    const { conds: orderConds, params: orderParams } = buildOrderScopedFilters({
+      orderAlias: 'o',
+      salespersonId,
+      groupId,
+      shopId,
+    });
+    whereConds = [...conds, ...orderConds];
+    whereParams = [...params, ...orderParams];
+  }
 
   const [rows] = await pool.query(
     `
@@ -163,12 +217,29 @@ async function getReturnCommissionByMonthYear(pool, { month, year, userId = null
   return parseFloat(rows?.[0]?.return_commission) || 0;
 }
 
-async function getReturnCommissionByRange(pool, { from, to, userId = null, shopId = null }) {
-  const { conds, params } = buildRangeConds('ca', from, to);
+async function getReturnCommissionByRange(pool, {
+  from,
+  to,
+  userId = null,
+  shopId = null,
+  groupId = null,
+  payrollPeriodId = null,
+}) {
+  const conds = [];
+  const params = [];
+  if (payrollPeriodId != null) {
+    conds.push('o.payroll_period_id = ?');
+    params.push(payrollPeriodId);
+  } else {
+    const r = buildRangeConds('ca', from, to);
+    conds.push(...r.conds);
+    params.push(...r.params);
+  }
   conds.push("ca.type = 'direct'");
   conds.push('ca.user_id = o.salesperson_id');
   if (shopId != null) { conds.push('o.shop_id = ?'); params.push(shopId); }
   if (userId != null) { conds.push('o.salesperson_id = ?'); params.push(userId); }
+  if (groupId != null) { conds.push('o.group_id = ?'); params.push(groupId); }
 
   const [rows] = await pool.query(
     `

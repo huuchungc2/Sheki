@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   TrendingUp,
   Users,
@@ -13,6 +13,9 @@ import {
   CalendarRange,
   Filter,
   RefreshCcw,
+  Search,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import {
   BarChart,
@@ -24,22 +27,9 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { formatCurrency, cn, formatDate } from "../lib/utils";
+import { formatCurrency, cn, formatDate, isAdminUser } from "../lib/utils";
+import { useChartTheme } from "../lib/chartTheme";
 
-/* ── Chart colors — hex tĩnh để SVG fill đọc được ── */
-const CHART_COLORS = {
-  light: { primary: "#0d9488", primary80: "#14b8a6cc", primary55: "#14b8a68c", muted: "#94a3b8", muted55: "#94a3b88c", grid: "#e2e8f0" },
-  dark:  { primary: "#6366f1", primary80: "#6366f1cc", primary55: "#6366f18c", muted: "#64748b", muted55: "#64748b8c", grid: "#23252a" },
-};
-function useIsDark() {
-  const [isDark, setIsDark] = React.useState(() => document.documentElement.classList.contains("dark"));
-  React.useEffect(() => {
-    const obs = new MutationObserver(() => setIsDark(document.documentElement.classList.contains("dark")));
-    obs.observe(document.documentElement, { attributeFilter: ["class"] });
-    return () => obs.disconnect();
-  }, []);
-  return isDark;
-}
 import { exportRevenueReport } from "../lib/exportExcel";
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -56,8 +46,37 @@ function rankStyle(i: number) {
 }
 
 export function RevenueReport() {
-  const isDark = useIsDark();
-  const C = isDark ? CHART_COLORS.dark : CHART_COLORS.light;
+  const C = useChartTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const employeeId = (searchParams.get("employee") ?? "").trim();
+
+  const patchRevParams = React.useCallback(
+    (patch: Record<string, string | null | undefined>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === undefined || v === "") next.delete(k);
+            else next.set(k, v);
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const [currentUser, setCurrentUser] = React.useState<any>(() => {
+    try {
+      const u = localStorage.getItem("user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  });
+  const isAdmin = isAdminUser(currentUser);
+
   const [loading, setLoading] = React.useState(true);
   const [exporting, setExporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -72,6 +91,12 @@ export function RevenueReport() {
   const [payrollPeriods, setPayrollPeriods] = React.useState<any[]>([]);
   const [payrollPeriodId, setPayrollPeriodId] = React.useState<string>("");
   const [periodTouched, setPeriodTouched] = React.useState(false);
+
+  const [showEmployeeMenu, setShowEmployeeMenu] = React.useState(false);
+  const [employeeQuery, setEmployeeQuery] = React.useState("");
+  const [employeeOptions, setEmployeeOptions] = React.useState<any[]>([]);
+  const [employeeLoading, setEmployeeLoading] = React.useState(false);
+  const [employeeSelectedName, setEmployeeSelectedName] = React.useState("");
 
   const yearOptions = React.useMemo(() => {
     const y = new Date().getFullYear();
@@ -104,6 +129,75 @@ export function RevenueReport() {
       window.removeEventListener("storage", sync as any);
     };
   }, []);
+
+  React.useEffect(() => {
+    const syncUser = () => {
+      try {
+        const u = localStorage.getItem("user");
+        setCurrentUser(u ? JSON.parse(u) : null);
+      } catch {
+        setCurrentUser(null);
+      }
+    };
+    syncUser();
+    window.addEventListener("auth-change", syncUser as any);
+    window.addEventListener("storage", syncUser as any);
+    return () => {
+      window.removeEventListener("auth-change", syncUser as any);
+      window.removeEventListener("storage", syncUser as any);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!isAdmin || !employeeId) {
+      setEmployeeSelectedName("");
+      return;
+    }
+    let aborted = false;
+    fetch(`${API_URL}/users/${employeeId}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (aborted) return;
+        setEmployeeSelectedName(String(j?.data?.full_name || ""));
+      })
+      .catch(() => {
+        if (aborted) return;
+        setEmployeeSelectedName("");
+      });
+    return () => {
+      aborted = true;
+    };
+  }, [isAdmin, employeeId, token]);
+
+  React.useEffect(() => {
+    if (!isAdmin || !showEmployeeMenu) return;
+    const q = employeeQuery.trim();
+    const t = window.setTimeout(async () => {
+      try {
+        setEmployeeLoading(true);
+        const params = new URLSearchParams({
+          scoped: "1",
+          limit: "20",
+          active_only: "1",
+          ...(q ? { search: q } : {}),
+        });
+        const res = await fetch(`${API_URL}/users?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const j = await res.json();
+        setEmployeeOptions(j?.data || []);
+      } catch {
+        setEmployeeOptions([]);
+      } finally {
+        setEmployeeLoading(false);
+      }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [isAdmin, showEmployeeMenu, employeeQuery, token]);
+
+  React.useEffect(() => {
+    if (isAdmin || !employeeId) return;
+    patchRevParams({ employee: null });
+  }, [isAdmin, employeeId, patchRevParams]);
 
   const fetchPayrollPeriods = React.useCallback(async (): Promise<string | null> => {
     try {
@@ -148,6 +242,7 @@ export function RevenueReport() {
         params.set("year", year);
       }
       if (groupId) params.set("group_id", groupId);
+      if (isAdmin && employeeId) params.set("employee", employeeId);
       const res = await fetch(`${API_URL}/reports/revenue?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -163,7 +258,7 @@ export function RevenueReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, year, groupId, token, filterMode, fetchPayrollPeriods]);
+  }, [month, year, groupId, token, filterMode, fetchPayrollPeriods, isAdmin, employeeId]);
 
   React.useEffect(() => {
     fetchReport();
@@ -211,13 +306,24 @@ export function RevenueReport() {
       }
       return `Kỳ lương #${payrollPeriodId}`;
     }
-    return `Tháng ${parseInt(month, 10)}/${year}`;
+    return month === "all" ? `Năm ${year}` : `Tháng ${parseInt(month, 10)}/${year}`;
   }, [filterMode, payrollPeriodId, payrollPeriods, month, year]);
 
-  const exportPeriodDescription =
-    filterMode === "payroll" && payrollPeriodId
-      ? `${periodLabel}${groupName ? ` — Nhóm: ${groupName}` : ""}`
-      : undefined;
+  const employeeExportLabel =
+    isAdmin && employeeId ? `${employeeSelectedName || ""}`.trim() || `NV #${employeeId}` : "";
+
+  const exportPeriodDescription = React.useMemo(() => {
+    const base =
+      filterMode === "payroll" && payrollPeriodId
+        ? periodLabel
+        : month === "all"
+          ? `Năm ${year}`
+          : `Tháng ${parseInt(month, 10)}/${year}`;
+    const parts = [base];
+    if (groupName) parts.push(`Nhóm: ${groupName}`);
+    if (employeeExportLabel) parts.push(`Nhân viên: ${employeeExportLabel}`);
+    return parts.join(" — ");
+  }, [filterMode, payrollPeriodId, periodLabel, month, year, groupName, employeeExportLabel]);
 
   const handleExport = () => {
     setExporting(true);
@@ -230,6 +336,7 @@ export function RevenueReport() {
         groupName,
         periodDescription: exportPeriodDescription,
         payrollPeriodId: filterMode === "payroll" && payrollPeriodId ? payrollPeriodId : undefined,
+        employeeId: isAdmin && employeeId ? employeeId : undefined,
       });
     } finally {
       setExporting(false);
@@ -264,7 +371,7 @@ export function RevenueReport() {
   }
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden pb-8">
       {/* Tiêu đề — cùng nhịp với Dashboard */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -297,12 +404,105 @@ export function RevenueReport() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Lọc báo cáo</p>
-            <p className="text-xs text-muted-foreground">Chọn nhóm và kỳ (tháng/năm hoặc kỳ lương)</p>
+            <p className="text-xs text-muted-foreground">
+              {isAdmin ? "Admin: nhân viên (salesperson), " : ""}nhóm bán hàng, kỳ (tháng/năm hoặc kỳ lương)
+            </p>
           </div>
         </div>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-1 lg:flex-wrap lg:gap-3">
-            <label className="flex min-w-0 flex-col gap-1.5 lg:min-w-[200px]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
+          <div className="flex w-full min-w-0 flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-3 lg:flex lg:flex-row lg:flex-wrap lg:items-end lg:gap-3">
+            {isAdmin ? (
+              <div className="relative flex min-w-[200px] flex-col gap-1.5 sm:min-w-0 lg:min-w-[220px]">
+                <span className="text-xs font-medium text-muted-foreground">Nhân viên (salesperson)</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEmployeeMenu((v) => !v);
+                    setEmployeeQuery("");
+                  }}
+                  className="flex h-11 min-h-[44px] items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2.5 text-left text-sm font-semibold text-foreground shadow-sm outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  title="Lọc báo cáo theo nhân viên bán (salesperson)"
+                >
+                  <span className="truncate">
+                    {employeeId ? employeeSelectedName || `NV #${employeeId}` : "Tất cả nhân viên"}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                </button>
+                {showEmployeeMenu ? (
+                  <div className="absolute left-0 top-full z-50 mt-1 w-[18rem] overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-lg">
+                    <div className="border-b border-border p-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                          value={employeeQuery}
+                          onChange={(e) => setEmployeeQuery(e.target.value)}
+                          placeholder="Gõ tên/username/phone..."
+                          className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowEmployeeMenu(false)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          title="Đóng"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          patchRevParams({ employee: null });
+                          setShowEmployeeMenu(false);
+                        }}
+                        className={cn(
+                          "mt-2 w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                          !employeeId ? "bg-accent font-semibold text-accent-foreground" : "text-foreground hover:bg-accent/50"
+                        )}
+                      >
+                        Tất cả nhân viên
+                      </button>
+                    </div>
+                    <div className="max-h-72 overflow-auto">
+                      {employeeLoading ? (
+                        <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Đang tải...
+                        </div>
+                      ) : employeeOptions.length === 0 ? (
+                        <div className="px-3 py-3 text-sm text-muted-foreground">Không tìm thấy nhân viên</div>
+                      ) : (
+                        employeeOptions.map((emp: any) => (
+                          <button
+                            key={emp.id}
+                            type="button"
+                            onClick={() => {
+                              patchRevParams({ employee: String(emp.id) });
+                              setEmployeeSelectedName(String(emp.full_name || ""));
+                              setShowEmployeeMenu(false);
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/50",
+                              String(employeeId) === String(emp.id)
+                                ? "bg-accent font-semibold text-accent-foreground"
+                                : "text-foreground"
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="truncate">{emp.full_name}</span>
+                              <span className="shrink-0 text-xs text-muted-foreground">#{emp.id}</span>
+                            </div>
+                            {emp.username ? (
+                              <div className="mt-0.5 truncate text-xs text-muted-foreground">{emp.username}</div>
+                            ) : null}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <label className="flex min-w-[180px] flex-col gap-1.5 sm:min-w-0">
               <span className="text-xs font-medium text-muted-foreground">Nhóm bán hàng</span>
               <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={selectCls}>
                 <option value="">Tất cả nhóm</option>
@@ -313,10 +513,10 @@ export function RevenueReport() {
                 ))}
               </select>
             </label>
-            <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2 lg:min-w-[260px]">
               <span className="text-xs font-medium text-muted-foreground">Cách lọc kỳ</span>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-border bg-muted/30 p-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="inline-flex shrink-0 rounded-xl border border-border bg-muted/30 p-1">
                   <button
                     type="button"
                     onClick={() => setFilterMode("payroll")}
@@ -350,7 +550,7 @@ export function RevenueReport() {
                         setPeriodTouched(true);
                         setPayrollPeriodId(e.target.value);
                       }}
-                      className={cn(selectCls, "min-w-[12rem] flex-1")}
+                      className={cn(selectCls, "w-full min-w-[12rem] max-w-md sm:w-auto")}
                     >
                       {payrollPeriods.map((p: any) => (
                         <option key={p.id} value={String(p.id)}>
@@ -373,6 +573,7 @@ export function RevenueReport() {
                     <label className="flex min-w-0 flex-col gap-1 lg:w-[140px]">
                       <span className="sr-only">Tháng</span>
                       <select value={month} onChange={(e) => setMonth(e.target.value)} className={selectCls}>
+                        <option value="all">Tất cả (cả năm)</option>
                         {Array.from({ length: 12 }, (_, i) => (
                           <option key={i + 1} value={String(i + 1).padStart(2, "0")}>
                             Tháng {i + 1}
@@ -408,6 +609,11 @@ export function RevenueReport() {
             Xuất Excel
           </button>
         </div>
+        {isAdmin && employeeId ? (
+          <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+            Báo cáo đang lọc theo nhân viên bán (salesperson): chỉ đơn/HH gắn với NV này trong kỳ đã chọn.
+          </p>
+        ) : null}
       </div>
 
       {/* KPI — giống Dashboard: icon tròn + số rõ */}
@@ -598,7 +804,9 @@ export function RevenueReport() {
           <p className="text-base font-semibold text-foreground">Chưa có dữ liệu doanh thu</p>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">
             Trong kỳ {periodLabel}
-            {groupName ? ` — nhóm «${groupName}»` : ""} chưa ghi nhận đơn hoàn thành phân bổ cho nhân viên. Thử đổi kỳ lương / tháng-năm hoặc nhóm.
+            {groupName ? ` — nhóm «${groupName}»` : ""}
+            {employeeExportLabel ? ` — nhân viên «${employeeExportLabel}»` : ""} chưa ghi nhận đơn hoàn thành phân bổ cho nhân viên. Thử đổi kỳ lương / tháng-năm hoặc nhóm
+            {employeeExportLabel ? " / bỏ lọc NV" : ""}.
           </p>
         </div>
       )}

@@ -1,9 +1,24 @@
 import * as React from "react";
-import { Loader2, Calendar, Lock, Unlock, RefreshCcw, Download } from "lucide-react";
-import { cn, formatCurrency, formatDate } from "../lib/utils";
+import { useSearchParams } from "react-router-dom";
+import {
+  Loader2,
+  Calendar,
+  Lock,
+  Unlock,
+  RefreshCcw,
+  Download,
+  Filter,
+  Search,
+  ChevronDown,
+  X,
+} from "lucide-react";
+import { cn, formatCurrency, formatDate, isAdminUser } from "../lib/utils";
 import { exportPayrollPeriodPreview } from "../lib/exportExcel";
 
 const API_URL = (import.meta as any)?.env?.VITE_API_URL || "/api";
+
+const payrollSelectCls =
+  "min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 type Period = {
   id: number;
@@ -14,6 +29,41 @@ type Period = {
 };
 
 export function PayrollPeriods() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const employeeIdRaw = (searchParams.get("employee") ?? "").trim();
+  const patchSearchParams = React.useCallback(
+    (patch: Record<string, string | null | undefined>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === undefined || v === "") next.delete(k);
+            else next.set(k, v);
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const [currentUser, setCurrentUser] = React.useState<any>(() => {
+    try {
+      const u = localStorage.getItem("user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  });
+  const isAdmin = isAdminUser(currentUser);
+  const previewEmployeeId =
+    isAdmin && employeeIdRaw && /^\d+$/.test(employeeIdRaw) ? employeeIdRaw : null;
+
+  React.useEffect(() => {
+    if (!isAdmin && employeeIdRaw) patchSearchParams({ employee: null });
+  }, [isAdmin, employeeIdRaw, patchSearchParams]);
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [periods, setPeriods] = React.useState<Period[]>([]);
@@ -23,6 +73,50 @@ export function PayrollPeriods() {
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [exporting, setExporting] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<number | null>(null);
+
+  const [showEmployeeMenu, setShowEmployeeMenu] = React.useState(false);
+  const [employeeQuery, setEmployeeQuery] = React.useState("");
+  const [employeeOptions, setEmployeeOptions] = React.useState<any[]>([]);
+  const [employeeLoading, setEmployeeLoading] = React.useState(false);
+  const [employeeSelectedName, setEmployeeSelectedName] = React.useState("");
+
+  React.useEffect(() => {
+    if (!isAdmin || !showEmployeeMenu) return;
+    const q = employeeQuery.trim();
+    const t = window.setTimeout(async () => {
+      try {
+        setEmployeeLoading(true);
+        const token = localStorage.getItem("token") || "";
+        const params = new URLSearchParams({
+          scoped: "1",
+          limit: "20",
+          active_only: "1",
+          ...(q ? { search: q } : {}),
+        });
+        const res = await fetch(`${API_URL}/users?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const j = await res.json();
+        setEmployeeOptions(j?.data || []);
+      } catch {
+        setEmployeeOptions([]);
+      } finally {
+        setEmployeeLoading(false);
+      }
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [isAdmin, showEmployeeMenu, employeeQuery]);
+
+  React.useEffect(() => {
+    if (!previewEmployeeId) {
+      setEmployeeSelectedName("");
+      return;
+    }
+    const token = localStorage.getItem("token");
+    fetch(`${API_URL}/users/${previewEmployeeId}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setEmployeeSelectedName(String(j?.data?.full_name || "")))
+      .catch(() => setEmployeeSelectedName(""));
+  }, [previewEmployeeId]);
 
   const fetchPeriods = React.useCallback(async () => {
     setLoading(true);
@@ -50,22 +144,26 @@ export function PayrollPeriods() {
     }
   }, []);
 
-  const fetchPreview = React.useCallback(async (periodId: number) => {
-    setPreviewLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/payroll/periods/${periodId}/preview`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Không thể tải preview kỳ lương");
-      const j = await res.json();
-      setPreviewRows(j?.data ?? []);
-    } catch {
-      setPreviewRows([]);
-    } finally {
-      setPreviewLoading(false);
-    }
-  }, []);
+  const fetchPreview = React.useCallback(
+    async (periodId: number) => {
+      setPreviewLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        const empQ = previewEmployeeId ? `?employee=${encodeURIComponent(previewEmployeeId)}` : "";
+        const res = await fetch(`${API_URL}/payroll/periods/${periodId}/preview${empQ}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Không thể tải preview kỳ lương");
+        const j = await res.json();
+        setPreviewRows(j?.data ?? []);
+      } catch {
+        setPreviewRows([]);
+      } finally {
+        setPreviewLoading(false);
+      }
+    },
+    [previewEmployeeId]
+  );
 
   React.useEffect(() => {
     fetchPeriods();
@@ -74,6 +172,19 @@ export function PayrollPeriods() {
   React.useEffect(() => {
     if (selectedId != null) fetchPreview(selectedId);
   }, [selectedId, fetchPreview]);
+
+  React.useEffect(() => {
+    const onAuth = () => {
+      try {
+        const u = localStorage.getItem("user");
+        setCurrentUser(u ? JSON.parse(u) : null);
+      } catch {
+        setCurrentUser(null);
+      }
+    };
+    window.addEventListener("auth-change", onAuth as any);
+    return () => window.removeEventListener("auth-change", onAuth as any);
+  }, []);
 
   const closeNow = async () => {
     if (!current?.id) return;
@@ -128,11 +239,13 @@ export function PayrollPeriods() {
         periodFrom: p?.from_at,
         periodTo: p?.to_at,
         periodStatus: p?.status,
+        filteredEmployeeId: previewEmployeeId ? Number(previewEmployeeId) : null,
+        filteredEmployeeName: previewEmployeeId ? employeeSelectedName || null : null,
       });
     } finally {
       setExporting(false);
     }
-  }, [selectedId, previewRows, periods]);
+  }, [selectedId, previewRows, periods, previewEmployeeId, employeeSelectedName]);
 
   const rebuildSettlements = async () => {
     if (!selected?.id) return;
@@ -230,41 +343,155 @@ export function PayrollPeriods() {
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-semibold text-foreground">Chọn kỳ</span>
-          <select
-            value={selectedId ?? ""}
-            onChange={(e) => setSelectedId(e.target.value ? Number(e.target.value) : null)}
-            className="ml-auto px-3 py-2 bg-background border border-input rounded-md text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>
-                #{p.id} • {p.status === "open" ? "Đang mở" : "Đã chốt"} • {formatDate(p.from_at)}
-                {p.to_at ? ` → ${formatDate(p.to_at)}` : ""}
-              </option>
-            ))}
-          </select>
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5 space-y-4">
+        <div className="flex items-center gap-2 text-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Filter className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Lọc preview lương</p>
+            <p className="text-xs text-muted-foreground">
+              Chọn kỳ lương{isAdmin ? ", Admin: nhân viên (salesperson / dòng lương theo user_id)" : ""}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+          <label className="flex flex-col gap-1.5 min-w-[220px] flex-1">
+            <span className="text-xs font-medium text-muted-foreground">Kỳ lương</span>
+            <select
+              value={selectedId ?? ""}
+              onChange={(e) => setSelectedId(e.target.value ? Number(e.target.value) : null)}
+              className={payrollSelectCls}
+            >
+              {periods.map((p) => (
+                <option key={p.id} value={p.id}>
+                  #{p.id} • {p.status === "open" ? "Đang mở" : "Đã chốt"} • {formatDate(p.from_at)}
+                  {p.to_at ? ` → ${formatDate(p.to_at)}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          {isAdmin ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmployeeMenu((v) => !v);
+                  setEmployeeQuery("");
+                }}
+                className="flex h-10 min-w-[200px] items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent/50"
+                title="Lọc preview theo một nhân viên (user_id trên bảng lương)"
+              >
+                <span className="truncate">
+                  {previewEmployeeId
+                    ? employeeSelectedName || `NV #${previewEmployeeId}`
+                    : "Tất cả nhân viên"}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </button>
+              {showEmployeeMenu && (
+                <div className="absolute left-0 top-full z-50 mt-1 w-[18rem] overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-lg">
+                  <div className="border-b border-border p-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        value={employeeQuery}
+                        onChange={(e) => setEmployeeQuery(e.target.value)}
+                        placeholder="Gõ tên/username/phone..."
+                        className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmployeeMenu(false)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        title="Đóng"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        patchSearchParams({ employee: null });
+                        setShowEmployeeMenu(false);
+                      }}
+                      className={cn(
+                        "mt-2 w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        !previewEmployeeId
+                          ? "bg-accent font-semibold text-accent-foreground"
+                          : "text-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      Tất cả nhân viên
+                    </button>
+                  </div>
+                  <div className="max-h-72 overflow-auto">
+                    {employeeLoading ? (
+                      <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang tải...
+                      </div>
+                    ) : employeeOptions.length === 0 ? (
+                      <div className="px-3 py-3 text-sm text-muted-foreground">Không tìm thấy nhân viên</div>
+                    ) : (
+                      employeeOptions.map((emp: any) => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => {
+                            patchSearchParams({ employee: String(emp.id) });
+                            setEmployeeSelectedName(String(emp.full_name || ""));
+                            setShowEmployeeMenu(false);
+                          }}
+                          className={cn(
+                            "w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/50",
+                            String(previewEmployeeId) === String(emp.id)
+                              ? "bg-accent font-semibold text-accent-foreground"
+                              : "text-foreground"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate">{emp.full_name}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">#{emp.id}</span>
+                          </div>
+                          {emp.username ? (
+                            <div className="mt-0.5 truncate text-xs text-muted-foreground">{emp.username}</div>
+                          ) : null}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
+        {previewEmployeeId && isAdmin ? (
+          <p className="text-xs text-muted-foreground">
+            Preview chỉ hiển thị một dòng lương theo <span className="font-semibold text-foreground">user_id</span> đã chọn
+            (HH direct/ship/NV chịu theo đơn salesperson; HH override/hoàn QL theo user nhận override).
+          </p>
+        ) : null}
+
         {selected && (
-          <div className="text-xs text-muted-foreground flex items-center gap-2">
+          <div className="flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
             {selected.status === "open" ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-accent-foreground font-semibold border border-border">
-                <Unlock className="w-3 h-3" /> Đang mở
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-accent px-2 py-0.5 font-semibold text-accent-foreground">
+                <Unlock className="h-3 w-3" /> Đang mở
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-semibold border border-border">
-                <Lock className="w-3 h-3" /> Đã chốt
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
+                <Lock className="h-3 w-3" /> Đã chốt
               </span>
             )}
             <span>
-              Từ <span className="font-semibold">{formatDate(selected.from_at)}</span>
+              Từ <span className="font-semibold text-foreground">{formatDate(selected.from_at)}</span>
               {selected.to_at ? (
                 <>
                   {" "}
-                  đến <span className="font-semibold">{formatDate(selected.to_at)}</span>
+                  đến <span className="font-semibold text-foreground">{formatDate(selected.to_at)}</span>
                 </>
               ) : null}
             </span>
@@ -294,7 +521,11 @@ export function PayrollPeriods() {
           </div>
         </div>
         {previewRows.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground text-sm">Chưa có dữ liệu trong kỳ này</div>
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            {previewEmployeeId
+              ? "Không có dữ liệu lương cho nhân viên đã chọn trong kỳ này."
+              : "Chưa có dữ liệu trong kỳ này"}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <p className="text-xs text-muted-foreground px-5 pt-4 pb-1 leading-relaxed">

@@ -185,6 +185,11 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
   try {
     const pool = await getPool();
     const { month, year, group_id, payroll_period_id, page = 1, limit = 20, user_id } = req.query;
+    // month=all => filter theo năm (bỏ filter theo tháng)
+    const monthRaw = month != null ? String(month).trim() : '';
+    const monthNum = monthRaw && monthRaw !== 'all' ? parseInt(monthRaw, 10) : null;
+    const yearRaw = year != null ? String(year).trim() : '';
+    const yearNum = yearRaw ? parseInt(yearRaw, 10) : null;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const conditions = ['o.shop_id = ?'];
@@ -235,17 +240,17 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
       );
       baseParams.push(pid, pid);
     } else {
-      if (month) {
+      if (monthNum != null && Number.isFinite(monthNum)) {
         conditions.push(
           '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o.created_at) = ?))'
         );
-        baseParams.push(parseInt(month, 10), parseInt(month, 10));
+        baseParams.push(monthNum, monthNum);
       }
-      if (year) {
+      if (yearNum != null && Number.isFinite(yearNum)) {
         conditions.push(
           '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o.created_at) = ?))'
         );
-        baseParams.push(parseInt(year, 10), parseInt(year, 10));
+        baseParams.push(yearNum, yearNum);
       }
     }
     // group_id is enforced above for scope=group; for others, allow explicit filter
@@ -336,17 +341,17 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
         );
         summaryParams.push(pid, pid);
       } else {
-        if (month) {
+        if (monthNum != null && Number.isFinite(monthNum)) {
           summaryConds.push(
             '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o.created_at) = ?))'
           );
-          summaryParams.push(parseInt(month, 10), parseInt(month, 10));
+          summaryParams.push(monthNum, monthNum);
         }
-        if (year) {
+        if (yearNum != null && Number.isFinite(yearNum)) {
           summaryConds.push(
             '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o.created_at) = ?))'
           );
-          summaryParams.push(parseInt(year, 10), parseInt(year, 10));
+          summaryParams.push(yearNum, yearNum);
         }
       }
       if (group_id) {
@@ -385,17 +390,17 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
         );
         summaryParams.push(pid, pid);
       } else {
-        if (month) {
+        if (monthNum != null && Number.isFinite(monthNum)) {
           summaryConds.push(
             '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o.created_at) = ?))'
           );
-          summaryParams.push(parseInt(month, 10), parseInt(month, 10));
+          summaryParams.push(monthNum, monthNum);
         }
-        if (year) {
+        if (yearNum != null && Number.isFinite(yearNum)) {
           summaryConds.push(
             '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o.created_at) = ?))'
           );
-          summaryParams.push(parseInt(year, 10), parseInt(year, 10));
+          summaryParams.push(yearNum, yearNum);
         }
       }
       if (group_id) {

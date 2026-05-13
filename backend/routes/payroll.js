@@ -295,7 +295,7 @@ router.get('/periods/:id/preview', auth, requireShop, requireFeature('reports.sa
     const nameMap = new Map(users.map((u) => [Number(u.id), String(u.full_name)]));
 
     const baseMap = new Map(directShipRows.map((r) => [Number(r.user_id), r]));
-    const out = ids.map((uid) => {
+    let out = ids.map((uid) => {
       const b = baseMap.get(uid) || {};
       const direct = parseFloat(b.direct_commission) || 0;
       const ship = parseFloat(b.ship_khach_tra) || 0;
@@ -321,6 +321,11 @@ router.get('/periods/:id/preview', auth, requireShop, requireFeature('reports.sa
         total_luong: totalLuong,
       };
     });
+
+    const empFilter = parseInt(String(req.query.employee ?? '').trim(), 10);
+    if (Number.isFinite(empFilter) && empFilter > 0) {
+      out = out.filter((row) => Number(row.user_id) === empFilter);
+    }
 
     out.sort((a, b) => (Number(b.total_luong) || 0) - (Number(a.total_luong) || 0));
     res.json({ data: out });
