@@ -781,7 +781,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {currentUser?.email || "Chưa đăng nhập"}
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white font-bold shadow-lg shadow-teal-500/20 cursor-pointer hover:ring-2 hover:ring-teal-300 transition-all"
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
                 {currentUser?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || "U"}

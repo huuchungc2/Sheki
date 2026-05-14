@@ -91,39 +91,44 @@
 :root {
   --radius: 1.2rem;
 
-  /* Surface */
-  --background: #F5F7FA;
-  --foreground: #111827;
+  /* Surface — giống MutilProxy #F1F6FC */
+  --background: #F1F6FC;
+  --foreground: #162130;
 
   --card: #FFFFFF;
-  --card-foreground: #111827;
+  --card-foreground: #162130;
 
   --popover: #FFFFFF;
-  --popover-foreground: #111827;
+  --popover-foreground: #162130;
 
-  /* Primary */
+  /* Primary — #2563FF */
   --primary: #2563FF;
   --primary-foreground: #FFFFFF;
 
   /* Secondary */
-  --secondary: #EEF4FF;
-  --secondary-foreground: #2563FF;
+  --secondary: #EBF5FF;
+  --secondary-foreground: #1E6FD9;
 
   /* Muted */
-  --muted: #F3F4F6;
-  --muted-foreground: #6B7280;
+  --muted: #F3F6FB;
+  --muted-foreground: #54657B;
 
-  /* Accent */
-  --accent: #EAF1FF;
-  --accent-foreground: #2563FF;
+  /* Accent — soft blue tint */
+  --accent: #EBF5FF;
+  --accent-foreground: #1E6FD9;
 
   /* Semantic */
   --destructive: #EF4444;
 
-  /* Border */
-  --border: #E5E7EB;
-  --input: #D1D5DB;
+  /* Border — MutilProxy #D1DFEF */
+  --border: #D1DFEF;
+  --input: #C4D4E8;
   --ring: #2563FF;
+
+  /* Glow — MutilProxy rgba(66,165,255,0.25) */
+  --glow: rgba(37, 99, 255, 0.25);
+  --glow-md: rgba(37, 99, 255, 0.18);
+  --shadow-glow: 0 0 32px var(--glow);
 
   /* Charts */
   --chart-1: #2563FF;
@@ -138,7 +143,7 @@
   --recharts-primary-55: #2563FF8C;
   --recharts-muted: #94A3B8;
   --recharts-muted-55: #94A3B88C;
-  --recharts-grid: #E2E8F0;
+  --recharts-grid: #D1DFEF;
 
   --recharts-amber: #F59E0B;
   --recharts-red: #EF4444;
@@ -163,28 +168,28 @@
   --kpi-success-border: #A7F3D0; /* emerald-200 */
 
   /* Dashboard KPI palette (theo tên KPI) */
-  --kpi-revenue: #1E40AF; /* blue-800 (đậm hơn) */
-  --kpi-orders: #4F46E5; /* indigo */
+  --kpi-revenue: #2563FF; /* blue-800 (đậm hơn) */
+  --kpi-orders: #2563FF; /* indigo */
   --kpi-commission: #2563FF; /* primary */
-  --kpi-commission-direct: #16A34A; /* green */
+  --kpi-commission-direct: #0891B2; /* cyan-600 — nhẹ hơn green */
   --kpi-customers: #F59E0B; /* amber */
-  --kpi-returns: #EF4444; /* destructive */
-  --kpi-return-commission: #EF4444; /* destructive */
+  --kpi-returns: #D97706; /* amber-600 — warning */
+  --kpi-return-commission: #D97706; /* amber-600 */
   --kpi-ship: #0284C7; /* sky */
-  --kpi-absorbed: #E11D48; /* rose */
+  --kpi-absorbed: #6366F1; /* indigo */
   --kpi-salary: #7C3AED; /* violet */
 
-  /* Sidebar */
+  /* Sidebar — trắng như MutilProxy */
   --sidebar: #FFFFFF;
-  --sidebar-foreground: #374151;
+  --sidebar-foreground: #162130;
 
   --sidebar-primary: #2563FF;
   --sidebar-primary-foreground: #FFFFFF;
 
-  --sidebar-accent: #EEF4FF;
-  --sidebar-accent-foreground: #2563FF;
+  --sidebar-accent: #EBF5FF;
+  --sidebar-accent-foreground: #1E6FD9;
 
-  --sidebar-border: #E5E7EB;
+  --sidebar-border: #D1DFEF;
   --sidebar-ring: #2563FF;
 }
 
@@ -192,45 +197,50 @@
    DARK MODE — Linear Lavender
 ══════════════════════════════════════════════════════════ */
 .dark {
-  --background: #0B0F1A;
-  --foreground: #F9FAFB;
+  --background: #0B1120;
+  --foreground: #E2E8F0;
 
   --card: #111827;
-  --card-foreground: #F9FAFB;
+  --card-foreground: #E2E8F0;
 
   --popover: #111827;
-  --popover-foreground: #F9FAFB;
+  --popover-foreground: #E2E8F0;
 
-  --primary: #3B82F6;
-  --primary-foreground: #FFFFFF;
+  --primary: #2563FF;
+  --primary-foreground: #0B1120;
 
-  --secondary: #172033;
-  --secondary-foreground: #E5E7EB;
+  --secondary: #1A2332;
+  --secondary-foreground: #E2E8F0;
 
-  --muted: #1F2937;
-  --muted-foreground: #9CA3AF;
+  --muted: #1A2332;
+  --muted-foreground: #94A3B8;
 
-  --accent: #172554;
+  --accent: #1A2744;
   --accent-foreground: #93C5FD;
 
   --destructive: #EF4444;
 
   --border: #1F2937;
   --input: #374151;
-  --ring: #3B82F6;
+  --ring: #2563FF;
 
-  --chart-1: #3B82F6;
+  /* Glow dark */
+  --glow: rgba(37, 99, 255, 0.2);
+  --glow-md: rgba(37, 99, 255, 0.12);
+  --shadow-glow: 0 0 32px var(--glow);
+
+  --chart-1: #2563FF;
   --chart-2: #60A5FA;
   --chart-3: #93C5FD;
   --chart-4: #1D4ED8;
   --chart-5: #BFDBFE;
 
-  --recharts-primary: #3B82F6;
-  --recharts-primary-80: #3B82F6CC;
-  --recharts-primary-55: #3B82F68C;
+  --recharts-primary: #2563FF;
+  --recharts-primary-80: #2563FFCC;
+  --recharts-primary-55: #2563FF8C;
   --recharts-muted: #64748B;
   --recharts-muted-55: #64748B8C;
-  --recharts-grid: #1E293B;
+  --recharts-grid: #1F2937;
 
   --recharts-amber: #FBBF24;
   --recharts-red: #F87171;
@@ -258,25 +268,25 @@
   --kpi-revenue: #60A5FA; /* blue-400 (đậm + dễ đọc trên dark) */
   --kpi-orders: #A5B4FC; /* indigo/lavender */
   --kpi-commission: #93C5FD; /* blue-300 */
-  --kpi-commission-direct: #4ADE80; /* green-400 */
+  --kpi-commission-direct: #22D3EE; /* cyan-400 dark */
   --kpi-customers: #FBBF24; /* amber-400 */
-  --kpi-returns: #F87171; /* red-400 */
-  --kpi-return-commission: #F87171; /* red-400 */
+  --kpi-returns: #FBBF24; /* amber-400 dark */
+  --kpi-return-commission: #FBBF24; /* amber-400 dark */
   --kpi-ship: #38BDF8; /* sky-400 */
-  --kpi-absorbed: #FB7185; /* rose-400 */
+  --kpi-absorbed: #818CF8; /* indigo-400 dark */
   --kpi-salary: #C4B5FD; /* violet-300 */
 
   --sidebar: #111827;
-  --sidebar-foreground: #F3F4F6;
+  --sidebar-foreground: #E2E8F0;
 
-  --sidebar-primary: #3B82F6;
-  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-primary: #2563FF;
+  --sidebar-primary-foreground: #0B1120;
 
-  --sidebar-accent: #172554;
+  --sidebar-accent: #1A2744;
   --sidebar-accent-foreground: #93C5FD;
 
   --sidebar-border: #1F2937;
-  --sidebar-ring: #3B82F6;
+  --sidebar-ring: #2563FF;
 }
 
 @layer utilities {
@@ -329,13 +339,13 @@
   .kpi-card--ship,
   .kpi-card--absorbed,
   .kpi-card--salary {
-    --kpi-card-bg: color-mix(in oklab, var(--kpi-accent) 7%, var(--card));
-    --kpi-card-border: color-mix(in oklab, var(--kpi-accent) 18%, var(--border));
+    --kpi-card-bg: color-mix(in oklab, var(--kpi-accent) 4%, var(--card));
+    --kpi-card-border: color-mix(in oklab, var(--kpi-accent) 10%, var(--border));
   }
   /* Doanh thu nổi hơn chút */
   .kpi-card--revenue {
-    --kpi-card-bg: color-mix(in oklab, var(--kpi-accent) 10%, var(--card));
-    --kpi-card-border: color-mix(in oklab, var(--kpi-accent) 24%, var(--border));
+    --kpi-card-bg: color-mix(in oklab, var(--kpi-accent) 6%, var(--card));
+    --kpi-card-border: color-mix(in oklab, var(--kpi-accent) 14%, var(--border));
   }
 
   .kpi-icon {
@@ -355,7 +365,7 @@
   .kpi-icon--ship,
   .kpi-icon--absorbed,
   .kpi-icon--salary {
-    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 14%, transparent);
+    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 10%, transparent);
     --kpi-icon-fg: var(--kpi-accent);
     --kpi-metric-fg: var(--kpi-accent);
     --kpi-title-fg: color-mix(in oklab, var(--kpi-accent) 75%, var(--muted-foreground));
@@ -363,7 +373,7 @@
 
   .kpi-icon--commission-direct {
     --kpi-accent: var(--kpi-commission-direct);
-    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 14%, transparent);
+    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 10%, transparent);
     --kpi-icon-fg: var(--kpi-accent);
     --kpi-metric-fg: var(--kpi-accent);
     --kpi-title-fg: color-mix(in oklab, var(--kpi-accent) 75%, var(--muted-foreground));
@@ -372,7 +382,7 @@
   .kpi-icon--returns,
   .kpi-icon--return-commission {
     --kpi-accent: var(--kpi-returns);
-    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 14%, transparent);
+    --kpi-icon-bg: color-mix(in oklab, var(--kpi-accent) 10%, transparent);
     --kpi-icon-fg: var(--kpi-accent);
     --kpi-metric-fg: var(--kpi-accent);
     --kpi-title-fg: color-mix(in oklab, var(--kpi-accent) 78%, var(--muted-foreground));
@@ -396,4 +406,67 @@
   .kpi-icon--ship { --kpi-accent: var(--kpi-ship); }
   .kpi-icon--absorbed { --kpi-accent: var(--kpi-absorbed); }
   .kpi-icon--salary { --kpi-accent: var(--kpi-salary); }
+}
+
+/* ══════════════════════════════════════════════════════════
+   MUTILPROXY-STYLE EFFECTS
+══════════════════════════════════════════════════════════ */
+
+/* Card hover — translateY + shadow tăng */
+.card, [class*="rounded-xl"], [class*="rounded-2xl"] {
+  transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.10);
+  border-color: var(--primary);
+}
+
+/* Button primary glow */
+.btn-glow,
+button[class*="bg-primary"],
+a[class*="bg-primary"] {
+  box-shadow: 0 4px 16px var(--glow);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.btn-glow:hover,
+button[class*="bg-primary"]:hover,
+a[class*="bg-primary"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--glow);
+}
+
+/* Glow utility class — dùng trực tiếp nếu cần */
+.shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+.shadow-glow-md {
+  box-shadow: 0 4px 16px var(--glow-md);
+}
+
+/* Navbar scroll transition — thêm cho smooth */
+header {
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Scrollbar mỏng hơn */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+
+/* ── KPI Card hover ── */
+.kpi-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  cursor: default;
+}
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  border-color: color-mix(in oklab, var(--kpi-accent, var(--primary)) 40%, var(--border));
+}
+
+/* ── bg-card sections hover (Top sản phẩm, Đơn gần đây, Top KH) ── */
+.bg-card.rounded-xl {
+  transition: box-shadow 0.25s ease;
+}
+.bg-card.rounded-xl:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }

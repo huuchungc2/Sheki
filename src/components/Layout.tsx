@@ -198,6 +198,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return (localStorage.getItem("sheki-theme") ?? "light") === "dark";
   });
 
+  // Scroll-aware header (kiểu MutilProxy: transparent → frosted glass)
+  const [isScrolled, setIsScrolled] = React.useState(false);
+  React.useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const toggleTheme = () => {
     const next = isDark ? "light" : "dark";
     setIsDark(!isDark);
@@ -616,8 +624,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* TopBar — safe-area-inset-top: PWA standalone (iPhone) tránh menu 3 gạch dính sát / dưới giờ pin */}
         <header
           className={cn(
-            "bg-background/95 backdrop-blur-md border-b border-border shadow-sm sticky top-0 z-50 isolate touch-manipulation supports-[backdrop-filter]:bg-background/90",
+            "sticky top-0 z-50 isolate touch-manipulation transition-all duration-300",
             "pt-[env(safe-area-inset-top,0px)]",
+            isScrolled
+              ? "bg-background/85 backdrop-blur-xl border-b border-border shadow-sm supports-[backdrop-filter]:bg-background/80"
+              : "bg-transparent border-b border-transparent",
             isMobile && isSidebarOpen && "pointer-events-auto relative z-[60]"
           )}
         >

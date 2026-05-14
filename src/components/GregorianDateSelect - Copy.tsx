@@ -95,8 +95,7 @@ export function GregorianDateSelect({
   };
 
   const baseSelect = cn(
-    "w-full min-w-0 px-2 py-2.5 bg-muted border border-transparent focus:bg-card focus:border-primary focus:ring-4 focus:ring-ring/10 rounded-xl text-sm text-foreground outline-none transition-all duration-200 cursor-pointer",
-    "dark:bg-muted dark:focus:bg-card dark:text-foreground",
+    "w-full min-w-0 px-2 py-2.5 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm outline-none",
     selectClassName
   );
 
@@ -106,7 +105,7 @@ export function GregorianDateSelect({
   return (
     <div className={cn("relative min-w-0 max-w-full", className)}>
       {!hideIcon && (
-        <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-[1]" />
+        <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-[1]" />
       )}
       <div
         className={cn(
