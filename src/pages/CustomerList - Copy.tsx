@@ -29,10 +29,10 @@ const API_URL =
   "/api";
 
 const tierColors: Record<string, string> = {
-  Silver:   "bg-muted text-muted-foreground border border-border",
-  Gold:     "bg-[var(--status-pending-bg)] text-[var(--status-pending-fg)] border border-[var(--status-pending-border)]",
-  Platinum: "bg-[var(--status-shipping-bg)] text-[var(--status-shipping-fg)] border border-[var(--status-shipping-border)]",
-  Diamond:  "bg-accent text-accent-foreground border border-ring/20",
+  Silver: "bg-muted text-muted-foreground border border-border",
+  Gold: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50",
+  Platinum: "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900/50",
+  Diamond: "bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-900/50",
 };
 
 function getAuthToken(): string | null {

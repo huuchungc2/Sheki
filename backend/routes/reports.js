@@ -655,6 +655,87 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
       }));
     }
 
+    // ── Sale cần hỗ trợ ──
+    // Hiển thị cho:
+    //   - Admin / Super Admin / Sales scope `reports = shop`: toàn bộ sale trong shop.
+    //   - Sales scope `reports = group`: chỉ NV trong cùng nhóm với user.
+    //   - Sales scope `reports = own`: KHÔNG hiển thị (chỉ thấy chính mình cũng vô nghĩa).
+    // Sắp xếp NV 0 đơn lên đầu (ASC), rồi tăng dần theo số đơn / doanh số.
+    // CHỈ tính NV có vai trò Sales (`roles.code = 'sales'`) — loại bỏ admin, manager, CTV…
+    // Trả ĐẦY ĐỦ NV 0 đơn + tối đa 5 NV có đơn yếu nhất.
+    let bottomSales = [];
+    if (scope !== 'own') {
+      let bsGrpFrag = '';
+      let bsGrpFragP = [];
+      let userGroupRestriction = '';
+      let userGroupRestrictionP = [];
+      let canQueryBottom = true;
+
+      if (scope === 'group') {
+        const gids = Array.isArray(scopeGroupGids) ? scopeGroupGids : [];
+        if (!gids.length) {
+          canQueryBottom = false;
+        } else {
+          const ph = gids.map(() => '?').join(',');
+          bsGrpFrag = ` AND group_id IN (${ph})`;
+          bsGrpFragP = gids;
+          userGroupRestriction = ` AND EXISTS (SELECT 1 FROM user_groups ug2 JOIN \`groups\` g2 ON g2.id = ug2.group_id WHERE ug2.user_id = u.id AND g2.shop_id = ? AND ug2.group_id IN (${ph}))`;
+          userGroupRestrictionP = [shopId, ...gids];
+        }
+      } else if (filterGroupId != null) {
+        bsGrpFrag = ' AND group_id = ?';
+        bsGrpFragP = [filterGroupId];
+      }
+
+      if (canQueryBottom) {
+        const bsOrdBase = usePayrollDash
+          ? 'payroll_period_id = ? AND shop_id = ? AND status != \'cancelled\''
+          : 'MONTH(created_at) = ? AND YEAR(created_at) = ? AND shop_id = ? AND status != \'cancelled\'';
+        const bsOrdBaseP = usePayrollDash ? [payrollPidRaw, shopId] : [m + 1, y, shopId];
+
+        const bsParams = [
+          ...bsOrdBaseP,
+          ...bsGrpFragP,
+          shopId,
+          ...userGroupRestrictionP,
+          ...(filterEmployeeId != null ? [filterEmployeeId] : []),
+        ];
+
+        const [rows] = await pool.query(
+          `SELECT
+             u.id, u.full_name,
+             COALESCE(o_stats.total_orders, 0) AS total_orders,
+             COALESCE(o_stats.revenue, 0) AS revenue
+           FROM user_shops us
+           JOIN users u ON u.id = us.user_id
+           JOIN roles r ON r.id = us.role_id
+           LEFT JOIN (
+             SELECT salesperson_id,
+                    COUNT(*) AS total_orders,
+                    COALESCE(SUM(subtotal), 0) AS revenue
+             FROM orders
+             WHERE ${bsOrdBase}${bsGrpFrag}
+             GROUP BY salesperson_id
+           ) o_stats ON o_stats.salesperson_id = u.id
+           WHERE us.shop_id = ?
+             AND u.is_active = 1
+             AND r.code = 'sales'${userGroupRestriction}
+             ${filterEmployeeId != null ? ' AND u.id = ?' : ''}
+           ORDER BY total_orders ASC, revenue ASC, u.full_name ASC
+           LIMIT 50`,
+          bsParams
+        );
+        const all = rows.map(r => ({
+          ...r,
+          total_orders: parseInt(r.total_orders) || 0,
+          revenue:      parseFloat(r.revenue) || 0,
+        }));
+        const zero = all.filter((s) => s.total_orders === 0);
+        const nonZero = all.filter((s) => s.total_orders > 0).slice(0, 5);
+        bottomSales = [...zero, ...nonZero];
+      }
+    }
+
     // values computed above via shared helper
 
     // Dashboard: hiển thị doanh thu bán hàng (gross). Hoàn hàng hiển thị KPI riêng.
@@ -728,6 +809,7 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
           revenue: parseFloat(c.revenue) || 0,
         })),
         topSales,
+        bottomSales,
       }
     });
   } catch (err) {
@@ -1242,7 +1324,7 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
          GROUP BY salesperson_id
        ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE us.shop_id = ? AND u.is_active = 1
-         ${isScoped ? ' AND u.id = ?' : ''}
+         ${scope === 'own' ? ' AND u.id = ?' : ''}
        ORDER BY total_sales DESC`,
       [
         // o_stats
@@ -1261,7 +1343,7 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
         shopId, currentMonth, currentYear, ...(groupId ? [groupId] : []),
         // us.shop_id
         shopId,
-        ...(isScoped ? [scopedUserId] : []),
+        ...(scope === 'own' ? [scopedUserId] : []),
       ]
     );
 
@@ -1277,7 +1359,7 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
       ordersAllWhere.push('o.group_id = ?');
       ordersAllParams.push(groupId);
     }
-    if (isScoped) {
+    if (scope === 'own') {
       ordersAllWhere.push('o.salesperson_id = ?');
       ordersAllParams.push(scopedUserId);
     }
@@ -1345,11 +1427,11 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
     if (yearOnly) {
       const shopCond = ' AND o.shop_id = ?';
       const groupCond = Number.isFinite(groupId) ? ' AND o.group_id = ?' : '';
-      const userCond = isScoped ? ' AND c.user_id = ?' : '';
-      const userCondAdj = isScoped ? ' AND ca.user_id = ?' : '';
-      const directParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(isScoped ? [scopedUserId] : [])];
-      const ovParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(isScoped ? [scopedUserId] : [])];
-      const adjParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(isScoped ? [scopedUserId] : [])];
+      const userCond = scope === 'own' ? ' AND c.user_id = ?' : '';
+      const userCondAdj = scope === 'own' ? ' AND ca.user_id = ?' : '';
+      const directParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(scope === 'own' ? [scopedUserId] : [])];
+      const ovParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(scope === 'own' ? [scopedUserId] : [])];
+      const adjParams = [cy, shopId, ...(Number.isFinite(groupId) ? [groupId] : []), ...(scope === 'own' ? [scopedUserId] : [])];
 
       const [[dRow]] = await pool.query(
         `SELECT COALESCE(SUM(c.commission_amount), 0) AS v
@@ -1381,7 +1463,7 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
       const overrideNet = overrideComm + overrideAdj;
       kpiTotals = { directGross, overrideComm, overrideAdj, overrideNet, totalHH: directGross + overrideNet };
     } else {
-      kpiTotals = isScoped
+      kpiTotals = scope === 'own'
         ? await getCommissionMonthKpi(pool, {
             month: cm,
             year: cy,
@@ -1404,14 +1486,14 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
       ? await getReturnCommissionByRange(pool, {
           from: new Date(cy, 0, 1),
           to: new Date(cy + 1, 0, 1),
-          userId: isScoped ? scopedUserId : null,
+          userId: scope === 'own' ? scopedUserId : null,
           groupId: Number.isFinite(groupId) ? groupId : null,
           shopId,
         })
       : await getReturnCommissionByMonthYear(pool, {
           month: cm,
           year: cy,
-          userId: isScoped ? scopedUserId : null,
+          userId: scope === 'own' ? scopedUserId : null,
           groupId: Number.isFinite(groupId) ? groupId : null,
           shopId,
         }); // negative
@@ -1428,13 +1510,13 @@ router.get('/salary', auth, requireShop, requirePermission('reports', 'view'), r
         AND o.status <> 'cancelled'
         AND u.is_active = 1
         ${groupId ? ' AND o.group_id = ?' : ''}
-        ${isScoped ? ' AND o.salesperson_id = ?' : ''}
+        ${scope === 'own' ? ' AND o.salesperson_id = ?' : ''}
       `,
       [
         shopId,
         ...(yearOnly ? [cy] : [cm, cy]),
         ...(groupId ? [groupId] : []),
-        ...(isScoped ? [scopedUserId] : []),
+        ...(scope === 'own' ? [scopedUserId] : []),
       ]
     );
     const kpiShip = parseFloat(shipNvAll?.total_khach_ship) || 0;
@@ -1654,7 +1736,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
        ) ship_nv ON u.id = ship_nv.salesperson_id
        WHERE us.shop_id = ?
          AND COALESCE(o_stats.total_sales, 0) > 0
-         ${isScoped ? ' AND u.id = ?' : filterEmployeeId != null ? ' AND u.id = ?' : ''}
+         ${scope === 'own' ? ' AND u.id = ?' : filterEmployeeId != null ? ' AND u.id = ?' : ''}
        ORDER BY total_sales DESC`,
       [
         ...oStatsParams,
@@ -1663,7 +1745,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
         ...joinOrdersParams,
         ...shipParams,
         shopId,
-        ...(isScoped ? [scopedUserId] : filterEmployeeId != null ? [filterEmployeeId] : []),
+        ...(scope === 'own' ? [scopedUserId] : filterEmployeeId != null ? [filterEmployeeId] : []),
       ]
     );
 
@@ -1695,7 +1777,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
       summaryConds.push('o.group_id = ?');
       summaryParams.push(groupId);
     }
-    if (isScoped) {
+    if (scope === 'own') {
       summaryConds.push('o.salesperson_id = ?');
       summaryParams.push(scopedUserId);
     } else if (filterEmployeeId != null) {
@@ -1733,7 +1815,7 @@ router.get('/revenue', auth, requireShop, requirePermission('reports', 'view'), 
       retWhere.push('o.group_id = ?');
       retParams.push(groupId);
     }
-    if (isScoped) {
+    if (scope === 'own') {
       retWhere.push('o.salesperson_id = ?');
       retParams.push(scopedUserId);
     } else if (filterEmployeeId != null) {

@@ -455,13 +455,13 @@ export function CounterOrdersList() {
 
       {summary ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="kpi-card kpi-card--orders rounded-xl p-4">
-            <div className="kpi-title kpi-icon--orders text-[11px] font-semibold uppercase tracking-widest">Số đơn</div>
-            <div className="kpi-metric kpi-icon--orders mt-1 text-2xl font-semibold tabular-nums">{summary.total_orders}</div>
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Số đơn</div>
+            <div className="mt-1 text-2xl font-semibold text-foreground tabular-nums">{summary.total_orders}</div>
           </div>
-          <div className="kpi-card kpi-card--commission-direct rounded-xl p-4">
-            <div className="kpi-title kpi-icon--commission-direct text-[11px] font-semibold uppercase tracking-widest">Tổng giá trị đơn</div>
-            <div className="kpi-metric kpi-icon--commission-direct mt-1 text-2xl font-semibold tabular-nums">
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Tổng giá trị đơn</div>
+            <div className="mt-1 text-2xl font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
               {formatCurrency(summary.total_revenue)}
             </div>
           </div>
@@ -511,7 +511,7 @@ export function CounterOrdersList() {
                     <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">
                       {formatCurrency(Number(o.subtotal) || 0)}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-[var(--kpi-commission-direct)] tabular-nums">
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">
                       {formatCurrency(Number(o.customer_collect ?? o.total_amount) || 0)}
                     </td>
                     <td className="px-4 py-3 text-center">

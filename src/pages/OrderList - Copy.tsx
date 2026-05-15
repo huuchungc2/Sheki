@@ -752,38 +752,38 @@ export function OrderList() {
 
       {/* KPI totals (theo bộ lọc hiện tại) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="kpi-card kpi-card--orders rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="kpi-title kpi-icon--orders text-xs font-medium uppercase tracking-wide">Tổng đơn hàng</p>
-            <div className="kpi-icon kpi-icon--orders w-9 h-9 rounded-lg flex items-center justify-center">
-              <ShoppingCart className="w-5 h-5" />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng đơn hàng</p>
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+              <ShoppingCart className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="kpi-metric kpi-icon--orders mt-3 text-2xl font-semibold tabular-nums tracking-tight">
+          <p className="mt-3 text-2xl font-semibold text-foreground tabular-nums tracking-tight">
             {summary.total_orders || 0}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Tổng đơn (không gồm đơn hủy) theo bộ lọc.</p>
         </div>
-        <div className="kpi-card kpi-card--revenue rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="kpi-title kpi-icon--revenue text-xs font-medium uppercase tracking-wide">Tổng doanh thu</p>
-            <div className="kpi-icon kpi-icon--revenue w-9 h-9 rounded-lg flex items-center justify-center">
-              <Wallet className="w-5 h-5" />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng doanh thu</p>
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="kpi-metric kpi-icon--revenue mt-3 text-2xl font-semibold tabular-nums tracking-tight">
+          <p className="mt-3 text-2xl font-semibold text-foreground tabular-nums tracking-tight">
             {formatCurrency(summary.total_revenue)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Tổng tạm tính (subtotal) theo bộ lọc.</p>
         </div>
-        <div className="kpi-card kpi-card--commission rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="kpi-title kpi-icon--commission text-xs font-medium uppercase tracking-wide">Tổng hoa hồng</p>
-            <div className="kpi-icon kpi-icon--commission w-9 h-9 rounded-lg flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5" />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tổng hoa hồng</p>
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <p className="kpi-metric kpi-icon--commission mt-3 text-2xl font-semibold tabular-nums tracking-tight">
+          <p className="mt-3 text-2xl font-semibold text-foreground tabular-nums tracking-tight">
             {formatCurrency(summary.total_commission)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">

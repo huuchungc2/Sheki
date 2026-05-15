@@ -818,36 +818,36 @@ export function SalesReturnsList() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="kpi-card kpi-card--returns rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="kpi-title kpi-icon--returns text-xs font-semibold">Tổng số đơn hoàn</p>
-            <div className="kpi-icon kpi-icon--returns w-9 h-9 rounded-xl flex items-center justify-center">
-              <Package className="w-5 h-5" />
+            <p className="text-xs font-semibold text-muted-foreground">Tổng số đơn hoàn</p>
+            <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <Package className="w-5 h-5 text-destructive" />
             </div>
           </div>
-          <p className="kpi-metric kpi-icon--returns mt-3 text-2xl font-semibold tabular-nums">{total || 0}</p>
+          <p className="mt-3 text-2xl font-semibold text-foreground tabular-nums">{total || 0}</p>
           <p className="mt-1 text-xs text-muted-foreground">Tổng số đơn hoàn theo bộ lọc hiện tại.</p>
         </div>
-        <div className="kpi-card kpi-card--returns rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="kpi-title kpi-icon--returns text-xs font-semibold">Tổng doanh số hoàn</p>
-            <div className="kpi-icon kpi-icon--returns w-9 h-9 rounded-xl flex items-center justify-center">
-              <Wallet className="w-5 h-5" />
+            <p className="text-xs font-semibold text-muted-foreground">Tổng doanh số hoàn</p>
+            <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-destructive" />
             </div>
           </div>
-          <p className="kpi-metric kpi-icon--returns mt-3 text-2xl font-semibold tabular-nums">
+          <p className="mt-3 text-2xl font-semibold text-destructive tabular-nums">
             {formatCurrency(-Math.abs(totals.totalReturnAmount))}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Tổng giá trị hàng hoàn (sau CK dòng), không gồm ship.</p>
         </div>
-        <div className="kpi-card kpi-card--return-commission rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="kpi-title kpi-icon--returns text-xs font-semibold">Tổng hoa hồng hoàn</p>
-            <div className="kpi-icon kpi-icon--returns w-9 h-9 rounded-xl flex items-center justify-center">
-              <TrendingDown className="w-5 h-5" />
+            <p className="text-xs font-semibold text-muted-foreground">Tổng hoa hồng hoàn</p>
+            <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
+              <TrendingDown className="w-5 h-5 text-destructive" />
             </div>
           </div>
-          <p className="kpi-metric kpi-icon--returns mt-3 text-2xl font-semibold tabular-nums">
+          <p className="mt-3 text-2xl font-semibold text-destructive tabular-nums">
             {formatCurrency(-Math.abs(totals.totalCommissionReturnAbs))}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Tổng hoa hồng bị trừ do hoàn hàng.</p>

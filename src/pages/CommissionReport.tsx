@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, ChevronRight, ShoppingCart, ChevronDown, Wallet, Truck, CircleDollarSign, ArrowLeft, RefreshCcw, Search, X,
   Filter,
 } from "lucide-react";
-import { formatCurrency, formatDate, cn, isAdminUser } from "../lib/utils";
+import { formatCurrency, formatDate, cn, isAdminUser, canViewShopReports } from "../lib/utils";
 import { exportSalesCommission, exportAdminCommission } from "../lib/exportExcel";
 
 const API_URL =
@@ -114,7 +114,8 @@ export function CommissionReport() {
       window.removeEventListener("storage", onStorage);
     };
   }, []);
-  const isAdmin = isAdminUser(currentUser);
+  // `isAdmin` = "được xem báo cáo toàn shop" — bao gồm Admin/Super Admin và Sales được cấp scope `reports = shop`.
+  const isAdmin = isAdminUser(currentUser) || canViewShopReports(currentUser);
   /** Admin xem 1 NV: cùng UI «Hoa hồng của tôi» — từ route `:userId` hoặc query `?employee=` */
   const employeeDrilldown = Boolean(isAdmin && filterSubjectUserId != null);
   const [employeeSelectedName, setEmployeeSelectedName] = React.useState<string>("");

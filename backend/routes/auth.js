@@ -182,6 +182,71 @@ function allTrueCaps() {
 }
 
 /**
+ * Resolve data scope cho từng module trong SCOPE_TARGETS để FE biết phạm vi xem dữ liệu.
+ * Logic phải khớp với `backend/utils/scope.js#getScope`:
+ *  - Super admin / can_access_admin → 'shop' cho mọi target.
+ *  - Ưu tiên `role_scopes` (own/group/shop), fallback `role_module_scopes` (own/shop),
+ *    cuối cùng fallback `roles.scope_own_data` (legacy).
+ * Trả về object dạng: { orders: 'shop'|'group'|'own', customers: ..., reports: ... }.
+ */
+async function computeScopesForUser(pool, reqUser) {
+  const out = {};
+  for (const t of SCOPE_TARGETS) out[t.id] = 'own';
+  if (!reqUser) return out;
+  if (reqUser.is_super_admin || reqUser.can_access_admin) {
+    for (const t of SCOPE_TARGETS) out[t.id] = 'shop';
+    return out;
+  }
+
+  const shopId = reqUser.shop_id ?? null;
+  const roleId = reqUser.role_id ?? null;
+  const fallback = reqUser.scope_own_data ? 'own' : 'shop';
+
+  if (!shopId || !roleId) {
+    for (const t of SCOPE_TARGETS) out[t.id] = fallback;
+    return out;
+  }
+
+  const explicit = new Map();
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT target, scope FROM role_scopes WHERE shop_id = ? AND role_id = ?',
+      [shopId, roleId]
+    );
+    for (const r of rows || []) {
+      const s = String(r?.scope || '');
+      if (s === 'shop' || s === 'group' || s === 'own') {
+        explicit.set(String(r.target), s);
+      }
+    }
+  } catch (e) {
+    if (!e || e.code !== 'ER_NO_SUCH_TABLE') throw e;
+  }
+
+  try {
+    const [rows2] = await pool.query(
+      'SELECT module, scope FROM role_module_scopes WHERE shop_id = ? AND role_id = ?',
+      [shopId, roleId]
+    );
+    for (const r of rows2 || []) {
+      const key = String(r?.module || '');
+      if (explicit.has(key)) continue;
+      const s = String(r?.scope || '');
+      if (s === 'shop') explicit.set(key, 'shop');
+      else if (s === 'own') explicit.set(key, 'own');
+    }
+  } catch (e) {
+    if (!e || e.code !== 'ER_NO_SUCH_TABLE') throw e;
+  }
+
+  for (const t of SCOPE_TARGETS) {
+    out[t.id] = explicit.get(t.id) || fallback;
+  }
+  return out;
+}
+
+/**
  * Caps phục vụ UI routing (không thay thế kiểm tra API đầy đủ).
  * Logic cố gắng khớp `backend/middleware/requirePermission.js` ở mức "module có action view/edit...".
  */
@@ -318,10 +383,11 @@ router.get('/me', auth, async (req, res, next) => {
     };
     const caps = await computePermissionCaps(pool, effUser);
     const caps2 = await computeFeatureCaps(pool, effUser);
+    const scopes = await computeScopesForUser(pool, effUser);
     const shopOrderLine = await fetchShopOrderLineSettings(pool, req.user.shop_id);
 
     res.json({
-      data: { ...row, shop_order_line: shopOrderLine, _caps: caps, _caps2: caps2 },
+      data: { ...row, shop_order_line: shopOrderLine, _caps: caps, _caps2: caps2, _scopes: scopes },
       shops,
       all_shops: allShops,
       current_shop_id: req.user.shop_id != null ? Number(req.user.shop_id) : null,

@@ -12,7 +12,7 @@ import {
   BarChart, Bar, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
-import { cn, formatCurrency, isAdminUser, formatDate } from "../lib/utils";
+import { cn, formatCurrency, isAdminUser, canViewShopReports, formatDate } from "../lib/utils";
 import { useChartTheme } from "../lib/chartTheme";
 
 const API_URL =
@@ -74,7 +74,9 @@ export function Dashboard() {
     return u ? JSON.parse(u) : null;
   });
   const [token, setToken] = React.useState<string>(() => localStorage.getItem("token") || "");
-  const isAdmin = isAdminUser(currentUser);
+  // `isAdmin` ở đây mang nghĩa "được xem báo cáo trên phạm vi toàn shop" — bao gồm Admin/Super Admin
+  // và cả Sales đã được cấp `reports.view` + scope `reports = shop` trong Cài đặt → Phân quyền xem dữ liệu.
+  const isAdmin = isAdminUser(currentUser) || canViewShopReports(currentUser);
 
   const patchDashParams = React.useCallback(
     (patch: Record<string, string | null | undefined>) => {
@@ -209,7 +211,7 @@ export function Dashboard() {
       qs.set("year", filterYear);
     }
     if (groupId) qs.set("group_id", groupId);
-    if (isAdminUser(currentUser) && employeeId) qs.set("employee", employeeId);
+    if (isAdmin && employeeId) qs.set("employee", employeeId);
     const qstr = qs.toString();
     fetch(`${API_URL}/reports/dashboard${qstr ? `?${qstr}` : ""}`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -251,12 +253,92 @@ export function Dashboard() {
   const topProducts  = d?.topProducts  || [];
   const topCustomers = d?.topCustomers || [];
   const topSales     = d?.topSales     || [];
+  const bottomSales  = d?.bottomSales  || [];
   const byStatus     = d?.byStatus     || {};
   const commission   = d?.commission   || { direct: 0, override: 0, total: 0 };
   const luongMonth   = d?.luongMonth   || { total_khach_ship: 0, total_nv_chiu: 0, total_luong: 0 };
   const thisMonth    = d?.thisMonth    || {};
   const today        = d?.today        || {};
   const customers    = d?.customers    || {};
+
+  // Sale cần hỗ trợ — render dùng chung cho Admin view (scope shop) và Sales view (scope group/shop).
+  // BE chỉ trả `bottomSales` khi `scope !== 'own'`, nên với Sales scope `own` mảng rỗng → null.
+  const bottomSalesCard = bottomSales.length > 0 ? (
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <TrendingDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          <h2 className="text-sm font-semibold text-foreground">Sale cần hỗ trợ — {periodLabelDash}</h2>
+          {(() => {
+            const zeroCount = bottomSales.filter((s: any) => (Number(s.total_orders) || 0) === 0).length;
+            return zeroCount > 0 ? (
+              <span className="shrink-0 inline-flex items-center rounded-full bg-destructive/10 text-destructive px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                {zeroCount} NV 0 đơn
+              </span>
+            ) : null;
+          })()}
+        </div>
+        <Link to="/reports/revenue" className="text-xs text-primary hover:underline flex items-center gap-0.5">
+          Xem báo cáo doanh thu <ChevronRight className="w-3 h-3" />
+        </Link>
+      </div>
+      <p className="px-5 pt-3 text-[11px] text-muted-foreground leading-snug">
+        Xếp theo số đơn tăng dần, doanh số tăng dần — NV chưa có đơn nào trong kỳ được liệt kê đầu tiên.
+      </p>
+      <div className="max-h-[420px] overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-muted/40 backdrop-blur z-10">
+            <tr className="border-b border-border">
+              <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-left">#</th>
+              <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-left">Nhân viên</th>
+              <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-center">Đơn</th>
+              <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-right">Doanh số</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {bottomSales.map((s: any, i: number) => {
+              const noOrders = (Number(s.total_orders) || 0) === 0;
+              return (
+                <tr key={s.id} className={cn("hover:bg-muted/30 transition-colors", noOrders && "bg-destructive/[0.04]")}>
+                  <td className="px-5 py-3">
+                    <span
+                      className={cn(
+                        "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                        noOrders ? "bg-destructive/15 text-destructive" : "bg-muted/40 text-muted-foreground"
+                      )}
+                    >
+                      {i + 1}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Link
+                        to={`/employees/${s.id}`}
+                        className="font-semibold text-foreground hover:text-primary truncate"
+                      >
+                        {s.full_name}
+                      </Link>
+                      {noOrders ? (
+                        <span className="shrink-0 inline-flex items-center rounded-full bg-destructive/10 text-destructive px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                          0 đơn
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className={cn("px-5 py-3 text-center tabular-nums", noOrders ? "text-destructive font-semibold" : "text-muted-foreground")}>
+                    {s.total_orders || 0}
+                  </td>
+                  <td className={cn("px-5 py-3 text-right tabular-nums", noOrders ? "text-destructive font-semibold" : "text-foreground font-semibold")}>
+                    {formatCurrency(s.revenue || 0)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className="space-y-6">
@@ -642,10 +724,10 @@ export function Dashboard() {
             ))}
           </div>
 
-          {/* Top nhân viên + Đơn gần đây */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Top nhân viên + Sale cần hỗ trợ — chia 50/50 (xếp dọc trên mobile) */}
+          <div className={cn("grid grid-cols-1 gap-6", bottomSalesCard ? "lg:grid-cols-2" : "lg:grid-cols-1")}>
             {/* Top nhân viên */}
-            <div className="lg:col-span-2 bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-foreground">Top nhân viên — {periodLabelDash}</h2>
                 <Link to="/employees" className="text-xs text-primary hover:underline flex items-center gap-0.5">
@@ -655,53 +737,60 @@ export function Dashboard() {
               {topSales.length === 0 ? (
                 <div className="py-10 text-center text-muted-foreground text-sm">Chưa có dữ liệu</div>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/30 border-b border-border">
-                      <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-left">#</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-left">Nhân viên</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-center">Đơn</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-right">Doanh số</th>
-                      <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-right">Hoa hồng</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {topSales.map((s: any, i: number) => (
-                      <tr key={s.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-5 py-3">
-                          <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
-                            i === 0 ? "bg-amber-100 text-amber-700" :
-                            i === 1 ? "bg-muted text-muted-foreground" :
-                            i === 2 ? "bg-orange-100 text-orange-700" : "bg-muted/30 text-muted-foreground"
-                          )}>{i + 1}</span>
-                        </td>
-                        <td className="px-5 py-3">
-                          <Link to={`/employees/${s.id}`} className="font-semibold text-foreground hover:text-primary">{s.full_name}</Link>
-                        </td>
-                        <td className="px-5 py-3 text-center text-muted-foreground tabular-nums">{s.total_orders}</td>
-                        <td className="px-5 py-3 text-right font-semibold text-foreground tabular-nums">{formatCurrency(s.revenue)}</td>
-                        <td className="px-5 py-3 text-right font-semibold kpi-text-success tabular-nums">
-                          {formatCurrency(s.direct_comm + s.override_comm)}
-                        </td>
+                <div className="max-h-[420px] overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-muted/40 backdrop-blur z-10">
+                      <tr className="border-b border-border">
+                        <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-left">#</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-left">Nhân viên</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-center">Đơn</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-right">Doanh số</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-muted-foreground text-right">Hoa hồng</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {topSales.map((s: any, i: number) => (
+                        <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-5 py-3">
+                            <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                              i === 0 ? "bg-amber-100 text-amber-700" :
+                              i === 1 ? "bg-muted text-muted-foreground" :
+                              i === 2 ? "bg-orange-100 text-orange-700" : "bg-muted/30 text-muted-foreground"
+                            )}>{i + 1}</span>
+                          </td>
+                          <td className="px-5 py-3">
+                            <Link to={`/employees/${s.id}`} className="font-semibold text-foreground hover:text-primary">{s.full_name}</Link>
+                          </td>
+                          <td className="px-5 py-3 text-center text-muted-foreground tabular-nums">{s.total_orders}</td>
+                          <td className="px-5 py-3 text-right font-semibold text-foreground tabular-nums">{formatCurrency(s.revenue)}</td>
+                          <td className="px-5 py-3 text-right font-semibold kpi-text-success tabular-nums">
+                            {formatCurrency(s.direct_comm + s.override_comm)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
-            {/* Đơn gần đây */}
-            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-foreground">Đơn hàng gần đây</h2>
-                <Link to="/orders" className="text-xs text-primary hover:underline flex items-center gap-0.5">
-                  Xem tất cả <ChevronRight className="w-3 h-3" />
-                </Link>
-              </div>
-              <div className="divide-y divide-border">
-                {recentOrders.length === 0 ? (
-                  <div className="py-10 text-center text-muted-foreground text-sm">Chưa có đơn hàng</div>
-                ) : recentOrders.slice(0, 6).map((o: any) => {
+            {/* Sale cần hỗ trợ — chiếm cột phải; tự ẩn nếu BE trả rỗng (Top NV sẽ tự co lại full-width) */}
+            {bottomSalesCard}
+          </div>
+
+          {/* Đơn hàng gần đây — full-width sau hàng "Top NV + Sale cần hỗ trợ" */}
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">Đơn hàng gần đây</h2>
+              <Link to="/orders" className="text-xs text-primary hover:underline flex items-center gap-0.5">
+                Xem tất cả <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            {recentOrders.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground text-sm">Chưa có đơn hàng</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                {recentOrders.slice(0, 6).map((o: any) => {
                   const st = STATUS_CFG[o.status] || { label: o.status, color: "text-muted-foreground", bg: "bg-muted/30 border border-border", icon: Clock };
                   return (
                     <Link key={o.id} to={`/orders/edit/${o.id}`}
@@ -723,7 +812,7 @@ export function Dashboard() {
                   );
                 })}
               </div>
-            </div>
+            )}
           </div>
 
           {/* Top khách hàng */}
@@ -959,6 +1048,9 @@ export function Dashboard() {
               </div>
             ))}
           </div>
+
+          {/* Sale cần hỗ trợ — chỉ hiển thị cho Sales scope `group` / `shop` (BE bỏ qua scope `own`) */}
+          {bottomSalesCard}
 
           {/* Top sản phẩm + Đơn gần đây */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

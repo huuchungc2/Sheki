@@ -75,3 +75,45 @@ export function isAdminUser(
 
   return false;
 }
+
+/**
+ * Người dùng có được xem báo cáo trên phạm vi toàn shop hay không.
+ * Dùng cho UI Dashboard / RevenueReport / CommissionReport để bật bộ lọc theo NV,
+ * Top NV, drilldown… đồng nhất với scope `reports = shop` đã cấu hình ở Settings.
+ *
+ * Ưu tiên đọc `_scopes.reports` từ `/auth/me` (BE đã resolve role_scopes/role_module_scopes).
+ * Admin / Super admin luôn coi như scope shop (giữ tương thích cờ `can_access_admin`).
+ * Khi `_scopes` chưa có (token cũ chưa refresh), fallback theo `isAdminUser` để không vỡ UI.
+ */
+export function canViewShopReports(
+  user:
+    | {
+        _caps?: any;
+        _scopes?: any;
+        can_access_admin?: any;
+        is_super_admin?: any;
+        role?: any;
+        role_name?: any;
+      }
+    | null
+    | undefined
+): boolean {
+  if (!user) return false;
+  if ((user as any).is_super_admin) return true;
+  if (isAdminUser(user)) return true;
+
+  const scopes = (user as any)?._scopes;
+  if (scopes && typeof scopes === "object") {
+    const scope = String(scopes.reports || "").trim().toLowerCase();
+    if (scope === "shop") {
+      // Có scope shop, kiểm tra thêm permission `reports.view` nếu có; nếu không có _caps thì cho qua.
+      const caps = (user as any)?._caps;
+      if (!caps || !caps.reports) return true;
+      return caps.reports.view !== false;
+    }
+    return false;
+  }
+
+  // Token/localStorage cũ chưa có _scopes → giữ hành vi cũ.
+  return false;
+}

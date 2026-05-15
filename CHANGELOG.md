@@ -1,3 +1,44 @@
+## [15/05/2026] - Dashboard (Admin view): re-layout "Top NV" + "Sale cần hỗ trợ" 50/50; "Đơn gần đây" full-width
+### Changed
+- **Hàng "Top nhân viên" & "Sale cần hỗ trợ" chia 50/50** trên `lg+` (xếp dọc trên mobile). Cả 2 card cuộn nội bộ `max-h-[420px]` + sticky header để chiều cao đồng bộ. Khi `bottomSalesCard` ẩn (Sales scope `own` / shop trống) thì "Top NV" tự co full-width. — File: `src/pages/Dashboard.tsx`
+- **"Đơn hàng gần đây" tách xuống hàng riêng full-width** (vị trí cũ của "Sale cần hỗ trợ"), bố cục 3 cột trên `lg+` / 2 cột `sm` / 1 cột mobile, phân tách bằng divider để dễ quét nhanh. — File: `src/pages/Dashboard.tsx`
+
+## [15/05/2026] - Dashboard: "Sale cần hỗ trợ" lọc strict theo role `sales`
+### Changed
+- **`/reports/dashboard.bottomSales` chỉ liệt kê NV có vai trò Sales** — Đổi điều kiện `r.scope_own_data = 1` (sales-like, gồm cả CTV) → `r.code = 'sales'` để chỉ lấy đúng NV có role mã `sales`. Loại bỏ Admin, Manager, CTV và mọi role khác khỏi card "Sale cần hỗ trợ" trên Dashboard. — File: `backend/routes/reports.js`
+
+## [15/05/2026] - Dashboard: card "Sale cần hỗ trợ" mở rộng cho cả scope `group` và `shop`
+### Added
+- **`/reports/dashboard.bottomSales` hỗ trợ scope `group`/`shop`** — Trước chỉ tính khi `!isScoped` (admin). Nay tính cho mọi `scope !== 'own'`:
+  - `scope = 'shop'` (Admin / Super Admin / Sales được cấp scope shop): toàn bộ sale trong shop.
+  - `scope = 'group'` (Sales được cấp scope nhóm): chỉ NV cùng nhóm với user (`EXISTS user_groups WHERE group_id IN (gids)` + `o.group_id IN (gids)` cho subquery orders). Không có nhóm → mảng rỗng.
+  - `scope = 'own'`: bỏ qua (chỉ thấy chính mình thì vô nghĩa) — luôn trả `[]`.
+  Sort `total_orders ASC, revenue ASC, full_name ASC`; lấy đầy đủ NV 0 đơn + tối đa 5 NV có đơn yếu nhất; chỉ role `scope_own_data = 1`. — File: `backend/routes/reports.js`
+- **Dashboard FE: card "Sale cần hỗ trợ" hiển thị cả Admin view lẫn Sales view** — Tách thành biến `bottomSalesCard` dùng chung; render trong Admin view (giữ vị trí cũ giữa "Top NV/Đơn gần đây" và "Top khách hàng") và trong Sales view (sau "Trạng thái đơn", trước "Top sản phẩm"). Khi `bottomSales.length === 0` (Sales scope `own` hoặc shop trống) tự ẩn. Header có badge đếm "X NV 0 đơn"; bảng cuộn nội bộ `max-h-[420px]` + sticky header; NV 0 đơn tô nền `bg-destructive/[0.04]` + chữ destructive. — File: `src/pages/Dashboard.tsx`
+
+## [15/05/2026] - Dashboard (Admin): card "Sale cần hỗ trợ" — bottom sale theo doanh số + số đơn
+### Added
+- **`/reports/dashboard` trả thêm `bottomSales`** — Sale "yếu" trong kỳ theo 2 tiêu chí: `ORDER BY total_orders ASC, revenue ASC, full_name ASC` để NV 0 đơn luôn lên đầu. Chỉ tính role `scope_own_data = 1` (loại admin/quản lý). Trả **đầy đủ NV 0 đơn** (không bị cắt vì LIMIT) + tối đa 5 NV có đơn yếu nhất. Cùng filter kỳ (tháng/năm/kỳ lương) + nhóm + employee như `topSales`; chỉ tính khi `!isScoped` (admin / scope shop). — File: `backend/routes/reports.js`
+- **Dashboard admin: card "Sale cần hỗ trợ — {kỳ}"** — Đặt giữa khối "Top NV + Đơn gần đây" và "Top khách hàng". Header có badge đếm "X NV 0 đơn" cho Admin nhìn phát biết, subtitle giải thích cách xếp; bảng 4 cột (#, Nhân viên, Đơn, Doanh số) cuộn nội bộ `max-h-[420px]` + sticky header để không phình Dashboard khi shop đông sale; NV 0 đơn được tô nền nhạt + badge đỏ `0 đơn` + cột Đơn/Doanh số chữ destructive đậm. Link "Xem báo cáo doanh thu" → `/reports/revenue`. — File: `src/pages/Dashboard.tsx`
+
+## [15/05/2026] - RevenueReport: filter nhóm cho Sales chỉ tải nhóm của mình
+### Fixed
+- **RevenueReport — dropdown "Nhóm bán hàng" cho Sales liệt kê toàn bộ nhóm shop** — `RevenueReport.tsx` luôn gọi `GET /groups` không phân biệt vai trò, trong khi `Dashboard.tsx` và `CommissionReport.tsx` đều dùng `isAdmin ? "/groups" : "/groups/user/:id"`. Sales chỉ thuộc 2 nhóm vẫn thấy đủ danh sách nhóm shop, dễ chọn nhầm nhóm không có quyền (BE sẽ chặn 403 ở `/reports/revenue`). Đồng bộ về cùng pattern: `isAdmin → /groups`, ngược lại → `/groups/user/${currentUser.id}`. — File: `src/pages/RevenueReport.tsx`
+
+## [15/05/2026] - Reports: Sales scope `reports = group` không trả dữ liệu (RevenueReport / CommissionReport)
+### Fixed
+- **`/reports/revenue` + `/reports/salary` — scope `group` trả mảng rỗng** — Cả hai handler khai báo `isScoped = scope !== 'shop'` (đúng cho cả `'own'` lẫn `'group'`) nhưng `scopedUserId = scope === 'own' ? req.user.id : null`. Khi sales được set scope `reports = group`, các đoạn `${isScoped ? ' AND u.id = ?' : ''}` chèn `AND u.id = NULL` → không match user nào, `salesData = []`, summary = 0; UI thấy "không load / dữ liệu sai". Thay `isScoped` bằng `scope === 'own'` cho mọi chỗ ràng buộc theo `scopedUserId` (cả nhánh `WHERE us.shop_id` lẫn `summaryConds`/`retWhere`/`ordersAll`/`kpiTotals`/ship-NV). Phạm vi `group` đã được handler chặn `groupId` về một nhóm hợp lệ ở khối `if (scope === 'group')` nên không cần thêm filter user. — File: `backend/routes/reports.js`
+
+## [15/05/2026] - Reports: Sales được cấp scope `reports = shop` thấy đúng layout Admin
+### Fixed
+- **Phân quyền báo cáo** — Trước đây `Dashboard.tsx`, `RevenueReport.tsx`, `CommissionReport.tsx` gate UI bằng cờ `isAdminUser()` (`roles.can_access_admin` / `role` = `admin`), nên dù role Sales được tick `reports.view` + scope `reports = shop` ở Cài đặt → "Phân quyền xem dữ liệu" thì BE đã trả full data shop nhưng FE vẫn render layout rút gọn của Sales (không có filter NV, không có Top NV, không drilldown).
+- **Dropdown lọc nhân viên trên Dashboard / RevenueReport / CommissionReport không load với Sales scope shop** — `GET /users` bị `requireFeature('employees.list')` chặn (Sales không có feature này theo defaults `salesLikeFeatureDefaults`) nên trả 403 → dropdown rỗng. Bổ sung wrapper `employeesListOrShopReports`: cho qua khi user có scope `reports = shop` (đọc qua `getScope(req,'reports')`), giữ nguyên `requireFeature('employees.list')` cho các trường hợp còn lại. — File: `backend/routes/users.js`
+### Added
+- **`/auth/me` trả thêm `_scopes`** — Resolve scope cho `SCOPE_TARGETS` (`orders`/`customers`/`reports`) khớp logic `backend/utils/scope.js#getScope`: ưu tiên `role_scopes` → fallback `role_module_scopes` → fallback `roles.scope_own_data`. Super admin / `can_access_admin` luôn nhận `shop` cho mọi target. — File: `backend/routes/auth.js`
+- **Helper `canViewShopReports(user)` (`src/lib/utils.ts`)** — Trả `true` khi user là Admin/Super Admin **hoặc** `_scopes.reports === 'shop'` (kèm check `_caps.reports.view` nếu có). FE Layout đã refresh `_scopes` từ `/auth/me` vào `localStorage.user` nên sales sau khi đổi scope chỉ cần reload để áp dụng.
+### Changed
+- **Dashboard / RevenueReport / CommissionReport** — Biến `isAdmin` cục bộ tính `isAdminUser(currentUser) || canViewShopReports(currentUser)` để mở khoá nguyên block "ADMIN VIEW" (filter NV, Top NV, drilldown, query string `?employee=...`) cho Sales được cấp scope shop. Không đổi cờ `roles.can_access_admin` để tránh ảnh hưởng menu sidebar / các trang admin khác. — Files: `src/pages/Dashboard.tsx`, `src/pages/RevenueReport.tsx`, `src/pages/CommissionReport.tsx`
+
 ## [09/05/2026] - VPS: INSERT role_permissions luôn có cột `role` (strict MySQL)
 ### Fixed
 - **Settings / đồng bộ ma trận** — Một số DB có `role_permissions.role` NOT NULL; code chỉ ghi `role_id` nên MySQL strict báo *Field 'role' doesn't have a default value*. `PUT .../permissions` và `rolePermissionSync` giờ luôn ghi thêm `roles.code` (lowercase) cùng `role_id`. — Files: `backend/routes/settings.js`, `backend/services/rolePermissionSync.js`

@@ -27,7 +27,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { formatCurrency, cn, formatDate, isAdminUser } from "../lib/utils";
+import { formatCurrency, cn, formatDate, isAdminUser, canViewShopReports } from "../lib/utils";
 import { useChartTheme } from "../lib/chartTheme";
 
 import { exportRevenueReport } from "../lib/exportExcel";
@@ -75,7 +75,8 @@ export function RevenueReport() {
       return null;
     }
   });
-  const isAdmin = isAdminUser(currentUser);
+  // `isAdmin` = "được xem báo cáo toàn shop" — bao gồm Admin/Super Admin và Sales được cấp scope `reports = shop`.
+  const isAdmin = isAdminUser(currentUser) || canViewShopReports(currentUser);
 
   const [loading, setLoading] = React.useState(true);
   const [exporting, setExporting] = React.useState(false);
@@ -104,9 +105,11 @@ export function RevenueReport() {
   }, []);
 
   React.useEffect(() => {
+    if (!token) return;
     const fetchGroups = async () => {
       try {
-        const res = await fetch(`${API_URL}/groups`, { headers: { Authorization: `Bearer ${token}` } });
+        const ep = isAdmin ? "/groups" : `/groups/user/${currentUser?.id}`;
+        const res = await fetch(`${API_URL}${ep}`, { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
           const json = await res.json();
           setGroups(json.data || []);
@@ -116,7 +119,7 @@ export function RevenueReport() {
       }
     };
     fetchGroups();
-  }, [token]);
+  }, [token, isAdmin, currentUser?.id]);
 
   // Sync token after switch-shop/login/logout
   React.useEffect(() => {

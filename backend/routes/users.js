@@ -5,12 +5,34 @@ const auth = require('../middleware/auth');
 const requireShop = require('../middleware/requireShop');
 const authorize = require('../middleware/authorize');
 const { requireFeature } = require('../middleware/requireFeature');
+const { getScope } = require('../utils/scope');
 const { getPool } = require('../config/db');
 
-
+/**
+ * Wrapper cho `requireFeature('employees.list')` ở route `GET /users`:
+ * - Admin / Super Admin / `can_access_admin` → pass (giống requireFeature).
+ * - Sales được cấp scope `reports = shop` (Cài đặt → Phân quyền xem dữ liệu) → pass.
+ *   Cho phép dropdown lọc nhân viên trên Dashboard / RevenueReport / CommissionReport hoạt động
+ *   khi sales được mở quyền xem báo cáo toàn shop, dù chưa được tick `employees.list`.
+ * - Còn lại: rơi về `requireFeature('employees.list')` như cũ.
+ */
+function employeesListOrShopReports(req, res, next) {
+  Promise.resolve()
+    .then(async () => {
+      if (req.user?.is_super_admin || req.user?.can_access_admin) return next();
+      try {
+        const scope = await getScope(req, 'reports');
+        if (scope === 'shop') return next();
+      } catch (e) {
+        // ignore — fallback to feature check
+      }
+      return requireFeature('employees.list')(req, res, next);
+    })
+    .catch(next);
+}
 
 // Admin: toàn bộ NV. Sales (scope_own_data): cần dropdown NV phụ trách ở form KH — không chỉ admin.
-router.get('/', auth, requireShop, requireFeature('employees.list'), (req, res, next) => {
+router.get('/', auth, requireShop, employeesListOrShopReports, (req, res, next) => {
   if (req.user.can_access_admin || req.user.scope_own_data) return next();
   return res.status(403).json({ error: 'Không có quyền truy cập' });
 }, async (req, res, next) => {
