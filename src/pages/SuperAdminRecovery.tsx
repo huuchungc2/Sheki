@@ -49,9 +49,7 @@ export function SuperAdminRecovery() {
             </button>
             <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-tight">Khôi phục Super Admin</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Đặt lại mật khẩu bằng script chạy trên máy có MySQL.
-              </p>
+            
             </div>
           </div>
         </div>
@@ -113,11 +111,7 @@ export function SuperAdminRecovery() {
           </form>
 
           <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-semibold text-foreground">Reset trên máy có MySQL</p>
-            <p>
-              Chạy:
-              <code className="bg-muted px-1 rounded ml-1">node backend/scripts/resetSuperAdminPassword.js &lt;mật_mới&gt; [username]</code>
-            </p>
+            
           </div>
           <p className="text-center text-sm">
             <Link to="/login" className="text-primary font-semibold hover:underline">

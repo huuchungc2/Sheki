@@ -83,6 +83,11 @@ export default defineConfig(({mode}) => {
           changeOrigin: true,
           configure: forwardClientIpToBackend,
         },
+        "/zalopilot": {
+          target: "http://127.0.0.1:3000",
+          changeOrigin: true,
+          configure: forwardClientIpToBackend,
+        },
       },
     },
   };

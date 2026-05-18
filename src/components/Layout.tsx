@@ -21,9 +21,20 @@ import {
   Building2,
   Sun,
   Moon,
+  Download,
 } from "lucide-react";
 import { cn, isAdminUser } from "../lib/utils";
 import { api } from "../lib/api";
+
+/** File tĩnh: đặt `public/zalopilot/zalopilot.zip` */
+const ZALOPILOT_ZIP_PATH = "/zalopilot/zalopilot.zip";
+
+const zaloPilotMenuItem = {
+  name: "Tải ZaloPilot",
+  href: ZALOPILOT_ZIP_PATH,
+  icon: Download,
+  external: true,
+};
 
 const API_URL =
   (import.meta as any)?.env?.VITE_API_URL ||
@@ -98,8 +109,10 @@ function buildNonAdminNavigation(caps: any) {
     items.push({ name: "Báo cáo", icon: BarChart3, children: reportChildren });
   }
 
+  items.push(zaloPilotMenuItem);
+
   // Fallback: nếu caps rỗng (token cũ / lỗi load) thì giữ menu sales tối thiểu để không “mất app”
-  if (items.length === 0) {
+  if (items.length === 1) {
     return navigationSales;
   }
 
@@ -165,6 +178,7 @@ const navigationAdmin = [
     ],
   },
   { name: "Nhật ký", href: "/logs", icon: ClipboardList },
+  zaloPilotMenuItem,
 ];
 
 const navigationSales = [
@@ -187,6 +201,7 @@ const navigationSales = [
       { name: "Hoa hồng CTV", href: "/reports/commissions/ctv" },
     ],
   },
+  zaloPilotMenuItem,
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -551,6 +566,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 >
                   <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70")} />
                 </Link>
+              );
+            }
+
+            const isExternalDownload =
+              ("external" in item && !!(item as { external?: boolean }).external) ||
+              ("download" in item && typeof (item as { download?: string }).download === "string");
+
+            if (isExternalDownload && "href" in item && item.href) {
+              return (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => {
+                    if (isMobile) setIsSidebarOpen(false);
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-all group",
+                    "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  )}
+                >
+                  <item.icon className="w-5 h-5 shrink-0 text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70" />
+                  {isSidebarOpen && <span className="text-sm">{item.name}</span>}
+                </a>
               );
             }
 

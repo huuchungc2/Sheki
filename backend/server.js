@@ -146,6 +146,29 @@ app.use('/api/payroll', payrollRouter);
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+/** ZaloPilot installer — public/zalopilot/zalopilot.zip (tránh SPA trả HTML khi sai tên file / Linux phân biệt hoa thường) */
+function resolveZaloPilotZipPath() {
+  const dir = path.join(__dirname, '..', 'public', 'zalopilot');
+  const candidates = ['zalopilot.zip', 'ZaloPilot.zip'];
+  for (const name of candidates) {
+    const full = path.join(dir, name);
+    if (fs.existsSync(full)) return full;
+  }
+  return null;
+}
+
+app.get('/zalopilot/zalopilot.zip', (req, res, next) => {
+  const zipPath = resolveZaloPilotZipPath();
+  if (!zipPath) {
+    return res.status(404).json({ error: 'Không tìm thấy file ZaloPilot trên server' });
+  }
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename="zalopilot.zip"');
+  res.sendFile(zipPath, (err) => {
+    if (err) next(err);
+  });
+});
+
 // Health check
 app.get('/api/health', async (req, res) => {
   try {

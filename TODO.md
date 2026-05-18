@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Sidebar: menu Tải ZaloPilot** — Link tải `public/zalopilot/zalopilot.zip` qua `/zalopilot/zalopilot.zip` cho mọi user đăng nhập. — File: `src/components/Layout.tsx`
 - [x] **Dashboard (Admin): re-layout "Top NV" + "Sale cần hỗ trợ" 50/50, "Đơn gần đây" full-width** — Hàng đầu: Top NV (trái) + Sale cần hỗ trợ (phải) chia 50/50 trên `lg+`, cùng cuộn nội bộ `max-h-[420px]`. Hàng dưới: Đơn hàng gần đây full-width, grid 3 cột trên `lg+`. Khi `bottomSalesCard` ẩn → Top NV tự full-width. — File: `src/pages/Dashboard.tsx`
 - [x] **Dashboard: "Sale cần hỗ trợ" lọc strict theo role `sales`** — `/reports/dashboard.bottomSales` đổi `r.scope_own_data = 1` → `r.code = 'sales'` để loại bỏ Admin/Manager/CTV và chỉ list NV vai trò Sales. — File: `backend/routes/reports.js`
 - [x] **Dashboard: "Sale cần hỗ trợ" mở rộng cho scope `group` + `shop`** — BE `/reports/dashboard` đổi điều kiện từ `!isScoped` → `scope !== 'own'`, scope `group` thêm ràng `EXISTS user_groups WHERE group_id IN (gids)` + `o.group_id IN (gids)` (chỉ NV cùng nhóm với user). FE tách `bottomSalesCard` dùng chung, render trong cả Admin view (giữ vị trí cũ) lẫn Sales view (sau "Trạng thái đơn"); auto ẩn khi mảng rỗng (Sales scope `own`). — Files: `backend/routes/reports.js`, `src/pages/Dashboard.tsx`

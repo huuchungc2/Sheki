@@ -1,3 +1,11 @@
+## [18/05/2026] - ZaloPilot: sửa tải zip bị hỏng (trả HTML thay vì file)
+### Fixed
+- **Tải ZaloPilot báo lỗi khi mở zip** — File thật là `ZaloPilot.zip` nhưng link trỏ `zalopilot.zip`; Vite/nginx không tìm thấy → trả `index.html` (user lưu thành .zip rồi mở lỗi). Đổi tên file → `zalopilot.zip`; BE `GET /zalopilot/zalopilot.zip` với `Content-Type: application/zip`; proxy Vite + nginx. — Files: `public/zalopilot/zalopilot.zip`, `backend/server.js`, `vite.config.ts`, `nginx.conf`, `src/components/Layout.tsx`
+
+## [18/05/2026] - Sidebar: menu Tải ZaloPilot
+### Added
+- **Menu "Tải ZaloPilot"** — Click tải file `zalopilot.zip` từ `/zalopilot/zalopilot.zip` (đặt file tại `public/zalopilot/zalopilot.zip`). Hiển thị Admin, Sales và mọi user đã đăng nhập. — File: `src/components/Layout.tsx`, `public/zalopilot/`
+
 ## [15/05/2026] - Dashboard (Admin view): re-layout "Top NV" + "Sale cần hỗ trợ" 50/50; "Đơn gần đây" full-width
 ### Changed
 - **Hàng "Top nhân viên" & "Sale cần hỗ trợ" chia 50/50** trên `lg+` (xếp dọc trên mobile). Cả 2 card cuộn nội bộ `max-h-[420px]` + sticky header để chiều cao đồng bộ. Khi `bottomSalesCard` ẩn (Sales scope `own` / shop trống) thì "Top NV" tự co full-width. — File: `src/pages/Dashboard.tsx`
