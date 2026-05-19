@@ -262,6 +262,9 @@ export function OrderForm() {
   /** Khi sửa đơn collaborator: đảm bảo quản lý hiện tại có trong list (kể cả ngoài nhóm — backend include_user_ids) */
   const [editIncludeManagerId, setEditIncludeManagerId] = React.useState<number | null>(null);
   const isAdmin = isAdminUser(currentUser);
+  const isPayrollClosedEdit = Boolean(isEdit && payrollPeriodStatus === "closed");
+  const isPayrollClosedAdminStatusOnly = isPayrollClosedEdit && isAdmin;
+  const saveDisabledByClosedPayroll = isPayrollClosedEdit && !isPayrollClosedAdminStatusOnly;
 
   const apiOrigin = React.useMemo(() => {
     if (typeof API_URL !== "string") return "";
@@ -639,13 +642,29 @@ export function OrderForm() {
     })();
   }, [id, isAdmin, currentUser?.scope_own_data, navigate, location.state]);
 
-  // Note: đơn thuộc kỳ lương đã chốt không được hủy/xóa. Nếu cần xử lý, hãy tạo đơn hoàn (returns).
-
   // Submit
   const submitOrder = async () => {
     setFormError("");
 
-    if (isEdit && payrollPeriodStatus === "closed") {
+    if (isPayrollClosedAdminStatusOnly && id) {
+      if (orderStatus === "cancelled") {
+        setFormError("Đơn thuộc kỳ lương đã chốt: không được chuyển sang Đã hủy. Vui lòng tạo đơn hoàn (returns).");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      try {
+        await api.put(`/orders/${id}`, { status: orderStatus });
+        const listReturn = (location.state as { ordersListReturn?: string } | null)?.ordersListReturn;
+        if (listReturn) navigate(listReturn);
+        else navigate("/orders");
+      } catch (e: any) {
+        setFormError(e?.message || "Lỗi khi cập nhật trạng thái. Vui lòng thử lại.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      return;
+    }
+
+    if (isPayrollClosedEdit && !isAdmin) {
       setFormError("Đơn thuộc kỳ lương đã chốt: không được sửa/hủy/xóa. Vui lòng tạo đơn hoàn (returns).");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -912,11 +931,11 @@ export function OrderForm() {
           <button
             type="button"
             onClick={submitOrder}
-            disabled={isEdit && payrollPeriodStatus === "closed"}
+            disabled={saveDisabledByClosedPayroll}
             className="hidden sm:flex items-center gap-2 h-10 px-5 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
-            {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
+            {isPayrollClosedAdminStatusOnly ? "Cập nhật trạng thái" : isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}
           </button>
         </div>
       </div>
@@ -932,7 +951,12 @@ export function OrderForm() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
 
         {/* LEFT COLUMN */}
-        <div className="flex flex-col gap-4">
+        <div
+          className={cn(
+            "flex flex-col gap-4",
+            isPayrollClosedAdminStatusOnly && "pointer-events-none opacity-60"
+          )}
+        >
 
           {/* Card: Khách hàng */}
           <div className="bg-card border border-border rounded-xl p-5">
@@ -1820,16 +1844,17 @@ export function OrderForm() {
               <select
                 value={orderStatus}
                 onChange={(e) => setOrderStatus(e.target.value)}
-                className="w-full h-10 px-3 py-2 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                disabled={isPayrollClosedEdit && !isAdmin}
+                className="w-full h-10 px-3 py-2 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <option value="pending">Chờ duyệt</option>
                 <option value="shipping">Đang giao</option>
                 <option value="completed">Đã giao</option>
-                <option value="cancelled">Đã hủy</option>
+                {!isPayrollClosedAdminStatusOnly ? <option value="cancelled">Đã hủy</option> : null}
               </select>
-              {isEdit && isAdmin && payrollPeriodStatus === "closed" ? (
-                <div className="mt-2 w-full px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs font-semibold">
-                  Đơn thuộc kỳ lương đã chốt: không được hủy/xóa. Nếu cần, hãy tạo đơn hoàn (returns).
+              {isPayrollClosedAdminStatusOnly ? (
+                <div className="mt-2 w-full px-3 py-2 rounded-lg border border-border bg-muted/50 text-muted-foreground text-xs leading-relaxed">
+                  Kỳ lương đã chốt: chỉ đổi trạng thái vận hành (không hủy). Sai tiền/HH → tạo đơn hoàn (returns).
                 </div>
               ) : null}
             </div>
@@ -1853,8 +1878,9 @@ export function OrderForm() {
                 rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                disabled={isPayrollClosedAdminStatusOnly}
                 placeholder="Ghi chú thêm về đơn hàng, yêu cầu đặc biệt..."
-                className="w-full px-3 py-2 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-none"
+                className="w-full px-3 py-2 border border-input rounded-md text-sm outline-none transition-colors bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background resize-none disabled:opacity-60"
               />
             </div>
 
@@ -1869,11 +1895,11 @@ export function OrderForm() {
           <button
             type="button"
             onClick={submitOrder}
-            disabled={isEdit && payrollPeriodStatus === "closed"}
+            disabled={saveDisabledByClosedPayroll}
             className="hidden lg:flex w-full items-center justify-center gap-2 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
-            {isEdit ? 'Cập nhật đơn hàng' : 'Hoàn tất & Xuất kho'}
+            {isPayrollClosedAdminStatusOnly ? "Cập nhật trạng thái" : isEdit ? "Cập nhật đơn hàng" : "Hoàn tất & Xuất kho"}
           </button>
         </div>
       </div>

@@ -1,3 +1,8 @@
+## [19/05/2026] - Đơn kỳ đã chốt: Admin đổi trạng thái (không hủy)
+### Changed
+- **`PUT /orders/:id`** — Đơn thuộc kỳ lương `closed`: Admin được cập nhật **chỉ** `status` (`pending` / `shipping` / `completed`); cấm `cancelled` và cấm sửa các trường khác. Sales vẫn bị chặn toàn bộ. — Files: `backend/routes/orders.js`, `LOGIC_BUSINESS.md`
+- **OrderForm / OrderList** — Admin: dropdown trạng thái + lưu/bulk khi kỳ đã chốt; ẩn «Đã hủy» khi chọn đơn thuộc kỳ closed; danh sách đơn trả `payroll_period_status`. — Files: `src/pages/OrderForm.tsx`, `src/pages/OrderList.tsx`
+
 ## [19/05/2026] - ZaloPilot: tải trên iPhone không thoát khỏi ERP
 ### Fixed
 - **Menu "Tải ZaloPilot" trên mobile** — Link trực tiếp tới `.zip` khiến Safari iOS mở màn preview full-screen (không có nút Back). Đổi sang `fetch` + blob + `download` (giữ tab ERP); fallback mở tab mới nếu lỗi. — File: `src/components/Layout.tsx`

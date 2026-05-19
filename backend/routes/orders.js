@@ -44,6 +44,51 @@ async function loadUserGroupIds(pool, shopId, userId) {
 
 const COUNTER_SALE_ADDRESS = 'Mua tại cửa hàng';
 
+const PAYROLL_CLOSED_ADMIN_STATUSES = new Set(['pending', 'shipping', 'completed']);
+
+/** PUT body chỉ gồm `status` — dùng khi Admin đổi trạng thái đơn thuộc kỳ lương đã chốt. */
+function isPayrollClosedStatusOnlyPut(body) {
+  if (!body || typeof body !== 'object') return false;
+  const keys = Object.keys(body).filter((k) => body[k] !== undefined);
+  return keys.length === 1 && keys[0] === 'status';
+}
+
+async function applyOrderStatusTransition(pool, orderId, order, oldStatus, newStatus, shopId) {
+  if (newStatus === oldStatus) return;
+
+  if (newStatus === 'completed' && oldStatus !== 'completed') {
+    await deductStockOnComplete(orderId);
+  } else if (newStatus === 'cancelled') {
+    await restoreStockOnCancel(orderId, oldStatus);
+  } else {
+    const [allItems] = await pool.query('SELECT product_id FROM order_items WHERE order_id = ?', [orderId]);
+    const productIds = [...new Set(allItems.map((i) => i.product_id))];
+    for (const productId of productIds) {
+      await recalculateStock(productId);
+    }
+  }
+
+  await recalculateCommission(orderId);
+
+  if (newStatus === 'completed' && oldStatus !== 'completed') {
+    await updateLoyaltyPoints(order.customer_id, orderId, order.total_amount, shopId);
+  }
+
+  try {
+    publishOrderEvent('status_changed', {
+      order_id: parseInt(orderId, 10),
+      order_code: order.code,
+      old_status: oldStatus,
+      status: newStatus,
+      salesperson_id: order.salesperson_id,
+      group_id: order.group_id || null,
+      total_amount: order.total_amount,
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 /** List/export: `counter=1|true` chỉ đơn quầy; `counter=0|false` loại đơn quầy; khác = không lọc */
 async function getCounterSaleListFilter(pool, counter) {
   const cRaw = String(counter ?? '').trim().toLowerCase();
@@ -144,6 +189,7 @@ router.get('/', auth, requireShop, requirePermission('orders', 'view'), requireF
 
     let query = `
       SELECT o.*, c.name as customer_name, c.phone as customer_phone, u.full_name as salesperson_name, w.name as warehouse_name, g.name as group_name,
+        p.status AS payroll_period_status,
         COALESCE((
           SELECT commission_amount
           FROM commissions
@@ -155,6 +201,7 @@ router.get('/', auth, requireShop, requirePermission('orders', 'view'), requireF
       LEFT JOIN users u ON o.salesperson_id = u.id
       LEFT JOIN warehouses w ON o.warehouse_id = w.id
       LEFT JOIN groups g ON o.group_id = g.id
+      LEFT JOIN payroll_periods p ON p.id = o.payroll_period_id
       WHERE 1=1
     `;
     let countQuery = 'SELECT COUNT(*) as total FROM orders WHERE 1=1';
@@ -1048,11 +1095,46 @@ router.put('/:id', auth, requireShop, requireOrderPutAccess, async (req, res, ne
     }
 
     const order = existing[0];
-    // Nếu đơn thuộc kỳ lương đã chốt: chặn sửa tuyệt đối (không lật số kỳ đã trả).
     const p = await getOrderPayrollPeriod(pool, { shopId: req.shopId, orderId: parseInt(req.params.id, 10) });
+    const isAdminOrderPutEarly = req.user.can_access_admin === true || req.user.role === 'admin';
+
+    // Kỳ lương đã chốt: Admin chỉ được PUT `{ status }` (pending/shipping/completed), không hủy.
     if (p?.status === 'closed') {
+      const reqStatus = req.body?.status != null ? String(req.body.status) : null;
+      if (reqStatus === 'cancelled') {
+        return res.status(400).json({
+          error: 'Đơn thuộc kỳ lương đã chốt không được hủy. Vui lòng tạo đơn hoàn (returns).',
+        });
+      }
+      if (isAdminOrderPutEarly && isPayrollClosedStatusOnlyPut(req.body)) {
+        if (!reqStatus || !PAYROLL_CLOSED_ADMIN_STATUSES.has(reqStatus)) {
+          return res.status(400).json({ error: 'Trạng thái không hợp lệ (chỉ Chờ duyệt / Đang giao / Đã giao).' });
+        }
+        const scopeClosed = await getScope(req, 'orders');
+        if (scopeClosed === 'own' && order.salesperson_id !== req.user.id) {
+          return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
+        }
+        if (scopeClosed === 'group') {
+          const gidsClosed = await loadUserGroupIds(pool, req.shopId, req.user.id);
+          if (!gidsClosed.length || !gidsClosed.includes(Number(order.group_id))) {
+            return res.status(403).json({ error: 'Không có quyền sửa đơn hàng này' });
+          }
+        }
+        const oldStatus = order.status;
+        if (reqStatus !== oldStatus) {
+          await pool.query('UPDATE orders SET status = ? WHERE id = ? AND shop_id = ?', [
+            reqStatus,
+            req.params.id,
+            req.shopId,
+          ]);
+          await applyOrderStatusTransition(pool, req.params.id, order, oldStatus, reqStatus, req.shopId);
+        }
+        return res.json({ message: 'Cập nhật trạng thái đơn hàng thành công' });
+      }
       return res.status(400).json({
-        error: 'Kỳ lương của đơn này đã chốt. Không thể sửa/hủy/xóa; hãy tạo đơn hoàn (returns).',
+        error: isAdminOrderPutEarly
+          ? 'Kỳ lương đã chốt: chỉ được đổi trạng thái (không hủy). Các trường khác không sửa được.'
+          : 'Kỳ lương của đơn này đã chốt. Không thể sửa/hủy/xóa; hãy tạo đơn hoàn (returns).',
       });
     }
 

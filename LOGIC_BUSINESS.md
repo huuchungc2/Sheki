@@ -55,6 +55,12 @@
   - Chọn quản lý → `source_type=collaborator`, HH direct cho quản lý (`salesperson_id`), `collaborator_user_id` = A
 - **Admin** sửa đơn: form không có dropdown quản lý.
 
+### Đơn thuộc kỳ lương đã chốt (`payroll_periods.status = 'closed'`)
+- **Không** sửa tiền, dòng SP, HH, ship, cọc, NV chịu, KH, nhóm, … và **không** xóa đơn.
+- **Không** chuyển trạng thái sang `cancelled` (hủy) — xử lý sai sót bằng **đơn hoàn** (`returns`).
+- **Admin** được `PUT /orders/:id` với body **chỉ** `{ "status": "pending"|"shipping"|"completed" }` để cập nhật trạng thái vận hành (kho vẫn theo transition pending ↔ shipping ↔ completed).
+- **Sales / non-admin:** không sửa đơn thuộc kỳ đã chốt.
+
 ### Khi xóa đơn
 - Hoa hồng đơn đó = 0 (trừ đi khỏi tổng)
 - Tính lại tổng hoa hồng của nhân viên

@@ -455,8 +455,21 @@ export function OrderList() {
     } catch { } finally { setDeleting(null); }
   };
 
+  const selectedClosedPayrollCount = React.useMemo(() => {
+    if (!isAdmin) return 0;
+    return orders.filter(
+      (o: any) => selected.has(o.id) && String(o.payroll_period_status) === "closed"
+    ).length;
+  }, [isAdmin, orders, selected]);
+
   const handleBulkStatus = async () => {
     if (!bulkStatus || selected.size === 0) return;
+    if (bulkStatus === "cancelled" && selectedClosedPayrollCount > 0) {
+      alert(
+        `${selectedClosedPayrollCount} đơn thuộc kỳ lương đã chốt — không được chuyển sang Đã hủy. Bỏ chọn các đơn đó hoặc tạo đơn hoàn.`
+      );
+      return;
+    }
     if (!confirm(`Đổi ${selected.size} đơn sang "${statusConfig[bulkStatus]?.label}"?`)) return;
     setBulkLoading(true);
     const token = localStorage.getItem("token");
@@ -806,7 +819,9 @@ export function OrderList() {
               <option value="pending">Chờ duyệt</option>
               <option value="shipping">Đang giao</option>
               <option value="completed">Đã giao</option>
-              <option value="cancelled">Đã hủy</option>
+              {!(isAdmin && selectedClosedPayrollCount > 0) ? (
+                <option value="cancelled">Đã hủy</option>
+              ) : null}
             </select>
             <button
               onClick={handleBulkStatus}

@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Đơn kỳ lương đã chốt: Admin đổi trạng thái (trừ hủy)** — `PUT` chỉ `{ status }` pending/shipping/completed; chặn `cancelled`; OrderForm + bulk OrderList; list trả `payroll_period_status`. — Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`, `src/pages/OrderList.tsx`, `LOGIC_BUSINESS.md`
 - [x] **ZaloPilot mobile: tải zip không đẩy user ra khỏi SPA** — `fetch` + blob thay link trực tiếp; tránh màn preview iOS không có Back. — File: `src/components/Layout.tsx`
 - [x] **Sidebar: menu Tải ZaloPilot** — Link tải `public/zalopilot/zalopilot.zip` qua `/zalopilot/zalopilot.zip` cho mọi user đăng nhập. — File: `src/components/Layout.tsx`
 - [x] **Dashboard (Admin): re-layout "Top NV" + "Sale cần hỗ trợ" 50/50, "Đơn gần đây" full-width** — Hàng đầu: Top NV (trái) + Sale cần hỗ trợ (phải) chia 50/50 trên `lg+`, cùng cuộn nội bộ `max-h-[420px]`. Hàng dưới: Đơn hàng gần đây full-width, grid 3 cột trên `lg+`. Khi `bottomSalesCard` ẩn → Top NV tự full-width. — File: `src/pages/Dashboard.tsx`
