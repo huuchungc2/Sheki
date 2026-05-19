@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **ZaloPilot mobile: tải zip không đẩy user ra khỏi SPA** — `fetch` + blob thay link trực tiếp; tránh màn preview iOS không có Back. — File: `src/components/Layout.tsx`
 - [x] **Sidebar: menu Tải ZaloPilot** — Link tải `public/zalopilot/zalopilot.zip` qua `/zalopilot/zalopilot.zip` cho mọi user đăng nhập. — File: `src/components/Layout.tsx`
 - [x] **Dashboard (Admin): re-layout "Top NV" + "Sale cần hỗ trợ" 50/50, "Đơn gần đây" full-width** — Hàng đầu: Top NV (trái) + Sale cần hỗ trợ (phải) chia 50/50 trên `lg+`, cùng cuộn nội bộ `max-h-[420px]`. Hàng dưới: Đơn hàng gần đây full-width, grid 3 cột trên `lg+`. Khi `bottomSalesCard` ẩn → Top NV tự full-width. — File: `src/pages/Dashboard.tsx`
 - [x] **Dashboard: "Sale cần hỗ trợ" lọc strict theo role `sales`** — `/reports/dashboard.bottomSales` đổi `r.scope_own_data = 1` → `r.code = 'sales'` để loại bỏ Admin/Manager/CTV và chỉ list NV vai trò Sales. — File: `backend/routes/reports.js`

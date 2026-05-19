@@ -1,3 +1,7 @@
+## [19/05/2026] - ZaloPilot: tải trên iPhone không thoát khỏi ERP
+### Fixed
+- **Menu "Tải ZaloPilot" trên mobile** — Link trực tiếp tới `.zip` khiến Safari iOS mở màn preview full-screen (không có nút Back). Đổi sang `fetch` + blob + `download` (giữ tab ERP); fallback mở tab mới nếu lỗi. — File: `src/components/Layout.tsx`
+
 ## [18/05/2026] - ZaloPilot: sửa tải zip bị hỏng (trả HTML thay vì file)
 ### Fixed
 - **Tải ZaloPilot báo lỗi khi mở zip** — File thật là `ZaloPilot.zip` nhưng link trỏ `zalopilot.zip`; Vite/nginx không tìm thấy → trả `index.html` (user lưu thành .zip rồi mở lỗi). Đổi tên file → `zalopilot.zip`; BE `GET /zalopilot/zalopilot.zip` với `Content-Type: application/zip`; proxy Vite + nginx. — Files: `public/zalopilot/zalopilot.zip`, `backend/server.js`, `vite.config.ts`, `nginx.conf`, `src/components/Layout.tsx`

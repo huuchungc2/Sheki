@@ -29,11 +29,30 @@ import { api } from "../lib/api";
 /** File tĩnh: đặt `public/zalopilot/zalopilot.zip` */
 const ZALOPILOT_ZIP_PATH = "/zalopilot/zalopilot.zip";
 
+/** Tải zip trong tab hiện tại — tránh Safari iOS mở preview full-screen (khó quay lại SPA). */
+async function downloadZaloPilotZip() {
+  try {
+    const res = await fetch(ZALOPILOT_ZIP_PATH);
+    if (!res.ok) throw new Error("fetch failed");
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "zalopilot.zip";
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch {
+    window.open(ZALOPILOT_ZIP_PATH, "_blank", "noopener,noreferrer");
+  }
+}
+
 const zaloPilotMenuItem = {
   name: "Tải ZaloPilot",
   href: ZALOPILOT_ZIP_PATH,
   icon: Download,
-  external: true,
+  zalopilotDownload: true,
 };
 
 const API_URL =
@@ -569,9 +588,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
               );
             }
 
+            const isZaloPilotDownload =
+              "zalopilotDownload" in item && !!(item as { zalopilotDownload?: boolean }).zalopilotDownload;
+
             const isExternalDownload =
               ("external" in item && !!(item as { external?: boolean }).external) ||
               ("download" in item && typeof (item as { download?: string }).download === "string");
+
+            if (isZaloPilotDownload) {
+              return (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => {
+                    if (isMobile) setIsSidebarOpen(false);
+                    void downloadZaloPilotZip();
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all group text-left",
+                    "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  )}
+                >
+                  <item.icon className="w-5 h-5 shrink-0 text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70" />
+                  {isSidebarOpen && <span className="text-sm">{item.name}</span>}
+                </button>
+              );
+            }
 
             if (isExternalDownload && "href" in item && item.href) {
               return (
