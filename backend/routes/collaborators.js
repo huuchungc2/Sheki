@@ -204,6 +204,9 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
     const sid = req.shopId;
     const { month, year, group_id, sales_id, payroll_period_id } = req.query;
     const scope = await getScope(req, 'reports');
+    const monthStr = month != null ? String(month).trim() : '';
+    const yearStr = year != null ? String(year).trim() : '';
+    const yearOnly = monthStr === 'all' && yearStr !== '';
 
     // Đơn bán: kỳ theo đơn; bút toán hoàn override: kỳ theo entry_date / khoảng payroll_periods
     const txFilterConds = [];
@@ -220,18 +223,28 @@ router.get('/commissions/all', auth, requireShop, async (req, res, next) => {
         )))`
       );
       txFilterParams.push(pid, pid);
+    } else if (yearOnly) {
+      const y = parseInt(yearStr, 10);
+      txFilterConds.push(
+        '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o_tx.created_at) = ?))'
+      );
+      txFilterParams.push(y, y);
     } else {
-      if (month) {
+      const mm = monthStr !== '' ? parseInt(monthStr, 10) : null;
+      if (mm != null && Number.isFinite(mm) && mm >= 1 && mm <= 12) {
         txFilterConds.push(
           '((t.entry_kind = \'adjustment\' AND MONTH(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND MONTH(o_tx.created_at) = ?))'
         );
-        txFilterParams.push(parseInt(month, 10), parseInt(month, 10));
+        txFilterParams.push(mm, mm);
       }
-      if (year) {
-        txFilterConds.push(
-          '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o_tx.created_at) = ?))'
-        );
-        txFilterParams.push(parseInt(year, 10), parseInt(year, 10));
+      if (yearStr !== '') {
+        const y = parseInt(yearStr, 10);
+        if (Number.isFinite(y)) {
+          txFilterConds.push(
+            '((t.entry_kind = \'adjustment\' AND YEAR(t.entry_date) = ?) OR (t.entry_kind = \'commission\' AND YEAR(o_tx.created_at) = ?))'
+          );
+          txFilterParams.push(y, y);
+        }
       }
     }
     const txWhereExtra = txFilterConds.length ? ' AND ' + txFilterConds.join(' AND ') : '';

@@ -169,21 +169,32 @@ router.get('/periods/:id/preview', auth, requireShop, requireFeature('reports.sa
     );
     if (!p) return res.status(404).json({ error: 'Không tìm thấy kỳ lương' });
 
+    // Ship/NV: chỉ aggregate trên orders (tránh JOIN commissions nhân đôi shipping_fee mỗi dòng HH).
     const [directShipRows] = await pool.query(
       `
       SELECT
         o.salesperson_id AS user_id,
         COALESCE(SUM(CASE WHEN o.ship_payer='shop' THEN 0 ELSE o.shipping_fee END), 0) AS ship_khach_tra,
         COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS nv_chiu,
-        COALESCE(SUM(CASE WHEN c.type='direct' AND c.user_id=o.salesperson_id THEN c.commission_amount ELSE 0 END), 0) AS direct_commission
+        COALESCE(SUM(c_direct.direct_commission), 0) AS direct_commission
       FROM orders o
-      LEFT JOIN commissions c ON c.order_id = o.id
+      LEFT JOIN (
+        SELECT c.order_id, c.user_id, SUM(c.commission_amount) AS direct_commission
+        FROM commissions c
+        JOIN orders o2 ON o2.id = c.order_id
+        WHERE o2.shop_id = ?
+          AND o2.payroll_period_id = ?
+          AND o2.status <> 'cancelled'
+          AND c.type = 'direct'
+          AND c.user_id = o2.salesperson_id
+        GROUP BY c.order_id, c.user_id
+      ) c_direct ON c_direct.order_id = o.id AND c_direct.user_id = o.salesperson_id
       WHERE o.shop_id = ?
         AND o.payroll_period_id = ?
         AND o.status <> 'cancelled'
       GROUP BY o.salesperson_id
       `,
-      [req.shopId, periodId]
+      [req.shopId, periodId, req.shopId, periodId]
     );
 
     const [ovRows] = await pool.query(

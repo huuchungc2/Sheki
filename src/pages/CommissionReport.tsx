@@ -116,8 +116,10 @@ export function CommissionReport() {
   }, []);
   // `isAdmin` = "được xem báo cáo toàn shop" — bao gồm Admin/Super Admin và Sales được cấp scope `reports = shop`.
   const isAdmin = isAdminUser(currentUser) || canViewShopReports(currentUser);
-  /** Admin xem 1 NV: cùng UI «Hoa hồng của tôi» — từ route `:userId` hoặc query `?employee=` */
-  const employeeDrilldown = Boolean(isAdmin && filterSubjectUserId != null);
+  /** Route `/reports/commissions/:userId` — tiêu đề + nút back; vẫn hiển thị bảng NV/CTV (lọc 1 NV) */
+  const routeDrilldown = Boolean(isAdmin && routeSubjectUserId != null);
+  /** Lọc theo 1 NV: `?employee=` hoặc route `:userId` */
+  const activeEmployeeId = filterSubjectUserId ?? null;
   const [employeeSelectedName, setEmployeeSelectedName] = React.useState<string>("");
 
   React.useEffect(() => {
@@ -132,7 +134,7 @@ export function CommissionReport() {
   }, [routeSubjectUserId, employeeQueryRaw, patchEmployeeSearchParam]);
 
   React.useEffect(() => {
-    if (!employeeDrilldown || filterSubjectUserId == null) {
+    if (filterSubjectUserId == null) {
       setEmployeeSelectedName("");
       return;
     }
@@ -141,7 +143,7 @@ export function CommissionReport() {
       .then(r => (r.ok ? r.json() : null))
       .then(j => setEmployeeSelectedName(String(j?.data?.full_name || "")))
       .catch(() => setEmployeeSelectedName(""));
-  }, [employeeDrilldown, filterSubjectUserId]);
+  }, [filterSubjectUserId]);
 
   const [loading, setLoading]   = React.useState(true);
   const [error, setError]       = React.useState<string | null>(null);
@@ -158,13 +160,62 @@ export function CommissionReport() {
   const [payrollReady, setPayrollReady] = React.useState(false);
 
   const periodTouchedRef = React.useRef(bootstrapFilters.periodTouched);
+  const payrollPeriodIdRef = React.useRef(bootstrapFilters.payrollPeriodId);
+  const fetchSeqRef = React.useRef(0);
+  const skipUrlHydrateRef = React.useRef(false);
   React.useEffect(() => {
     periodTouchedRef.current = periodTouched;
   }, [periodTouched]);
+  React.useEffect(() => {
+    payrollPeriodIdRef.current = payrollPeriodId;
+  }, [payrollPeriodId]);
 
-  // Preserve filters when navigating list → detail (hoặc đổi query) — không ghi đè state khi search rỗng.
+  const writeFilterToUrl = React.useCallback(
+    (next: {
+      filterMode?: "payroll" | "month";
+      month?: string;
+      year?: string;
+      groupId?: string;
+      payrollPeriodId?: string;
+    }) => {
+      skipUrlHydrateRef.current = true;
+      setSearchParams(
+        (prev) => {
+          const sp = new URLSearchParams(prev);
+          const mode = next.filterMode ?? filterMode;
+          if (mode === "payroll") {
+            sp.set("mode", "payroll");
+            const pid = next.payrollPeriodId ?? payrollPeriodId;
+            if (pid) sp.set("payroll_period_id", pid);
+            else sp.delete("payroll_period_id");
+            sp.delete("month");
+            sp.delete("year");
+          } else {
+            sp.set("mode", "month");
+            sp.delete("payroll_period_id");
+            const m = next.month ?? month;
+            const y = next.year ?? year;
+            if (m) sp.set("month", m);
+            if (y) sp.set("year", y);
+          }
+          const gid = next.groupId ?? groupId;
+          if (gid) sp.set("group_id", gid);
+          else sp.delete("group_id");
+          return sp;
+        },
+        { replace: true }
+      );
+    },
+    [filterMode, month, year, groupId, payrollPeriodId, setSearchParams]
+  );
+
+  // Hydrate filter từ URL (back/forward, deep link) — mặc định «Tháng» nếu không có mode.
   // Example: /reports/commissions/12?mode=month&month=04&year=2026&group_id=3
   React.useEffect(() => {
+    if (skipUrlHydrateRef.current) {
+      skipUrlHydrateRef.current = false;
+      return;
+    }
     const sp = new URLSearchParams(location.search);
     const mode = sp.get("mode");
     const m = sp.get("month");
@@ -181,7 +232,7 @@ export function CommissionReport() {
       }
       return;
     }
-    if (mode === "month") setFilterMode("month");
+    setFilterMode("month");
     if (m === "all") setMonth("all");
     else if (m && /^\d{1,2}$/.test(m)) setMonth(String(m).padStart(2, "0"));
     if (y && /^\d{4}$/.test(y)) setYear(String(y));
@@ -299,15 +350,14 @@ export function CommissionReport() {
       .then(r => r.json()).then(j => setGroups(j.data || [])).catch(() => {});
   }, [isAdmin, currentUser?.id]);
 
-  const fetchPayrollPeriods = React.useCallback(async () => {
+  const fetchPayrollPeriods = React.useCallback(async (): Promise<string> => {
     try {
-      setPayrollReady(false);
       const token = localStorage.getItem("token");
       const [curRes, listRes] = await Promise.all([
         fetch(`${API_URL}/payroll/periods/current`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API_URL}/payroll/periods`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-      if (!curRes.ok || !listRes.ok) return;
+      if (!curRes.ok || !listRes.ok) return payrollPeriodIdRef.current || "";
       const curJ = await curRes.json();
       const listJ = await listRes.json();
       const cur = curJ?.data;
@@ -315,19 +365,22 @@ export function CommissionReport() {
       const openId = cur?.id != null ? String(cur.id) : "";
       setPayrollPeriods(list);
 
-      // If user hasn't manually chosen a period, always follow current open period.
-      // Also heal stale selection (e.g. after closing periods).
       const ids = new Set(list.map((p: any) => String(p.id)));
       const openExists = openId && ids.has(openId);
-      setPayrollPeriodId((prev) => {
-        const touched = periodTouchedRef.current;
-        const prevOk = prev && ids.has(prev);
-        if (!prevOk) return openExists ? openId : prev;
-        if (!touched) return openExists ? openId : prev;
-        return prev;
-      });
+      const prev = payrollPeriodIdRef.current;
+      const touched = periodTouchedRef.current;
+      const prevOk = prev && ids.has(prev);
+      let resolvedId = prev;
+      if (!prevOk) resolvedId = openExists ? openId : prev;
+      else if (!touched) resolvedId = openExists ? openId : prev;
+
+      payrollPeriodIdRef.current = resolvedId;
+      setPayrollPeriodId(resolvedId);
       setPayrollReady(true);
-    } catch {}
+      return resolvedId;
+    } catch {
+      return payrollPeriodIdRef.current || "";
+    }
   }, []);
 
   // Fetch payroll periods (for Admin + Sales) — refresh when user/shop changes too
@@ -336,54 +389,68 @@ export function CommissionReport() {
   }, [fetchPayrollPeriods, currentUser?.id]);
 
   const fetchReport = React.useCallback(async () => {
+    const seq = ++fetchSeqRef.current;
     setLoading(true);
     setError(null);
-    setSummary({
-      direct_commission: 0,
-      override_commission: 0,
-      total_commission: 0,
-      total_orders: 0,
-      total_khach_ship: 0,
-      total_nv_chiu: 0,
-      total_return_commission_abs: 0,
-      total_luong: 0,
-    });
-    setOrderCommissions([]);
-    setReturnsSummary({
-      return_orders: 0,
-      return_revenue: 0,
-      return_commission: 0,
-      return_commission_direct_abs: 0,
-      return_commission_override_abs: 0,
-      return_commission_total_abs: 0,
-    });
     try {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({ page: String(commPage), limit: String(commLimit) });
+      let activePayrollPeriodId = payrollPeriodIdRef.current || payrollPeriodId;
       if (filterMode === "payroll") {
-        // Ensure we have a valid period before fetching.
-        if (!payrollReady || !payrollPeriodId) {
-          await fetchPayrollPeriods();
-          if (!payrollPeriodId) {
-            // still not ready
-            return;
-          }
+        if (!activePayrollPeriodId) {
+          activePayrollPeriodId = await fetchPayrollPeriods();
         }
-        params.set("payroll_period_id", String(payrollPeriodId));
+        if (!activePayrollPeriodId) {
+          if (seq !== fetchSeqRef.current) return;
+          setError(
+            "Không tải được kỳ lương. Kiểm tra quyền «Lương / tổng hợp nhân viên» hoặc chọn «Tháng» để xem theo lịch."
+          );
+          return;
+        }
+        params.set("mode", "payroll");
+        params.set("payroll_period_id", String(activePayrollPeriodId));
       } else {
+        params.set("mode", "month");
         params.set("month", month);
         params.set("year", year);
       }
       if (groupId) params.set("group_id", groupId);
-      if (employeeDrilldown && filterSubjectUserId != null) params.set("user_id", String(filterSubjectUserId));
+      if (filterSubjectUserId != null) params.set("user_id", String(filterSubjectUserId));
+
+      if (seq !== fetchSeqRef.current) return;
+      setSummary({
+        direct_commission: 0,
+        override_commission: 0,
+        total_commission: 0,
+        total_orders: 0,
+        total_khach_ship: 0,
+        total_nv_chiu: 0,
+        total_return_commission_abs: 0,
+        total_luong: 0,
+      });
+      setOrderCommissions([]);
+      setSalesData([]);
+      setCtvPairs([]);
+      setCtvOrders([]);
+      setCtvTotals({});
+      setReturnsSummary({
+        return_orders: 0,
+        return_revenue: 0,
+        return_commission: 0,
+        return_commission_direct_abs: 0,
+        return_commission_override_abs: 0,
+        return_commission_total_abs: 0,
+      });
 
       // 1. Chi tiết theo đơn (cùng API «Hoa hồng của tôi»; Admin + user_id = 1 NV)
       const [orderRes, returnsRes] = await Promise.all([
         fetch(`${API_URL}/commissions/orders?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API_URL}/reports/returns-summary?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
+      if (seq !== fetchSeqRef.current) return;
       if (!orderRes.ok) throw new Error("Không thể tải báo cáo hoa hồng");
       const orderJson = await orderRes.json();
+      if (seq !== fetchSeqRef.current) return;
       setOrderCommissions(orderJson.data || []);
       setCommTotal(orderJson.total || 0);
       const s = orderJson.summary;
@@ -420,54 +487,59 @@ export function CommissionReport() {
         });
       }
 
-      // 3. Bảng tổng hợp (theo menu Admin): luôn gọi khi không drilldown.
-      // - Admin => toàn shop
-      // - Non-admin (Sales) => scope own => API tự trả 1 dòng của chính mình
-      if (!employeeDrilldown) {
-        const salaryParams = new URLSearchParams();
-        if (filterMode === "payroll" && payrollPeriodId) {
-          salaryParams.set("payroll_period_id", String(payrollPeriodId));
-        } else {
-          salaryParams.set("month", month);
-          salaryParams.set("year", year);
+      // 3. Bảng Hoa hồng NV + CTV (Admin/Sales); lọc 1 NV qua ?employee= hoặc route :userId
+      const salaryParams = new URLSearchParams();
+      if (filterMode === "payroll" && activePayrollPeriodId) {
+        salaryParams.set("mode", "payroll");
+        salaryParams.set("payroll_period_id", String(activePayrollPeriodId));
+      } else {
+        salaryParams.set("mode", "month");
+        salaryParams.set("month", month);
+        salaryParams.set("year", year);
+      }
+      if (groupId) salaryParams.set("group_id", groupId);
+      if (activeEmployeeId != null) salaryParams.set("employee", String(activeEmployeeId));
+
+      const ctvParams = new URLSearchParams(salaryParams);
+      const ctvSalesId =
+        !isAdmin && currentUser?.id != null
+          ? Number(currentUser.id)
+          : activeEmployeeId != null
+            ? activeEmployeeId
+            : null;
+      if (ctvSalesId != null) ctvParams.set("sales_id", String(ctvSalesId));
+
+      const [salaryRes, ctvRes] = await Promise.all([
+        fetch(`${API_URL}/reports/salary?${salaryParams}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/collaborators/commissions/all?${ctvParams}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      if (seq !== fetchSeqRef.current) return;
+      if (salaryRes.ok) {
+        const j = await salaryRes.json();
+        let sd = j.data?.salesData || [];
+        if (activeEmployeeId != null) {
+          sd = sd.filter((row: any) => Number(row.id) === activeEmployeeId);
         }
-        if (groupId) salaryParams.set("group_id", groupId);
+        setSalesData(sd);
 
-        const [salaryRes, ctvRes] = await Promise.all([
-          fetch(`${API_URL}/reports/salary?${salaryParams}`, { headers: { Authorization: `Bearer ${token}` } }),
-          // Admin: xem toàn hệ thống; Sales: chỉ xem cặp của mình (sales_id = current user)
-          (() => {
-            const p = new URLSearchParams(salaryParams);
-            if (!isAdmin && currentUser?.id != null) p.set("sales_id", String(currentUser.id));
-            return fetch(`${API_URL}/collaborators/commissions/all?${p}`, { headers: { Authorization: `Bearer ${token}` } });
-          })(),
-        ]);
-
-        if (salaryRes.ok) {
-          const j = await salaryRes.json();
-          const sd = j.data?.salesData || [];
-          setSalesData(sd);
-
-          // KPI tổng (HH bán gross + CTV net) lấy từ `/reports/salary` — cùng nguồn với Dashboard (commissionKpi),
-          // không cộng từ từng dòng NV (tránh thiếu khi NV không có đơn trong tháng nhưng vẫn có phát sinh HH).
-          const sumOrders = sd.reduce((s: number, i: any) => s + (Number(i.total_orders) || 0), 0);
-          const sumShip = sd.reduce((s: number, i: any) => s + (Number(i.total_khach_ship) || 0), 0);
-          const sumNv = sd.reduce((s: number, i: any) => s + (Number(i.total_nv_chiu) || 0), 0);
-          const sumLuong = sd.reduce((s: number, i: any) => s + (Number(i.total_luong) || 0), 0);
-          const ordersAll = Number(j.data?.summary?.totalOrdersAll) || 0;
-          const kpiD = Number(j.data?.summary?.kpi_direct_gross);
-          const kpiO = Number(j.data?.summary?.kpi_override_net);
-          const kpiT = Number(j.data?.summary?.kpi_total_hh);
-          const kpiLuong = Number(j.data?.summary?.kpi_total_luong);
-          const kpiShip = Number(j.data?.summary?.kpi_total_khach_ship);
-          const kpiNv = Number(j.data?.summary?.kpi_total_nv_chiu);
-          const kpiRet = Number(j.data?.summary?.kpi_return_commission);
-          const fallbackD = sd.reduce((s: number, i: any) => s + (Number(i.direct_commission) || 0), 0);
-          const fallbackO = sd.reduce((s: number, i: any) => s + (Number(i.override_commission) || 0), 0);
-          const fallbackRet = sd.reduce((s: number, i: any) => s + (Number(i.total_return_commission_abs) || 0), 0);
-
-          setSummary((prev: any) => ({
-            ...prev,
+        const mergeSalaryKpi = (rows: any[], sum: any) => {
+          const sumOrders = rows.reduce((acc: number, i: any) => acc + (Number(i.total_orders) || 0), 0);
+          const sumShip = rows.reduce((acc: number, i: any) => acc + (Number(i.total_khach_ship) || 0), 0);
+          const sumNv = rows.reduce((acc: number, i: any) => acc + (Number(i.total_nv_chiu) || 0), 0);
+          const sumLuong = rows.reduce((acc: number, i: any) => acc + (Number(i.total_luong) || 0), 0);
+          const ordersAll = Number(sum?.totalOrdersAll) || 0;
+          const kpiD = Number(sum?.kpi_direct_gross);
+          const kpiO = Number(sum?.kpi_override_net);
+          const kpiT = Number(sum?.kpi_total_hh);
+          const kpiLuong = Number(sum?.kpi_total_luong);
+          const kpiShip = Number(sum?.kpi_total_khach_ship);
+          const kpiNv = Number(sum?.kpi_total_nv_chiu);
+          const kpiRet = Number(sum?.kpi_return_commission);
+          const fallbackD = rows.reduce((acc: number, i: any) => acc + (Number(i.direct_commission) || 0), 0);
+          const fallbackO = rows.reduce((acc: number, i: any) => acc + (Number(i.override_commission) || 0), 0);
+          const fallbackRet = rows.reduce((acc: number, i: any) => acc + (Number(i.total_return_commission_abs) || 0), 0);
+          return {
             direct_commission: Number.isFinite(kpiD) ? kpiD : fallbackD,
             override_commission: Number.isFinite(kpiO) ? kpiO : fallbackO,
             total_commission: Number.isFinite(kpiT) ? kpiT : fallbackD + fallbackO,
@@ -476,16 +548,65 @@ export function CommissionReport() {
             total_nv_chiu: Number.isFinite(kpiNv) ? kpiNv : sumNv,
             total_return_commission_abs: Number.isFinite(kpiRet) ? kpiRet : fallbackRet,
             total_luong: Number.isFinite(kpiLuong) ? kpiLuong : sumLuong,
-          }));
+          };
+        };
+
+        if (activeEmployeeId == null) {
+          setSummary((prev: any) => ({ ...prev, ...mergeSalaryKpi(sd, j.data?.summary) }));
+        } else if (sd.length > 0) {
+          setSummary((prev: any) => ({ ...prev, ...mergeSalaryKpi(sd, j.data?.summary) }));
         }
-        if (ctvRes.ok) {
-          const j = await ctvRes.json();
-          setCtvPairs(j.data?.pairs || []);
-          setCtvOrders(j.data?.orders || []);
-          setCtvTotals(j.data?.totals || {});
-        }
-      } else if (employeeDrilldown) {
-        setSalesData([]);
+      } else if (salaryRes.status === 403) {
+        setError((prev) =>
+          prev ||
+          "Không có quyền xem bảng lương/HH nhân viên (feature «Lương / tổng hợp»). Liên hệ Admin shop."
+        );
+      } else if (!salaryRes.ok && activeEmployeeId != null) {
+        setError((prev) => prev || "Không tải được bảng HH nhân viên. Thử lại hoặc kiểm tra quyền «Lương / tổng hợp».");
+      }
+
+      // Lọc 1 NV: nếu salary rỗng nhưng chi tiết đơn có dữ liệu → dựng 1 dòng bảng NV từ KPI đơn
+      if (seq === fetchSeqRef.current && activeEmployeeId != null) {
+        setSalesData((prev) => {
+          if (prev.length > 0) return prev;
+          const os = orderJson.summary;
+          const hasOrders =
+            (Number(os?.total_orders) || 0) > 0 ||
+            (orderJson.data?.length || 0) > 0 ||
+            (Number(os?.direct_commission) || 0) !== 0;
+          if (!hasOrders) return prev;
+          const direct = Number(os?.direct_commission) || 0;
+          const override = Number(os?.override_commission) || 0;
+          return [
+            {
+              id: activeEmployeeId,
+              full_name: employeeSelectedName || `NV #${activeEmployeeId}`,
+              total_orders: Number(os?.total_orders) || 0,
+              total_sales: 0,
+              direct_commission: direct,
+              override_commission: override,
+              total_all_commission: direct + override,
+              total_khach_ship: Number(os?.total_khach_ship) || 0,
+              total_nv_chiu: Number(os?.total_nv_chiu) || 0,
+              total_luong: Number(os?.total_luong) || 0,
+              total_return_commission_abs: Number(os?.total_return_commission_abs) || 0,
+            },
+          ];
+        });
+      }
+
+      if (seq !== fetchSeqRef.current) return;
+      if (ctvRes.ok) {
+        const j = await ctvRes.json();
+        const pairs = j.data?.pairs || [];
+        const orders = j.data?.orders || [];
+        setCtvPairs(pairs);
+        setCtvOrders(orders);
+        setCtvTotals({
+          total_override: pairs.reduce((s: number, p: any) => s + (Number(p.override_commission) || 0), 0),
+          total_orders: pairs.reduce((s: number, p: any) => s + (Number(p.total_orders) || 0), 0),
+        });
+      } else {
         setCtvPairs([]);
         setCtvOrders([]);
         setCtvTotals({});
@@ -495,7 +616,21 @@ export function CommissionReport() {
     } finally {
       setLoading(false);
     }
-  }, [month, year, groupId, commPage, commLimit, isAdmin, currentUser?.id, employeeDrilldown, filterSubjectUserId, filterMode, payrollPeriodId, payrollReady]);
+  }, [
+    month,
+    year,
+    groupId,
+    commPage,
+    commLimit,
+    isAdmin,
+    currentUser?.id,
+    routeDrilldown,
+    activeEmployeeId,
+    filterSubjectUserId,
+    filterMode,
+    filterMode === "payroll" ? payrollPeriodId : "",
+    fetchPayrollPeriods,
+  ]);
 
   // Reset page khi filter hoặc limit / NV thay đổi
   React.useEffect(() => { setCommPage(1); }, [month, year, groupId, commLimit, filterSubjectUserId, filterMode, payrollPeriodId]);
@@ -527,14 +662,21 @@ export function CommissionReport() {
 
       // Fetch toàn bộ data (limit=9999, không phân trang)
       const allParams = new URLSearchParams({ page: "1", limit: "9999" });
-      if (filterMode === "payroll" && payrollPeriodId) {
-        allParams.set("payroll_period_id", String(payrollPeriodId));
+      let exportPayrollId = payrollPeriodIdRef.current || payrollPeriodId;
+      if (filterMode === "payroll") {
+        if (!exportPayrollId) {
+          exportPayrollId = await fetchPayrollPeriods();
+        }
+        if (!exportPayrollId) return;
+        allParams.set("mode", "payroll");
+        allParams.set("payroll_period_id", String(exportPayrollId));
       } else {
+        allParams.set("mode", "month");
         allParams.set("month", month);
         allParams.set("year", year);
       }
       if (groupId) allParams.set("group_id", groupId);
-      if (employeeDrilldown && filterSubjectUserId != null) allParams.set("user_id", String(filterSubjectUserId));
+      if (filterSubjectUserId != null) allParams.set("user_id", String(filterSubjectUserId));
       const allRes = await fetch(`${API_URL}/commissions/orders?${allParams}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -542,7 +684,7 @@ export function CommissionReport() {
       const allOrders = allJson.data || [];
       const periodSummary = { ...summary, ...(allJson.summary || {}) };
 
-      if (isAdmin && !employeeDrilldown) {
+      if (isAdmin) {
         exportAdminCommission({
           salesData,
           orderCommissions: allOrders,
@@ -557,7 +699,9 @@ export function CommissionReport() {
         exportSalesCommission({
           orders: allOrders,
           summary: periodSummary,
-          userName: employeeDrilldown ? (employeeSelectedName || `NV #${filterSubjectUserId}`) : (currentUser?.full_name || "NhanVien"),
+          userName: activeEmployeeId != null
+            ? (employeeSelectedName || `NV #${filterSubjectUserId}`)
+            : (currentUser?.full_name || "NhanVien"),
           month,
           year,
           groupName,
@@ -588,7 +732,7 @@ export function CommissionReport() {
     );
   }
 
-  const isSalesMyCommission = !isAdmin && !employeeDrilldown;
+  const isSalesMyCommission = !isAdmin && !routeDrilldown;
   const totalOrdersWithReturns = Number(summary.total_orders) || 0;
 
   // (chart removed per request)
@@ -597,7 +741,7 @@ export function CommissionReport() {
     <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
       {/* Tiêu đề */}
       <div className="flex items-start gap-3 min-w-0">
-          {employeeDrilldown && (
+          {routeDrilldown && (
             <Link
               to={buildListUrl()}
               className="mt-1 p-2 rounded-lg text-muted-foreground hover:bg-accent transition-colors shrink-0"
@@ -608,13 +752,13 @@ export function CommissionReport() {
           )}
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground break-words">
-              {employeeDrilldown
+              {routeDrilldown
                 ? `Hoa hồng: ${employeeSelectedName || `Nhân viên #${filterSubjectUserId}`}`
                 : "Báo cáo hoa hồng"}
             </h1>
             <p className="text-muted-foreground text-sm mt-0.5 break-words">
-              {employeeDrilldown
-                ? "Cùng cột KPI và bảng đơn như «Hoa hồng của tôi» — theo nhân viên đã chọn (menu lọc hoặc URL `?employee=` / `/reports/commissions/:id`)."
+              {activeEmployeeId != null
+                ? `Đang xem nhân viên: ${employeeSelectedName || `#${activeEmployeeId}`} — KPI, bảng NV/CTV và chi tiết đơn theo NV này.`
                 : "Tổng hợp hoa hồng theo menu Admin; dữ liệu sẽ tự co theo phạm vi (cá nhân/nhóm/toàn shop)."}
             </p>
           </div>
@@ -730,7 +874,15 @@ export function CommissionReport() {
           ) : null}
             <label className="flex flex-col gap-1.5 min-w-[180px]">
               <span className="text-xs font-medium text-muted-foreground">Nhóm bán hàng</span>
-              <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={commSelectCls}>
+              <select
+                value={groupId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setGroupId(v);
+                  writeFilterToUrl({ groupId: v });
+                }}
+                className={commSelectCls}
+              >
                 <option value="">Tất cả nhóm</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
@@ -747,7 +899,10 @@ export function CommissionReport() {
                     type="button"
                     disabled={payrollPeriods.length === 0}
                     title={payrollPeriods.length === 0 ? "Chưa có kỳ lương trong shop" : undefined}
-                    onClick={() => setFilterMode("payroll")}
+                    onClick={() => {
+                      setFilterMode("payroll");
+                      writeFilterToUrl({ filterMode: "payroll", payrollPeriodId });
+                    }}
                     className={cn(
                       "rounded-md px-3 py-2 text-xs font-semibold transition",
                       filterMode === "payroll"
@@ -760,7 +915,10 @@ export function CommissionReport() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFilterMode("month")}
+                    onClick={() => {
+                      setFilterMode("month");
+                      writeFilterToUrl({ filterMode: "month", month, year });
+                    }}
                     className={cn(
                       "rounded-md px-3 py-2 text-xs font-semibold transition",
                       filterMode === "month"
@@ -776,8 +934,10 @@ export function CommissionReport() {
             <select
               value={payrollPeriodId}
               onChange={(e) => {
+                const v = e.target.value;
                 setPeriodTouched(true);
-                setPayrollPeriodId(e.target.value);
+                setPayrollPeriodId(v);
+                writeFilterToUrl({ filterMode: "payroll", payrollPeriodId: v });
               }}
               className={cn(commSelectCls, "min-w-[12rem]")}
             >
@@ -790,13 +950,29 @@ export function CommissionReport() {
             </select>
           ) : (
             <>
-              <select value={month} onChange={(e) => setMonth(e.target.value)} className={cn(commSelectCls, "w-[130px]")}>
+              <select
+                value={month}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setMonth(v);
+                  writeFilterToUrl({ filterMode: "month", month: v, year });
+                }}
+                className={cn(commSelectCls, "w-[130px]")}
+              >
                 <option value="all">Tất cả (cả năm)</option>
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={String(i + 1).padStart(2, "0")}>Tháng {i + 1}</option>
                 ))}
               </select>
-              <select value={year} onChange={(e) => setYear(e.target.value)} className={cn(commSelectCls, "w-[100px]")}>
+              <select
+                value={year}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setYear(v);
+                  writeFilterToUrl({ filterMode: "month", month, year: v });
+                }}
+                className={cn(commSelectCls, "w-[100px]")}
+              >
                 {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </>
@@ -825,7 +1001,7 @@ export function CommissionReport() {
             }
           </button>
         </div>
-        {employeeDrilldown && isAdmin ? (
+        {routeDrilldown && isAdmin ? (
           <p className="text-xs text-muted-foreground">
             KPI theo nhân viên bán (salesperson): hoa hồng trực tiếp/CTV, đơn chi tiết, hoàn, ship/NV chịu, tổng lương trong kỳ đã chọn.
           </p>
@@ -857,7 +1033,7 @@ export function CommissionReport() {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-3 break-words" title="Chỉ khi bạn là quản lý nhận override; đơn ghi nhận quản lý + cặp collaborators + tier. Nếu bạn chỉ là người lên đơn (CTV), HH nằm ở «HH bán hàng».">
-              {employeeDrilldown
+              {routeDrilldown
                 ? "Tiền quản lý nhận từ đơn CTV — nếu chỉ là CTV, thường = 0"
                 : "Override quản lý trên đơn CTV"}
             </p>
@@ -960,9 +1136,8 @@ export function CommissionReport() {
         </div>
       </div>
 
-      {/* Tabs (theo menu Admin): Hoa hồng NV / Hoa hồng CTV — ẩn khi xem 1 NV */}
-      {!employeeDrilldown && (
-        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden min-w-0">
+      {/* Tabs: Hoa hồng NV / Hoa hồng CTV — luôn hiện; lọc 1 NV (?employee= hoặc Chi tiết /:userId) thu hẹp dữ liệu */}
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden min-w-0">
           {/* Tab header */}
           <div className="flex border-b border-border">
             <button
@@ -996,7 +1171,22 @@ export function CommissionReport() {
           {/* Tab: Hoa hồng nhân viên */}
           {activeTab === "direct" && (
             salesData.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">Chưa có dữ liệu trong tháng này</div>
+              <div className="py-12 text-center text-muted-foreground text-sm px-6 max-w-lg mx-auto">
+                {activeEmployeeId != null ? (
+                  <>
+                    <p className="font-medium text-foreground">
+                      {employeeSelectedName || `NV #${activeEmployeeId}`} không có đơn/HH trong kỳ đã chọn
+                      {groupId ? ` (nhóm ${groups.find((g) => String(g.id) === groupId)?.name || `#${groupId}`})` : ""}.
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed">
+                      Bộ lọc áp dụng <span className="text-foreground">cả nhóm và nhân viên</span>: chỉ tính đơn thuộc nhóm đó do NV này phụ trách trong {periodLabelShort}.
+                      Thử bỏ lọc nhóm hoặc chọn đúng nhóm có đơn của NV (vd. kỳ lương #1 — NV #99 có đơn ở nhóm khác, không phải nhóm đang chọn).
+                    </p>
+                  </>
+                ) : (
+                  "Chưa có dữ liệu trong kỳ đã chọn"
+                )}
+              </div>
             ) : (
               <div className="min-w-0">
                 <div className="overflow-x-auto">
@@ -1113,11 +1303,12 @@ export function CommissionReport() {
 
           {/* Tab: Hoa hồng từ CTV */}
           {activeTab === "ctv" && (() => {
-            // Group pairs by sales — chỉ lấy pairs có override > 0
+            const pairsWithHh = ctvPairs.filter((p) => (Number(p.override_commission) || 0) > 0);
             const bySales: Record<number, any[]> = {};
-            ctvPairs
-              .filter(p => p.override_commission > 0)
-              .forEach(p => { if (!bySales[p.sales_id]) bySales[p.sales_id] = []; bySales[p.sales_id].push(p); });
+            pairsWithHh.forEach((p) => {
+              if (!bySales[p.sales_id]) bySales[p.sales_id] = [];
+              bySales[p.sales_id].push(p);
+            });
             const ordersByPair: Record<string, any[]> = {};
             ctvOrders.forEach(o => {
               const k = `${o.sales_id}-${o.ctv_id}`;
@@ -1127,7 +1318,26 @@ export function CommissionReport() {
             const salesIds = Object.keys(bySales).map(Number);
 
             return salesIds.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">Chưa có hoa hồng CTV trong tháng này</div>
+              <div className="py-12 text-center text-muted-foreground text-sm px-6 max-w-lg mx-auto">
+                {ctvPairs.length === 0 ? (
+                  <>
+                    <p className="font-medium text-foreground">
+                      {activeEmployeeId != null
+                        ? `${employeeSelectedName || `NV #${activeEmployeeId}`} chưa có CTV được gán hoặc chưa phát sinh HH quản lý (override) trong ${periodLabelShort}.`
+                        : `Chưa có dữ liệu HH từ CTV trong ${periodLabelShort}.`}
+                    </p>
+                    <p className="mt-2 text-xs leading-relaxed">
+                      Tab này chỉ hiển thị <span className="text-foreground">HH override</span> khi CTV lên đơn (không phải HH bán trực tiếp ở tab «Hoa hồng nhân viên»).
+                      Gán CTV tại menu Cộng tác viên nếu cần.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-foreground">Có {ctvPairs.length} cặp CTV nhưng chưa có HH override trong {periodLabelShort}.</p>
+                    <p className="mt-2 text-xs">Thử bỏ lọc nhóm hoặc đổi kỳ nếu HH override phát sinh ở nhóm/kỳ khác.</p>
+                  </>
+                )}
+              </div>
             ) : (
               <div>
                 {salesIds.map(sid => {
@@ -1250,7 +1460,6 @@ export function CommissionReport() {
             );
           })()}
         </div>
-      )}
 
       {/* Bảng chi tiết hoa hồng theo đơn (cả sales lẫn admin đều thấy) */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden min-w-0">

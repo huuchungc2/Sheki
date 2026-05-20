@@ -6,6 +6,7 @@ const authorize = require('../middleware/authorize');
 const { requireFeature } = require('../middleware/requireFeature');
 const { getPool } = require('../config/db');
 const { getScope } = require('../utils/scope');
+const { sumShipNvForOrdersScope } = require('../utils/shipNvScope');
 
 async function loadUserGroupIds(pool, shopId, userId) {
   const [rows] = await pool.query(
@@ -485,23 +486,18 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
       totalKhachShip = parseFloat(shipRows[0]?.total_khach_ship) || 0;
       totalNvChiu = parseFloat(shipRows[0]?.total_nv_chiu) || 0;
     } else if (!isScoped && adminEmployeeUid == null) {
-      const [orderAggRows] = await pool.query(
-        `
-        SELECT
-          COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
-          COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
-        FROM orders o
-        WHERE o.id IN (
-          SELECT DISTINCT t.order_id
-          ${baseFrom}
-          ${whereClause}
-        )
-      `,
-        baseParams
-      );
-      const oa = orderAggRows[0] || {};
-      totalKhachShip = parseFloat(oa.total_khach_ship) || 0;
-      totalNvChiu = parseFloat(oa.total_nv_chiu) || 0;
+      // Tổng shop: ship/NV theo đơn trong kỳ (giống chốt kỳ lương), không chỉ đơn có dòng HH trong UNION
+      const gid = group_id ? parseInt(String(group_id), 10) : null;
+      const shipNv = await sumShipNvForOrdersScope(pool, {
+        shopId: req.shopId,
+        payrollPeriodId: pid,
+        groupId: Number.isFinite(gid) ? gid : null,
+        month: pid == null && monthNum != null && Number.isFinite(monthNum) ? monthNum : null,
+        year: yearNum != null && Number.isFinite(yearNum) ? yearNum : null,
+        yearOnly: pid == null && monthRaw === 'all' && yearNum != null && Number.isFinite(yearNum),
+      });
+      totalKhachShip = shipNv.total_khach_ship;
+      totalNvChiu = shipNv.total_nv_chiu;
     }
 
     const directComm = parseFloat(s.direct_commission) || 0;

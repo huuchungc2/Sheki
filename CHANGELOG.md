@@ -1,3 +1,53 @@
+## [20/05/2026] - Preview kỳ lương: Ship KH bị nhân đôi (JOIN commissions)
+### Fixed
+- **`GET /payroll/periods/:id/preview`** — `LEFT JOIN commissions` không lọc `user_id`/`type` khiến `SUM(shipping_fee)` nhân theo số dòng HH (vd NV #95: 360.800 vs đúng 257.400). Ship/NV chỉ aggregate trên `orders`; HH direct subquery riêng. — File: `backend/routes/payroll.js`
+
+## [20/05/2026] - Ship KH Trả: đồng bộ chốt kỳ lương vs báo cáo HH
+### Fixed
+- **Ship KH Trả lệch giữa chốt kỳ lương và báo cáo hoa hồng** — Chốt kỳ cộng ship trên mọi đơn trong kỳ (`salesperson_id`); HH trước đây chỉ cộng đơn có bút toán HH. Thêm `sumShipNvForOrdersScope`, dùng chung `GET /commissions/orders` (tổng shop) và `GET /reports/salary` (kỳ lương); kỳ đã chốt KPI ship lấy tổng `payroll_settlements`. — Files: `backend/utils/shipNvScope.js`, `backend/routes/commissions.js`, `backend/routes/reports.js`
+
+## [20/05/2026] - CommissionReport: payroll NV 91 + tab CTV trống
+### Fixed
+- **Lọc 1 NV (payroll)** — KPI/bảng «Hoa hồng nhân viên» đồng bộ từ `/reports/salary` khi có `employee`; fallback 1 dòng từ `commissions/orders` nếu salary lỗi/rỗng. — File: `src/pages/CommissionReport.tsx`
+- **Tab «Hoa hồng từ CTV»** — Empty state theo kỳ lương; phân biệt «chưa gán CTV / chưa có override» (HH CTV ≠ HH bán trực tiếp). — File: `src/pages/CommissionReport.tsx`
+
+## [20/05/2026] - CommissionReport: kỳ lương + group + employee
+### Fixed
+- **`GET /reports/salary` (kỳ lương)** — Hỗ trợ `?employee=`; kỳ **đã chốt** + lọc nhóm/NV không còn dùng snapshot toàn kỳ (tránh HH lệch); tính realtime theo `payroll_period_id` + `group_id` + salesperson. — File: `backend/routes/reports.js`
+
+## [20/05/2026] - CommissionReport: employee + group_id trống (vd NV 99 nhóm 5)
+### Fixed
+- **`GET /reports/salary`** — Sửa lệch tham số SQL khi `group_id` (thiếu `AND group_id` trong `o_stats`/`ship_nv`); hỗ trợ `?employee=` (lọc theo salesperson, giữ 1 dòng NV kể cả 0 đơn trong nhóm). — File: `backend/routes/reports.js`
+- **CommissionReport** — Gửi `employee` lên `/reports/salary`; empty state giải thích khi NV không có đơn trong nhóm/kỳ đã chọn. — File: `src/pages/CommissionReport.tsx`
+
+## [20/05/2026] - CommissionReport: mọi bộ lọc trống dữ liệu
+### Fixed
+- **Race fetch báo cáo HH** — `fetchPayrollPeriods` không còn `setPayrollReady(false)` (tránh kích hoạt lại `fetchReport` giữa chừng); xóa dữ liệu chỉ sau khi đã resolve kỳ lương; `fetchSeq` bỏ qua response cũ; báo lỗi khi không có kỳ thay vì UI trống im lặng. — File: `src/pages/CommissionReport.tsx`
+
+## [20/05/2026] - CommissionReport: Chi tiết + CTV khi lọc NV
+### Fixed
+- **Route `/reports/commissions/:userId` và `?employee=`** — Không còn ẩn tab «Hoa hồng nhân viên» / «Hoa hồng CTV»; luôn gọi `/reports/salary` + `/collaborators/commissions/all`. — File: `src/pages/CommissionReport.tsx`
+- **Hoa hồng CTV khi lọc NV** — Admin truyền `sales_id` lên API (trước chỉ Sales); `ctvTotals` tính lại từ pairs đã lọc; BE hỗ trợ `month=all` (không parse `all` thành NaN). — Files: `src/pages/CommissionReport.tsx`, `backend/routes/collaborators.js`
+
+## [20/05/2026] - CommissionReport: lọc nhân viên làm mất bảng Hoa hồng NV
+### Fixed
+- **Lọc `?employee=` trên trang tổng** — Không còn coi là drilldown (ẩn tab/bảng); giữ tab «Hoa hồng nhân viên» với 1 dòng NV, KPI từ `commissions/orders?user_id=`. Chỉ route `/reports/commissions/:userId` mới ẩn bảng shop (UI «Hoa hồng của tôi»). — File: `src/pages/CommissionReport.tsx`
+
+## [20/05/2026] - CommissionReport: lọc làm mất bảng Hoa hồng nhân viên
+### Fixed
+- **`GET /reports/salary`** — Không còn mặc định tháng hiện tại khi chỉ gửi `payroll_period_id` (trước đó nhảy nhánh lịch → có thể `MONTH = NULL` → `salesData` rỗng); tách `explicitCalendar` vs kỳ lương. — File: `backend/routes/reports.js`
+- **CommissionReport** — `fetchPayrollPeriods` trả `periodId` dùng ngay trong `fetchReport` (tránh return sớm vì state closure còn rỗng → xóa bảng NV); gửi `mode=payroll` khi lọc kỳ lương. — File: `src/pages/CommissionReport.tsx`
+
+## [20/05/2026] - CommissionReport: lọc theo tháng vẫn sai
+### Fixed
+- **`GET /reports/salary`** — Nhánh kỳ lương không còn “đè” lọc tháng khi có `month`+`year` hợp lệ hoặc `mode=month` (URL còn `payroll_period_id` cũ vẫn trả đúng theo tháng); parse tháng 1–12 giống Dashboard. — File: `backend/routes/reports.js`
+- **CommissionReport** — Đồng bộ `mode`/`month`/`year` lên URL khi đổi «Tháng»/nhóm; gửi `mode=month` lên API; hydrate URL mặc định «Tháng»; fetch không phụ thuộc `payrollPeriodId` khi đang lọc tháng. — File: `src/pages/CommissionReport.tsx`
+
+## [20/05/2026] - CommissionReport: tab Hoa hồng nhân viên load sai
+### Fixed
+- **`GET /reports/salary` (lọc tháng/năm)** — Bảng «Hoa hồng nhân viên» lọc HH bán/CTV theo `c.created_at` thay vì `o.created_at` (lệch KPI/Dashboard); lọc «Tất cả (cả năm)» (`month=all`) truyền `MONTH = null` nên bảng rỗng/sai trong khi thẻ KPI vẫn đúng. Chuẩn hóa điều kiện thời gian giống `commissionKpi` + RevenueReport. — File: `backend/routes/reports.js`
+- **CommissionReport** — Reset `salesData`/CTV khi bắt đầu fetch để không hiển thị dữ liệu kỳ cũ khi đổi filter. — File: `src/pages/CommissionReport.tsx`
+
 ## [20/05/2026] - CommissionReport: Ship/NV chịu khi lọc 1 NV
 ### Fixed
 - **`GET /commissions/orders?user_id=`** — Truy vấn tổng Ship KH Trả / Tiền NV chịu gắn sai thứ tự tham số SQL (`splice` đặt tháng/kỳ lương trước `salesperson_id`) nên KPI **Tổng lương** = 0 hoặc sai khi Admin lọc nhân viên hoặc mở chi tiết NV. Gộp nhánh Sales/Admin drilldown, `push` đúng thứ tự, hỗ trợ lọc `month=all` theo năm. — File: `backend/routes/commissions.js`

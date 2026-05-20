@@ -11,6 +11,14 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Preview kỳ lương Ship KH nhân đôi JOIN commissions** — Fix `GET /payroll/periods/:id/preview` (vd NV #95 257.400 khớp HH). — File: `backend/routes/payroll.js`
+- [x] **Ship KH Trả đồng bộ chốt kỳ vs báo cáo HH** — `sumShipNvForOrdersScope`; commissions/orders + reports/salary khớp payroll. — Files: `backend/utils/shipNvScope.js`, `backend/routes/commissions.js`, `backend/routes/reports.js`
+- [x] **CommissionReport: payroll NV91 + CTV empty state** — KPI 1 NV từ salary; fallback bảng NV; giải thích tab CTV. — File: `src/pages/CommissionReport.tsx`
+- [x] **CommissionReport: kỳ lương + group + employee** — Snapshot chốt kỳ chỉ khi không lọc nhóm/NV; payroll + `employee` API. — File: `backend/routes/reports.js`
+- [x] **CommissionReport: employee + group_id trống** — Fix SQL `group_id` lệch param trên `/reports/salary`; `?employee=` + empty state nhóm/NV. — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`
+- [x] **CommissionReport: mọi bộ lọc trống dữ liệu** — Sửa race `payrollReady`/xóa state sớm trong `fetchReport`; seq guard + thông báo khi không có kỳ lương. — File: `src/pages/CommissionReport.tsx`
+- [x] **CommissionReport: lọc theo tháng vẫn sai** — BE `/reports/salary` ưu tiên `mode=month` + month/year (không bị payroll_period_id cũ đè); FE sync URL + `mode=month` API; fetch không phụ thuộc kỳ lương khi chọn Tháng. — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`
+- [x] **CommissionReport: tab Hoa hồng nhân viên load sai** — `/reports/salary` lọc HH theo `o.created_at` (không `c.created_at`); hỗ trợ `month=all`; FE reset `salesData` khi fetch. — Files: `backend/routes/reports.js`, `src/pages/CommissionReport.tsx`
 - [x] **CommissionReport: Ship/NV chịu khi lọc 1 NV** — Sửa `GET /commissions/orders` gắn sai tham số SQL tổng ship/NV → KPI Tổng lương = 0 khi Admin `?employee=` hoặc `/reports/commissions/:id`. — File: `backend/routes/commissions.js`
 - [x] **Đơn kỳ lương đã chốt: Admin đổi trạng thái (trừ hủy)** — `PUT` chỉ `{ status }` pending/shipping/completed; chặn `cancelled`; OrderForm + bulk OrderList; list trả `payroll_period_status`. — Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`, `src/pages/OrderList.tsx`, `LOGIC_BUSINESS.md`
 - [x] **ZaloPilot mobile: tải zip không đẩy user ra khỏi SPA** — `fetch` + blob thay link trực tiếp; tránh màn preview iOS không có Back. — File: `src/components/Layout.tsx`
