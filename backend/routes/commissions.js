@@ -444,52 +444,31 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
 
     let totalKhachShip = 0;
     let totalNvChiu = 0;
-    if (isScoped && (pid != null || (month && year))) {
-      // Ship / NV chỉ theo đơn mình là salesperson (giống GET /reports/dashboard — không lấy ship đơn của CTV khi chỉ có override)
+    const shipSalespersonId = isScoped ? req.user.id : adminEmployeeUid;
+    const canQueryShipNv =
+      pid != null ||
+      (monthNum != null && Number.isFinite(monthNum) && yearNum != null && Number.isFinite(yearNum)) ||
+      (monthRaw === 'all' && yearNum != null && Number.isFinite(yearNum));
+    if (shipSalespersonId != null && canQueryShipNv) {
+      // Ship / NV chỉ theo đơn mình là salesperson (giống GET /reports/dashboard — không lấy ship đơn CTV khi chỉ có override)
       const shipConds = [
         'o.shop_id = ?',
         'o.salesperson_id = ?',
         "o.status <> 'cancelled'",
       ];
-      const shipParams = [req.shopId, req.user.id];
+      const shipParams = [req.shopId, shipSalespersonId];
       if (pid != null) {
         shipConds.push('o.payroll_period_id = ?');
         shipParams.push(pid);
       } else {
-        shipConds.push('MONTH(o.created_at) = ?');
-        shipConds.push('YEAR(o.created_at) = ?');
-        shipParams.splice(1, 0, parseInt(month));
-        shipParams.splice(2, 0, parseInt(year));
-      }
-      if (group_id) {
-        shipConds.push('o.group_id = ?');
-        shipParams.push(parseInt(group_id));
-      }
-      const [shipRows] = await pool.query(
-        `SELECT
-          COALESCE(SUM(CASE WHEN o.ship_payer = 'shop' THEN 0 ELSE o.shipping_fee END), 0) AS total_khach_ship,
-          COALESCE(SUM(o.salesperson_absorbed_amount), 0) AS total_nv_chiu
-        FROM orders o
-        WHERE ${shipConds.join(' AND ')}`,
-        shipParams
-      );
-      totalKhachShip = parseFloat(shipRows[0]?.total_khach_ship) || 0;
-      totalNvChiu = parseFloat(shipRows[0]?.total_nv_chiu) || 0;
-    } else if (adminEmployeeUid != null && (pid != null || (month && year))) {
-      const shipConds = [
-        'o.shop_id = ?',
-        'o.salesperson_id = ?',
-        "o.status <> 'cancelled'",
-      ];
-      const shipParams = [req.shopId, adminEmployeeUid];
-      if (pid != null) {
-        shipConds.push('o.payroll_period_id = ?');
-        shipParams.splice(1, 0, pid);
-      } else {
-        shipConds.push('MONTH(o.created_at) = ?');
-        shipConds.push('YEAR(o.created_at) = ?');
-        shipParams.splice(1, 0, parseInt(month, 10));
-        shipParams.splice(2, 0, parseInt(year, 10));
+        if (monthNum != null && Number.isFinite(monthNum)) {
+          shipConds.push('MONTH(o.created_at) = ?');
+          shipParams.push(monthNum);
+        }
+        if (yearNum != null && Number.isFinite(yearNum)) {
+          shipConds.push('YEAR(o.created_at) = ?');
+          shipParams.push(yearNum);
+        }
       }
       if (group_id) {
         shipConds.push('o.group_id = ?');
@@ -505,7 +484,7 @@ router.get('/orders', auth, requireShop, requireFeature('reports.commissions'), 
       );
       totalKhachShip = parseFloat(shipRows[0]?.total_khach_ship) || 0;
       totalNvChiu = parseFloat(shipRows[0]?.total_nv_chiu) || 0;
-    } else {
+    } else if (!isScoped && adminEmployeeUid == null) {
       const [orderAggRows] = await pool.query(
         `
         SELECT

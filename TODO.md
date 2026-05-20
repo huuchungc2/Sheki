@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **CommissionReport: Ship/NV chịu khi lọc 1 NV** — Sửa `GET /commissions/orders` gắn sai tham số SQL tổng ship/NV → KPI Tổng lương = 0 khi Admin `?employee=` hoặc `/reports/commissions/:id`. — File: `backend/routes/commissions.js`
 - [x] **Đơn kỳ lương đã chốt: Admin đổi trạng thái (trừ hủy)** — `PUT` chỉ `{ status }` pending/shipping/completed; chặn `cancelled`; OrderForm + bulk OrderList; list trả `payroll_period_status`. — Files: `backend/routes/orders.js`, `src/pages/OrderForm.tsx`, `src/pages/OrderList.tsx`, `LOGIC_BUSINESS.md`
 - [x] **ZaloPilot mobile: tải zip không đẩy user ra khỏi SPA** — `fetch` + blob thay link trực tiếp; tránh màn preview iOS không có Back. — File: `src/components/Layout.tsx`
 - [x] **Sidebar: menu Tải ZaloPilot** — Link tải `public/zalopilot/zalopilot.zip` qua `/zalopilot/zalopilot.zip` cho mọi user đăng nhập. — File: `src/components/Layout.tsx`

@@ -1,3 +1,7 @@
+## [20/05/2026] - CommissionReport: Ship/NV chịu khi lọc 1 NV
+### Fixed
+- **`GET /commissions/orders?user_id=`** — Truy vấn tổng Ship KH Trả / Tiền NV chịu gắn sai thứ tự tham số SQL (`splice` đặt tháng/kỳ lương trước `salesperson_id`) nên KPI **Tổng lương** = 0 hoặc sai khi Admin lọc nhân viên hoặc mở chi tiết NV. Gộp nhánh Sales/Admin drilldown, `push` đúng thứ tự, hỗ trợ lọc `month=all` theo năm. — File: `backend/routes/commissions.js`
+
 ## [19/05/2026] - Đơn kỳ đã chốt: Admin đổi trạng thái (không hủy)
 ### Changed
 - **`PUT /orders/:id`** — Đơn thuộc kỳ lương `closed`: Admin được cập nhật **chỉ** `status` (`pending` / `shipping` / `completed`); cấm `cancelled` và cấm sửa các trường khác. Sales vẫn bị chặn toàn bộ. — Files: `backend/routes/orders.js`, `LOGIC_BUSINESS.md`
