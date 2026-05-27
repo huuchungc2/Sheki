@@ -7,17 +7,17 @@ const API_URL =
 const ZALOPILOT_API = `${API_URL.replace(/\/$/, "")}/zalopilot`;
 
 type ZaloPilotFile = {
+  id: string;
   name: string;
   size: number;
   modifiedAt: string;
   modifiedMs: number;
-  folder?: string;
 };
 
 type ZaloPilotListResponse = {
   files: ZaloPilotFile[];
   defaultZipName: string | null;
-  folders?: { label: string; exists: boolean }[];
+  folder?: string;
 };
 
 function formatBytes(bytes: number) {
@@ -81,7 +81,7 @@ async function downloadZaloPilotFile(file: ZaloPilotFile): Promise<void> {
   if (expectedSize > 0 && blob.size !== expectedSize) {
     throw new Error(
       `Dung lượng không khớp: cần ${formatBytes(expectedSize)}, nhận ${formatBytes(blob.size)}. ` +
-        "Đặt zip vào zalopilot-releases/ trên server và restart backend."
+        "Kiểm tra file trong thư mục zalopilot/ trên server."
     );
   }
 
@@ -123,7 +123,7 @@ export function ZaloPilotDownloads() {
   }, [loadList]);
 
   const handleDownload = async (file: ZaloPilotFile) => {
-    setDownloading(file.name);
+    setDownloading(file.id);
     setDownloadError(null);
     try {
       await downloadZaloPilotFile(file);
@@ -140,7 +140,7 @@ export function ZaloPilotDownloads() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Tải ZaloPilot</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Chọn bản cần tải — mỗi dòng là một file zip trên server.
+            File lấy từ thư mục <code className="text-xs bg-muted px-1 rounded">zalopilot/</code> trên server.
           </p>
         </div>
         <button
@@ -176,17 +176,15 @@ export function ZaloPilotDownloads() {
           <li className="flex flex-col items-center gap-3 py-14 px-6 text-center">
             <HardDrive className="w-10 h-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              Chưa có file (.zip, .exe, .msi…). Đặt bản cài vào một trong:{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">zalopilot-releases/</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">public/zalopilot/</code> hoặc{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">zalopilot/</code> — rồi restart backend và bấm
-              Làm mới.
+              Chưa có file (.zip, .exe, .msi…). Đặt bản cài vào{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">zalopilot/</code> (cạnh thư mục backend), restart
+              backend rồi bấm Làm mới.
             </p>
           </li>
         ) : (
           files.map((file) => (
             <li
-              key={`${file.name}-${file.modifiedMs}`}
+              key={file.id}
               className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 py-4"
             >
               <div className="flex-1 min-w-0">
@@ -196,20 +194,15 @@ export function ZaloPilotDownloads() {
                     · {formatFileDate(file.modifiedAt)}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 tabular-nums">
-                  {formatBytes(file.size)}
-                  {file.folder ? (
-                    <span className="ml-2 text-muted-foreground/80">· {file.folder}</span>
-                  ) : null}
-                </p>
+                <p className="text-xs text-muted-foreground mt-1 tabular-nums">{formatBytes(file.size)}</p>
               </div>
               <button
                 type="button"
                 onClick={() => void handleDownload(file)}
-                disabled={downloading === file.name}
+                disabled={downloading === file.id}
                 className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 shrink-0 w-full sm:w-auto"
               >
-                {downloading === file.name ? (
+                {downloading === file.id ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Download className="w-4 h-4" />

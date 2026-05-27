@@ -1,3 +1,11 @@
+## [27/05/2026] - ZaloPilot: chỉ thư mục zalopilot/
+### Changed
+- **Một folder duy nhất** — Chỉ đọc `<repo>/zalopilot/`; bỏ `zalopilot-releases/`, `public/zalopilot/`. — Files: `backend/utils/zalopilotFiles.js`, `src/pages/ZaloPilotDownloads.tsx`
+
+## [27/05/2026] - ZaloPilot: xóa file vẫn hiện (bản copy nhiều folder)
+### Fixed
+- **Xóa 1 file vẫn thấy 3 dòng** — Trước gộp trùng tên / còn bản trong folder khác. Giờ mỗi file mỗi folder = 1 dòng; tải kèm `?folder=` đúng thư mục. — Files: `backend/utils/zalopilotFiles.js`, `backend/server.js`, `src/pages/ZaloPilotDownloads.tsx`
+
 ## [27/05/2026] - ZaloPilot: liệt kê mọi file trong các folder zalopilot
 ### Fixed
 - **Không thấy file trong folder** — Gộp `zalopilot-releases/`, `public/zalopilot/`, `zalopilot/`; không chỉ đọc 1 thư mục; FE hiện mọi định dạng cài (.zip, .exe…), không lọc chỉ .zip. — Files: `backend/utils/zalopilotFiles.js`, `src/pages/ZaloPilotDownloads.tsx`, `backend/server.js`

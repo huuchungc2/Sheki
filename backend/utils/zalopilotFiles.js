@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ALLOWED_EXT = new Set(['.zip', '.exe', '.msi', '.dmg', '.apk']);
+const FOLDER_LABEL = 'zalopilot';
 
 const MIME = {
   '.zip': 'application/zip',
@@ -15,14 +16,9 @@ function projectRoot() {
   return path.join(__dirname, '..', '..');
 }
 
-/** Mọi thư mục có thể chứa bản cài (ưu tiên releases → public/zalopilot → zalopilot/) */
-function getZaloPilotDirs() {
-  const root = projectRoot();
-  return [
-    { key: 'zalopilot-releases', dir: path.join(root, 'zalopilot-releases') },
-    { key: 'public/zalopilot', dir: path.join(root, 'public', 'zalopilot') },
-    { key: 'zalopilot', dir: path.join(root, 'zalopilot') },
-  ];
+/** Chỉ đọc thư mục <repo>/zalopilot/ */
+function getZaloPilotDir() {
+  return path.join(projectRoot(), FOLDER_LABEL);
 }
 
 function isSafeBasename(name) {
@@ -46,14 +42,14 @@ function setZaloPilotNoCacheHeaders(res) {
   res.setHeader('CDN-Cache-Control', 'no-store');
 }
 
-function statToMeta(fullPath, name, folder) {
+function statToMeta(fullPath, name) {
   const st = fs.statSync(fullPath);
   return {
+    id: name,
     name,
     size: st.size,
     modifiedAt: st.mtime.toISOString(),
     modifiedMs: st.mtimeMs,
-    folder,
   };
 }
 
@@ -67,69 +63,41 @@ function isAllowedInstallerFile(name, fullPath) {
   }
 }
 
-/** Liệt kê mọi file cài đặt trong tất cả thư mục zalopilot (trùng tên → giữ bản mtime mới hơn). */
 function listZaloPilotFiles() {
-  const byName = new Map();
+  const dir = getZaloPilotDir();
+  if (!fs.existsSync(dir)) return [];
 
-  for (const { key, dir } of getZaloPilotDirs()) {
-    if (!fs.existsSync(dir)) continue;
-    let names;
-    try {
-      names = fs.readdirSync(dir);
-    } catch {
-      continue;
-    }
-    for (const name of names) {
-      if (name === '.gitkeep') continue;
-      const full = path.join(dir, name);
-      if (!isAllowedInstallerFile(name, full)) continue;
-      try {
-        const meta = statToMeta(full, name, key);
-        const prev = byName.get(name);
-        if (!prev || meta.modifiedMs > prev.modifiedMs) {
-          byName.set(name, meta);
-        }
-      } catch {
-        // skip
-      }
-    }
+  const files = [];
+  let names;
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return [];
   }
 
-  const files = Array.from(byName.values());
-  files.sort((a, b) => b.modifiedMs - a.modifiedMs);
-  return files;
-}
-
-/** Thư mục đầu tiên tồn tại (để hiển thị gợi ý upload). */
-function getZaloPilotDir() {
-  for (const { dir } of getZaloPilotDirs()) {
-    if (fs.existsSync(dir)) return dir;
-  }
-  return getZaloPilotDirs()[0].dir;
-}
-
-function resolveZaloPilotFilePath(filename) {
-  const name = decodeFilenameParam(filename);
-  if (!isSafeBasename(name)) return null;
-
-  let newest = null;
-  let newestMs = -1;
-
-  for (const { dir } of getZaloPilotDirs()) {
+  for (const name of names) {
+    if (name === '.gitkeep') continue;
     const full = path.join(dir, name);
-    if (!fs.existsSync(full)) continue;
     if (!isAllowedInstallerFile(name, full)) continue;
     try {
-      const st = fs.statSync(full);
-      if (st.mtimeMs >= newestMs) {
-        newestMs = st.mtimeMs;
-        newest = full;
-      }
+      files.push(statToMeta(full, name));
     } catch {
       // skip
     }
   }
-  return newest;
+
+  files.sort((a, b) => b.modifiedMs - a.modifiedMs);
+  return files;
+}
+
+function resolveZaloPilotFile(filename) {
+  const name = decodeFilenameParam(filename);
+  if (!isSafeBasename(name)) return null;
+
+  const full = path.join(getZaloPilotDir(), name);
+  if (!fs.existsSync(full)) return null;
+  if (!isAllowedInstallerFile(name, full)) return null;
+  return full;
 }
 
 function resolveDefaultZaloPilotZipPath() {
@@ -139,14 +107,10 @@ function resolveDefaultZaloPilotZipPath() {
     if (!file.name.toLowerCase().endsWith('.zip')) continue;
     if (file.modifiedMs > bestMs) {
       bestMs = file.modifiedMs;
-      best = resolveZaloPilotFilePath(file.name);
+      best = path.join(getZaloPilotDir(), file.name);
     }
   }
   return best;
-}
-
-function resolveZaloPilotFile(filename) {
-  return resolveZaloPilotFilePath(filename);
 }
 
 function sendZaloPilotFile(res, filePath, next) {
@@ -190,7 +154,6 @@ function sendZaloPilotFile(res, filePath, next) {
 
 module.exports = {
   getZaloPilotDir,
-  getZaloPilotDirs,
   listZaloPilotFiles,
   resolveDefaultZaloPilotZipPath,
   resolveZaloPilotFile,
@@ -198,4 +161,5 @@ module.exports = {
   setZaloPilotNoCacheHeaders,
   sendZaloPilotFile,
   isSafeBasename,
+  FOLDER_LABEL,
 };
