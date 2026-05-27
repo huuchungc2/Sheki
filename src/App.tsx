@@ -40,6 +40,7 @@ import { CashTransactions } from "./pages/CashTransactions";
 import { Categories } from "./pages/Categories";
 import { SuperAdminShops } from "./pages/SuperAdminShops";
 import { SuperAdminRecovery } from "./pages/SuperAdminRecovery";
+import { ZaloPilotDownloads } from "./pages/ZaloPilotDownloads";
 import { isAdminUser } from "./lib/utils";
 import { mayEditCounterSaleOrder } from "./lib/counterOrderAccess";
 
@@ -295,6 +296,7 @@ export default function App() {
                   <Route path="/logs" element={<AdminRoute><ActivityLog /></AdminRoute>} />
                   <Route path="/change-password" element={<ChangePassword />} />
                   <Route path="/profile" element={<Profile />} />
+                  <Route path="/zalopilot" element={<ZaloPilotDownloads />} />
                   <Route path="/reports/revenue" element={<ReportsViewRoute><RevenueReport /></ReportsViewRoute>} />
                   <Route path="/reports/commissions" element={<CommissionReport />} />
                   <Route path="/reports/payroll-periods" element={<PermissionRoute module="reports" action="edit"><PayrollPeriods /></PermissionRoute>} />

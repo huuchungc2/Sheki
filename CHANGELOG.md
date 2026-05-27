@@ -1,3 +1,17 @@
+## [27/05/2026] - ZaloPilot: sửa tải nhầm bản cũ (dist cache / ETag)
+### Fixed
+- **Tải đúng file đã chọn** — Bản cài chuyển sang `zalopilot-releases/` (không copy vào `dist` khi build FE); `sendFile` tắt ETag/Last-Modified; header `X-ZaloPilot-File/Size`; FE kiểm tra dung lượng blob; nginx `proxy_cache off`. — Files: `backend/utils/zalopilotFiles.js`, `backend/server.js`, `nginx.conf`, `src/pages/ZaloPilotDownloads.tsx`, `zalopilot-releases/`
+
+## [27/05/2026] - ZaloPilot: trang tải file + sửa tải bản cũ
+### Added
+- **Trang `/zalopilot`** — Danh sách từng file `.zip` (tên + ngày kế bên + dung lượng), nút Tải riêng từng bản; menu sidebar mở trang. — Files: `src/pages/ZaloPilotDownloads.tsx`, `src/App.tsx`, `src/components/Layout.tsx`
+### Changed
+- **UI danh sách ZaloPilot** — Bỏ bảng/hướng dẫn dài; mỗi dòng: `tên.zip · dd/mm/yyyy` + Tải. — File: `src/pages/ZaloPilotDownloads.tsx`
+### Changed
+- **API ZaloPilot** — `GET /zalopilot/files`, `GET /zalopilot/download/:filename`; link legacy `/zalopilot/zalopilot.zip` phục vụ **file .zip mới nhất** (mtime), không ưu tiên tên `zalopilot.zip` trước `ZaloPilot.zip`. — Files: `backend/server.js`, `backend/utils/zalopilotFiles.js`
+### Fixed
+- **Cache trình duyệt** — Header `Cache-Control: no-store` trên response tải; FE `fetch` với `cache: 'no-store'` và `?v=modifiedMs`. — Files: `backend/utils/zalopilotFiles.js`, `src/pages/ZaloPilotDownloads.tsx`
+
 ## [20/05/2026] - Preview kỳ lương: Ship KH bị nhân đôi (JOIN commissions)
 ### Fixed
 - **`GET /payroll/periods/:id/preview`** — `LEFT JOIN commissions` không lọc `user_id`/`type` khiến `SUM(shipping_fee)` nhân theo số dòng HH (vd NV #95: 360.800 vs đúng 257.400). Ship/NV chỉ aggregate trên `orders`; HH direct subquery riêng. — File: `backend/routes/payroll.js`

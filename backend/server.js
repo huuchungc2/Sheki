@@ -146,27 +146,39 @@ app.use('/api/payroll', payrollRouter);
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-/** ZaloPilot installer — public/zalopilot/zalopilot.zip (tránh SPA trả HTML khi sai tên file / Linux phân biệt hoa thường) */
-function resolveZaloPilotZipPath() {
-  const dir = path.join(__dirname, '..', 'public', 'zalopilot');
-  const candidates = ['zalopilot.zip', 'ZaloPilot.zip'];
-  for (const name of candidates) {
-    const full = path.join(dir, name);
-    if (fs.existsSync(full)) return full;
-  }
-  return null;
-}
+const {
+  listZaloPilotFiles,
+  resolveDefaultZaloPilotZipPath,
+  resolveZaloPilotFile,
+  setZaloPilotNoCacheHeaders,
+  sendZaloPilotFile,
+  getZaloPilotDir,
+} = require('./utils/zalopilotFiles');
 
+/** ZaloPilot — đọc từ zalopilot-releases/ (không qua dist/public build) */
+app.get('/zalopilot/files', (req, res) => {
+  setZaloPilotNoCacheHeaders(res);
+  const files = listZaloPilotFiles();
+  const defaultZip = resolveDefaultZaloPilotZipPath();
+  const defaultZipName = defaultZip ? path.basename(defaultZip) : null;
+  res.json({ files, defaultZipName, dir: path.basename(getZaloPilotDir()) });
+});
+
+app.get('/zalopilot/download/:filename', (req, res, next) => {
+  const zipPath = resolveZaloPilotFile(req.params.filename);
+  if (!zipPath) {
+    return res.status(404).json({ error: 'Không tìm thấy file' });
+  }
+  sendZaloPilotFile(res, zipPath, next);
+});
+
+/** Legacy URL — bản .zip mới nhất theo mtime trên disk */
 app.get('/zalopilot/zalopilot.zip', (req, res, next) => {
-  const zipPath = resolveZaloPilotZipPath();
+  const zipPath = resolveDefaultZaloPilotZipPath();
   if (!zipPath) {
     return res.status(404).json({ error: 'Không tìm thấy file ZaloPilot trên server' });
   }
-  res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', 'attachment; filename="zalopilot.zip"');
-  res.sendFile(zipPath, (err) => {
-    if (err) next(err);
-  });
+  sendZaloPilotFile(res, zipPath, next);
 });
 
 // Health check

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --port=5173 --host=0.0.0.0",
     "dev:backend": "npm --prefix backend run dev",
-    "build": "vite build",
+    "build": "vite build && node scripts/strip-dist-zalopilot.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"

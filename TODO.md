@@ -11,6 +11,8 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **ZaloPilot: tải đúng file (zalopilot-releases, không dist cache)** — `zalopilot-releases/`, strip `dist/zalopilot`, verify size, nginx no-cache. — Files: `backend/utils/zalopilotFiles.js`, `scripts/strip-dist-zalopilot.mjs`, `nginx.conf`, `src/pages/ZaloPilotDownloads.tsx`
+- [x] **ZaloPilot: trang liệt kê tải + zip mới nhất + no-cache** — `/zalopilot`, API list/download; sửa ưu tiên tên file gây tải bản cũ. — Files: `src/pages/ZaloPilotDownloads.tsx`, `backend/utils/zalopilotFiles.js`, `backend/server.js`, `src/components/Layout.tsx`, `src/App.tsx`
 - [x] **Preview kỳ lương Ship KH nhân đôi JOIN commissions** — Fix `GET /payroll/periods/:id/preview` (vd NV #95 257.400 khớp HH). — File: `backend/routes/payroll.js`
 - [x] **Ship KH Trả đồng bộ chốt kỳ vs báo cáo HH** — `sumShipNvForOrdersScope`; commissions/orders + reports/salary khớp payroll. — Files: `backend/utils/shipNvScope.js`, `backend/routes/commissions.js`, `backend/routes/reports.js`
 - [x] **CommissionReport: payroll NV91 + CTV empty state** — KPI 1 NV từ salary; fallback bảng NV; giải thích tab CTV. — File: `src/pages/CommissionReport.tsx`
