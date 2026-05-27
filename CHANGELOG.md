@@ -1,3 +1,7 @@
+## [27/05/2026] - ZaloPilot: API /api/zalopilot (sửa lỗi HTML thay JSON)
+### Fixed
+- **`Unexpected token '<'`** — `/zalopilot/files` trùng SPA → trả `index.html`. FE gọi `/api/zalopilot/files` và `/api/zalopilot/download/...`; BE mount song song `/api/zalopilot` + `/zalopilot`. — Files: `src/pages/ZaloPilotDownloads.tsx`, `backend/server.js`
+
 ## [27/05/2026] - ZaloPilot: sửa tải nhầm bản cũ (dist cache / ETag)
 ### Fixed
 - **Tải đúng file đã chọn** — Bản cài chuyển sang `zalopilot-releases/` (không copy vào `dist` khi build FE); `sendFile` tắt ETag/Last-Modified; header `X-ZaloPilot-File/Size`; FE kiểm tra dung lượng blob; nginx `proxy_cache off`. — Files: `backend/utils/zalopilotFiles.js`, `backend/server.js`, `nginx.conf`, `src/pages/ZaloPilotDownloads.tsx`, `zalopilot-releases/`

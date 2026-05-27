@@ -1,6 +1,11 @@
 import * as React from "react";
 import { Download, HardDrive, Loader2, RefreshCw } from "lucide-react";
 
+const API_URL =
+  (import.meta as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL || "/api";
+
+const ZALOPILOT_API = `${API_URL.replace(/\/$/, "")}/zalopilot`;
+
 type ZaloPilotFile = {
   name: string;
   size: number;
@@ -28,9 +33,23 @@ function formatFileDate(iso: string) {
   }).format(new Date(iso));
 }
 
+async function parseJsonResponse<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (text.trimStart().startsWith("<")) {
+    throw new Error(
+      "Server trả trang HTML thay vì JSON — backend chưa chạy hoặc chưa deploy bản mới. Chạy backend port 3000 rồi thử Làm mới."
+    );
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error("Phản hồi server không hợp lệ");
+  }
+}
+
 async function downloadZaloPilotFile(file: ZaloPilotFile): Promise<void> {
   const url =
-    `/zalopilot/download/${encodeURIComponent(file.name)}` +
+    `${ZALOPILOT_API}/download/${encodeURIComponent(file.name)}` +
     `?v=${file.modifiedMs}&s=${file.size}&_=${Date.now()}`;
 
   const res = await fetch(url, {
@@ -45,6 +64,11 @@ async function downloadZaloPilotFile(file: ZaloPilotFile): Promise<void> {
     throw new Error("Không tải được file từ server");
   }
 
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("text/html")) {
+    throw new Error("Server trả HTML thay vì file zip — kiểm tra backend và proxy /api");
+  }
+
   const blob = await res.blob();
   const hdrSize = res.headers.get("X-ZaloPilot-Size");
   const hdrName = res.headers.get("X-ZaloPilot-File");
@@ -56,7 +80,7 @@ async function downloadZaloPilotFile(file: ZaloPilotFile): Promise<void> {
   if (expectedSize > 0 && blob.size !== expectedSize) {
     throw new Error(
       `Dung lượng không khớp: cần ${formatBytes(expectedSize)}, nhận ${formatBytes(blob.size)}. ` +
-        "Có thể VPS chưa cập nhật file hoặc proxy cache — đặt zip vào zalopilot-releases/ và restart backend."
+        "Đặt zip vào zalopilot-releases/ trên server và restart backend."
     );
   }
 
@@ -81,9 +105,9 @@ export function ZaloPilotDownloads() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/zalopilot/files?_=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch(`${ZALOPILOT_API}/files?_=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Không tải được danh sách file");
-      const json = (await res.json()) as ZaloPilotListResponse;
+      const json = await parseJsonResponse<ZaloPilotListResponse>(res);
       const zips = (json.files ?? []).filter((f) => f.name.toLowerCase().endsWith(".zip"));
       setFiles(zips);
     } catch (e: unknown) {
@@ -116,7 +140,7 @@ export function ZaloPilotDownloads() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Tải ZaloPilot</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Bấm Tải đúng dòng — server gửi đúng file đó (không dùng bản build cũ trong dist).
+            Chọn bản cần tải — mỗi dòng là một file zip trên server.
           </p>
         </div>
         <button
@@ -148,7 +172,7 @@ export function ZaloPilotDownloads() {
             <Loader2 className="w-5 h-5 animate-spin" />
             Đang tải danh sách…
           </li>
-        ) : files.length === 0 ? (
+        ) : files.length === 0 && !error ? (
           <li className="flex flex-col items-center gap-3 py-14 px-6 text-center">
             <HardDrive className="w-10 h-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">

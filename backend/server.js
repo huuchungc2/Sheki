@@ -155,25 +155,37 @@ const {
   getZaloPilotDir,
 } = require('./utils/zalopilotFiles');
 
-/** ZaloPilot — đọc từ zalopilot-releases/ (không qua dist/public build) */
-app.get('/zalopilot/files', (req, res) => {
-  setZaloPilotNoCacheHeaders(res);
-  const files = listZaloPilotFiles();
-  const defaultZip = resolveDefaultZaloPilotZipPath();
-  const defaultZipName = defaultZip ? path.basename(defaultZip) : null;
-  res.json({ files, defaultZipName, dir: path.basename(getZaloPilotDir()) });
-});
+/** ZaloPilot — API qua /api/zalopilot (proxy /api luôn có); giữ /zalopilot cho link tải trực tiếp cũ */
+function mountZaloPilotRoutes(basePath) {
+  app.get(`${basePath}/files`, (req, res) => {
+    setZaloPilotNoCacheHeaders(res);
+    const files = listZaloPilotFiles();
+    const defaultZip = resolveDefaultZaloPilotZipPath();
+    const defaultZipName = defaultZip ? path.basename(defaultZip) : null;
+    res.json({ files, defaultZipName, dir: path.basename(getZaloPilotDir()) });
+  });
 
-app.get('/zalopilot/download/:filename', (req, res, next) => {
-  const zipPath = resolveZaloPilotFile(req.params.filename);
-  if (!zipPath) {
-    return res.status(404).json({ error: 'Không tìm thấy file' });
-  }
-  sendZaloPilotFile(res, zipPath, next);
-});
+  app.get(`${basePath}/download/:filename`, (req, res, next) => {
+    const zipPath = resolveZaloPilotFile(req.params.filename);
+    if (!zipPath) {
+      return res.status(404).json({ error: 'Không tìm thấy file' });
+    }
+    sendZaloPilotFile(res, zipPath, next);
+  });
+}
+
+mountZaloPilotRoutes('/api/zalopilot');
+mountZaloPilotRoutes('/zalopilot');
 
 /** Legacy URL — bản .zip mới nhất theo mtime trên disk */
 app.get('/zalopilot/zalopilot.zip', (req, res, next) => {
+  const zipPath = resolveDefaultZaloPilotZipPath();
+  if (!zipPath) {
+    return res.status(404).json({ error: 'Không tìm thấy file ZaloPilot trên server' });
+  }
+  sendZaloPilotFile(res, zipPath, next);
+});
+app.get('/api/zalopilot/zalopilot.zip', (req, res, next) => {
   const zipPath = resolveDefaultZaloPilotZipPath();
   if (!zipPath) {
     return res.status(404).json({ error: 'Không tìm thấy file ZaloPilot trên server' });
