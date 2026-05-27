@@ -1,3 +1,7 @@
+## [27/05/2026] - ZaloPilot: liệt kê mọi file trong các folder zalopilot
+### Fixed
+- **Không thấy file trong folder** — Gộp `zalopilot-releases/`, `public/zalopilot/`, `zalopilot/`; không chỉ đọc 1 thư mục; FE hiện mọi định dạng cài (.zip, .exe…), không lọc chỉ .zip. — Files: `backend/utils/zalopilotFiles.js`, `src/pages/ZaloPilotDownloads.tsx`, `backend/server.js`
+
 ## [27/05/2026] - ZaloPilot: API /api/zalopilot (sửa lỗi HTML thay JSON)
 ### Fixed
 - **`Unexpected token '<'`** — `/zalopilot/files` trùng SPA → trả `index.html`. FE gọi `/api/zalopilot/files` và `/api/zalopilot/download/...`; BE mount song song `/api/zalopilot` + `/zalopilot`. — Files: `src/pages/ZaloPilotDownloads.tsx`, `backend/server.js`

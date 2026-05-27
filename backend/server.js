@@ -152,7 +152,7 @@ const {
   resolveZaloPilotFile,
   setZaloPilotNoCacheHeaders,
   sendZaloPilotFile,
-  getZaloPilotDir,
+  getZaloPilotDirs,
 } = require('./utils/zalopilotFiles');
 
 /** ZaloPilot — API qua /api/zalopilot (proxy /api luôn có); giữ /zalopilot cho link tải trực tiếp cũ */
@@ -162,7 +162,14 @@ function mountZaloPilotRoutes(basePath) {
     const files = listZaloPilotFiles();
     const defaultZip = resolveDefaultZaloPilotZipPath();
     const defaultZipName = defaultZip ? path.basename(defaultZip) : null;
-    res.json({ files, defaultZipName, dir: path.basename(getZaloPilotDir()) });
+    res.json({
+      files,
+      defaultZipName,
+      folders: getZaloPilotDirs().map(({ key, dir }) => ({
+        label: key,
+        exists: fs.existsSync(dir),
+      })),
+    });
   });
 
   app.get(`${basePath}/download/:filename`, (req, res, next) => {

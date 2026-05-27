@@ -11,12 +11,13 @@ type ZaloPilotFile = {
   size: number;
   modifiedAt: string;
   modifiedMs: number;
+  folder?: string;
 };
 
 type ZaloPilotListResponse = {
   files: ZaloPilotFile[];
   defaultZipName: string | null;
-  dir?: string;
+  folders?: { label: string; exists: boolean }[];
 };
 
 function formatBytes(bytes: number) {
@@ -108,8 +109,7 @@ export function ZaloPilotDownloads() {
       const res = await fetch(`${ZALOPILOT_API}/files?_=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Không tải được danh sách file");
       const json = await parseJsonResponse<ZaloPilotListResponse>(res);
-      const zips = (json.files ?? []).filter((f) => f.name.toLowerCase().endsWith(".zip"));
-      setFiles(zips);
+      setFiles(json.files ?? []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Lỗi kết nối");
       setFiles([]);
@@ -176,10 +176,11 @@ export function ZaloPilotDownloads() {
           <li className="flex flex-col items-center gap-3 py-14 px-6 text-center">
             <HardDrive className="w-10 h-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              Chưa có file zip. Đặt bản cài vào{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">zalopilot-releases/</code>{" "}
-              (ưu tiên) hoặc <code className="text-xs bg-muted px-1 py-0.5 rounded">public/zalopilot/</code>, rồi
-              restart backend.
+              Chưa có file (.zip, .exe, .msi…). Đặt bản cài vào một trong:{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">zalopilot-releases/</code>,{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">public/zalopilot/</code> hoặc{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">zalopilot/</code> — rồi restart backend và bấm
+              Làm mới.
             </p>
           </li>
         ) : (
@@ -195,7 +196,12 @@ export function ZaloPilotDownloads() {
                     · {formatFileDate(file.modifiedAt)}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 tabular-nums">{formatBytes(file.size)}</p>
+                <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+                  {formatBytes(file.size)}
+                  {file.folder ? (
+                    <span className="ml-2 text-muted-foreground/80">· {file.folder}</span>
+                  ) : null}
+                </p>
               </div>
               <button
                 type="button"
