@@ -16,8 +16,6 @@ type ZaloPilotFile = {
 
 type ZaloPilotListResponse = {
   files: ZaloPilotFile[];
-  defaultZipName: string | null;
-  folder?: string;
 };
 
 function formatBytes(bytes: number) {
@@ -37,52 +35,22 @@ function formatFileDate(iso: string) {
 async function parseJsonResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (text.trimStart().startsWith("<")) {
-    throw new Error(
-      "Server trả trang HTML thay vì JSON — backend chưa chạy hoặc chưa deploy bản mới. Chạy backend port 3000 rồi thử Làm mới."
-    );
+    throw new Error("Không kết nối được API — kiểm tra server ERP đang chạy.");
   }
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error("Phản hồi server không hợp lệ");
-  }
+  return JSON.parse(text) as T;
 }
 
 async function downloadZaloPilotFile(file: ZaloPilotFile): Promise<void> {
   const url =
     `${ZALOPILOT_API}/download/${encodeURIComponent(file.name)}` +
-    `?v=${file.modifiedMs}&s=${file.size}&_=${Date.now()}`;
+    `?v=${file.modifiedMs}&_=${Date.now()}`;
 
-  const res = await fetch(url, {
-    cache: "no-store",
-    headers: {
-      Pragma: "no-cache",
-      "Cache-Control": "no-cache",
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error("Không tải được file từ server");
-  }
-
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("text/html")) {
-    throw new Error("Server trả HTML thay vì file zip — kiểm tra backend và proxy /api");
-  }
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("Không tải được file");
 
   const blob = await res.blob();
-  const hdrSize = res.headers.get("X-ZaloPilot-Size");
-  const hdrName = res.headers.get("X-ZaloPilot-File");
-  const expectedSize = hdrSize ? Number(hdrSize) : file.size;
-
-  if (hdrName && hdrName !== file.name) {
-    throw new Error(`Server trả sai file (cần ${file.name}, nhận ${hdrName})`);
-  }
-  if (expectedSize > 0 && blob.size !== expectedSize) {
-    throw new Error(
-      `Dung lượng không khớp: cần ${formatBytes(expectedSize)}, nhận ${formatBytes(blob.size)}. ` +
-        "Kiểm tra file trong thư mục zalopilot/ trên server."
-    );
+  if (file.size > 0 && blob.size !== file.size) {
+    throw new Error("File tải về không khớp dung lượng trên server — thử Làm mới.");
   }
 
   const blobUrl = window.URL.createObjectURL(blob);
@@ -107,7 +75,7 @@ export function ZaloPilotDownloads() {
     setError(null);
     try {
       const res = await fetch(`${ZALOPILOT_API}/files?_=${Date.now()}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Không tải được danh sách file");
+      if (!res.ok) throw new Error("Không đọc được thư mục public/zalopilot");
       const json = await parseJsonResponse<ZaloPilotListResponse>(res);
       setFiles(json.files ?? []);
     } catch (e: unknown) {
@@ -122,25 +90,14 @@ export function ZaloPilotDownloads() {
     void loadList();
   }, [loadList]);
 
-  const handleDownload = async (file: ZaloPilotFile) => {
-    setDownloading(file.id);
-    setDownloadError(null);
-    try {
-      await downloadZaloPilotFile(file);
-    } catch (e: unknown) {
-      setDownloadError(e instanceof Error ? e.message : "Tải thất bại");
-    } finally {
-      setDownloading(null);
-    }
-  };
-
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Tải ZaloPilot</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            File lấy từ thư mục <code className="text-xs bg-muted px-1 rounded">zalopilot/</code> trên server.
+            Danh sách file trong <code className="text-xs bg-muted px-1 rounded">public/zalopilot</code> trên server
+            (FTP: <code className="text-xs bg-muted px-1 rounded">…/erp/public/zalopilot</code>).
           </p>
         </div>
         <button
@@ -170,15 +127,14 @@ export function ZaloPilotDownloads() {
         {loading && files.length === 0 ? (
           <li className="flex items-center justify-center gap-2 py-14 text-sm text-muted-foreground">
             <Loader2 className="w-5 h-5 animate-spin" />
-            Đang tải danh sách…
+            Đang đọc thư mục…
           </li>
         ) : files.length === 0 && !error ? (
           <li className="flex flex-col items-center gap-3 py-14 px-6 text-center">
             <HardDrive className="w-10 h-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">
-              Chưa có file (.zip, .exe, .msi…). Đặt bản cài vào{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">zalopilot/</code> (cạnh thư mục backend), restart
-              backend rồi bấm Làm mới.
+              Thư mục trống. Upload file vào <code className="text-xs bg-muted px-1 rounded">public/zalopilot</code> rồi
+              bấm Làm mới.
             </p>
           </li>
         ) : (
@@ -198,7 +154,15 @@ export function ZaloPilotDownloads() {
               </div>
               <button
                 type="button"
-                onClick={() => void handleDownload(file)}
+                onClick={() => {
+                  setDownloading(file.id);
+                  setDownloadError(null);
+                  void downloadZaloPilotFile(file)
+                    .catch((e: unknown) => {
+                      setDownloadError(e instanceof Error ? e.message : "Tải thất bại");
+                    })
+                    .finally(() => setDownloading(null));
+                }}
                 disabled={downloading === file.id}
                 className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 shrink-0 w-full sm:w-auto"
               >

@@ -1,28 +1,36 @@
 const fs = require('fs');
 const path = require('path');
 
-const ALLOWED_EXT = new Set(['.zip', '.exe', '.msi', '.dmg', '.apk']);
-const FOLDER_LABEL = 'zalopilot';
-
 const MIME = {
   '.zip': 'application/zip',
+  '.apk': 'application/vnd.android.package-archive',
   '.exe': 'application/vnd.microsoft.portable-executable',
   '.msi': 'application/x-msi',
   '.dmg': 'application/x-apple-diskimage',
-  '.apk': 'application/vnd.android.package-archive',
 };
 
 function projectRoot() {
   return path.join(__dirname, '..', '..');
 }
 
-/** Chỉ đọc thư mục <repo>/zalopilot/ */
+/** Thư mục public/zalopilot trong project website (VPS: /var/www/erp/public/zalopilot) */
 function getZaloPilotDir() {
-  return path.join(projectRoot(), FOLDER_LABEL);
+  if (process.env.ZALOPILOT_DIR) {
+    return path.resolve(process.env.ZALOPILOT_DIR);
+  }
+  return path.join(projectRoot(), 'public', 'zalopilot');
 }
 
 function isSafeBasename(name) {
-  return typeof name === 'string' && /^[a-zA-Z0-9._-]+$/.test(name) && !name.includes('..');
+  return (
+    typeof name === 'string' &&
+    name.length > 0 &&
+    name.length <= 255 &&
+    !name.includes('..') &&
+    !name.includes('/') &&
+    !name.includes('\\') &&
+    !name.startsWith('.')
+  );
 }
 
 function decodeFilenameParam(raw) {
@@ -35,11 +43,9 @@ function decodeFilenameParam(raw) {
 }
 
 function setZaloPilotNoCacheHeaders(res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
-  res.setHeader('CDN-Cache-Control', 'no-store');
 }
 
 function statToMeta(fullPath, name) {
@@ -53,16 +59,7 @@ function statToMeta(fullPath, name) {
   };
 }
 
-function isAllowedInstallerFile(name, fullPath) {
-  const ext = path.extname(name).toLowerCase();
-  if (!ALLOWED_EXT.has(ext)) return false;
-  try {
-    return fs.statSync(fullPath).isFile();
-  } catch {
-    return false;
-  }
-}
-
+/** Đọc thư mục — có bao nhiêu file thì trả bấy nhiêu (trừ file ẩn). */
 function listZaloPilotFiles() {
   const dir = getZaloPilotDir();
   if (!fs.existsSync(dir)) return [];
@@ -76,10 +73,10 @@ function listZaloPilotFiles() {
   }
 
   for (const name of names) {
-    if (name === '.gitkeep') continue;
+    if (name.startsWith('.')) continue;
     const full = path.join(dir, name);
-    if (!isAllowedInstallerFile(name, full)) continue;
     try {
+      if (!fs.statSync(full).isFile()) continue;
       files.push(statToMeta(full, name));
     } catch {
       // skip
@@ -96,8 +93,12 @@ function resolveZaloPilotFile(filename) {
 
   const full = path.join(getZaloPilotDir(), name);
   if (!fs.existsSync(full)) return null;
-  if (!isAllowedInstallerFile(name, full)) return null;
-  return full;
+  try {
+    if (!fs.statSync(full).isFile()) return null;
+    return full;
+  } catch {
+    return null;
+  }
 }
 
 function resolveDefaultZaloPilotZipPath() {
@@ -133,23 +134,10 @@ function sendZaloPilotFile(res, filePath, next) {
   res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
   res.setHeader('X-ZaloPilot-File', name);
   res.setHeader('X-ZaloPilot-Size', String(stat.size));
-  res.setHeader('X-ZaloPilot-Mtime', String(stat.mtimeMs));
 
-  res.sendFile(
-    filePath,
-    {
-      etag: false,
-      lastModified: false,
-      maxAge: 0,
-      dotfiles: 'deny',
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-      },
-    },
-    (err) => {
-      if (err) next(err);
-    }
-  );
+  res.sendFile(filePath, { etag: false, lastModified: false, maxAge: 0 }, (err) => {
+    if (err) next(err);
+  });
 }
 
 module.exports = {
@@ -157,9 +145,7 @@ module.exports = {
   listZaloPilotFiles,
   resolveDefaultZaloPilotZipPath,
   resolveZaloPilotFile,
-  decodeFilenameParam,
   setZaloPilotNoCacheHeaders,
   sendZaloPilotFile,
-  isSafeBasename,
-  FOLDER_LABEL,
+  FOLDER_LABEL: 'public/zalopilot',
 };

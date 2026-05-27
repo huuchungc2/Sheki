@@ -1,6 +1,10 @@
-## [27/05/2026] - ZaloPilot: chỉ thư mục zalopilot/
+## [27/05/2026] - ZaloPilot: liệt kê mọi file trong public/zalopilot
 ### Changed
-- **Một folder duy nhất** — Chỉ đọc `<repo>/zalopilot/`; bỏ `zalopilot-releases/`, `public/zalopilot/`. — Files: `backend/utils/zalopilotFiles.js`, `src/pages/ZaloPilotDownloads.tsx`
+- **Đơn giản** — Chỉ `public/zalopilot/`; liệt kê mọi file (zip, apk, …); tên file dài như `ZaloPilot-v1.0.17-….apk` được hỗ trợ. — Files: `backend/utils/zalopilotFiles.js`, `src/pages/ZaloPilotDownloads.tsx`
+
+## [27/05/2026] - ZaloPilot: chỉ public/zalopilot/
+### Changed
+- **Một folder duy nhất** — Chỉ đọc `public/zalopilot/` trong thư mục website (không quét folder khác). — Files: `backend/utils/zalopilotFiles.js`, `src/pages/ZaloPilotDownloads.tsx`
 
 ## [27/05/2026] - ZaloPilot: xóa file vẫn hiện (bản copy nhiều folder)
 ### Fixed

@@ -161,13 +161,10 @@ function mountZaloPilotRoutes(basePath) {
   app.get(`${basePath}/files`, (req, res) => {
     setZaloPilotNoCacheHeaders(res);
     const files = listZaloPilotFiles();
-    const defaultZip = resolveDefaultZaloPilotZipPath();
-    const defaultZipName = defaultZip ? path.basename(defaultZip) : null;
     res.json({
       files,
-      defaultZipName,
       folder: FOLDER_LABEL,
-      folderExists: fs.existsSync(getZaloPilotDir()),
+      path: getZaloPilotDir(),
     });
   });
 
