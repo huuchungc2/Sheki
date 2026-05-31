@@ -575,6 +575,12 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
       const tsOrdBaseP = usePayrollDash ? [payrollPidRaw, shopId] : [m + 1, y, shopId];
       const tsGrpFrag = filterGroupId != null ? ' AND group_id = ?' : '';
       const tsGrpFragP = filterGroupId != null ? [filterGroupId] : [];
+      // Lọc nhóm Dashboard: chỉ NV thuộc nhóm (user_groups), không list toàn shop với 0 đơn.
+      const tsUserGrpFrag =
+        filterGroupId != null
+          ? ` AND EXISTS (SELECT 1 FROM user_groups ug2 JOIN \`groups\` g2 ON g2.id = ug2.group_id WHERE ug2.user_id = u.id AND g2.shop_id = ? AND ug2.group_id = ?)`
+          : '';
+      const tsUserGrpFragP = filterGroupId != null ? [shopId, filterGroupId] : [];
       const tsOwhere = usePayrollDash
         ? 'o.shop_id = ? AND o.payroll_period_id = ? AND o.status != \'cancelled\''
         : 'MONTH(o.created_at) = ? AND YEAR(o.created_at) = ? AND o.shop_id = ? AND o.status != \'cancelled\'';
@@ -596,6 +602,7 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
         ...tsAdjP,
         ...tsOgrpP,
         shopId,
+        ...tsUserGrpFragP,
         ...(filterEmployeeId != null ? [filterEmployeeId] : []),
       ];
 
@@ -641,7 +648,7 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
              AND ca.type='override'${tsOgrp}
            GROUP BY ca.user_id
          ) o_adj ON o_adj.user_id = u.id
-         WHERE us.shop_id = ? AND u.is_active=1${filterEmployeeId != null ? ' AND u.id = ?' : ''}
+         WHERE us.shop_id = ? AND u.is_active=1${tsUserGrpFrag}${filterEmployeeId != null ? ' AND u.id = ?' : ''}
          ORDER BY total_comm DESC
          LIMIT 5`,
         tsParams
@@ -686,6 +693,9 @@ router.get('/dashboard', auth, requireShop, requirePermission('reports', 'view')
       } else if (filterGroupId != null) {
         bsGrpFrag = ' AND group_id = ?';
         bsGrpFragP = [filterGroupId];
+        // Dashboard «Nhóm BH»: chỉ NV là thành viên nhóm (user_groups), không hiện NV ngoài nhóm với 0 đơn.
+        userGroupRestriction = ` AND EXISTS (SELECT 1 FROM user_groups ug2 JOIN \`groups\` g2 ON g2.id = ug2.group_id WHERE ug2.user_id = u.id AND g2.shop_id = ? AND ug2.group_id = ?)`;
+        userGroupRestrictionP = [shopId, filterGroupId];
       }
 
       if (canQueryBottom) {

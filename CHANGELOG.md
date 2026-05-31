@@ -1,3 +1,8 @@
+## [31/05/2026] - Dashboard: lọc nhóm chỉ hiện NV thuộc nhóm (Top NV + Sale cần hỗ trợ)
+
+### Fixed
+- **Dashboard — filter «Nhóm bán hàng»** — `topSales` và `bottomSales` trước chỉ lọc đơn theo `orders.group_id` nhưng vẫn liệt kê mọi Sale → NV không thuộc nhóm hiện 0 đơn (gây hiểu nhầm). Thêm `EXISTS user_groups` khi có `group_id` để chỉ trả NV là thành viên nhóm; số đơn/doanh số vẫn tính đơn thuộc nhóm trong kỳ. — File: `backend/routes/reports.js`
+
 ## [31/05/2026] - ZaloPilot: Admin xem/tải diagnostic trên trang Tải
 
 ### Added
