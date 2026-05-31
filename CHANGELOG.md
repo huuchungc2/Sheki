@@ -1,3 +1,8 @@
+## [31/05/2026] - ZaloPilot: Admin xem/tải diagnostic trên trang Tải
+
+### Added
+- **ERP `/zalopilot`** (Admin) — Danh sách log `ZP-…` + nút tải zip; API `GET /api/zalopilot/diagnostics`, `GET …/diagnostics/:id/download` (JWT Admin). — Files: `backend/routes/zalopilot.js`, `backend/utils/zalopilotDiagnostics.js`, `src/pages/ZaloPilotDownloads.tsx`
+
 ## [31/05/2026] - ZaloPilot: chống spam upload diagnostic
 
 ### Added

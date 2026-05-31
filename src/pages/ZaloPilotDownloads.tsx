@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Download, HardDrive, Loader2, RefreshCw } from "lucide-react";
+import { Download, FileArchive, HardDrive, Loader2, RefreshCw } from "lucide-react";
+import { isAdminUser } from "../lib/utils";
 
 const API_URL =
   (import.meta as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL || "/api";
@@ -16,6 +17,19 @@ type ZaloPilotFile = {
 
 type ZaloPilotListResponse = {
   files: ZaloPilotFile[];
+};
+
+type ZaloPilotDiagnostic = {
+  diagnosticId: string;
+  uploadedAt: string | null;
+  originalFilename: string | null;
+  sizeBytes: number;
+  modifiedMs: number;
+  clientIp: string | null;
+};
+
+type ZaloPilotDiagnosticsResponse = {
+  diagnostics: ZaloPilotDiagnostic[];
 };
 
 function formatBytes(bytes: number) {
@@ -63,12 +77,60 @@ async function downloadZaloPilotFile(file: ZaloPilotFile): Promise<void> {
   document.body.removeChild(a);
 }
 
+function readStoredUser(): { can_access_admin?: boolean; role?: string; is_super_admin?: boolean } | null {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function downloadDiagnosticZip(item: ZaloPilotDiagnostic): Promise<void> {
+  const token = localStorage.getItem("token");
+  if (!token) throw new Error("Cần đăng nhập ERP");
+
+  const url = `${ZALOPILOT_API}/diagnostics/${encodeURIComponent(item.diagnosticId)}/download?_=${Date.now()}`;
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    try {
+      const j = JSON.parse(text) as { error?: string };
+      throw new Error(j.error || "Không tải được diagnostic");
+    } catch {
+      throw new Error("Không tải được diagnostic");
+    }
+  }
+
+  const blob = await res.blob();
+  if (item.sizeBytes > 0 && blob.size !== item.sizeBytes) {
+    throw new Error("File tải về không khớp dung lượng trên server");
+  }
+
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = `${item.diagnosticId}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(blobUrl);
+  document.body.removeChild(a);
+}
+
 export function ZaloPilotDownloads() {
+  const isAdmin = isAdminUser(readStoredUser());
   const [files, setFiles] = React.useState<ZaloPilotFile[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
   const [downloading, setDownloading] = React.useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = React.useState<ZaloPilotDiagnostic[]>([]);
+  const [diagLoading, setDiagLoading] = React.useState(false);
+  const [diagError, setDiagError] = React.useState<string | null>(null);
+  const [downloadingDiag, setDownloadingDiag] = React.useState<string | null>(null);
 
   const loadList = React.useCallback(async () => {
     setLoading(true);
@@ -86,12 +148,45 @@ export function ZaloPilotDownloads() {
     }
   }, []);
 
+  const loadDiagnostics = React.useCallback(async () => {
+    if (!isAdmin) return;
+    setDiagLoading(true);
+    setDiagError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${ZALOPILOT_API}/diagnostics?_=${Date.now()}`, {
+        cache: "no-store",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const json = await parseJsonResponse<{ error?: string }>(res);
+        throw new Error(json.error || "Không đọc được danh sách diagnostic");
+      }
+      const json = await parseJsonResponse<ZaloPilotDiagnosticsResponse>(res);
+      setDiagnostics(json.diagnostics ?? []);
+    } catch (e: unknown) {
+      setDiagError(e instanceof Error ? e.message : "Lỗi kết nối");
+      setDiagnostics([]);
+    } finally {
+      setDiagLoading(false);
+    }
+  }, [isAdmin]);
+
+  const refreshAll = React.useCallback(() => {
+    void loadList();
+    void loadDiagnostics();
+  }, [loadList, loadDiagnostics]);
+
   React.useEffect(() => {
     void loadList();
   }, [loadList]);
 
+  React.useEffect(() => {
+    void loadDiagnostics();
+  }, [loadDiagnostics]);
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Tải ZaloPilot</h1>
@@ -102,14 +197,91 @@ export function ZaloPilotDownloads() {
         </div>
         <button
           type="button"
-          onClick={() => void loadList()}
-          disabled={loading}
+          onClick={() => void refreshAll()}
+          disabled={loading || diagLoading}
           className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-md border border-border bg-background text-sm hover:bg-accent transition-colors disabled:opacity-50"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          {loading || diagLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           Làm mới
         </button>
       </div>
+
+      {isAdmin && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight flex items-center gap-2">
+              <FileArchive className="w-4 h-4 text-muted-foreground" />
+              Log diagnostic (app gửi lên)
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Chỉ Admin. App upload qua API → thư mục{" "}
+              <code className="text-xs bg-muted px-1 rounded">public/zalopilot/ZP-…/</code>
+            </p>
+          </div>
+
+          {diagError && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {diagError}
+            </div>
+          )}
+
+          <ul className="rounded-lg border border-border bg-card divide-y divide-border">
+            {diagLoading && diagnostics.length === 0 ? (
+              <li className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Đang tải log…
+              </li>
+            ) : diagnostics.length === 0 && !diagError ? (
+              <li className="py-10 px-6 text-center text-sm text-muted-foreground">
+                Chưa có diagnostic nào từ app.
+              </li>
+            ) : (
+              diagnostics.map((item) => (
+                <li
+                  key={item.diagnosticId}
+                  className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 py-4"
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-foreground font-mono text-sm break-all">
+                      {item.diagnosticId}
+                    </span>
+                    <p className="text-sm text-muted-foreground mt-1 tabular-nums">
+                      {item.uploadedAt ? formatFileDate(item.uploadedAt) : "—"} · {formatBytes(item.sizeBytes)}
+                      {item.clientIp ? ` · IP ${item.clientIp}` : ""}
+                    </p>
+                    {item.originalFilename && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        File gốc: {item.originalFilename}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDownloadingDiag(item.diagnosticId);
+                      setDownloadError(null);
+                      void downloadDiagnosticZip(item)
+                        .catch((e: unknown) => {
+                          setDownloadError(e instanceof Error ? e.message : "Tải thất bại");
+                        })
+                        .finally(() => setDownloadingDiag(null));
+                    }}
+                    disabled={downloadingDiag === item.diagnosticId || item.sizeBytes <= 0}
+                    className="inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md border border-border bg-background text-sm hover:bg-accent disabled:opacity-50 shrink-0 w-full sm:w-auto"
+                  >
+                    {downloadingDiag === item.diagnosticId ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Tải zip
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </section>
+      )}
 
       {error && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -123,6 +295,8 @@ export function ZaloPilotDownloads() {
         </div>
       )}
 
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold tracking-tight">Bản cài ZaloPilot</h2>
       <ul className="rounded-lg border border-border bg-card divide-y divide-border">
         {loading && files.length === 0 ? (
           <li className="flex items-center justify-center gap-2 py-14 text-sm text-muted-foreground">
@@ -177,6 +351,7 @@ export function ZaloPilotDownloads() {
           ))
         )}
       </ul>
+      </section>
     </div>
   );
 }

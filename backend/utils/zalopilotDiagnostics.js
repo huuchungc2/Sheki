@@ -3,6 +3,8 @@ const path = require('path');
 const { getClientIp } = require('./clientIp');
 const { getZaloPilotDir } = require('./zalopilotFiles');
 
+const DIAGNOSTIC_ID_RE = /^ZP-\d{8}-\d{4}$/;
+
 /** Cùng thư mục bản cài: public/zalopilot (hoặc ZALOPILOT_DIR / ZALOPILOT_DIAGNOSTICS_DIR) */
 function getDiagnosticsStorageDir() {
   if (process.env.ZALOPILOT_DIAGNOSTICS_DIR) {
@@ -55,7 +57,79 @@ function countTodayDiagnosticUploads() {
   return n;
 }
 
+function isValidDiagnosticId(diagnosticId) {
+  return DIAGNOSTIC_ID_RE.test(String(diagnosticId || ''));
+}
+
+function listDiagnostics() {
+  const baseDir = getDiagnosticsStorageDir();
+  if (!fs.existsSync(baseDir)) return [];
+
+  const items = [];
+  for (const name of fs.readdirSync(baseDir)) {
+    if (!isValidDiagnosticId(name)) continue;
+    const dir = path.join(baseDir, name);
+    try {
+      if (!fs.statSync(dir).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+
+    const zipPath = path.join(dir, 'diagnostic.zip');
+    const metaPath = path.join(dir, 'metadata.json');
+    let metadata = null;
+    if (fs.existsSync(metaPath)) {
+      try {
+        metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      } catch {
+        metadata = null;
+      }
+    }
+
+    let size = 0;
+    let modifiedMs = 0;
+    if (fs.existsSync(zipPath)) {
+      try {
+        const st = fs.statSync(zipPath);
+        if (st.isFile()) {
+          size = st.size;
+          modifiedMs = st.mtimeMs;
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    items.push({
+      diagnosticId: name,
+      uploadedAt: metadata?.uploadedAt || null,
+      originalFilename: metadata?.originalFilename || null,
+      sizeBytes: size,
+      modifiedMs,
+      clientIp: metadata?.clientIp || null,
+    });
+  }
+
+  items.sort((a, b) => (b.modifiedMs || 0) - (a.modifiedMs || 0));
+  return items;
+}
+
+function resolveDiagnosticZipPath(diagnosticId) {
+  if (!isValidDiagnosticId(diagnosticId)) return null;
+  const zipPath = path.join(getDiagnosticsStorageDir(), diagnosticId, 'diagnostic.zip');
+  if (!fs.existsSync(zipPath)) return null;
+  try {
+    if (!fs.statSync(zipPath).isFile()) return null;
+    return zipPath;
+  } catch {
+    return null;
+  }
+}
+
 function ensureDiagnosticDir(diagnosticId) {
+  if (!isValidDiagnosticId(diagnosticId)) {
+    throw new Error('Mã diagnostic không hợp lệ');
+  }
   const dir = path.join(getDiagnosticsStorageDir(), diagnosticId);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
@@ -81,7 +155,10 @@ function saveDiagnosticUpload({ diagnosticId, fileBuffer, originalName, size, co
 
 module.exports = {
   getDiagnosticsStorageDir,
+  isValidDiagnosticId,
   generateDiagnosticId,
   countTodayDiagnosticUploads,
+  listDiagnostics,
+  resolveDiagnosticZipPath,
   saveDiagnosticUpload,
 };
