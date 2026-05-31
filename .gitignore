@@ -23,3 +23,7 @@ npm-debug.log*
 dump/
 *.sql.bak
 erp_*.sql
+
+# ZaloPilot — chỉ dùng public/zalopilot/ (không commit bản cài ở root)
+/zalopilot/
+/zalopilot-releases/

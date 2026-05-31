@@ -1,3 +1,8 @@
+## [31/05/2026] - ZaloPilot: xóa folder thừa zalopilot/ và zalopilot-releases/
+
+### Removed
+- **Thư mục bản cài cũ ở root** — Xóa `zalopilot/` và `zalopilot-releases/` (zip trùng ~10MB) khỏi repo; backend chỉ đọc `public/zalopilot/`. Thêm `.gitignore` chặn tạo lại hai folder root. — Files: `.gitignore` (xóa `zalopilot/`, `zalopilot-releases/`)
+
 ## [31/05/2026] - Dashboard: lọc nhóm chỉ hiện NV thuộc nhóm (Top NV + Sale cần hỗ trợ)
 
 ### Fixed

@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **ZaloPilot: xóa folder thừa `zalopilot/` + `zalopilot-releases/`** — Chỉ giữ `public/zalopilot/`; `.gitignore` chặn folder root. — Files: (deleted) `zalopilot/`, `zalopilot-releases/`, `.gitignore`
 - [x] **Dashboard: lọc nhóm Top NV + Sale cần hỗ trợ chỉ NV thuộc nhóm** — Khi `?group_id=` thêm `EXISTS user_groups`; không còn list NV ngoài nhóm với 0 đơn. — File: `backend/routes/reports.js`
 - [x] **ZaloPilot: API upload diagnostic zip** — Token + rate limit IP/ngày; lưu `public/zalopilot/{ZP-...}/`. — Files: `backend/routes/zalopilot.js`, `backend/middleware/zalopilotToken.js`, `backend/middleware/zalopilotUploadLimit.js`, `backend/utils/zalopilotDiagnostics.js`, `backend/server.js`, `nginx.conf`
 - [x] **ZaloPilot: tải đúng file (zalopilot-releases, không dist cache)** — `zalopilot-releases/`, strip `dist/zalopilot`, verify size, nginx no-cache. — Files: `backend/utils/zalopilotFiles.js`, `scripts/strip-dist-zalopilot.mjs`, `nginx.conf`, `src/pages/ZaloPilotDownloads.tsx`
