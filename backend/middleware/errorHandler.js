@@ -56,6 +56,12 @@ function errorHandler(err, req, res, next) {
   if (err.message && String(err.message).includes('Chỉ hỗ trợ file ảnh')) {
     return res.status(400).json({ error: err.message });
   }
+  if (err.message && String(err.message).includes('Chỉ chấp nhận file .zip')) {
+    return res.status(400).json({ error: err.message });
+  }
+  if (err.status === 429 || err.statusCode === 429) {
+    return res.status(429).json({ error: err.message || 'Quá nhiều yêu cầu' });
+  }
 
   if (err.code === 'ECONNREFUSED') {
     return res.status(500).json({ error: 'Lỗi kết nối database - Connection refused' });

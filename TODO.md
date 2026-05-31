@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **ZaloPilot: API upload diagnostic zip** — Token + rate limit IP/ngày; lưu `public/zalopilot/{ZP-...}/`. — Files: `backend/routes/zalopilot.js`, `backend/middleware/zalopilotToken.js`, `backend/middleware/zalopilotUploadLimit.js`, `backend/utils/zalopilotDiagnostics.js`, `backend/server.js`, `nginx.conf`
 - [x] **ZaloPilot: tải đúng file (zalopilot-releases, không dist cache)** — `zalopilot-releases/`, strip `dist/zalopilot`, verify size, nginx no-cache. — Files: `backend/utils/zalopilotFiles.js`, `scripts/strip-dist-zalopilot.mjs`, `nginx.conf`, `src/pages/ZaloPilotDownloads.tsx`
 - [x] **ZaloPilot: trang liệt kê tải + zip mới nhất + no-cache** — `/zalopilot`, API list/download; sửa ưu tiên tên file gây tải bản cũ. — Files: `src/pages/ZaloPilotDownloads.tsx`, `backend/utils/zalopilotFiles.js`, `backend/server.js`, `src/components/Layout.tsx`, `src/App.tsx`
 - [x] **Preview kỳ lương Ship KH nhân đôi JOIN commissions** — Fix `GET /payroll/periods/:id/preview` (vd NV #95 257.400 khớp HH). — File: `backend/routes/payroll.js`

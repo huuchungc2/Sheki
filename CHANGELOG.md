@@ -1,3 +1,18 @@
+## [31/05/2026] - ZaloPilot: chống spam upload diagnostic
+
+### Added
+- **Rate limit + cap** — IP tối đa 8 request/15 phút (env); tối đa 80 gói/ngày/server; token ≥24 ký tự + `timingSafeEqual`; kiểm token **trước** multer (401 không đọc 50MB). — Files: `backend/middleware/zalopilotUploadLimit.js`, `backend/middleware/zalopilotToken.js`, `backend/routes/zalopilot.js`, `backend/utils/zalopilotDiagnostics.js`, `nginx.conf`, `backend/.env.example`
+
+## [31/05/2026] - ZaloPilot: diagnostic upload vào public/zalopilot
+
+### Changed
+- **Đường lưu diagnostic** — `POST /api/zalopilot/diagnostics/upload` ghi vào `public/zalopilot/{ZP-...}/` (cùng `ZALOPILOT_DIR` với bản cài), không còn `storage/zalopilot-diagnostics/`. — File: `backend/utils/zalopilotDiagnostics.js`, `backend/.env.example`
+
+## [31/05/2026] - ZaloPilot: API upload diagnostic zip
+
+### Added
+- **`POST /api/zalopilot/diagnostics/upload`** — Multipart field `file` (.zip ≤50MB), header `X-ZaloPilot-Token` (`ZALOPILOT_UPLOAD_TOKEN`); mã `ZP-YYYYMMDD-XXXX`; lưu `diagnostic.zip` + `metadata.json`; trả `{ ok, diagnosticId }`. — Files: `backend/routes/zalopilot.js`, `backend/utils/zalopilotDiagnostics.js`, `backend/server.js`, `backend/middleware/errorHandler.js`, `backend/.env.example`
+
 ## [27/05/2026] - ZaloPilot: liệt kê mọi file trong public/zalopilot
 ### Changed
 - **Đơn giản** — Chỉ `public/zalopilot/`; liệt kê mọi file (zip, apk, …); tên file dài như `ZaloPilot-v1.0.17-….apk` được hỗ trợ. — Files: `backend/utils/zalopilotFiles.js`, `src/pages/ZaloPilotDownloads.tsx`
