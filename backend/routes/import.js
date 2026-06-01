@@ -412,11 +412,13 @@ router.get('/export/:entity', auth, requireShop, authorize('admin'), async (req,
     let filename = '';
 
     if (entity === 'employees') {
+      const hideSa = !req.user.is_super_admin ? ' AND COALESCE(u.is_super_admin, 0) = 0' : '';
       const [data] = await pool.query(
         `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, u.department, u.position, u.commission_rate, u.salary, u.join_date, u.address, u.city, u.district, u.is_active
          FROM users u
          INNER JOIN user_shops us ON us.user_id = u.id AND us.shop_id = ?
          JOIN roles r ON us.role_id = r.id
+         WHERE 1=1${hideSa}
          ORDER BY u.id`,
         [sid]
       );

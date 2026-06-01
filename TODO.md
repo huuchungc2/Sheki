@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **Employees: ẩn Super Admin khỏi admin shop** — `GET /users` + export + chi tiết/sửa/xóa: lọc `is_super_admin` khi caller không phải SA. — Files: `backend/routes/users.js`, `backend/routes/import.js`
 - [x] **ZaloPilot: xóa folder thừa `zalopilot/` + `zalopilot-releases/`** — Chỉ giữ `public/zalopilot/`; `.gitignore` chặn folder root. — Files: (deleted) `zalopilot/`, `zalopilot-releases/`, `.gitignore`
 - [x] **Dashboard: lọc nhóm Top NV + Sale cần hỗ trợ chỉ NV thuộc nhóm** — Khi `?group_id=` thêm `EXISTS user_groups`; không còn list NV ngoài nhóm với 0 đơn. — File: `backend/routes/reports.js`
 - [x] **ZaloPilot: API upload diagnostic zip** — Token + rate limit IP/ngày; lưu `public/zalopilot/{ZP-...}/`. — Files: `backend/routes/zalopilot.js`, `backend/middleware/zalopilotToken.js`, `backend/middleware/zalopilotUploadLimit.js`, `backend/utils/zalopilotDiagnostics.js`, `backend/server.js`, `nginx.conf`

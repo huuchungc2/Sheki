@@ -8,6 +8,23 @@ const { requireFeature } = require('../middleware/requireFeature');
 const { getScope } = require('../utils/scope');
 const { getPool } = require('../config/db');
 
+/** Shop admin / sales không thấy user `is_super_admin=1` trong danh sách NV (migration 018 gán mọi user vào user_shops). */
+const SQL_HIDE_SUPER_ADMIN = ' AND COALESCE(u.is_super_admin, 0) = 0';
+
+async function targetIsSuperAdmin(pool, userId) {
+  const [[row]] = await pool.query('SELECT is_super_admin FROM users WHERE id = ? LIMIT 1', [userId]);
+  return !!row?.is_super_admin;
+}
+
+async function assertCanAccessEmployeeTarget(req, pool, userId) {
+  if (req.user.is_super_admin) return;
+  if (await targetIsSuperAdmin(pool, userId)) {
+    const err = new Error('Không tìm thấy nhân viên');
+    err.status = 404;
+    throw err;
+  }
+}
+
 /**
  * Wrapper cho `requireFeature('employees.list')` ở route `GET /users`:
  * - Admin / Super Admin / `can_access_admin` → pass (giống requireFeature).
@@ -87,6 +104,11 @@ router.get('/', auth, requireShop, employeesListOrShopReports, (req, res, next) 
       countQuery += ' AND r.scope_own_data = 1';
     }
 
+    if (!req.user.is_super_admin) {
+      query += SQL_HIDE_SUPER_ADMIN;
+      countQuery += SQL_HIDE_SUPER_ADMIN;
+    }
+
     query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
@@ -161,6 +183,7 @@ router.put('/me', auth, async (req, res, next) => {
 router.get('/:id', auth, requireShop, async (req, res, next) => {
   try {
     const pool = await getPool();
+    await assertCanAccessEmployeeTarget(req, pool, req.params.id);
     const [rows] = await pool.query(
       `SELECT u.id, u.full_name, u.username, u.email, u.phone, r.code AS role, r.name AS role_name, us.role_id,
         u.department, u.position, u.commission_rate, u.salary, u.join_date, u.avatar_url, u.address, u.city, u.district, u.postal_code, u.is_active, u.created_at
@@ -319,6 +342,9 @@ router.post('/', auth, requireShop, authorize('admin'), async (req, res, next) =
 
 router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
+    const pool = await getPool();
+    await assertCanAccessEmployeeTarget(req, pool, req.params.id);
+
     const { full_name, email, phone, department, position, commission_rate, salary, join_date, address, city, district, postal_code, is_active, password } = req.body;
     const username = normalizeUsername(req.body.username);
     const roleId = parseInt(req.body.role_id, 10);
@@ -330,8 +356,6 @@ router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next)
     if (!roleId) {
       return res.status(400).json({ error: 'Thiếu vai trò (role_id)' });
     }
-
-    const pool = await getPool();
 
     let roleRow = null;
     try {
@@ -382,6 +406,7 @@ router.put('/:id', auth, requireShop, authorize('admin'), async (req, res, next)
 router.delete('/:id', auth, requireShop, authorize('admin'), async (req, res, next) => {
   try {
     const pool = await getPool();
+    await assertCanAccessEmployeeTarget(req, pool, req.params.id);
     await pool.query('UPDATE users SET is_active = 0 WHERE id = ?', [req.params.id]);
     res.json({ message: 'Vô hiệu hóa nhân viên thành công' });
   } catch (err) {
@@ -396,6 +421,7 @@ router.put('/:id/role', auth, requireShop, authorize('admin'), async (req, res, 
       return res.status(400).json({ error: 'Thiếu role_id' });
     }
     const pool = await getPool();
+    await assertCanAccessEmployeeTarget(req, pool, req.params.id);
     let r = null;
     try {
       const [[rr]] = await pool.query('SELECT id, shop_id FROM roles WHERE id = ? AND shop_id IN (0, ?)', [roleId, req.shopId]);
@@ -435,6 +461,10 @@ router.get('/available/collaborators', auth, requireShop, async (req, res, next)
       params.push(req.user.id);
     }
 
+    if (!req.user.is_super_admin) {
+      query += SQL_HIDE_SUPER_ADMIN;
+    }
+
     query += ' ORDER BY u.full_name ASC';
 
     const [rows] = await pool.query(query, params);
@@ -454,6 +484,8 @@ router.get('/:id/overview', auth, requireShop, async (req, res, next) => {
     const sid = req.shopId;
     const targetUserId = parseInt(req.params.id);
     const { date_from, date_to } = req.query;
+
+    await assertCanAccessEmployeeTarget(req, pool, targetUserId);
 
     const [userRows] = await pool.query(
       `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role, r.name AS role_name, us.role_id,
@@ -560,6 +592,7 @@ router.get('/:id/orders', auth, requireShop, async (req, res, next) => {
     }
 
     const pool = await getPool();
+    await assertCanAccessEmployeeTarget(req, pool, req.params.id);
     const sid = req.shopId;
     const targetUserId = parseInt(req.params.id);
     const { status, date_from, date_to, page = 1, limit = 20 } = req.query;
@@ -613,6 +646,7 @@ router.get('/:id/collaborators', auth, requireShop, async (req, res, next) => {
     }
 
     const pool = await getPool();
+    await assertCanAccessEmployeeTarget(req, pool, req.params.id);
     // Dùng bảng collaborators (sales_id → ctv_id), không dùng user_collaborators (rỗng)
     const [rows] = await pool.query(
       `SELECT c.id, c.ctv_id as collaborator_id, c.created_at,
@@ -641,6 +675,7 @@ router.get('/:id/collaborators/commissions', auth, requireShop, async (req, res,
     }
 
     const pool = await getPool();
+    await assertCanAccessEmployeeTarget(req, pool, req.params.id);
     const sid = req.shopId;
     const targetUserId = parseInt(req.params.id);
     const { month, year, group_id } = req.query;

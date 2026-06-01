@@ -1,3 +1,8 @@
+## [01/06/2026] - Employees: ẩn Super Admin khỏi admin shop
+
+### Fixed
+- **GET /users (và export NV)** — Admin shop không còn thấy user `is_super_admin=1` trong danh sách nhân viên / dropdown / export; chỉ Super Admin mới load được. Nguyên nhân: migration 018 gán mọi user vào `user_shops` shop 1 nhưng API chưa lọc `is_super_admin`. Chặn thêm xem/sửa/xóa chi tiết NV super admin. — Files: `backend/routes/users.js`, `backend/routes/import.js`
+
 ## [31/05/2026] - ZaloPilot: xóa folder thừa zalopilot/ và zalopilot-releases/
 
 ### Removed
