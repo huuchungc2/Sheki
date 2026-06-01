@@ -135,6 +135,19 @@ function ensureDiagnosticDir(diagnosticId) {
   return dir;
 }
 
+/** Xóa cả thư mục ZP-YYYYMMDD-XXXX (zip + metadata). */
+function deleteDiagnostic(diagnosticId) {
+  if (!isValidDiagnosticId(diagnosticId)) return false;
+  const dir = path.join(getDiagnosticsStorageDir(), diagnosticId);
+  if (!fs.existsSync(dir)) return false;
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function saveDiagnosticUpload({ diagnosticId, fileBuffer, originalName, size, contentType, req }) {
   const dir = ensureDiagnosticDir(diagnosticId);
   fs.writeFileSync(path.join(dir, 'diagnostic.zip'), fileBuffer);
@@ -160,5 +173,6 @@ module.exports = {
   countTodayDiagnosticUploads,
   listDiagnostics,
   resolveDiagnosticZipPath,
+  deleteDiagnostic,
   saveDiagnosticUpload,
 };

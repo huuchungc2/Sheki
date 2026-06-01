@@ -7,8 +7,13 @@ const {
   saveDiagnosticUpload,
   listDiagnostics,
   resolveDiagnosticZipPath,
+  deleteDiagnostic,
 } = require('../utils/zalopilotDiagnostics');
-const { setZaloPilotNoCacheHeaders } = require('../utils/zalopilotFiles');
+const {
+  setZaloPilotNoCacheHeaders,
+  deleteZaloPilotFile,
+  decodeFilenameParam,
+} = require('../utils/zalopilotFiles');
 const { requireZaloPilotToken } = require('../middleware/zalopilotToken');
 const {
   zalopilotDiagnosticsIpRateLimit,
@@ -50,6 +55,22 @@ const upload = multer({
 
 router.get('/diagnostics', auth, requireAdmin, (req, res) => {
   res.json({ diagnostics: listDiagnostics() });
+});
+
+router.delete('/files/:filename', auth, requireAdmin, (req, res) => {
+  const name = decodeFilenameParam(req.params.filename);
+  if (!deleteZaloPilotFile(name)) {
+    return res.status(404).json({ error: 'Không tìm thấy file hoặc không xóa được' });
+  }
+  res.json({ ok: true, name });
+});
+
+router.delete('/diagnostics/:id', auth, requireAdmin, (req, res) => {
+  const id = String(req.params.id || '');
+  if (!deleteDiagnostic(id)) {
+    return res.status(404).json({ error: 'Không tìm thấy diagnostic hoặc không xóa được' });
+  }
+  res.json({ ok: true, diagnosticId: id });
 });
 
 router.get('/diagnostics/:id/download', auth, requireAdmin, (req, res, next) => {

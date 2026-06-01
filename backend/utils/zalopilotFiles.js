@@ -101,6 +101,18 @@ function resolveZaloPilotFile(filename) {
   }
 }
 
+/** Xóa file bản cài trong public/zalopilot (chỉ file, không thư mục con). */
+function deleteZaloPilotFile(filename) {
+  const full = resolveZaloPilotFile(filename);
+  if (!full) return false;
+  try {
+    fs.unlinkSync(full);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function resolveDefaultZaloPilotZipPath() {
   let best = null;
   let bestMs = -1;
@@ -145,6 +157,8 @@ module.exports = {
   listZaloPilotFiles,
   resolveDefaultZaloPilotZipPath,
   resolveZaloPilotFile,
+  deleteZaloPilotFile,
+  decodeFilenameParam,
   setZaloPilotNoCacheHeaders,
   sendZaloPilotFile,
   FOLDER_LABEL: 'public/zalopilot',

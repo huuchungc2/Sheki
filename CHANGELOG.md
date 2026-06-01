@@ -1,3 +1,11 @@
+## [01/06/2026] - ZaloPilot: nhóm theo ngày + nút xóa file
+
+### Added
+- **Trang `/zalopilot`** — Danh sách bản cài và log diagnostic nhóm theo ngày (mới nhất trước); trong ngày sort theo giờ; hiển thị ngày giờ đầy đủ; Admin có nút **Xóa** từng file/log. — Files: `src/pages/ZaloPilotDownloads.tsx`, `backend/routes/zalopilot.js`, `backend/utils/zalopilotFiles.js`, `backend/utils/zalopilotDiagnostics.js`
+
+### Changed
+- **API xóa (Admin)** — `DELETE /api/zalopilot/files/:filename`, `DELETE /api/zalopilot/diagnostics/:id`. — Files: `backend/routes/zalopilot.js`, `backend/utils/zalopilotFiles.js`, `backend/utils/zalopilotDiagnostics.js`
+
 ## [01/06/2026] - Employees: ẩn Super Admin khỏi admin shop
 
 ### Fixed

@@ -11,6 +11,7 @@
 
 ## 🛠️ VỪA LÀM
 
+- [x] **ZaloPilot: nhóm theo ngày + xóa file** — UI nhóm ngày (mới trước), giờ phút; Admin `DELETE` bản cài + diagnostic. — Files: `src/pages/ZaloPilotDownloads.tsx`, `backend/routes/zalopilot.js`, `backend/utils/zalopilotFiles.js`, `backend/utils/zalopilotDiagnostics.js`
 - [x] **Employees: ẩn Super Admin khỏi admin shop** — `GET /users` + export + chi tiết/sửa/xóa: lọc `is_super_admin` khi caller không phải SA. — Files: `backend/routes/users.js`, `backend/routes/import.js`
 - [x] **ZaloPilot: xóa folder thừa `zalopilot/` + `zalopilot-releases/`** — Chỉ giữ `public/zalopilot/`; `.gitignore` chặn folder root. — Files: (deleted) `zalopilot/`, `zalopilot-releases/`, `.gitignore`
 - [x] **Dashboard: lọc nhóm Top NV + Sale cần hỗ trợ chỉ NV thuộc nhóm** — Khi `?group_id=` thêm `EXISTS user_groups`; không còn list NV ngoài nhóm với 0 đơn. — File: `backend/routes/reports.js`
