@@ -22,11 +22,11 @@ const API_URL =
 const dashSelectCls =
   "min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-const STATUS_CFG: Record<string, { label: string; icon: any; cls: string }> = {
-  pending:   { label: "Chờ duyệt", icon: Clock,        cls: "kpi-status--pending" },
-  shipping:  { label: "Đang giao", icon: Truck,        cls: "kpi-status--shipping" },
-  completed: { label: "Đã giao",   icon: CheckCircle2, cls: "kpi-status--completed" },
-  cancelled: { label: "Đã hủy",    icon: XCircle,      cls: "bg-destructive/10 border border-destructive/30 text-destructive" },
+const STATUS_CFG: Record<string, { label: string; icon: any; cls: string; textCls: string }> = {
+  pending:   { label: "Chờ duyệt", icon: Clock,        cls: "kpi-status--pending", textCls: "text-[var(--status-pending-fg)]" },
+  shipping:  { label: "Đang giao", icon: Truck,        cls: "kpi-status--shipping", textCls: "text-[var(--status-shipping-fg)]" },
+  completed: { label: "Đã giao",   icon: CheckCircle2, cls: "kpi-status--completed", textCls: "text-[var(--status-completed-fg)]" },
+  cancelled: { label: "Đã hủy",    icon: XCircle,      cls: "bg-destructive/10 border border-destructive/30 text-destructive", textCls: "text-destructive" },
 };
 
 function greet(name: string) {
@@ -791,7 +791,7 @@ export function Dashboard() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
                 {recentOrders.slice(0, 6).map((o: any) => {
-                  const st = STATUS_CFG[o.status] || { label: o.status, color: "text-muted-foreground", bg: "bg-muted/30 border border-border", icon: Clock };
+                  const st = STATUS_CFG[o.status] || { label: o.status, textCls: "text-muted-foreground" };
                   return (
                     <Link key={o.id} to={`/orders/edit/${o.id}`}
                       className="flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors">
@@ -806,7 +806,7 @@ export function Dashboard() {
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
                         <p className="text-xs font-semibold text-foreground tabular-nums">{formatCurrency(o.subtotal ?? o.total_amount)}</p>
-                        <span className={cn("text-[10px] font-semibold", st.color)}>{st.label}</span>
+                        <span className={cn("text-[10px] font-semibold", st.textCls)}>{st.label}</span>
                       </div>
                     </Link>
                   );
@@ -1097,7 +1097,7 @@ export function Dashboard() {
                 {recentOrders.length === 0 ? (
                   <div className="py-10 text-center text-muted-foreground text-sm">Chưa có đơn hàng</div>
                 ) : recentOrders.slice(0, 6).map((o: any) => {
-                  const st = STATUS_CFG[o.status] || { label: o.status, color: "text-muted-foreground", bg: "bg-muted/30 border border-border", icon: Clock };
+                  const st = STATUS_CFG[o.status] || { label: o.status, textCls: "text-muted-foreground" };
                   return (
                     <Link key={o.id} to={`/orders/edit/${o.id}`}
                       className="flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors">
@@ -1112,7 +1112,7 @@ export function Dashboard() {
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
                         <p className="text-xs font-semibold text-foreground tabular-nums">{formatCurrency(o.subtotal ?? o.total_amount)}</p>
-                        <span className={cn("text-[10px] font-semibold", st.color)}>{st.label}</span>
+                        <span className={cn("text-[10px] font-semibold", st.textCls)}>{st.label}</span>
                       </div>
                     </Link>
                   );
