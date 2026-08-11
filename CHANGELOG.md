@@ -1,3 +1,8 @@
+## [11/08/2026] - Hoàn hàng đảo đúng hoa hồng gốc theo sản phẩm
+
+### Fixed
+- **Duyệt hoàn (`POST /returns/requests/:id/approve`)** — Bỏ dùng `users.commission_rate` hiện tại (thường 10%) cho mọi sản phẩm. Hoàn một phần lấy đúng snapshot HH từng dòng; hoàn toàn bộ dùng cùng phép tính với đủ số lượng và quyết toán phần HH gốc còn lại; trừ cả direct của Sale và override của quản lý, không vượt tổng HH đã nhận. — Files: `backend/routes/returns.js`, `backend/utils/returnCommission.js`, `backend/test/returnCommission.test.js`, `LOGIC_BUSINESS.md`
+
 ## [01/06/2026] - ZaloPilot: nhóm theo ngày + nút xóa file
 
 ### Added

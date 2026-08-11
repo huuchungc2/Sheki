@@ -7,16 +7,24 @@ const requirePermission = require('../middleware/requirePermission');
 const { getPool } = require('../config/db');
 const { recalculateStock } = require('../services/orderService');
 const { isShopDateTimeInClosedPayrollPeriod } = require('../services/payrollPeriod');
+const {
+  allocateReturnAcrossLines,
+  prorateLineCommission,
+  resolveReturnAdjustment,
+  roundMoney,
+} = require('../utils/returnCommission');
 
 // Helpers
 function normalizeItems(items) {
   if (!Array.isArray(items)) return [];
-  return items
-    .map(it => ({
-      product_id: it.product_id ?? it.productId,
-      qty: parseFloat(it.qty ?? it.quantity ?? 0),
-    }))
-    .filter(it => it.product_id && Number.isFinite(it.qty) && it.qty > 0);
+  const qtyByProduct = new Map();
+  for (const item of items) {
+    const productId = item.product_id ?? item.productId;
+    const qty = parseFloat(item.qty ?? item.quantity ?? 0);
+    if (!productId || !Number.isFinite(qty) || qty <= 0) continue;
+    qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + qty);
+  }
+  return [...qtyByProduct.entries()].map(([product_id, qty]) => ({ product_id, qty }));
 }
 
 async function getReturnedQtyByProduct(pool, orderId) {
@@ -566,7 +574,9 @@ router.post(
 
     // Load original order items with pricing to compute return amount + commissions by returned items (supports multi-tier)
     const [orderItems] = await pool.query(
-      'SELECT product_id, qty, unit_price, discount_amount FROM order_items WHERE order_id = ?',
+      `SELECT id, product_id, qty, unit_price, discount_amount,
+              commission_rate, commission_amount
+       FROM order_items WHERE order_id = ? ORDER BY id`,
       [rr.order_id]
     );
     const orderItemsByProduct = orderItems.reduce((acc, it) => {
@@ -577,26 +587,56 @@ router.post(
     const orderBaseTotal = orderItems.reduce((sum, it) => sum + computeOrderItemBaseAmount(it), 0);
 
     const [commRows] = await pool.query(
-      'SELECT user_id, type, ctv_user_id, commission_amount FROM commissions WHERE order_id = ?',
+      `SELECT user_id, type, ctv_user_id, commission_amount, override_rate
+       FROM commissions WHERE order_id = ?`,
       [rr.order_id]
     );
     const directRow = commRows.find((c) => String(c.type) === 'direct');
-    // HH khi hoàn: % NV (users.commission_rate) tại thời điểm duyệt hoàn; tier quản lý lấy từ commission_tiers hiện tại với mốc % CTV hiện tại.
-    const rateUserId = directRow
-      ? parseInt(directRow.user_id, 10)
-      : parseInt(order.salesperson_id, 10);
-    let currentCommissionRate = 0;
-    if (Number.isFinite(rateUserId)) {
-      const [[ur]] = await pool.query(
-        'SELECT commission_rate FROM users WHERE id = ? LIMIT 1',
-        [rateUserId]
-      );
-      currentCommissionRate = parseFloat(ur?.commission_rate) || 0;
-    }
+    const overrideManagers = commRows.filter((c) => String(c.type) === 'override');
+
+    const [previousAdjustmentRows] = await pool.query(
+      `SELECT user_id, type,
+              COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS adjusted_amount
+       FROM commission_adjustments
+       WHERE order_id = ? AND return_id IS NOT NULL
+       GROUP BY user_id, type`,
+      [rr.order_id]
+    );
+    const previouslyAdjusted = new Map(
+      previousAdjustmentRows.map((row) => [
+        `${row.type}:${row.user_id}`,
+        parseFloat(row.adjusted_amount) || 0,
+      ])
+    );
+    const returnedBeforeByProduct = await getReturnedQtyByProduct(pool, rr.order_id);
+    const requestedQtyByProduct = reqItems.reduce((acc, it) => {
+      const key = String(it.product_id);
+      acc[key] = (acc[key] || 0) + (parseFloat(it.qty) || 0);
+      return acc;
+    }, {});
+    const orderedQtyByProduct = orderItems.reduce((acc, it) => {
+      const key = String(it.product_id);
+      acc[key] = (acc[key] || 0) + (parseFloat(it.qty) || 0);
+      return acc;
+    }, {});
+    const fullyReturnedAfterApproval = Object.entries(orderedQtyByProduct).every(
+      ([productId, orderedQty]) =>
+        (returnedBeforeByProduct[productId] || 0) +
+          (requestedQtyByProduct[productId] || 0) >=
+        orderedQty - 1e-9
+    );
 
     let returnBaseTotal = 0;
     let directReturnCommission = 0;
     const overrideReturnCommissionByManager = new Map(); // manager_user_id -> amount (positive)
+    const tierCache = new Map();
+    const getTier = async (ctvRate) => {
+      const key = String(ctvRate);
+      if (tierCache.has(key)) return tierCache.get(key);
+      const rate = await getOverrideTierRate(pool, ctvRate, sid);
+      tierCache.set(key, rate);
+      return rate;
+    };
 
     // Create returns + items
     const [retRes] = await pool.query(
@@ -613,21 +653,43 @@ router.post(
       );
 
       // Sum return base amount + direct commission by returned items
-      const list = orderItemsByProduct[String(it.product_id)] || [];
-      // In this system each product typically appears once per order; if multiple lines exist, allocate by remaining qty.
-      let remaining = qty;
-      for (const line of list) {
-        if (remaining <= 0) break;
-        const lineQty = parseFloat(line.qty) || 0;
-        const take = Math.min(remaining, lineQty);
-        if (take > 0) {
-          const returnNet = computeReturnAmountForItem(line, take);
-          returnBaseTotal += returnNet;
+      const productId = String(it.product_id);
+      const list = orderItemsByProduct[productId] || [];
+      const allocations = allocateReturnAcrossLines(
+        list,
+        qty,
+        returnedBeforeByProduct[productId] || 0
+      );
+      for (const { line, take } of allocations) {
+        const returnNet = computeReturnAmountForItem(line, take);
+        returnBaseTotal += returnNet;
+        directReturnCommission += prorateLineCommission(
+          line.commission_amount,
+          line.qty,
+          take
+        );
 
-          if (currentCommissionRate > 0) {
-            directReturnCommission += (returnNet * currentCommissionRate) / 100;
-          }
-          remaining -= take;
+        for (const manager of overrideManagers) {
+          const savedOverrideRate = parseFloat(manager.override_rate);
+          const itemCommissionRate = parseFloat(line.commission_rate) || 0;
+          const overrideRate = Number.isFinite(savedOverrideRate)
+            ? savedOverrideRate
+            : await getTier(itemCommissionRate);
+          if (overrideRate <= 0) continue;
+
+          const originalLineOverride = roundMoney(
+            computeOrderItemBaseAmount(line) * overrideRate / 100
+          );
+          const returnOverride = prorateLineCommission(
+            originalLineOverride,
+            line.qty,
+            take
+          );
+          const managerId = parseInt(manager.user_id, 10);
+          overrideReturnCommissionByManager.set(
+            managerId,
+            (overrideReturnCommissionByManager.get(managerId) || 0) + returnOverride
+          );
         }
       }
 
@@ -641,53 +703,18 @@ router.post(
 
     const ratio = orderBaseTotal > 0 ? Math.min(1, Math.max(0, returnBaseTotal / orderBaseTotal)) : 0;
 
-    const tierCache = new Map();
-    const getTier = async (ctvRate) => {
-      const key = String(ctvRate);
-      if (tierCache.has(key)) return tierCache.get(key);
-      const r = await getOverrideTierRate(pool, ctvRate, sid);
-      tierCache.set(key, r);
-      return r;
-    };
-
-    const overrideManagers = commRows.filter((c) => String(c.type) === 'override');
-    if (overrideManagers.length > 0) {
-      for (const it of reqItems) {
-        const qty = parseFloat(it.qty) || 0;
-        if (qty <= 0) continue;
-        const list = orderItemsByProduct[String(it.product_id)] || [];
-        let remaining = qty;
-        for (const line of list) {
-          if (remaining <= 0) break;
-          const lineQty = parseFloat(line.qty) || 0;
-          const take = Math.min(remaining, lineQty);
-          if (take <= 0) continue;
-
-          const returnNet = computeReturnAmountForItem(line, take);
-          const ovRate = await getTier(currentCommissionRate);
-          if (ovRate > 0) {
-            const ovAmt = (returnNet * ovRate) / 100;
-            for (const m of overrideManagers) {
-              const managerId = parseInt(m.user_id, 10);
-              overrideReturnCommissionByManager.set(
-                managerId,
-                (overrideReturnCommissionByManager.get(managerId) || 0) + ovAmt
-              );
-            }
-          }
-
-          remaining -= take;
-        }
-      }
-    }
-
     const reason =
-      ratio >= 0.999
+      fullyReturnedAfterApproval
         ? `Hoàn hàng (full) đơn ${order.code}`
         : `Hoàn hàng (partial ${(ratio * 100).toFixed(1)}%) đơn ${order.code}`;
 
     if (directRow) {
-      const amt = Math.round(directReturnCommission * 100) / 100;
+      const amt = resolveReturnAdjustment({
+        calculatedAmount: directReturnCommission,
+        originalCommission: directRow.commission_amount,
+        alreadyAdjusted: previouslyAdjusted.get(`direct:${directRow.user_id}`) || 0,
+        fullyReturned: fullyReturnedAfterApproval,
+      });
       if (amt !== 0) {
         await pool.query(
           `INSERT INTO commission_adjustments
@@ -700,7 +727,12 @@ router.post(
 
     for (const m of overrideManagers) {
       const managerId = parseInt(m.user_id, 10);
-      const amt = Math.round((overrideReturnCommissionByManager.get(managerId) || 0) * 100) / 100;
+      const amt = resolveReturnAdjustment({
+        calculatedAmount: overrideReturnCommissionByManager.get(managerId) || 0,
+        originalCommission: m.commission_amount,
+        alreadyAdjusted: previouslyAdjusted.get(`override:${managerId}`) || 0,
+        fullyReturned: fullyReturnedAfterApproval,
+      });
       if (!amt) continue;
       await pool.query(
         `INSERT INTO commission_adjustments
@@ -750,4 +782,3 @@ router.post(
 });
 
 module.exports = router;
-
